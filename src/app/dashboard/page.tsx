@@ -31,7 +31,7 @@ export default function DashboardPage() {
     useEffect(() => {
         fetchData();
 
-        // Subscriptions
+        // Subscriptions a
         const channels = [
             supabase.channel('public:matches').on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, fetchMatches),
             supabase.channel('public:players').on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetchSquad),
