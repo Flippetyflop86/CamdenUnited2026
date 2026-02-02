@@ -79,7 +79,31 @@ export default function InventoryPage() {
         }
     };
 
-    // ... (startEdit, closeModal remain same) ...
+    const closeModal = () => {
+        setIsAddOpen(false);
+        setEditingId(null);
+        setNewItem({
+            name: '',
+            quantity: 1,
+            category: 'Kit',
+            status: 'Good',
+            assignedTo: '',
+            notes: ''
+        });
+    };
+
+    const startEdit = (item: InventoryItem) => {
+        setEditingId(item.id);
+        setNewItem({
+            name: item.name,
+            quantity: item.quantity,
+            category: item.category,
+            status: item.status,
+            assignedTo: item.assignedTo,
+            notes: item.notes
+        });
+        setIsAddOpen(true);
+    };
 
     const adjustQuantity = async (id: string, delta: number) => {
         const item = items.find(i => i.id === id);

@@ -103,7 +103,18 @@ export default function OppositionReportsPage() {
         }
     };
 
-    // ... (handleSelectTeam, handleEditTeam remain same) ...
+    const handleSelectTeam = (team: OppositionTeam) => {
+        setSelectedTeam(team);
+        setEditedTeam(null);
+        setIsEditing(false);
+    };
+
+    const handleEditTeam = () => {
+        if (selectedTeam) {
+            setEditedTeam(selectedTeam);
+            setIsEditing(true);
+        }
+    };
 
     const handleSaveTeam = async () => {
         if (!editedTeam) return;

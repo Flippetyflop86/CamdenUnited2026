@@ -67,7 +67,16 @@ export default function MatchdayXIPage() {
                 lastName: p.last_name,
                 position: p.position,
                 squad: p.squad,
-                // ... map other fields if needed for sorting
+                // Default values for required fields not needed for this view
+                squadNumber: p.squad_number || 0,
+                age: p.age || 0,
+                nationality: p.nationality || "Unknown",
+                medicalStatus: p.medical_status || "Available",
+                contractExpiry: p.contract_expiry || "",
+                availability: p.availability ?? true,
+                appearances: p.appearances || 0,
+                goals: p.goals || 0,
+                assists: p.assists || 0,
             }));
 
             // Sort logic
@@ -100,11 +109,13 @@ export default function MatchdayXIPage() {
                     opponent: upcoming.opponent,
                     date: upcoming.date,
                     time: upcoming.time,
-                    location: upcoming.location,
+                    competition: upcoming.competition || "League",
                     isHome: upcoming.is_home,
                     result: upcoming.result,
-                    stats: upcoming.stats,
-                    goals: upcoming.goals
+                    // Remove extra fields not in Match interface
+                    // location: upcoming.location, 
+                    // stats: upcoming.stats,
+                    // goals: upcoming.goals
                 });
             }
         }

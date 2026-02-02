@@ -65,9 +65,51 @@ export default function WatcherPage() {
         }
     };
 
-    // ... handleMatchSelect remains same ...
+    const handleMatchSelect = (matchId: string) => {
+        setSelectedMatchId(matchId);
+        if (!matchId) {
+            setCurrentStats(null);
+            return;
+        }
 
-    // ... updateHalfStat remains same ...
+        const stats = watcherStats.find(s => s.matchId === matchId);
+        if (stats) {
+            // Clone deep to avoid mutating state directly
+            setCurrentStats(JSON.parse(JSON.stringify(stats)));
+        } else {
+            // Initialize new stats
+            setCurrentStats({
+                id: "new",
+                matchId: matchId,
+                us: JSON.parse(JSON.stringify(initialTeamStats)),
+                opposition: JSON.parse(JSON.stringify(initialTeamStats)),
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            });
+        }
+        setIsDirty(false);
+    };
+
+    const updateHalfStat = (team: "us" | "opposition", half: "firstHalf" | "secondHalf", field: keyof WatcherHalfStats, value: string) => {
+        if (!currentStats) return;
+
+        const numVal = parseInt(value) || 0;
+
+        setCurrentStats(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                [team]: {
+                    ...prev[team],
+                    [half]: {
+                        ...prev[team][half],
+                        [field]: numVal
+                    }
+                }
+            };
+        });
+        setIsDirty(true);
+    };
 
     const saveStats = async () => {
         if (!currentStats) return;

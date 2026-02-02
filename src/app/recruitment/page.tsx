@@ -130,7 +130,23 @@ export default function RecruitmentPage() {
         }
     };
 
-    // ... (handleEdit remains same) ...
+    const handleEdit = (recruit: Recruit) => {
+        setEditingRecruit(recruit);
+        setFormData({
+            name: recruit.name,
+            primaryPosition: recruit.primaryPosition,
+            secondaryPosition: recruit.secondaryPosition || "",
+            age: recruit.age.toString(),
+            location: recruit.location,
+            status: recruit.status,
+            currentClub: recruit.currentClub || "",
+            onTrial: recruit.onTrial,
+            scoutedRole: recruit.scoutedRole,
+            notes: recruit.notes || "",
+            clubConnection: recruit.clubConnection || ""
+        });
+        setIsDialogOpen(true);
+    };
 
     const handleDelete = async (id: string) => {
         if (window.confirm("Are you sure you want to delete this player from recruitment?")) {
@@ -138,7 +154,23 @@ export default function RecruitmentPage() {
         }
     };
 
-    // ... (handleCloseDialog remains same) ...
+    const handleCloseDialog = () => {
+        setIsDialogOpen(false);
+        setEditingRecruit(null);
+        setFormData({
+            name: "",
+            primaryPosition: "MID",
+            secondaryPosition: "",
+            age: "",
+            location: "",
+            status: "Attached",
+            currentClub: "",
+            onTrial: false,
+            scoutedRole: "1st Team Player",
+            notes: "",
+            clubConnection: ""
+        });
+    };
 
     const handleSignPlayer = async (recruit: Recruit) => {
         if (!window.confirm(`Are you sure you want to sign ${recruit.name} to the First Team squad?`)) return;
