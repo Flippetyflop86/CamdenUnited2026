@@ -12,6 +12,9 @@ import AppShell from "@/components/layout/app-shell";
 export const metadata: Metadata = {
     title: "The CAM-DEN",
     description: "Club Management Hub",
+    icons: {
+        icon: "/logo.png",
+    }
 };
 
 import { ClubProvider } from "@/context/club-context";

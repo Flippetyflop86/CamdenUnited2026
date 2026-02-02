@@ -16,7 +16,7 @@ interface ClubContextType {
 
 const defaultSettings: ClubSettings = {
     name: "The CAM-DEN",
-    logo: null,
+    logo: "/logo.png",
     primaryColor: "#ef4444" // red-500
 };
 
@@ -41,7 +41,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                 if (data) {
                     setSettings({
                         name: data.name,
-                        logo: data.logo,
+                        logo: data.logo || "/logo.png",
                         primaryColor: data.primary_color, // Map snake_case to camelCase
                         financeStartingBalance: 0 // Not yet in schema, keeping default
                     });

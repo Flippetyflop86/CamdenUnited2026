@@ -61,9 +61,7 @@ export function Sidebar() {
                 {settings.logo ? (
                     <img src={settings.logo} alt={settings.name} className="h-8 w-8 object-contain" />
                 ) : (
-                    <div className="h-8 w-8 rounded bg-red-600 flex items-center justify-center font-bold">
-                        {settings.name.substring(0, 1)}
-                    </div>
+                    <img src="/logo.png" alt={settings.name} className="h-8 w-8 object-contain" />
                 )}
                 <h1 className="text-lg font-bold text-white truncate text-ellipsis">{settings.name}</h1>
             </div>

@@ -1,6 +1,6 @@
 export const seedSettings = {
     "name": "Camden United",
-    "logo": "", // Note: Logo data omitted due to size. Please re-upload in Admin panel.
+    "logo": "/logo.png", // Updated to use the new png logo
     "primaryColor": "#ef4444"
 };
 
