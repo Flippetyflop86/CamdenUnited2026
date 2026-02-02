@@ -77,6 +77,7 @@ export default function MatchdayXIPage() {
                 appearances: p.appearances || 0,
                 goals: p.goals || 0,
                 assists: p.assists || 0,
+                imageUrl: p.image_url, // Added mapping
             }));
 
             // Sort logic
