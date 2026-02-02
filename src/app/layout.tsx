@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     title: "The CAM-DEN",
     description: "Club Management Hub",
     icons: {
-        icon: "/logo.png",
+        icon: "/logo-2.jpeg",
     }
 };
 
