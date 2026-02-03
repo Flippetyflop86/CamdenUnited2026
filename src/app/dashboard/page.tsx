@@ -10,7 +10,9 @@ import {
     Activity,
     CalendarDays,
     ArrowUpRight,
-    ArrowDownRight
+    ArrowDownRight,
+    RefreshCw,
+    Check
 } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { supabase } from "@/lib/supabase";
@@ -27,6 +29,8 @@ export default function DashboardPage() {
     const [totalSquad, setTotalSquad] = useState(0);
     const [midweekCount, setMidweekCount] = useState(0);
     const [youthCount, setYouthCount] = useState(0);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncSuccess, setSyncSuccess] = useState(false);
 
     useEffect(() => {
         fetchData();
@@ -151,6 +155,30 @@ export default function DashboardPage() {
         setIsEditingLeague(false);
     };
 
+    const syncLeague = async () => {
+        setIsSyncing(true);
+        setSyncSuccess(false);
+
+        try {
+            const res = await fetch('/api/sync-league', { method: 'POST' });
+            const data = await res.json();
+
+            if (data.success) {
+                setLeaguePosition(data.position);
+                setLeaguePoints(data.points);
+                setSyncSuccess(true);
+                setTimeout(() => setSyncSuccess(false), 3000);
+            } else {
+                alert("Failed to sync: " + (data.error || "Unknown error"));
+            }
+        } catch (e) {
+            alert("Error during sync. Check console.");
+            console.error(e);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
     const stats = [
         {
             title: "First Team Squad",
@@ -209,7 +237,22 @@ export default function DashboardPage() {
                             <CardTitle className="text-sm font-medium text-slate-600">
                                 {stat.title}
                             </CardTitle>
-                            <stat.icon className="h-4 w-4 text-slate-500" />
+                            <div className="flex items-center gap-2">
+                                {stat.title === "League Position" && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            syncLeague();
+                                        }}
+                                        disabled={isSyncing}
+                                        className={`p-1 rounded-full hover:bg-slate-100 transition-colors ${isSyncing ? 'animate-spin' : ''} ${syncSuccess ? 'text-green-600' : 'text-slate-400'}`}
+                                        title="Sync with League Table"
+                                    >
+                                        {syncSuccess ? <Check className="h-3.5 w-3.5" /> : <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />}
+                                    </button>
+                                )}
+                                <stat.icon className="h-4 w-4 text-slate-500" />
+                            </div>
                         </CardHeader>
                         <CardContent>
                             {stat.title === "League Position" && isEditingLeague ? (
@@ -344,6 +387,6 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
             </div>
-        </div>
+        </div >
     );
 }

@@ -514,8 +514,8 @@ export default function OppositionReportsPage() {
                                         {/* Player positions */}
                                         {formation.map((pos, idx) => {
                                             // Determine if player is in top half (GK/Def) or bottom half (Mid/Att)
-                                            // We use 45% as cut-off to be safe
-                                            const isTopHalf = pos.y < 45;
+                                            // Push AWAY from the center (y=50) to prevent overlaps
+                                            const isTopHalf = pos.y < 50;
 
                                             return (
                                                 <div
@@ -529,9 +529,9 @@ export default function OppositionReportsPage() {
                                                     </div>
 
                                                     {/* Labels & Inputs - Positioned Relative to Dot */}
-                                                    {/* If Top Half: Render BELOW dot (top-5) */}
-                                                    {/* If Bottom Half: Render ABOVE dot (bottom-5) and reverse column so input is furthest out */}
-                                                    <div className={`absolute -translate-x-1/2 flex flex-col items-center gap-1 w-32 z-30 ${isTopHalf ? 'top-5' : 'bottom-5 flex-col-reverse'
+                                                    {/* If Top Half: Render ABOVE dot (bottom-5) */}
+                                                    {/* If Bottom Half: Render BELOW dot (top-5) */}
+                                                    <div className={`absolute -translate-x-1/2 flex flex-col items-center gap-1 w-32 z-30 ${isTopHalf ? 'bottom-5 flex-col-reverse' : 'top-5'
                                                         }`}>
                                                         {/* Position Label */}
                                                         <span className="text-[9px] font-bold text-white bg-slate-900/40 px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm">
