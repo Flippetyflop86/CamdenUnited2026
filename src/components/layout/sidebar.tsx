@@ -15,11 +15,9 @@ import {
     UserPlus,
     Clipboard,
     Eye,
-    Shield, // Added Shield icon import
-    PoundSterling,
-    BarChart,
     Search,
     Briefcase,
+    X,
 } from "lucide-react";
 
 
@@ -46,7 +44,7 @@ import { useClub } from "@/context/club-context";
 
 // ... (keep navigation)
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void }) {
     const pathname = usePathname();
     const { settings } = useClub();
 
@@ -63,7 +61,16 @@ export function Sidebar() {
                 ) : (
                     <img src="/logo-2.jpeg" alt={settings.name} className="h-8 w-8 object-contain" />
                 )}
-                <h1 className="text-lg font-bold text-white truncate text-ellipsis">{settings.name}</h1>
+                <h1 className="flex-1 text-lg font-bold text-white truncate text-ellipsis">{settings.name}</h1>
+                {onClose && (
+                    <button
+                        onClick={onClose}
+                        className="p-2 text-slate-400 hover:text-white md:hidden"
+                        aria-label="Close sidebar"
+                    >
+                        <X className="h-6 w-6" />
+                    </button>
+                )}
             </div>
 
             <div className="px-4 pt-4">
@@ -87,6 +94,7 @@ export function Sidebar() {
                             <li key={item.label}>
                                 <Link
                                     href={item.href}
+                                    onClick={onClose}
                                     aria-current={isActive ? "page" : undefined}
                                     className={cn(
                                         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-red-500",
