@@ -515,7 +515,9 @@ export default function OppositionReportsPage() {
                                         {formation.map((pos, idx) => {
                                             // Determine if player is in top half (GK/Def) or bottom half (Mid/Att)
                                             // Push AWAY from the center (y=50) to prevent overlaps
-                                            const isTopHalf = pos.y < 50;
+                                            // Special case: GK ALWAYS pushes DOWN to stay on the pitch
+                                            const isGk = pos.label === "GK" || pos.label === "Gk";
+                                            const isTopHalf = pos.y < 50 && !isGk;
 
                                             return (
                                                 <div
@@ -529,12 +531,11 @@ export default function OppositionReportsPage() {
                                                     </div>
 
                                                     {/* Labels & Inputs - Positioned Relative to Dot */}
-                                                    {/* If Top Half: Render ABOVE dot (bottom-5) */}
-                                                    {/* If Bottom Half: Render BELOW dot (top-5) */}
-                                                    <div className={`absolute -translate-x-1/2 flex flex-col items-center gap-1 w-32 z-30 ${isTopHalf ? 'bottom-5 flex-col-reverse' : 'top-5'
+                                                    {/* Use w-fit and pointer-events-none to prevent blocking neighbors on mobile */}
+                                                    <div className={`absolute -translate-x-1/2 flex flex-col items-center gap-1 w-max min-w-[80px] z-30 pointer-events-none ${isTopHalf ? 'bottom-5 flex-col-reverse' : 'top-5'
                                                         }`}>
                                                         {/* Position Label */}
-                                                        <span className="text-[9px] font-bold text-white bg-slate-900/40 px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm">
+                                                        <span className="text-[9px] font-bold text-white bg-slate-900/40 px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm pointer-events-none">
                                                             {pos.label}
                                                         </span>
 
