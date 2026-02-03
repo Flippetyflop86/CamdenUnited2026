@@ -10,7 +10,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 // Create and export the client
+// Provide placeholders during build to prevent initialization errors
 export const supabase = createClient(
-    supabaseUrl || '',
-    supabaseAnonKey || ''
+    supabaseUrl || 'https://placeholder.supabase.co',
+    supabaseAnonKey || 'placeholder'
 );
