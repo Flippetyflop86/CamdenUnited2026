@@ -85,7 +85,7 @@ export default function PlayerBudgetsPage() {
                 firstName: p.first_name,
                 lastName: p.last_name,
                 squad: p.squad
-            })));
+            } as Player)));
         }
         setEditingPlayer({
             id: "", // will be selected from dropdown

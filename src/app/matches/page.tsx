@@ -615,7 +615,7 @@ export default function MatchesPage() {
                                     <Label>Surface</Label>
                                     <Select
                                         value={formData.surface || "4G"}
-                                        onValueChange={(v: "4G" | "Grass") => setFormData({ ...formData, surface: v })}
+                                        onValueChange={(v) => setFormData({ ...formData, surface: v as "4G" | "Grass" })}
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select Surface" />

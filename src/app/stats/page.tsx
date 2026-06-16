@@ -27,6 +27,9 @@ interface Shot {
     outcome: "Goal" | "Saved" | "Missed" | "Blocked";
     minute?: number;
     matchId?: string;
+    buildUp?: string;
+    quality?: string;
+    isDelivery?: boolean;
 }
 
 export default function StatsPage() {
