@@ -5,10 +5,33 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { Menu } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { cn } from "@/lib/utils";
+import { usePathname } from "next/navigation";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-    const { settings } = useClub();
+    const { settings, isLoaded } = useClub();
+    const pathname = usePathname();
+
+    const isAuthPage = ["/login", "/signup", "/reset-password", "/update-password"].includes(pathname);
+    const isOnboardingPage = pathname === "/onboarding";
+
+    if (isAuthPage || isOnboardingPage) {
+        return <main className="min-h-screen bg-slate-50">{children}</main>;
+    }
+
+    if (isLoaded && !settings.isOnboarded) {
+        if (typeof window !== 'undefined') {
+            window.location.href = '/onboarding';
+        }
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <div className="h-8 w-8 rounded-full border-4 border-red-600 border-t-transparent animate-spin" />
+                    <p className="text-slate-400 font-medium">Redirecting to setup...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="flex h-screen w-full bg-slate-50 overflow-hidden">
@@ -18,7 +41,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     {settings.logo ? (
                         <img src={settings.logo} alt={settings.name} className="h-8 w-8 object-contain" />
                     ) : (
-                        <img src="/logo-2.jpeg" alt={settings.name} className="h-8 w-8 object-contain" />
+                        <div className="h-8 w-8 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
+                            <span className="text-sm font-bold text-white">{settings.name.charAt(0).toUpperCase()}</span>
+                        </div>
                     )}
                     <span className="font-bold text-white truncate">{settings.name}</span>
                 </div>

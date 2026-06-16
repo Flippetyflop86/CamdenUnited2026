@@ -1,15 +1,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { TrainingSession, SquadType, Player } from "@/types";
+import { TrainingSession, Player } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CalendarDays, MapPin, Users, Trash2, Pencil, BarChart3, List, Download, ClipboardList } from "lucide-react";
+import { Plus, CalendarDays, MapPin, Users, Trash2, Pencil, BarChart3, List, Download, ClipboardList, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase";
+import { useClub } from "@/context/club-context";
 
 // I'll stick to native date formatting for zero-dep speed unless complex.
 function formatDate(dateStr: string) {
@@ -27,12 +28,16 @@ function getSeasonString(date: Date) {
     return `${startYear}/${startYear + 1}`;
 }
 
+function formatSquad(squad: string) {
+    if (squad === "firstTeam") return "First Team";
+    if (squad === "midweek") return "Midweek";
+    if (squad === "youth") return "Youth";
+    return squad;
+}
+
 export default function TrainingPage() {
-    const SQUAD_LABELS: Record<string, string> = {
-        firstTeam: "First Team",
-        midweek: "Midweek",
-        youth: "Youth"
-    };
+    const { settings } = useClub();
+    const currentSquads = settings.squads || ["First Team"];
 
     const [sessions, setSessions] = useState<TrainingSession[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);
@@ -44,16 +49,17 @@ export default function TrainingPage() {
         date: string;
         time: string;
         location: string;
-        squad: SquadType | "All";
+        squad: string;
         topic: string;
     }>({
         date: "",
         time: "20:15",
         location: "Harris Lowe Academy",
-        squad: "firstTeam",
+        squad: currentSquads[0],
         topic: ""
     });
-    // ...
+
+    const [squadFilter, setSquadFilter] = useState<string>("All");
 
     useEffect(() => {
         fetchData();
@@ -141,7 +147,7 @@ export default function TrainingPage() {
                 date: "",
                 time: "20:15",
                 location: "Harris Lowe Academy",
-                squad: "firstTeam",
+                squad: currentSquads[0],
                 topic: ""
             });
             setEditingSessionId(null);
@@ -180,7 +186,7 @@ export default function TrainingPage() {
             date: "",
             time: "20:15",
             location: "Harris Lowe Academy",
-            squad: "firstTeam",
+            squad: currentSquads[0],
             topic: ""
         });
         setIsDialogOpen(true);
@@ -190,33 +196,63 @@ export default function TrainingPage() {
         new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
+    const handleCopyTrainingToWhatsApp = () => {
+        let msg = `⚽ *TRAINING AVAILABILITY* ⚽\n\n`;
+        
+        const nextSession = upcomingSessions.find(s => new Date(s.date) >= new Date(new Date().setHours(0,0,0,0)));
+        
+        if (nextSession) {
+            msg += `📅 *Date:* ${formatDate(nextSession.date)}\n`;
+            msg += `⏰ *Time:* ${nextSession.time}\n`;
+            msg += `📍 *Venue:* ${nextSession.location}\n`;
+            if (nextSession.topic) {
+                msg += `📋 *Topic:* ${nextSession.topic}\n`;
+            }
+            msg += `\n`;
+        }
+
+        msg += `Please react below or reply if you are available to attend this week's training session!\n\n`;
+        msg += `👍 = Available\n`;
+        msg += `👎 = Unavailable\n`;
+        msg += `⏳ = Late / Maybe\n\n`;
+        msg += `🔴 *Let's get the numbers in early!*`;
+
+        navigator.clipboard.writeText(msg).then(() => {
+            alert("Training availability message copied to clipboard! Paste it into WhatsApp.");
+        }).catch(err => {
+            console.error('Failed to copy: ', err);
+            alert("Failed to copy to clipboard.");
+        });
+    };
+
     // Calculate Season Stats
     const now = new Date();
 
-    // Determine Season Start Date
-    let seasonStartDate: Date;
-    let displaySeasonLabel = "Current Season";
-
-    // Current period requested: Jan 6th 2026 until June 2026.
-    if (now < new Date(2026, 5, 1)) {
-        seasonStartDate = new Date(2026, 0, 6); // Jan 6th
-        displaySeasonLabel = "From Jan 6th, 2026";
-    } else {
-        // Standard Season Logic (Starts June 1st)
-        const currentYear = now.getFullYear();
-        const startYear = now.getMonth() < 5 ? currentYear - 1 : currentYear;
-        seasonStartDate = new Date(startYear, 5, 1);
-        displaySeasonLabel = `Season ${startYear}/${startYear + 1} (Starts June 1st)`;
+    // Determine Season Start Date (Standard Season Logic: Starts July 1st)
+    const currentYear = now.getFullYear();
+    const startYear = now.getMonth() < 6 ? currentYear - 1 : currentYear; // Month 6 is July
+    
+    let seasonStartDate = new Date(startYear, 6, 1);
+    
+    // Absolute minimum tracking date requested by user: July 1st 2026
+    const absoluteMinimumDate = new Date(2026, 6, 1);
+    if (seasonStartDate < absoluteMinimumDate) {
+        seasonStartDate = absoluteMinimumDate;
     }
+
+    const seasonLabelYear = seasonStartDate.getFullYear();
+    const displaySeasonLabel = `Season ${seasonLabelYear.toString().slice(-2)}/${(seasonLabelYear + 1).toString().slice(-2)} (Tracking from July 1st)`;
 
     const seasonSessions = sessions.filter(s => {
         const d = new Date(s.date);
-        // Include session if it's in the season AND in the past (or today)
-        return d >= seasonStartDate && d <= now;
+        // Include any session in the season window that has attendance marked,
+        // whether past or future (so pre-scheduled sessions with saved attendance count)
+        const hasAttendance = s.attendance && s.attendance.length > 0;
+        return d >= seasonStartDate && (d <= now || hasAttendance);
     });
 
     const playerStats = players
-        .filter(p => p.squad === "firstTeam" || p.isInTrainingSquad) // firstTeam + tracked players
+        .filter(p => p.squad === currentSquads[0] || p.isInTrainingSquad) // primary squad + tracked players
         .map(player => {
             const attended = seasonSessions.filter(s => {
                 const record = s.attendance.find(a => a.playerId === player.id);
@@ -279,6 +315,9 @@ export default function TrainingPage() {
                     </div>
                     {activeTab === 'sessions' && (
                         <div className="flex gap-2">
+                            <Button className="bg-emerald-600 hover:bg-emerald-700 hidden sm:flex" onClick={handleCopyTrainingToWhatsApp}>
+                                <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp Poll
+                            </Button>
                             <Button className="bg-red-600 hover:bg-red-700" onClick={handleOpenNew}>
                                 <Plus className="h-4 w-4 mr-2" /> Schedule Session
                             </Button>
@@ -301,7 +340,7 @@ export default function TrainingPage() {
                             </div>
                             <CardHeader className="pb-2">
                                 <div className="flex justify-between items-start pr-16">
-                                    <Badge variant="outline">{session.squad} Squad</Badge>
+                                    <Badge variant="outline">{formatSquad(session.squad)} Squad</Badge>
                                 </div>
                                 <CardTitle className="text-lg mt-2">{session.topic || "General Session"}</CardTitle>
                                 <CardDescription className="flex items-center gap-1">
@@ -374,7 +413,7 @@ export default function TrainingPage() {
                                                     <span className="font-medium text-slate-900">{player.firstName} {player.lastName}</span>
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-3 text-slate-500">{SQUAD_LABELS[player.squad] || player.squad}</td>
+                                            <td className="px-4 py-3 text-slate-500">{formatSquad(player.squad)}</td>
                                             <td className="px-4 py-3 text-center font-medium">{player.stats.attended} / {player.stats.total}</td>
                                             <td className="px-4 py-3 text-center">
                                                 <Badge variant={player.stats.percentage >= 80 ? 'default' : player.stats.percentage >= 50 ? 'secondary' : 'destructive'}>
@@ -444,10 +483,10 @@ export default function TrainingPage() {
                                     value={newSession.squad}
                                     onChange={(e) => setNewSession({ ...newSession, squad: e.target.value as any })}
                                 >
-                                    <option value="firstTeam">First Team</option>
-                                    <option value="midweek">Midweek</option>
-                                    <option value="youth">Youth</option>
                                     <option value="All">All Squads</option>
+                                    {currentSquads.map(squad => (
+                                        <option key={squad} value={squad}>{squad}</option>
+                                    ))}
                                 </select>
                             </div>
                             <div className="space-y-2">

@@ -10,8 +10,8 @@ import { SearchCommand } from "@/components/layout/search-command";
 import AppShell from "@/components/layout/app-shell";
 
 export const metadata: Metadata = {
-    title: "The CAM-DEN",
-    description: "Club Management Hub",
+    title: "ClubCore",
+    description: "Club Management Platform",
     icons: {
         icon: "/logo-2.jpeg",
     }
@@ -25,6 +25,8 @@ export const viewport: Viewport = {
 
 import { ClubProvider } from "@/context/club-context";
 
+import { AuthProvider } from "@/context/auth-context";
+
 export default function RootLayout({
     children,
 }: Readonly<{
@@ -33,12 +35,14 @@ export default function RootLayout({
     return (
         <html lang="en">
             <body className={inter.className}>
-                <ClubProvider>
-                    <AppShell>
-                        {children}
-                        <SearchCommand />
-                    </AppShell>
-                </ClubProvider>
+                <AuthProvider>
+                    <ClubProvider>
+                        <AppShell>
+                            {children}
+                            <SearchCommand />
+                        </AppShell>
+                    </ClubProvider>
+                </AuthProvider>
                 <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
             </body>
         </html>

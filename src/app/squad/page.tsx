@@ -3,15 +3,18 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Player, SquadType } from "@/types";
+import { useClub } from "@/context/club-context";
 import { PlayerCard } from "@/components/squad/player-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Filter, ImageIcon, Trash2, RefreshCw } from "lucide-react";
+import { Search, Plus, Filter, Settings, Trash2, X } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
+import imageCompression from "browser-image-compression";
+import { UploadCloud, Loader2 } from "lucide-react";
 
 export default function SquadPage() {
     const [searchTerm, setSearchTerm] = useState("");
-    const [squadFilter, setSquadFilter] = useState<SquadType>("firstTeam");
     const [positionFilter, setPositionFilter] = useState<"All" | "GK" | "DEF" | "MID" | "FWD">("All");
     const [showAvailableOnly, setShowAvailableOnly] = useState(false);
     const [players, setPlayers] = useState<Player[]>([]);
@@ -19,91 +22,134 @@ export default function SquadPage() {
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const hasLoaded = useRef(false);
 
-    // Mappings for UI display
-    const SQUAD_LABELS: Record<SquadType, string> = {
-        firstTeam: "First Team",
-        midweek: "Midweek",
-        youth: "Youth"
+    const { settings, updateSettings } = useClub();
+    const currentSquads = settings.squads || ["First Team"];
+    const [activeTab, setActiveTab] = useState(currentSquads[0] || "All");
+    const [isManageSquadsOpen, setIsManageSquadsOpen] = useState(false);
+    const [editingSquads, setEditingSquads] = useState<string[]>(currentSquads);
+    const [isUploadingImage, setIsUploadingImage] = useState(false);
+    const getCurrentSeasonStr = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = d.getMonth(); // 0 = Jan, 5 = Jun
+        return month >= 5 
+            ? `${year.toString().slice(2)}/${(year + 1).toString().slice(2)}`
+            : `${(year - 1).toString().slice(2)}/${year.toString().slice(2)}`;
     };
 
-    // Image processing helper
-
-
-
-
-
+    const [seasonFilter, setSeasonFilter] = useState<string>("26/27");
+    const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
 
     // 1. Initial load: Supabase
     useEffect(() => {
-        const storedFilter = localStorage.getItem("camden-united-squad-filter");
-        if (storedFilter) setSquadFilter(storedFilter as SquadType);
-
         fetchData();
-
-        // Real-time Subscription for Players
         const channel = supabase
             .channel("public:players")
-            .on(
-                "postgres_changes",
-                { event: "*", schema: "public", table: "players" },
-                () => fetchData() // Re-fetch on any change for simplicity
-            )
+            .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => fetchData())
             .subscribe();
-
         return () => { supabase.removeChannel(channel); };
-    }, []);
+    }, [seasonFilter]);
 
     async function fetchData() {
         try {
-            // Fetch Players & Matches concurrently
-            const [playersRes, matchesRes] = await Promise.all([
+            const [playersRes, matchesRes, statsRes] = await Promise.all([
                 supabase.from("players").select("*"),
-                supabase.from("matches").select("*")
+                supabase.from("matches").select("id, date"),
+                supabase.from("match_player_stats").select("*")
             ]);
 
             if (playersRes.error) throw playersRes.error;
             const dbPlayers = playersRes.data || [];
-
-            // Map DB snake_case to CamelCase TS types if needed, 
-            // OR simple cast if we align types. 
-            // Our Schema uses snake_case (first_name), but App uses camelCase (firstName).
-            // We need a mapper.
-
-            // --- GOAL SYNC LOGIC ---
-            const goalMap = new Map<string, number>();
             const matches = matchesRes.data || [];
+            const stats = statsRes.data || [];
 
+            const matchSeasons = new Map<string, string>();
+            const seasonSet = new Set<string>();
+            
             matches.forEach((m: any) => {
-                if (m.goalscorers) {
-                    const scorers = m.goalscorers.split(",");
-                    scorers.forEach((s: string) => {
-                        const segment = s.trim();
-                        // Parse "Name(3)" format
-                        const match = segment.match(/([^(]+)(?:\((\d+)\))?/);
-                        if (match) {
-                            const name = match[1].trim();
-                            const count = match[2] ? parseInt(match[2]) : 1;
-                            goalMap.set(name.toLowerCase(), (goalMap.get(name.toLowerCase()) || 0) + count);
-                        }
-                    });
-                }
-            });
-
-            // Map and Merge Stats
-            const formattedPlayers: Player[] = dbPlayers.map((p: any) => {
-                // Determine goals from Map
-                let goals = 0;
-                // Try strict match "F.Lastname"
-                const strictKey = `${p.first_name?.[0]}.${p.last_name}`.toLowerCase();
-                if (goalMap.has(strictKey)) goals = goalMap.get(strictKey) || 0;
-                else {
-                    // Loose match
-                    for (const [key, val] of goalMap.entries()) {
-                        if (key.includes(p.last_name.toLowerCase())) {
-                            if (goals === 0) goals = val; // Take first reasonable match if 0
+                let seasonStr = "";
+                if (!m.date) {
+                    seasonStr = getCurrentSeasonStr();
+                } else {
+                    const d = new Date(m.date);
+                    if (isNaN(d.getTime())) {
+                        seasonStr = getCurrentSeasonStr();
+                    } else {
+                        const year = d.getFullYear();
+                        const month = d.getMonth(); // 0 = Jan, 5 = Jun
+                        if (month >= 5) {
+                            seasonStr = `${year.toString().slice(2)}/${(year + 1).toString().slice(2)}`;
+                        } else {
+                            seasonStr = `${(year - 1).toString().slice(2)}/${year.toString().slice(2)}`;
                         }
                     }
                 }
+                matchSeasons.set(m.id, seasonStr);
+                seasonSet.add(seasonStr);
+            });
+            
+            // Ensure the current season is always in the list even if no matches exist yet
+            seasonSet.add(getCurrentSeasonStr());
+            setAvailableSeasons(Array.from(seasonSet).sort().reverse());
+
+            // Calculate stats per player for the selected season
+            const playerStats = new Map<string, { apps: number, goals: number, assists: number, yellow: number, red: number }>();
+            stats.forEach((s: any) => {
+                const season = matchSeasons.get(s.match_id);
+                if (seasonFilter !== "All" && season !== seasonFilter) return;
+
+                const p = playerStats.get(s.player_id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0 };
+                p.apps += 1;
+                p.goals += (s.goals || 0);
+                p.assists += (s.assists || 0);
+                playerStats.set(s.player_id, p);
+            });
+
+            // Parse yellow and red cards directly from match strings
+            matches.forEach((m: any) => {
+                const season = matchSeasons.get(m.id);
+                if (seasonFilter !== "All" && season !== seasonFilter) return;
+
+                const parseCards = (cardStr: string, type: 'yellow' | 'red') => {
+                    if (!cardStr) return;
+                    const entries = cardStr.split(",");
+                    entries.forEach(entry => {
+                        entry = entry.trim();
+                        if (!entry) return;
+                        
+                        let count = 1;
+                        let name = entry;
+                        const trailingMatch = entry.match(/\s*\(?(?:x\s*)?(\d+)\)?$/i);
+                        if (trailingMatch) {
+                            count = parseInt(trailingMatch[1]);
+                            name = entry.replace(/\s*\(?(?:x\s*)?\d+\)?$/i, "").trim();
+                        }
+                        
+                        const matchedPlayer = dbPlayers.find((p: any) => {
+                            const fullName = `${p.first_name} ${p.last_name}`.toLowerCase();
+                            const initialLast = `${p.first_name.charAt(0)}.${p.last_name}`.toLowerCase();
+                            const initialSpaceLast = `${p.first_name.charAt(0)} ${p.last_name}`.toLowerCase();
+                            const justLast = p.last_name.toLowerCase();
+                            const search = name.toLowerCase();
+                            return fullName.includes(search) || initialLast.includes(search) || initialSpaceLast.includes(search) || justLast === search;
+                        });
+
+                        if (matchedPlayer) {
+                            const pStat = playerStats.get(matchedPlayer.id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0 };
+                            if (type === 'yellow') pStat.yellow += count;
+                            if (type === 'red') pStat.red += count;
+                            playerStats.set(matchedPlayer.id, pStat);
+                        }
+                    });
+                };
+                
+                // We use m.yellow_cards and m.red_cards from matches table
+                parseCards(m.yellow_cards, 'yellow');
+                parseCards(m.red_cards, 'red');
+            });
+
+            const formattedPlayers: Player[] = dbPlayers.map((p: any) => {
+                const s = playerStats.get(p.id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0 };
 
                 return {
                     id: p.id,
@@ -118,269 +164,158 @@ export default function SquadPage() {
                     availability: p.availability,
                     contractExpiry: p.contract_expiry,
                     imageUrl: p.image_url,
-                    appearances: p.appearances,
-                    goals: goals, // Calculated from live matches
-                    assists: p.assists,
+                    appearances: s.apps,
+                    goals: s.goals,
+                    assists: s.assists,
+                    yellow_cards: s.yellow,
+                    red_cards: s.red,
                     dateOfBirth: p.date_of_birth,
                     notes: p.notes,
-                    isInTrainingSquad: p.is_in_training_squad
+                    isInTrainingSquad: p.is_in_training_squad,
+                    isContracted: p.is_contracted,
+                    contractAmount: p.contract_amount,
+                    contractFrequency: p.contract_frequency || "Weekly",
+                    contractStartDate: p.contract_start_date,
+                    contractEndDate: p.contract_end_date
                 };
             });
 
             setPlayers(formattedPlayers);
             hasLoaded.current = true;
-        } catch (e) {
-            console.error("Error fetching squad:", e);
+        } catch (e: any) {
+            console.error("Error fetching squad:", e.message || e);
         }
     }
 
-    // 2. Persist Squad Filter
-    useEffect(() => {
-        if (hasLoaded.current) {
-            localStorage.setItem("camden-united-squad-filter", squadFilter);
-        }
-    }, [squadFilter]);
-
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure?")) return;
-
-        // Optimistic Update
         setPlayers((prev) => prev.filter((p) => p.id !== id));
-
-        const { error } = await supabase.from("players").delete().eq("id", id);
-        if (error) {
-            alert("Error deleting player");
-            fetchData(); // Revert
-        }
+        await supabase.from("players").delete().eq("id", id);
     };
 
-    // ... filteredPlayers ...
     const filteredPlayers = players.filter((player) => {
-        const matchesSearch =
-            player.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            player.lastName.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesSquad = player.squad === squadFilter;
-        const matchesPosition = positionFilter === "All" ||
-            (positionFilter === "GK" && player.position === "GK") ||
-            (positionFilter === "DEF" && ["LB", "CB", "RB"].includes(player.position)) ||
-            (positionFilter === "MID" && ["CDM", "CM", "CAM", "LW", "RW"].includes(player.position)) ||
-            (positionFilter === "FWD" && ["CF", "ST"].includes(player.position));
+        const SQUAD_LABELS: Record<string, string> = { firstTeam: "First Team", midweek: "Midweek", youth: "Youth" };
+        const mappedSquad = SQUAD_LABELS[player.squad] || player.squad;
+        
+        const matchesSearch = player.firstName.toLowerCase().includes(searchTerm.toLowerCase()) || player.lastName.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSquad = activeTab === "All" || mappedSquad === activeTab;
+        const matchesPosition = positionFilter === "All" || (positionFilter === "GK" && player.position === "GK") || (positionFilter === "DEF" && ["DEF", "LB", "CB", "RB", "LWB", "RWB"].includes(player.position)) || (positionFilter === "MID" && ["MID", "CDM", "CM", "CAM", "LM", "RM", "LW", "RW"].includes(player.position)) || (positionFilter === "FWD" && ["FWD", "CF", "ST"].includes(player.position));
         const matchesAvailability = !showAvailableOnly || player.medicalStatus === "Available";
         return matchesSearch && matchesSquad && matchesPosition && matchesAvailability;
     });
 
-    // ... positionOrder ...
-    const positionOrder: Record<string, number> = {
-        "GK": 1, "LB": 2, "CB": 3, "RB": 4,
-        "CDM": 5, "CM": 6, "CAM": 7, "LW": 8, "RW": 9,
-        "CF": 10, "ST": 11
-    };
+    const positionOrder: Record<string, number> = { "GK": 1, "DEF": 2, "LB": 3, "CB": 4, "RB": 5, "LWB": 6, "RWB": 7, "CDM": 8, "MID": 9, "CM": 10, "LM": 11, "RM": 12, "CAM": 13, "LW": 14, "RW": 15, "FWD": 16, "CF": 17, "ST": 18 };
+    const sortedPlayers = [...filteredPlayers].sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));
 
-    // ... sortedPlayers ...
-    const sortedPlayers = [...filteredPlayers].sort((a, b) => {
-        return (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99);
-    });
-
-    // ... handleEdit logic ...
-    const handleEdit = (player: Player) => {
-        setEditingPlayer(player);
-        setPreviewImage(player.imageUrl || null);
-    };
-
-    // ... handleImageUpload ...
-    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file && editingPlayer) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                const result = reader.result as string;
-                setPreviewImage(result);
-                setEditingPlayer({ ...editingPlayer, imageUrl: result });
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    // ... handlePaste ...
-    const handlePaste = (e: React.ClipboardEvent) => {
-        const items = e.clipboardData?.items;
-        if (items && editingPlayer) {
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf("image") !== -1) {
-                    const file = items[i].getAsFile();
-                    if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                            const result = reader.result as string;
-                            setPreviewImage(result);
-                            setEditingPlayer({ ...editingPlayer, imageUrl: result });
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                    break;
-                }
-            }
-        }
-    };
-
-    const handleAddPlayer = () => {
-        const newPlayer: Player = {
-            id: "new", // Placeholder, will be ignored by DB insert if we omit it or let DB gen it
-            firstName: "",
-            lastName: "",
-            position: "GK",
-            squadNumber: 0,
-            age: 0,
-            nationality: "English",
-            squad: squadFilter,
-            medicalStatus: "Available",
-            contractExpiry: "2026-06-30",
-            availability: true,
-            appearances: 0,
-            goals: 0,
-            assists: 0,
-            imageUrl: "/placeholder-player.png",
-            isInTrainingSquad: true
-        };
-        setEditingPlayer(newPlayer);
-        setPreviewImage("/placeholder-player.png");
-    };
+    const handleEdit = (player: Player) => { setEditingPlayer(player); setPreviewImage(player.imageUrl || null); };
 
     const handleSavePlayer = async (updatedPlayer: Player) => {
-        const isNew = updatedPlayer.id === "new" || !updatedPlayer.id.includes("-"); // Rough check
-
-        // Prepare payload for Supabase (snake_case)
-        const payload: any = {
-            first_name: updatedPlayer.firstName,
-            last_name: updatedPlayer.lastName,
-            position: updatedPlayer.position,
-            squad_number: updatedPlayer.squadNumber,
-            date_of_birth: updatedPlayer.dateOfBirth,
-            nationality: updatedPlayer.nationality,
-            squad: updatedPlayer.squad,
-            medical_status: updatedPlayer.medicalStatus,
-            availability: updatedPlayer.availability,
-            image_url: updatedPlayer.imageUrl, // We save the string (url or base64) directly
-            notes: updatedPlayer.notes,
+        const payload: any = { 
+            first_name: updatedPlayer.firstName, 
+            last_name: updatedPlayer.lastName, 
+            position: updatedPlayer.position, 
+            squad_number: updatedPlayer.squadNumber, 
+            date_of_birth: updatedPlayer.dateOfBirth, 
+            nationality: updatedPlayer.nationality, 
+            squad: updatedPlayer.squad, 
+            medical_status: updatedPlayer.medicalStatus, 
+            availability: updatedPlayer.availability, 
+            image_url: updatedPlayer.imageUrl, 
+            notes: updatedPlayer.notes, 
             is_in_training_squad: updatedPlayer.isInTrainingSquad,
-            // We usually don't manually set appearances/goals here if they come from matches,
-            // but we might want to allow manual override? For now, stick to basic fields.
-            age: updatedPlayer.age
+            is_contracted: updatedPlayer.isContracted,
+            contract_amount: updatedPlayer.contractAmount,
+            contract_frequency: updatedPlayer.contractFrequency,
+            contract_start_date: updatedPlayer.contractStartDate ? updatedPlayer.contractStartDate : null,
+            contract_end_date: updatedPlayer.contractEndDate ? updatedPlayer.contractEndDate : null
         };
-
-        if (updatedPlayer.dateOfBirth) {
-            // Recalc age
-            const birthDate = new Date(updatedPlayer.dateOfBirth);
-            const today = new Date();
-            let age = today.getFullYear() - birthDate.getFullYear();
-            const m = today.getMonth() - birthDate.getMonth();
-            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) age--;
-            payload.age = age;
-        }
-
-        try {
-            if (isNew) {
-                // INSERT
-                const { error } = await supabase.from("players").insert([payload]);
-                if (error) throw error;
-            } else {
-                // UPDATE
-                const { error } = await supabase
-                    .from("players")
-                    .update(payload)
-                    .eq("id", updatedPlayer.id);
-                if (error) throw error;
-            }
-
-            // Refresh data to get generated IDs and sync state
-            await fetchData();
-            setEditingPlayer(null);
-            setPreviewImage(null);
-        } catch (e: any) {
-            alert("Error saving player: " + e.message);
-        }
+        if (updatedPlayer.id === "new") await supabase.from("players").insert([payload]);
+        else await supabase.from("players").update(payload).eq("id", updatedPlayer.id);
+        await fetchData();
+        setEditingPlayer(null);
     };
 
-    const handleStatusToggle = async (player: Player) => {
-        const currentStatus = player.medicalStatus;
-        let nextStatus = "Available";
-        if (currentStatus === "Available") nextStatus = "Unavailable";
-        else if (currentStatus === "Unavailable") nextStatus = "Holiday";
-        else if (currentStatus === "Holiday") nextStatus = "Injured";
-        else if (currentStatus === "Injured") nextStatus = "Available";
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (!e.target.files || e.target.files.length === 0 || !editingPlayer) return;
+        const file = e.target.files[0];
+        setIsUploadingImage(true);
 
-        // Optimistic
-        setPlayers(prev => prev.map(p => p.id === player.id ? { ...p, medicalStatus: nextStatus as any } : p));
+        try {
+            // Compress Image
+            const options = {
+                maxSizeMB: 0.1,
+                maxWidthOrHeight: 400,
+                useWebWorker: true
+            };
+            const compressedFile = await imageCompression(file, options);
 
-        // DB Update
-        await supabase.from("players").update({ medical_status: nextStatus }).eq("id", player.id);
+            // Upload to Supabase Storage
+            const fileName = `${Date.now()}_${compressedFile.name}`;
+            const { data, error } = await supabase.storage
+                .from('player-avatars')
+                .upload(fileName, compressedFile, { cacheControl: '3600', upsert: false });
+
+            if (error) throw error;
+
+            // Get Public URL
+            const { data: { publicUrl } } = supabase.storage.from('player-avatars').getPublicUrl(data.path);
+            
+            // Update State
+            setEditingPlayer({ ...editingPlayer, imageUrl: publicUrl });
+
+        } catch (error: any) {
+            console.error("Upload error", error);
+            alert("Failed to upload image. Make sure you created the 'player-avatars' public bucket in Supabase.");
+        } finally {
+            setIsUploadingImage(false);
+        }
     };
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">Squad Management</h2>
+                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">Squad</h2>
                     <p className="text-slate-500">View and manage player profiles, availability, and stats.</p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-
-                    <Button className="bg-red-600 hover:bg-red-700" onClick={handleAddPlayer}>
+                <div className="flex gap-2">
+                    <Button onClick={() => setIsManageSquadsOpen(true)} variant="outline" size="icon">
+                        <Settings className="w-4 h-4" />
+                    </Button>
+                    <Button className="bg-red-600 hover:bg-red-700" onClick={() => setEditingPlayer({ id: "new", firstName: "", lastName: "", position: "GK", squadNumber: 0, age: 0, nationality: "English", squad: currentSquads[0], medicalStatus: "Available", availability: true, contractExpiry: "", appearances: 0, goals: 0, assists: 0, imageUrl: "", isInTrainingSquad: true, isContracted: false, contractAmount: 0, contractFrequency: "Weekly", contractStartDate: "", contractEndDate: "" })}>
                         <Plus className="h-4 w-4 mr-2" /> Add Player
                     </Button>
                 </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-lg border shadow-sm">
-                <div className="relative flex-1">
+            <div className="flex space-x-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
+                <button onClick={() => setActiveTab("All")} className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${activeTab === "All" ? "bg-red-50 text-red-700" : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>All Players</button>
+                {currentSquads.map(squad => (
+                    <button key={squad} onClick={() => setActiveTab(squad)} className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${activeTab === squad ? "bg-red-50 text-red-700" : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>{squad}</button>
+                ))}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-lg border shadow-sm items-center">
+                <div className="relative flex-1 w-full">
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-                    <Input
-                        placeholder="Search players..."
-                        className="pl-9"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
+                    <Input placeholder="Search players..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
-                <div className="flex gap-2">
-                    {(["firstTeam", "midweek", "youth"] as const).map((squad) => (
-                        <Button
-                            key={squad}
-                            variant={squadFilter === squad ? "default" : "outline"}
-                            onClick={() => setSquadFilter(squad)}
-                            className={squadFilter === squad ? "bg-slate-900" : ""}
-                        >
-                            {SQUAD_LABELS[squad]}
-                        </Button>
-                    ))}
-                </div>
-                <div className="flex gap-2">
-                    {(["All", "GK", "DEF", "MID", "FWD"] as const).map((pos) => (
-                        <Button
-                            key={pos}
-                            variant={positionFilter === pos ? "default" : "outline"}
-                            onClick={() => setPositionFilter(pos)}
-                            className={
-                                positionFilter === pos
-                                    ? pos === "GK" ? "bg-amber-500 hover:bg-amber-600 text-white"
-                                        : pos === "DEF" ? "bg-sky-600 hover:bg-sky-700 text-white"
-                                            : pos === "MID" ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                                                : pos === "FWD" ? "bg-rose-600 hover:bg-rose-700 text-white"
-                                                    : "bg-slate-900"
-                                    : ""
-                            }
-                        >
-                            {pos}
-                        </Button>
-                    ))}
-                </div>
-                <div className="flex gap-2 items-center">
-                    <Button
-                        variant={showAvailableOnly ? "default" : "outline"}
-                        onClick={() => setShowAvailableOnly(!showAvailableOnly)}
-                        className={showAvailableOnly ? "bg-green-600 hover:bg-green-700 text-white border-green-600" : "border-dashed"}
+                <div className="flex gap-2 shrink-0">
+                    <select
+                        value={seasonFilter}
+                        onChange={(e) => setSeasonFilter(e.target.value)}
+                        className="h-10 px-3 py-2 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
                     >
-                        {showAvailableOnly ? "Showing Available" : "Show Available Only"}
-                    </Button>
+                        <option value="All">All Seasons</option>
+                        {availableSeasons.map(s => (
+                            <option key={s} value={s}>{s} Season</option>
+                        ))}
+                    </select>
+                </div>
+                <div className="flex gap-2 overflow-x-auto no-scrollbar shrink-0 max-w-full">
+                    {(["All", "GK", "DEF", "MID", "FWD"] as const).map((pos) => (
+                        <Button key={pos} variant={positionFilter === pos ? "default" : "outline"} onClick={() => setPositionFilter(pos)}>{pos}</Button>
+                    ))}
                 </div>
             </div>
 
@@ -391,7 +326,9 @@ export default function SquadPage() {
                         player={player}
                         onDelete={handleDelete}
                         onEdit={handleEdit}
-                        onStatusToggle={handleStatusToggle}
+                        onStatusToggle={async () => {
+                            // Dummy
+                        }}
                     />
                 ))}
             </div>
@@ -399,16 +336,13 @@ export default function SquadPage() {
             {filteredPlayers.length === 0 && (
                 <div className="text-center py-12 text-slate-500">
                     <p>No players found matching your criteria.</p>
-                    <Button variant="link" onClick={() => { setSearchTerm(""); setSquadFilter("firstTeam"); setPositionFilter("All"); setShowAvailableOnly(false); }}>
-                        Clear filters
-                    </Button>
                 </div>
             )}
 
             {editingPlayer && (
                 <div className="fixed inset-0 z-50 flex justify-end">
                     <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setEditingPlayer(null)} />
-                    <div onPaste={handlePaste} className="relative h-screen w-[450px] bg-white shadow-xl border-l flex flex-col animate-in slide-in-from-right duration-300">
+                    <div className="relative h-screen w-[450px] bg-white shadow-xl border-l flex flex-col animate-in slide-in-from-right duration-300">
                         <div className="p-3 border-b flex items-center justify-between shrink-0 bg-slate-50">
                             <h2 className="text-lg font-semibold text-slate-800">{editingPlayer.firstName ? "Edit Player" : "Add Player"}</h2>
                             <button onClick={() => setEditingPlayer(null)} className="text-sm text-slate-400 hover:text-slate-700 p-2">✕</button>
@@ -417,75 +351,40 @@ export default function SquadPage() {
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                     <label className="block text-xs font-medium text-slate-500">First Name</label>
-                                    <Input
-                                        value={editingPlayer.firstName}
-                                        onChange={(e) => setEditingPlayer({ ...editingPlayer, firstName: e.target.value })}
-                                        className="w-full h-8 px-2 text-sm"
-                                        placeholder="First Name"
-                                    />
+                                    <Input value={editingPlayer.firstName} onChange={(e) => setEditingPlayer({ ...editingPlayer, firstName: e.target.value })} className="h-8 text-sm" />
                                 </div>
                                 <div className="space-y-1">
                                     <label className="block text-xs font-medium text-slate-500">Last Name</label>
-                                    <Input
-                                        value={editingPlayer.lastName}
-                                        onChange={(e) => setEditingPlayer({ ...editingPlayer, lastName: e.target.value })}
-                                        className="w-full h-8 px-2 text-sm"
-                                        placeholder="Last Name"
-                                    />
+                                    <Input value={editingPlayer.lastName} onChange={(e) => setEditingPlayer({ ...editingPlayer, lastName: e.target.value })} className="h-8 text-sm" />
                                 </div>
                             </div>
-
+                            
                             <div className="space-y-1">
-                                <label className="block text-xs font-medium text-slate-500">Photograph</label>
-                                <div
-                                    className="flex items-center gap-3 p-2 bg-slate-50 rounded border border-slate-100 group transition-colors hover:bg-slate-100 hover:border-slate-300"
-                                    onDragOver={(e) => {
-                                        e.preventDefault();
-                                        e.currentTarget.classList.add('border-blue-500', 'bg-blue-50');
-                                    }}
-                                    onDragLeave={(e) => {
-                                        e.preventDefault();
-                                        e.currentTarget.classList.remove('border-blue-500', 'bg-blue-50');
-                                    }}
-                                    onDrop={(e) => {
-                                        e.preventDefault();
-                                        e.currentTarget.classList.remove('border-blue-500', 'bg-blue-50');
-                                        const file = e.dataTransfer.files?.[0];
-                                        if (file && editingPlayer) {
-                                            const reader = new FileReader();
-                                            reader.onloadend = () => {
-                                                setEditingPlayer({ ...editingPlayer, imageUrl: reader.result as string });
-                                            };
-                                            reader.readAsDataURL(file);
-                                        }
-                                    }}
-                                >
-                                    <div className="h-14 w-14 rounded-full bg-white border border-slate-200 flex-shrink-0 overflow-hidden flex items-center justify-center relative">
-                                        {previewImage ? (
-                                            <img src={previewImage} alt="Preview" className="h-full w-full object-cover" />
-                                        ) : (
-                                            <span className="text-[9px] text-slate-300">No Img</span>
-                                        )}
-                                    </div>
-                                    <div className="flex-1">
-                                        <Input
-                                            type="file"
-                                            accept="image/*"
-                                            onChange={handleImageUpload}
-                                            className="h-8 text-[11px] file:mr-2 file:py-1 file:px-2 file:rounded-full file:border-0 file:text-[10px] file:font-semibold file:bg-slate-100 file:text-slate-600 hover:file:bg-slate-200"
-                                        />
-                                        <p className="text-[10px] text-slate-400 mt-1 ml-1">
-                                            <strong>Drag & Drop</strong>, Paste (Ctrl+V), or Click to Browse.
-                                        </p>
-                                    </div>
+                                <label className="block text-xs font-medium text-slate-500">Player Photo</label>
+                                <div className="flex items-center gap-4">
+                                    {editingPlayer.imageUrl ? (
+                                        <div className="relative h-12 w-12 rounded-full overflow-hidden border-2 border-slate-200 shrink-0 bg-slate-100">
+                                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                                            <img src={editingPlayer.imageUrl} alt="Avatar" className="object-cover h-full w-full" />
+                                        </div>
+                                    ) : (
+                                        <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border-2 border-slate-200">
+                                            <span className="text-slate-400 font-bold text-xs">{editingPlayer.firstName?.[0]}{editingPlayer.lastName?.[0]}</span>
+                                        </div>
+                                    )}
+                                    <label className="flex items-center justify-center px-4 py-2 border border-slate-200 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer flex-1 transition-colors">
+                                        {isUploadingImage ? <Loader2 className="h-4 w-4 mr-2 animate-spin text-slate-500" /> : <UploadCloud className="h-4 w-4 mr-2 text-slate-500" />}
+                                        {isUploadingImage ? "Uploading..." : "Upload Photo"}
+                                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploadingImage} />
+                                    </label>
                                 </div>
                             </div>
 
                             <div className="space-y-4">
                                 <div className="space-y-1">
                                     <label className="block text-xs font-medium text-slate-500">Squad</label>
-                                    <div className="flex gap-2">
-                                        {(["firstTeam", "midweek", "youth"] as const).map(squad => (
+                                    <div className="flex flex-wrap gap-2">
+                                        {currentSquads.map(squad => (
                                             <button
                                                 key={squad}
                                                 onClick={() => setEditingPlayer({ ...editingPlayer, squad })}
@@ -494,13 +393,13 @@ export default function SquadPage() {
                                                     : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
                                                     }`}
                                             >
-                                                {SQUAD_LABELS[squad]}
+                                                {squad}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
 
-                                {editingPlayer.squad !== "firstTeam" && (
+                                {editingPlayer.squad !== currentSquads[0] && (
                                     <div className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-200">
                                         <input
                                             type="checkbox"
@@ -525,8 +424,10 @@ export default function SquadPage() {
                                 >
                                     <option value="GK">Goalkeeper (GK)</option>
                                     <option value="LB">Left Back (LB)</option>
+                                    <option value="LWB">Left Wing Back (LWB)</option>
                                     <option value="CB">Centre Back (CB)</option>
                                     <option value="RB">Right Back (RB)</option>
+                                    <option value="RWB">Right Wing Back (RWB)</option>
                                     <option value="CDM">Defensive Mid (CDM)</option>
                                     <option value="CM">Centre Mid (CM)</option>
                                     <option value="CAM">Attacking Mid (CAM)</option>
@@ -543,7 +444,21 @@ export default function SquadPage() {
                                     <Input
                                         type="date"
                                         value={editingPlayer.dateOfBirth || ""}
-                                        onChange={(e) => setEditingPlayer({ ...editingPlayer, dateOfBirth: e.target.value })}
+                                        onChange={(e) => {
+                                            const dob = e.target.value;
+                                            let computedAge = editingPlayer.age;
+                                            if (dob) {
+                                                const birthDate = new Date(dob);
+                                                const today = new Date();
+                                                let age = today.getFullYear() - birthDate.getFullYear();
+                                                const m = today.getMonth() - birthDate.getMonth();
+                                                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                                                    age--;
+                                                }
+                                                computedAge = age;
+                                            }
+                                            setEditingPlayer({ ...editingPlayer, dateOfBirth: dob, age: computedAge });
+                                        }}
                                         className="w-full h-8 px-2 text-xs"
                                     />
                                     <div className="w-12 h-8 flex items-center justify-center bg-slate-50 border rounded text-xs font-medium text-slate-600">
@@ -552,6 +467,60 @@ export default function SquadPage() {
                                 </div>
                             </div>
 
+                            <div className="pt-2 border-t mt-2 border-slate-100">
+                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer mb-3">
+                                    <input
+                                        type="checkbox"
+                                        checked={editingPlayer.isContracted || false}
+                                        onChange={(e) => setEditingPlayer({ ...editingPlayer, isContracted: e.target.checked })}
+                                        className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                                    />
+                                    Player is Contracted
+                                </label>
+
+                                {editingPlayer.isContracted && (
+                                    <div className="grid grid-cols-2 gap-3 mb-2 p-3 bg-red-50/50 rounded border border-red-100">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-medium text-slate-500">Contract Amount (£)</label>
+                                            <Input
+                                                type="number"
+                                                value={editingPlayer.contractAmount || ''}
+                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, contractAmount: parseFloat(e.target.value) })}
+                                                className="h-8 text-xs bg-white"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-medium text-slate-500">Frequency</label>
+                                            <select
+                                                value={editingPlayer.contractFrequency || 'Weekly'}
+                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, contractFrequency: e.target.value as any })}
+                                                className="w-full h-8 px-2 border rounded-md text-xs bg-white"
+                                            >
+                                                <option value="Weekly">Weekly</option>
+                                                <option value="Monthly">Monthly</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-medium text-slate-500">Start Date</label>
+                                            <Input
+                                                type="date"
+                                                value={editingPlayer.contractStartDate || ''}
+                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, contractStartDate: e.target.value })}
+                                                className="h-8 text-xs bg-white"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-medium text-slate-500">End Date</label>
+                                            <Input
+                                                type="date"
+                                                value={editingPlayer.contractEndDate || ''}
+                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, contractEndDate: e.target.value })}
+                                                className="h-8 text-xs bg-white"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
 
                             <div className="space-y-1">
@@ -595,6 +564,62 @@ export default function SquadPage() {
                     </div>
                 </div>
             )}
+
+            {/* Manage Squads Modal */}
+            <Dialog open={isManageSquadsOpen} onOpenChange={(open) => {
+                setIsManageSquadsOpen(open);
+                if (open) setEditingSquads(currentSquads);
+            }}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle>Manage Squads</DialogTitle>
+                        <DialogDescription>
+                            Define the squads for your club. These will be available when assigning players.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                        {editingSquads.map((squad, index) => (
+                            <div key={index} className="flex gap-2">
+                                <Input
+                                    value={squad}
+                                    onChange={(e) => {
+                                        const newSquads = [...editingSquads];
+                                        newSquads[index] = e.target.value;
+                                        setEditingSquads(newSquads);
+                                    }}
+                                    placeholder="Squad Name"
+                                />
+                                <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => {
+                                        setEditingSquads(editingSquads.filter((_, i) => i !== index));
+                                    }}
+                                >
+                                    <Trash2 className="w-4 h-4 text-slate-500 hover:text-red-600" />
+                                </Button>
+                            </div>
+                        ))}
+                        <Button
+                            variant="outline"
+                            className="w-full border-dashed"
+                            onClick={() => setEditingSquads([...editingSquads, "New Squad"])}
+                        >
+                            <Plus className="w-4 h-4 mr-2" /> Add Squad
+                        </Button>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsManageSquadsOpen(false)}>Cancel</Button>
+                        <Button onClick={async () => {
+                            const cleanSquads = editingSquads.filter(s => s.trim() !== "");
+                            await updateSettings({ squads: cleanSquads });
+                            if (!cleanSquads.includes(activeTab) && activeTab !== "All") setActiveTab("All");
+                            setIsManageSquadsOpen(false);
+                        }} className="bg-red-600 hover:bg-red-700">Save Squads</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
         </div>
     );
 }

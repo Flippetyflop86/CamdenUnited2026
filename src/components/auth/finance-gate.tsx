@@ -148,7 +148,7 @@ export function FinanceGate({
                         <div className="flex flex-col">
                             <span className="text-sm font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-2">
                                 {currentUser.name}
-                                {currentUser.username === 'admin' && (
+                                {currentUser.role === 'Super Admin' && (
                                     <span
                                         onClick={() => setIsAdminPanelOpen(true)}
                                         className="text-[9px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded cursor-pointer hover:bg-red-200"
@@ -232,7 +232,7 @@ export function FinanceGate({
                                         <div className="font-medium text-sm">{user.name}</div>
                                         <div className="text-xs text-slate-500">{user.username}</div>
                                     </div>
-                                    {user.username !== 'admin' && (
+                                    {user.role !== 'Super Admin' && (
                                         <Button size="sm" variant="destructive" onClick={() => handleAdminReset(user.username)}>
                                             Reset Password
                                         </Button>

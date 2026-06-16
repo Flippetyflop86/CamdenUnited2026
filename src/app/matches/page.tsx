@@ -11,18 +11,43 @@ import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Acti
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { FixtureScout } from "@/components/matches/fixture-scout";
-import { FixtureImporter } from "@/components/matches/fixture-importer";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/supabase";
+import { useClub } from "@/context/club-context";
+import { RefreshCw } from "lucide-react";
+import { MatchStatsDialog } from "@/components/matches/match-stats-dialog";
 
 export default function MatchesPage() {
     const [matches, setMatches] = useState<Match[]>([]);
+    const [leagueTeams, setLeagueTeams] = useState<any[]>([]);
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
+    const { settings, updateSettings } = useClub();
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [isEditingUrl, setIsEditingUrl] = useState(false);
+    const [tempUrl, setTempUrl] = useState("");
+
+    const getCurrentSeasonStr = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = d.getMonth(); // 0 = Jan, 5 = Jun
+        return month >= 5 
+            ? `${year.toString().slice(2)}/${(year + 1).toString().slice(2)}`
+            : `${(year - 1).toString().slice(2)}/${year.toString().slice(2)}`;
+    };
+
+    const getNextSeasonStr = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = d.getMonth();
+        return month >= 5
+            ? `${(year + 1).toString().slice(2)}/${(year + 2).toString().slice(2)}`
+            : `${year.toString().slice(2)}/${(year + 1).toString().slice(2)}`;
+    };
 
     // UI State
     const [filterType, setFilterType] = useState<"all" | "league" | "cup" | "friendly">("all");
+    const [seasonFilter, setSeasonFilter] = useState<string>("26/27");
     const [resultSort, setResultSort] = useState<"desc" | "asc">("desc"); // desc = Newest First
 
     // Form State
@@ -31,18 +56,22 @@ export default function MatchesPage() {
         time: "15:00",
         opponent: "",
         isHome: true,
-        competition: "Premier Division",
+        competition: "League Match",
         scoreline: "",
         goalscorers: "",
         assists: "",
-        notes: ""
+        yellow_cards: "",
+        red_cards: "",
+        notes: "",
+        surface: "4G"
     });
 
     // ... (keep state) ...
 
-    // Load Matches from Supabase
+    // Load Matches and League Teams from Supabase
     useEffect(() => {
         fetchMatches();
+        fetchLeagueTeams();
 
         const channel = supabase
             .channel("public:matches")
@@ -56,26 +85,40 @@ export default function MatchesPage() {
         return () => { supabase.removeChannel(channel); };
     }, []);
 
+    async function fetchLeagueTeams() {
+        const { data } = await supabase.from("league_teams").select("*");
+        if (data) setLeagueTeams(data);
+    }
+
     async function fetchMatches() {
         const { data, error } = await supabase.from("matches").select("*");
         if (error) {
-            console.error("Error fetching matches:", error);
+            console.error("Error fetching matches:", error.message || error);
             return;
         }
 
-        const mapped: Match[] = (data || []).map((m: any) => ({
-            id: m.id,
-            date: m.date,
-            time: m.time,
-            opponent: m.opponent,
-            isHome: m.is_home, // map snake_case
-            competition: m.competition,
-            scoreline: m.scoreline,
-            result: m.result as any,
-            goalscorers: m.goalscorers,
-            assists: m.assists,
-            notes: m.notes
-        }));
+        const mapped: Match[] = data.map((m: any) => {
+            const surfaceMatch = m.notes ? m.notes.match(/\[Surface: (.*?)\]/) : null;
+            const surface = surfaceMatch ? surfaceMatch[1] : "4G";
+            const cleanNotes = m.notes ? m.notes.replace(/\[Surface: .*?\]\n?/, "").trim() : "";
+            
+            return {
+                id: m.id,
+                date: m.date,
+                time: m.time,
+                opponent: m.opponent,
+                isHome: m.is_home,
+                competition: m.competition,
+                scoreline: m.scoreline,
+                result: m.result,
+                goalscorers: m.goalscorers,
+                assists: m.assists,
+                yellow_cards: m.yellow_cards,
+                red_cards: m.red_cards,
+                notes: cleanNotes,
+                surface: surface
+            };
+        });
 
         setMatches(mapped);
     }
@@ -83,20 +126,34 @@ export default function MatchesPage() {
     const handleSaveMatch = async () => {
         if (!formData.opponent || !formData.date) return;
 
-        const result = determineResult(formData.scoreline, formData.isHome);
+        let cleanScoreline = formData.scoreline;
+        if (cleanScoreline && cleanScoreline.includes('-')) {
+            const parts = cleanScoreline.split('-');
+            if (parts[0].trim() === "" && parts[1].trim() === "") {
+                cleanScoreline = "";
+            } else {
+                const home = parts[0].trim() || "0";
+                const away = parts[1].trim() || "0";
+                cleanScoreline = `${home} - ${away}`;
+            }
+        }
+
+        const result = determineResult(cleanScoreline, formData.isHome);
         const isNew = !editingId;
 
         const payload = {
             date: formData.date,
             time: formData.time,
             opponent: formData.opponent,
-            is_home: formData.isHome, // db column
+            is_home: formData.isHome,
             competition: formData.competition,
-            scoreline: formData.scoreline,
+            scoreline: cleanScoreline,
             result: result,
             goalscorers: formData.goalscorers,
             assists: formData.assists,
-            notes: formData.notes
+            yellow_cards: formData.yellow_cards,
+            red_cards: formData.red_cards,
+            notes: formData.surface ? `[Surface: ${formData.surface}]\n${formData.notes || ""}`.trim() : formData.notes
         };
 
         try {
@@ -108,7 +165,8 @@ export default function MatchesPage() {
                 if (error) throw error;
             }
 
-            // Re-fetch handled by subscription usually, but we can optimistically update or just wait
+            // Explicitly fetch matches to ensure the screen updates instantly
+            await fetchMatches();
             resetForm();
         } catch (e: any) {
             alert("Error saving match: " + e.message);
@@ -125,7 +183,10 @@ export default function MatchesPage() {
             scoreline: match.scoreline || "",
             goalscorers: match.goalscorers || "",
             assists: match.assists || "",
-            notes: match.notes || ""
+            yellow_cards: match.yellow_cards || "",
+            red_cards: match.red_cards || "",
+            notes: match.notes || "",
+            surface: match.surface || "4G"
         });
         setEditingId(match.id);
         setIsAddOpen(true);
@@ -133,14 +194,93 @@ export default function MatchesPage() {
 
     const handleDeleteMatch = async (id: string) => {
         if (!confirm("Are you sure you want to delete this match?")) return;
+        
+        // Optimistically remove from UI instantly
+        setMatches(prev => prev.filter(m => m.id !== id));
+        
+        try {
+            const { error } = await supabase.from('matches').delete().eq('id', id);
+            if (error) {
+                // Revert on error
+                fetchMatches();
+                throw error;
+            }
+        } catch (e: any) {
+            alert("Failed to delete match: " + e.message);
+        }
+    };
 
-        // Optimistic
-        setMatches(matches.filter(m => m.id !== id));
+    const handleSyncFixtures = async () => {
+        if (!settings.leagueUrl) {
+            alert("Please set your League URL in the Club Settings (Settings -> League Integration) first.");
+            return;
+        }
 
-        const { error } = await supabase.from("matches").delete().eq("id", id);
-        if (error) {
-            alert("Failed to delete match");
-            fetchMatches(); // revert
+        setIsSyncing(true);
+        try {
+            const res = await fetch('/api/sync-fixtures', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: settings.leagueUrl, clubName: settings.name })
+            });
+
+            const data = await res.json();
+            
+            if (data.success && data.matches.length > 0) {
+                // Upsert logic: For each scraped match, check if it exists by Date + Opponent
+                let hasError = false;
+                for (const match of data.matches) {
+                    const { data: existing } = await supabase
+                        .from('matches')
+                        .select('id')
+                        .eq('date', match.date)
+                        .eq('opponent', match.opponent)
+                        .single();
+
+                    if (existing) {
+                        // Update existing match result
+                        const { error } = await supabase
+                            .from('matches')
+                            .update({
+                                time: match.time,
+                                is_home: match.is_home,
+                                result: match.result,
+                                scoreline: match.scoreline,
+                                competition: match.competition
+                            })
+                            .eq('id', existing.id);
+                        if (error) { alert("Failed to sync match: " + error.message); hasError = true; break; }
+                    } else {
+                        // Insert new match
+                        const { error } = await supabase
+                            .from('matches')
+                            .insert({
+                                date: match.date,
+                                time: match.time,
+                                opponent: match.opponent,
+                                is_home: match.is_home,
+                                competition: match.competition,
+                                result: match.result,
+                                scoreline: match.scoreline,
+                                notes: match.notes
+                            });
+                        if (error) { alert("Failed to insert match: " + error.message); hasError = true; break; }
+                    }
+                }
+                
+                if (!hasError) {
+                    alert(`Successfully synced ${data.matches.length} fixtures!`);
+                    fetchMatches();
+                }
+            } else if (data.success) {
+                alert("No fixtures found for your club on that page. Make sure your Club Name matches exactly.");
+            } else {
+                alert("Sync failed: " + data.error);
+            }
+        } catch (err: any) {
+            alert("Error connecting to sync server: " + err.message);
+        } finally {
+            setIsSyncing(false);
         }
     };
 
@@ -152,22 +292,29 @@ export default function MatchesPage() {
             time: "15:00",
             opponent: "",
             isHome: true,
-            competition: "Premier Division",
+            competition: "League Match",
             scoreline: "",
             goalscorers: "",
-            notes: ""
+            assists: "",
+            yellow_cards: "",
+            red_cards: "",
+            notes: "",
+            surface: "4G"
         });
     };
 
     const determineResult = (score?: string, isHome?: boolean): "Win" | "Loss" | "Draw" | "Pending" | undefined => {
         if (!score) return "Pending";
         const parts = score.split(/[-:]/);
-        if (parts.length !== 2) return undefined;
+        if (parts.length !== 2) return "Pending";
 
-        const homeScore = parseInt(parts[0].trim());
-        const awayScore = parseInt(parts[1].trim());
+        const homeStr = parts[0].trim() || "0";
+        const awayStr = parts[1].trim() || "0";
+        
+        const homeScore = parseInt(homeStr);
+        const awayScore = parseInt(awayStr);
 
-        if (isNaN(homeScore) || isNaN(awayScore)) return undefined;
+        if (isNaN(homeScore) || isNaN(awayScore)) return "Pending";
         if (homeScore === awayScore) return "Draw";
 
         if (isHome) {
@@ -189,6 +336,21 @@ export default function MatchesPage() {
     };
 
     // --- Filtering & Sorting Logic ---
+    const getSeasonFromDate = (dateString: string) => {
+        if (!dateString) return getCurrentSeasonStr();
+        const d = new Date(dateString);
+        if (isNaN(d.getTime())) return getCurrentSeasonStr();
+        const year = d.getFullYear();
+        const month = d.getMonth(); // 0-11, 5 is June
+        if (month >= 5) {
+            return `${year.toString().slice(-2)}/${(year + 1).toString().slice(-2)}`;
+        } else {
+            return `${(year - 1).toString().slice(-2)}/${year.toString().slice(-2)}`;
+        }
+    };
+
+    const availableSeasons = Array.from(new Set([...matches.map(m => getSeasonFromDate(m.date)), getCurrentSeasonStr(), getNextSeasonStr()])).sort().reverse();
+
     const getCompetitionType = (comp: string): "league" | "cup" | "friendly" => {
         const lower = comp.toLowerCase();
         if (lower.includes("cup") || lower.includes("trophy") || lower.includes("shield")) return "cup";
@@ -197,6 +359,8 @@ export default function MatchesPage() {
     };
 
     const filteredMatches = matches.filter(match => {
+        if (seasonFilter !== "All" && getSeasonFromDate(match.date) !== seasonFilter) return false;
+        
         if (filterType === "all") return true;
         const type = getCompetitionType(match.competition);
         return type === filterType;
@@ -220,7 +384,7 @@ export default function MatchesPage() {
         return resultSort === "desc" ? dateB - dateA : dateA - dateB;
     });
 
-    const MatchCard = ({ match }: { match: Match }) => (
+    const MatchCard = ({ match, isPast }: { match: Match, isPast?: boolean }) => (
         <Card className="overflow-hidden hover:shadow-md transition-shadow">
             <CardHeader className="py-4 bg-slate-50/50 border-b flex flex-row items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -233,6 +397,7 @@ export default function MatchesPage() {
                     </span>
                 </div>
                 <div className="flex items-center gap-1">
+                    {!isPast && <MatchStatsDialog matchId={match.id} matchDate={match.date} opponent={match.opponent} />}
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleEditMatch(match)}>
                         <Edit2 className="h-4 w-4" />
                     </Button>
@@ -253,8 +418,16 @@ export default function MatchesPage() {
 
                     {/* Score / VS */}
                     <div className="flex flex-col items-center min-w-[100px]">
-                        <div className="text-2xl font-black text-slate-900 tracking-tight">
-                            {match.scoreline || "v"}
+                        <div className="text-2xl font-black text-slate-900 tracking-tight flex items-center justify-center min-w-[80px]">
+                            {match.scoreline ? (
+                                match.scoreline.includes('-') ? (
+                                    <div className="flex items-center gap-2">
+                                        <span>{match.scoreline.split('-')[0].trim() || "0"}</span>
+                                        <span className="text-slate-300">-</span>
+                                        <span>{match.scoreline.split('-')[1].trim() || "0"}</span>
+                                    </div>
+                                ) : match.scoreline
+                            ) : "v"}
                         </div>
                         {match.result && (
                             <Badge variant="outline" className={`mt-1 text-[10px] uppercase px-2 py-0 ${getResultColor(match.result)}`}>
@@ -266,8 +439,14 @@ export default function MatchesPage() {
                     {/* Away Team */}
                     <div className="flex-1 flex items-center justify-start gap-4 text-left">
                         {!match.isHome && <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded">A</span>}
-                        <span className={`font-bold text-lg ${!match.isHome ? 'text-slate-900' : 'text-slate-500'}`}>
+                        <span className={`font-bold text-lg flex items-center gap-2 ${!match.isHome ? 'text-slate-900' : 'text-slate-500'}`}>
+                            {(!match.isHome && leagueTeams.find(t => t.name === match.opponent)?.badge_url) && (
+                                <img src={leagueTeams.find(t => t.name === match.opponent)?.badge_url} alt="Badge" className="h-6 w-6 object-contain" />
+                            )}
                             {!match.isHome ? "Camden United" : match.opponent}
+                            {(match.isHome && leagueTeams.find(t => t.name === match.opponent)?.badge_url) && (
+                                <img src={leagueTeams.find(t => t.name === match.opponent)?.badge_url} alt="Badge" className="h-6 w-6 object-contain" />
+                            )}
                         </span>
                     </div>
                 </div>
@@ -299,6 +478,11 @@ export default function MatchesPage() {
                     </div>
                 )}
             </CardContent>
+            {isPast && (
+                <div className="p-4 bg-slate-50 border-t">
+                    <MatchStatsDialog matchId={match.id} matchDate={match.date} opponent={match.opponent} variant="full" />
+                </div>
+            )}
         </Card>
     );
 
@@ -307,7 +491,7 @@ export default function MatchesPage() {
             {/* Header & Controls */}
             <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">Matches & Results</h2>
+                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">Fixtures & Results</h2>
                     <p className="text-slate-500">Track fixtures, results, and match statistics.</p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -355,10 +539,16 @@ export default function MatchesPage() {
                                     <div className="col-span-3 space-y-1.5">
                                         <Label>Opponent</Label>
                                         <Input
-                                            placeholder="Opponent Name"
+                                            list="league-teams-list"
+                                            placeholder="Select or type opponent name"
                                             value={formData.opponent}
                                             onChange={e => setFormData({ ...formData, opponent: e.target.value })}
                                         />
+                                        <datalist id="league-teams-list">
+                                            {leagueTeams.map(team => (
+                                                <option key={team.id} value={team.name} />
+                                            ))}
+                                        </datalist>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
@@ -380,14 +570,61 @@ export default function MatchesPage() {
                                             className="h-20"
                                         />
                                     </div>
+                                    <div className="space-y-2">
+                                        <Label>Yellow Cards</Label>
+                                        <Textarea
+                                            placeholder="e.g. J.Smith, P.Maldini"
+                                            value={formData.yellow_cards}
+                                            onChange={(e) => setFormData({ ...formData, yellow_cards: e.target.value })}
+                                            className="h-16"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Red Cards</Label>
+                                        <Textarea
+                                            placeholder="e.g. S.Ramos"
+                                            value={formData.red_cards}
+                                            onChange={(e) => setFormData({ ...formData, red_cards: e.target.value })}
+                                            className="h-16"
+                                        />
+                                    </div>
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label>Competition</Label>
-                                    <Input
-                                        placeholder="League, Cup, Friendly..."
+                                    <Select
                                         value={formData.competition}
-                                        onChange={e => setFormData({ ...formData, competition: e.target.value })}
-                                    />
+                                        onValueChange={(v: string) => setFormData({ ...formData, competition: v })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select Competition" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="League Match">League Match</SelectItem>
+                                            <SelectItem value="Alec Smith Premier Division Cup">Alec Smith Premier Division Cup</SelectItem>
+                                            <SelectItem value="Middlesex Cup">Middlesex Cup</SelectItem>
+                                            <SelectItem value="Friendly">Friendly</SelectItem>
+                                            <SelectItem value="Trial Match">Trial Match</SelectItem>
+                                            {/* Legacy Support for older fixtures like "Premier Division" */}
+                                            {formData.competition && !["League Match", "Alec Smith Premier Division Cup", "Middlesex Cup", "Friendly", "Trial Match"].includes(formData.competition) && (
+                                                <SelectItem value={formData.competition}>{formData.competition}</SelectItem>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label>Surface</Label>
+                                    <Select
+                                        value={formData.surface || "4G"}
+                                        onValueChange={(v: "4G" | "Grass") => setFormData({ ...formData, surface: v })}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select Surface" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Grass">Grass</SelectItem>
+                                            <SelectItem value="4G">4G</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label>Scoreline</Label>
@@ -421,15 +658,7 @@ export default function MatchesPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="space-y-1.5">
-                                    <Label>Goalscorers</Label>
-                                    <Textarea
-                                        className="min-h-[60px]"
-                                        placeholder="Comma separated (e.g. Smith, Jones)"
-                                        value={formData.goalscorers || ""}
-                                        onChange={e => setFormData({ ...formData, goalscorers: e.target.value })}
-                                    />
-                                </div>
+
                                 <div className="space-y-1.5">
                                     <Label>Notes</Label>
                                     <Textarea
@@ -444,9 +673,9 @@ export default function MatchesPage() {
                                 {editingId && formData.scoreline && (
                                     <Button
                                         type="button"
-                                        variant="secondary"
-                                        onClick={() => setFormData({ ...formData, scoreline: "", goalscorers: "", notes: "" })}
-                                        className="mr-auto text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200"
+                                        variant="outline"
+                                        onClick={() => setFormData({ ...formData, scoreline: "", goalscorers: "", assists: "", yellow_cards: "", red_cards: "", notes: "" })}
+                                        className="h-8 text-xs text-slate-500 bg-amber-50 hover:bg-amber-100 border border-amber-200 mr-auto"
                                     >
                                         Reset to Upcoming
                                     </Button>
@@ -462,39 +691,56 @@ export default function MatchesPage() {
             </div>
 
             {/* Filters */}
-            <div className="flex flex-wrap items-center gap-2 pb-2 border-b border-slate-100">
-                <Button
-                    variant={filterType === "all" ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterType("all")}
-                    className="rounded-full"
-                >
-                    All Matches
-                </Button>
-                <Button
-                    variant={filterType === "league" ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterType("league")}
-                    className="rounded-full"
-                >
-                    League
-                </Button>
-                <Button
-                    variant={filterType === "cup" ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterType("cup")}
-                    className="rounded-full"
-                >
-                    Cups
-                </Button>
-                <Button
-                    variant={filterType === "friendly" ? "secondary" : "ghost"}
-                    size="sm"
-                    onClick={() => setFilterType("friendly")}
-                    className="rounded-full"
-                >
-                    Friendlies
-                </Button>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-100">
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                        variant={filterType === "all" ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={() => setFilterType("all")}
+                        className="rounded-full"
+                    >
+                        All Matches
+                    </Button>
+                    <Button
+                        variant={filterType === "league" ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={() => setFilterType("league")}
+                        className="rounded-full"
+                    >
+                        League
+                    </Button>
+                    <Button
+                        variant={filterType === "cup" ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={() => setFilterType("cup")}
+                        className="rounded-full"
+                    >
+                        Cups
+                    </Button>
+                    <Button
+                        variant={filterType === "friendly" ? "secondary" : "ghost"}
+                        size="sm"
+                        onClick={() => setFilterType("friendly")}
+                        className="rounded-full"
+                    >
+                        Friendlies
+                    </Button>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                    <span className="text-sm font-semibold text-slate-500 hidden sm:inline-block">Season:</span>
+                    <Select value={seasonFilter} onValueChange={setSeasonFilter}>
+                        <SelectTrigger className="h-9 w-[160px] text-sm bg-white border-slate-200 shadow-sm font-medium">
+                            <SelectValue placeholder="Select Season" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All">All Seasons</SelectItem>
+                            {availableSeasons.map(season => (
+                                <SelectItem key={season} value={season}>20{season.split('/')[0]}/20{season.split('/')[1]}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
             </div>
 
             {/* Import Tool */}
@@ -504,17 +750,47 @@ export default function MatchesPage() {
                         <Target className="h-5 w-5 text-indigo-600" />
                     </div>
                     <div>
-                        <h3 className="font-semibold text-indigo-900">Import Matches via Text</h3>
-                        <p className="text-sm text-indigo-700">Copy & paste fixture lists from WhatsApp, FA Full-Time, or emails.</p>
+                        <h3 className="font-semibold text-indigo-900">League Integration</h3>
+                        <p className="text-sm text-indigo-700">Sync directly with your live league website.</p>
                     </div>
                 </div>
-                <FixtureScout onImport={(newMatches) => {
-                    setMatches([...matches, ...newMatches].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-                }} />
-                <div className="h-8 w-px bg-indigo-200 hidden sm:block"></div>
-                <FixtureImporter onImport={(newMatches) => {
-                    setMatches([...matches, ...newMatches].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-                }} />
+                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
+                    {(!settings.leagueUrl || isEditingUrl) ? (
+                        <div className="flex flex-1 sm:flex-none gap-2 w-full">
+                            <Input 
+                                placeholder="Paste FA Full-Time URL..." 
+                                value={tempUrl} 
+                                onChange={e => setTempUrl(e.target.value)}
+                                className="w-full sm:w-64 bg-white border-indigo-200"
+                            />
+                            <Button 
+                                onClick={() => {
+                                    if (tempUrl.trim()) {
+                                        updateSettings({ leagueUrl: tempUrl.trim() });
+                                        setIsEditingUrl(false);
+                                    }
+                                }}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0"
+                            >
+                                Save
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <Button variant="ghost" size="sm" onClick={() => { setTempUrl(settings.leagueUrl!); setIsEditingUrl(true); }} className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 hidden sm:flex">
+                                Edit URL
+                            </Button>
+                            <Button 
+                                onClick={handleSyncFixtures} 
+                                disabled={isSyncing}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white flex-1 sm:flex-none"
+                            >
+                                <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? "animate-spin" : ""}`} />
+                                {isSyncing ? "Syncing..." : "Sync from League URL"}
+                            </Button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Tabs for Fixtures / Results */}
@@ -530,7 +806,7 @@ export default function MatchesPage() {
                             <p>No upcoming fixtures found matching filters.</p>
                         </div>
                     ) : (
-                        upcomingMatches.map(match => <MatchCard key={match.id} match={match} />)
+                        upcomingMatches.map(match => <MatchCard key={match.id} match={match} isPast={false} />)
                     )}
                 </TabsContent>
 
@@ -553,7 +829,7 @@ export default function MatchesPage() {
                             <p>No results found matching filters.</p>
                         </div>
                     ) : (
-                        pastMatches.map(match => <MatchCard key={match.id} match={match} />)
+                        pastMatches.map(match => <MatchCard key={match.id} match={match} isPast={true} />)
                     )}
                 </TabsContent>
             </Tabs>

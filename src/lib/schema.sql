@@ -174,3 +174,14 @@ create table recruits (
   created_at timestamp with time zone default timezone('utc'::text, now()),
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );
+
+-- 15. Staff
+create table staff (
+  id uuid primary key default uuid_generate_v4(),
+  name text not null,
+  role text not null,
+  email text,
+  phone text,
+  notes text,
+  created_at timestamp with time zone default timezone('utc'::text, now())
+);

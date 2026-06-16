@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Recruit } from "@/types";
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -47,7 +48,7 @@ export default function RecruitmentPage() {
     const [editingRecruit, setEditingRecruit] = useState<Recruit | null>(null);
     const [expandedPositions, setExpandedPositions] = useState<string[]>(["GK", "DEF", "MID", "FWD"]);
 
-    const roles = ["Star Player", "1st Team Player", "Rotation Player", "Midweek Player", "Has Potential"];
+    const roles = ["Star Player", "1st Team Player", "Rotation Player", "Back-up", "Prospect"];
 
     // Form state
     const [formData, setFormData] = useState({
@@ -118,16 +119,22 @@ export default function RecruitmentPage() {
             updated_at: new Date().toISOString()
         };
 
-        try {
-            if (editingRecruit) {
-                await supabase.from('recruits').update(payload).eq('id', editingRecruit.id);
-            } else {
-                await supabase.from('recruits').insert([payload]);
+        if (editingRecruit) {
+            const { error } = await supabase.from('recruits').update(payload).eq('id', editingRecruit.id);
+            if (error) {
+                alert("Error updating recruit: " + error.message);
+                return;
             }
-            handleCloseDialog();
-        } catch (e: any) {
-            alert("Error saving recruit: " + e.message);
+        } else {
+            const { error } = await supabase.from('recruits').insert([payload]);
+            if (error) {
+                alert("Error inserting recruit: " + error.message);
+                return;
+            }
         }
+        
+        await fetchRecruits();
+        handleCloseDialog();
     };
 
     const handleEdit = (recruit: Recruit) => {
@@ -150,7 +157,12 @@ export default function RecruitmentPage() {
 
     const handleDelete = async (id: string) => {
         if (window.confirm("Are you sure you want to delete this player from recruitment?")) {
-            await supabase.from('recruits').delete().eq('id', id);
+            const { error } = await supabase.from('recruits').delete().eq('id', id);
+            if (error) {
+                alert("Error deleting recruit: " + error.message);
+                return;
+            }
+            await fetchRecruits();
         }
     };
 
@@ -258,7 +270,7 @@ export default function RecruitmentPage() {
             return `
                         <div class="section">
                             <div class="section-title">${section.title.toUpperCase()}</div>
-                            <table>
+                            <div className="overflow-x-auto w-full pb-2"><table>
                                 <thead>
                                     <tr>
                                         <th style="width: 25%;">Player Details</th>
@@ -289,7 +301,7 @@ export default function RecruitmentPage() {
                                         </tr>
                                     `).join('')}
                                 </tbody>
-                            </table>
+                            </table></div>
                         </div>
                     `;
         }).join('')}
@@ -389,11 +401,12 @@ export default function RecruitmentPage() {
                                             <option value="FWD">FWD</option>
                                             <option value="RW">RW</option>
                                             <option value="LW">LW</option>
+                                            <option value="CF">CF</option>
                                             <option value="ST">ST</option>
                                         </select>
                                     </div>
                                     <div className="grid grid-cols-4 items-center gap-4">
-                                        <Label htmlFor="secondaryPos" className="text-right">Secondary Position</Label>
+                                        <Label htmlFor="secondaryPos" className="text-right">Secondary Position (s)</Label>
                                         <Input
                                             id="secondaryPos"
                                             value={formData.secondaryPosition}
@@ -476,7 +489,7 @@ export default function RecruitmentPage() {
                                         </div>
                                     )}
                                     <div className="grid grid-cols-4 items-start gap-4">
-                                        <Label htmlFor="connection" className="text-right pt-2 text-xs leading-tight">Connection to Club</Label>
+                                        <Label htmlFor="connection" className="text-right pt-2 text-xs leading-tight">Connection to club?</Label>
                                         <Input
                                             id="connection"
                                             value={formData.clubConnection}
@@ -553,9 +566,9 @@ export default function RecruitmentPage() {
                                                                 <div className="flex justify-between items-start">
                                                                     <div>
                                                                         <div className="flex items-center gap-2">
-                                                                            <CardTitle className="inline-flex items-center gap-1.5 text-lg font-bold">
+                                                                            <CardTitle className="inline-flex items-center gap-1.5 text-lg font-bold hover:text-blue-600 transition-colors cursor-pointer">
                                                                                 {recruit.scoutedRole === "Star Player" && <Star className="h-4 w-4 fill-amber-400 text-amber-400" />}
-                                                                                {recruit.name}
+                                                                                <Link href={`/recruitment/${recruit.id}`}>{recruit.name}</Link>
                                                                             </CardTitle>
                                                                             {recruit.onTrial && (
                                                                                 <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100 flex gap-1 items-center scale-90">

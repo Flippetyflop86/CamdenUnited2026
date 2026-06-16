@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useClub } from "@/context/club-context";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer } from 'recharts';
 
 import {
     Plus,
@@ -18,6 +19,7 @@ import {
     CheckCircle2,
     Landmark,
     Pencil,
+    Users,
 } from "lucide-react";
 
 import { FinanceGate } from "@/components/auth/finance-gate";
@@ -32,7 +34,8 @@ export default function FinancePage() {
     const [sponsors, setSponsors] = useState<Sponsor[]>([]);
     const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]); // Contains both Ledger (History) and Commitments (Templates)
-    const [activeTab, setActiveTab] = useState<'overview' | 'planning'>('overview');
+    const [wages, setWages] = useState<{ id: string, name: string, amount: number, frequency: string, type: 'Player' | 'Staff' }[]>([]);
+    const [activeTab, setActiveTab] = useState<'overview' | 'planning'>('planning');
 
     // Derived State
     const ledger = transactions.filter(t => !t.isRecurring);
@@ -85,7 +88,7 @@ export default function FinancePage() {
 
     const fetchFinanceData = async () => {
         setIsEditingBalance(false); // just to reset ui
-        await Promise.all([fetchSponsors(), fetchSubs(), fetchTransactions()]);
+        await Promise.all([fetchSponsors(), fetchSubs(), fetchTransactions(), fetchWages()]);
 
         // Also sync starting balance from settings if changed remotely
         // (Handled by club-context mainly, but we can respect it here)
@@ -118,6 +121,26 @@ export default function FinancePage() {
                 frequency: t.frequency
             }));
             setTransactions(mapped);
+        }
+    };
+
+    const fetchWages = async () => {
+        try {
+            const [{ data: players }, { data: staff }] = await Promise.all([
+                supabase.from('players').select('id, first_name, last_name, contract_amount, contract_frequency').eq('is_contracted', true),
+                supabase.from('staff').select('id, name, contract_amount, contract_frequency').eq('is_contracted', true)
+            ]);
+
+            const allWages: any[] = [];
+            if (players) {
+                players.forEach((p: any) => allWages.push({ id: `p_${p.id}`, name: `${p.first_name} ${p.last_name}`, amount: p.contract_amount, frequency: p.contract_frequency || 'Weekly', type: 'Player' }));
+            }
+            if (staff) {
+                staff.forEach((s: any) => allWages.push({ id: `s_${s.id}`, name: s.name, amount: s.contract_amount, frequency: s.contract_frequency || 'Monthly', type: 'Staff' }));
+            }
+            setWages(allWages);
+        } catch (e) {
+            console.error("Error fetching wages:", e);
         }
     };
 
@@ -324,6 +347,13 @@ export default function FinancePage() {
             else monthlyExpense += amount;
         });
 
+        // Wages
+        wages.forEach(w => {
+            let amount = w.amount || 0;
+            if (w.frequency === 'Weekly') monthlyExpense += (amount * 52) / 12; // Precise monthly average
+            else monthlyExpense += amount;
+        });
+
         return { income: monthlyIncome, expense: monthlyExpense, profit: monthlyIncome - monthlyExpense };
     };
 
@@ -339,7 +369,14 @@ export default function FinancePage() {
     const monthlyTotals = calculateMonthly();
     const currentBalance = calculateBalance();
 
-
+    const projectionData = Array.from({ length: 6 }).map((_, i) => {
+        const d = new Date();
+        d.setMonth(d.getMonth() + i);
+        return {
+            name: d.toLocaleString('default', { month: 'short' }),
+            Balance: Math.round(currentBalance + (monthlyTotals.profit * i))
+        };
+    });
 
     return (
         <FinanceGate>
@@ -388,9 +425,14 @@ export default function FinancePage() {
                                         </Button>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center gap-1 cursor-pointer hover:text-slate-300 transition-colors" onClick={() => setIsEditingBalance(true)}>
-                                        <Landmark className="h-3 w-3" />
-                                        <span>Starting Balance: £{settings.financeStartingBalance?.toLocaleString() || 0}</span>
+                                    <div className="flex items-center justify-between w-full group">
+                                        <div className="flex items-center gap-1">
+                                            <Landmark className="h-3 w-3" />
+                                            <span>Starting Balance: £{settings.financeStartingBalance?.toLocaleString() || 0}</span>
+                                        </div>
+                                        <Button size="sm" variant="ghost" className="h-6 px-2 py-0 text-slate-400 opacity-50 group-hover:opacity-100 hover:text-white" onClick={() => setIsEditingBalance(true)}>
+                                            <Pencil className="h-3 w-3 mr-1" /> Edit
+                                        </Button>
                                     </div>
                                 )}
                             </div>
@@ -428,14 +470,37 @@ export default function FinancePage() {
                     </Card>
                 </div>
 
-                <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-                    <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-                        <TabsTrigger value="overview">Ledger (History)</TabsTrigger>
-                        <TabsTrigger value="planning">Commitments (Regular)</TabsTrigger>
+                <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full">
+                    <TabsList className="w-full justify-start border-b rounded-none h-12 bg-transparent p-0">
+                        <TabsTrigger value="planning" className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none h-12 px-6">Commitments (Regular)</TabsTrigger>
+                        <TabsTrigger value="overview" className="data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none h-12 px-6">Ledger (History)</TabsTrigger>
                     </TabsList>
 
                     {/* TRANSACTION LEDGER */}
                     <TabsContent value="overview" className="mt-6 space-y-6">
+
+                        {/* 6-MONTH PROJECTION CHART */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>6-Month Bank Balance Projection</CardTitle>
+                                <CardDescription>Estimated bank balance based on your Current Balance and Projected Monthly Cash Flow.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="h-72">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={projectionData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} dy={10} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b' }} tickFormatter={(val) => `£${val}`} dx={-10} />
+                                        <RechartsTooltip formatter={(value: number) => [`£${value.toLocaleString()}`, 'Projected Balance']} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                        <Line type="monotone" dataKey="Balance" stroke="#2563eb" strokeWidth={3} dot={{ r: 4, strokeWidth: 2 }} activeDot={{ r: 6 }} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-lg font-medium text-slate-900">Ledger History</h3>
+                        </div>     
                         <Card>
                             <CardHeader>
                                 <CardTitle>Transaction Ledger</CardTitle>
@@ -443,7 +508,7 @@ export default function FinancePage() {
                             </CardHeader>
                             <CardContent>
                                 <div className="rounded-md border">
-                                    <table className="w-full text-sm">
+                                    <div className="overflow-x-auto w-full pb-2"><table className="w-full text-sm">
                                         <thead className="bg-slate-50 border-b">
                                             <tr className="text-left text-xs font-medium text-slate-500 uppercase">
                                                 <th className="px-4 py-3">Date</th>
@@ -484,7 +549,7 @@ export default function FinancePage() {
                                                     </tr>
                                                 ))}
                                         </tbody>
-                                    </table>
+                                    </table></div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -619,6 +684,36 @@ export default function FinancePage() {
                                                     <Button size="icon" variant="ghost" className="h-6 w-6 text-red-400 opacity-0 group-hover:opacity-100" onClick={() => deleteItem(s.id, 'sub')}>
                                                         <Trash2 className="h-3 w-3" />
                                                     </Button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            {/* WAGES (READ-ONLY) */}
+                            <Card className="lg:col-span-2">
+                                <CardHeader>
+                                    <CardTitle>Staff & Player Wages</CardTitle>
+                                    <CardDescription>Automatically synced from Squad and Staff management pages.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-1">
+                                        {wages.length === 0 && <p className="text-sm text-slate-400 italic p-4">No contracted personnel.</p>}
+                                        {wages.map(w => (
+                                            <div key={w.id} className="flex items-center justify-between p-3 hover:bg-slate-50 rounded-lg border border-transparent transition-all">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center">
+                                                        <Users className="h-4 w-4" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-medium text-sm text-slate-900">{w.name}</p>
+                                                        <p className="text-xs text-slate-500">{w.type} Contract</p>
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="font-bold text-sm text-red-600">£{w.amount}</span>
+                                                    <span className="text-xs text-slate-500 ml-1">/{w.frequency === 'Weekly' ? 'wk' : 'mo'}</span>
                                                 </div>
                                             </div>
                                         ))}

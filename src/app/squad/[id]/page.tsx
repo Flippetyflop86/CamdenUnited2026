@@ -12,24 +12,41 @@ import { ArrowLeft, Edit, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { Player } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { useClub } from "@/context/club-context";
 
 export default function PlayerProfilePage() {
     const params = useParams();
     const id = params?.id as string;
     const [player, setPlayer] = useState<Player | null>(null);
     const [loading, setLoading] = useState(true);
-
-    const SQUAD_LABELS: Record<string, string> = {
-        firstTeam: "First Team",
-        midweek: "Midweek",
-        youth: "Youth"
+    const getCurrentSeasonStr = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = d.getMonth(); // 0 = Jan, 5 = Jun
+        return month >= 5 
+            ? `${year.toString().slice(2)}/${(year + 1).toString().slice(2)}`
+            : `${(year - 1).toString().slice(2)}/${year.toString().slice(2)}`;
     };
+
+    const [seasonFilter, setSeasonFilter] = useState<string>("26/27");
+    const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
+    const [calculatedStats, setCalculatedStats] = useState({ apps: 0, goals: 0, assists: 0 });
+
+    const { settings } = useClub();
+    const currentSquads = settings.squads || ["First Team"];
 
     useEffect(() => {
         const fetchPlayer = async () => {
             if (!id) return;
-            const { data, error } = await supabase.from('players').select('*').eq('id', id).single();
-            if (data) {
+            
+            const [playerRes, matchesRes, statsRes] = await Promise.all([
+                supabase.from('players').select('*').eq('id', id).single(),
+                supabase.from('matches').select('id, date'),
+                supabase.from('match_player_stats').select('*').eq('player_id', id)
+            ]);
+
+            if (playerRes.data) {
+                const data = playerRes.data;
                 setPlayer({
                     id: data.id,
                     firstName: data.first_name,
@@ -43,24 +60,75 @@ export default function PlayerProfilePage() {
                     availability: data.availability,
                     contractExpiry: data.contract_expiry,
                     imageUrl: data.image_url,
-                    appearances: data.appearances,
-                    goals: data.goals,
-                    assists: data.assists,
+                    appearances: data.appearances, // fallback
+                    goals: data.goals, // fallback
+                    assists: data.assists, // fallback
                     dateOfBirth: data.date_of_birth,
                     notes: data.notes,
                     isInTrainingSquad: data.is_in_training_squad,
                     medicalNotes: data.medical_notes
                 } as any);
             }
+
+            // Calculate dynamic stats
+            const matches = matchesRes.data || [];
+            const stats = statsRes.data || [];
+
+            const matchSeasons = new Map<string, string>();
+            const seasonSet = new Set<string>();
+            matches.forEach((m: any) => {
+                let seasonStr = "";
+                if (!m.date) {
+                    seasonStr = getCurrentSeasonStr();
+                } else {
+                    const d = new Date(m.date);
+                    if (isNaN(d.getTime())) {
+                        seasonStr = getCurrentSeasonStr();
+                    } else {
+                        const year = d.getFullYear();
+                        const month = d.getMonth();
+                        if (month >= 5) seasonStr = `${year.toString().slice(2)}/${(year + 1).toString().slice(2)}`;
+                        else seasonStr = `${(year - 1).toString().slice(2)}/${year.toString().slice(2)}`;
+                    }
+                }
+                matchSeasons.set(m.id, seasonStr);
+                seasonSet.add(seasonStr);
+            });
+            seasonSet.add(getCurrentSeasonStr());
+            setAvailableSeasons(Array.from(seasonSet).sort().reverse());
+
+            let apps = 0; let goals = 0; let assists = 0;
+            stats.forEach((s: any) => {
+                const season = matchSeasons.get(s.match_id);
+                if (seasonFilter !== "All" && season !== seasonFilter) return;
+                apps += 1;
+                goals += (s.goals || 0);
+                assists += (s.assists || 0);
+            });
+            setCalculatedStats({ apps, goals, assists });
+
             setLoading(false);
         };
         fetchPlayer();
-    }, [id]);
+    }, [id, seasonFilter]);
 
     if (loading) return <div className="p-8 text-center text-slate-500">Loading profile...</div>;
     if (!player) return notFound();
 
+    const SQUAD_LABELS: Record<string, string> = { firstTeam: "First Team", midweek: "Midweek", youth: "Youth" };
     const squadLabel = SQUAD_LABELS[player.squad as string] || player.squad;
+
+    let displayAge = player.age;
+    if (player.dateOfBirth) {
+        const birthDate = new Date(player.dateOfBirth);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        displayAge = age;
+    }
 
     return (
         <div className="space-y-6">
@@ -107,7 +175,7 @@ export default function PlayerProfilePage() {
                         </div>
                         <div>
                             <p className="text-xs text-slate-500 uppercase font-bold">Age</p>
-                            <p className="font-medium">{player.age}</p>
+                            <p className="font-medium">{displayAge}</p>
                         </div>
                         <div>
                             <p className="text-xs text-slate-500 uppercase font-bold">Status</p>
@@ -128,18 +196,32 @@ export default function PlayerProfilePage() {
                 </TabsList>
 
                 <TabsContent value="overview" className="mt-6 space-y-6">
+                    <div className="flex justify-between items-center bg-slate-50 p-4 border rounded-lg">
+                        <span className="font-bold text-slate-700">Display Stats For:</span>
+                        <select
+                            value={seasonFilter}
+                            onChange={(e) => setSeasonFilter(e.target.value)}
+                            className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500"
+                        >
+                            <option value="All">All Time</option>
+                            {availableSeasons.map(s => (
+                                <option key={s} value={s}>{s} Season</option>
+                            ))}
+                        </select>
+                    </div>
+
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                         <Card>
                             <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Appearances</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold">{player.appearances}</div></CardContent>
+                            <CardContent><div className="text-2xl font-bold">{calculatedStats.apps}</div></CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Goals</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold">{player.goals}</div></CardContent>
+                            <CardContent><div className="text-2xl font-bold">{calculatedStats.goals}</div></CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Assists</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold">{player.assists}</div></CardContent>
+                            <CardContent><div className="text-2xl font-bold">{calculatedStats.assists}</div></CardContent>
                         </Card>
                         <Card>
                             <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Mins Played</CardTitle></CardHeader>

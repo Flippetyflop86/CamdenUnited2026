@@ -1,6 +1,6 @@
 export type Position = "GK" | "DEF" | "MID" | "FWD" | "CB" | "RB" | "LB" | "CM" | "CDM" | "CAM" | "RW" | "LW" | "CF";
 
-export type SquadType = "firstTeam" | "midweek" | "youth";
+export type SquadType = string;
 
 export type MedicalStatus = "Available" | "Unavailable" | "Holiday" | "Injured" | "Doubtful" | "Suspended";
 
@@ -23,9 +23,18 @@ export interface Player {
     appearances: number;
     goals: number;
     assists: number;
+    yellow_cards?: number;
+    red_cards?: number;
     imageUrl?: string;
     notes?: string;
     isInTrainingSquad?: boolean;
+
+    // Contract Info
+    isContracted?: boolean;
+    contractAmount?: number;
+    contractFrequency?: "Weekly" | "Monthly";
+    contractStartDate?: string;
+    contractEndDate?: string;
 }
 
 export interface Staff {
@@ -33,6 +42,13 @@ export interface Staff {
     name: string;
     role: "Coach" | "Physio" | "Admin";
     email: string;
+
+    // Contract Info
+    isContracted?: boolean;
+    contractAmount?: number;
+    contractFrequency?: "Weekly" | "Monthly";
+    contractStartDate?: string;
+    contractEndDate?: string;
 }
 
 export type AttendanceStatus = "Present" | "Late" | "Absent" | "Injured" | "Excuse";
@@ -49,7 +65,7 @@ export interface TrainingSession {
     time: string;
     location: string;
     topic?: string;
-    squad: SquadType | "All";
+    squad: string;
     attendance: AttendanceRecord[];
     notes?: string;
 }
@@ -64,8 +80,11 @@ export interface Match {
     scoreline?: string;
     goalscorers?: string;
     assists?: string;
+    yellow_cards?: string;
+    red_cards?: string;
     result?: "Win" | "Loss" | "Draw" | "Pending";
     notes?: string;
+    surface?: "4G" | "Grass";
 }
 
 export interface OppositionTeam {
@@ -110,7 +129,7 @@ export interface Recruit {
     status: 'Attached' | 'Unattached';
     currentClub?: string;
     onTrial: boolean;
-    scoutedRole: 'Star Player' | '1st Team Player' | 'Rotation Player' | 'Midweek Player' | 'Has Potential';
+    scoutedRole: 'Star Player' | '1st Team Player' | 'Rotation Player' | 'Back-up' | 'Prospect';
     notes: string;
     clubConnection?: string;
     createdAt: string;

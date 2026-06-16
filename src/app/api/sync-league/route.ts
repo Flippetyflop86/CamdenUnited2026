@@ -1,108 +1,84 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import * as cheerio from 'cheerio';
 
-export async function POST() {
+export async function POST(request: Request) {
     try {
+        const body = await request.json();
+        const { url, clubName } = body;
 
-        // 1. Get the league table URL
-        const { data: urlData, error: urlError } = await supabase
-            .from('documents')
-            .select('url')
-            .eq('name', 'League Table')
-            .maybeSingle();
-
-        if (urlError || !urlData?.url) {
-            return NextResponse.json({ error: 'League table URL not found' }, { status: 404 });
+        if (!url || !clubName) {
+            return NextResponse.json({ success: false, error: 'Missing url or clubName' }, { status: 400 });
         }
 
-        // 2. Fetch the league table HTML
-        const response = await fetch(urlData.url, {
+        // Fetch the league page
+        const response = await fetch(url, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
-            },
-            next: { revalidate: 0 }
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
         });
 
         if (!response.ok) {
-            return NextResponse.json({ error: 'Failed to fetch league table' }, { status: 500 });
+            return NextResponse.json({ success: false, error: 'Failed to access the league website.' }, { status: 400 });
         }
 
         const html = await response.text();
+        const $ = cheerio.load(html);
 
-        // 3. Parse the data (Basic scraping since we don't have a DOM parser)
-        // Mitoo tables are usually simple <table><tr>...</tr></table>
-        // We look for "Camden United" and then find the rank before it or after it.
-        // Usually: <tr><td>Pos</td><td>Team</td>...</tr>
+        let position: number | null = null;
+        let foundName = "";
 
-        // Find the index of "Camden United"
-        const teamIndex = html.indexOf('Camden United');
-        if (teamIndex === -1) {
-            return NextResponse.json({ error: 'Team not found in league table' }, { status: 404 });
-        }
+        // Common table selectors for FA Full-Time and Mitoo
+        const rows = $('table tr, tbody tr');
 
-        // Search backwards for the rank
-        // Rank is usually in the first <td> of the <tr>
-        const beforeTeam = html.substring(0, teamIndex);
-        const lastTrIndex = beforeTeam.lastIndexOf('<tr');
-        const teamRow = html.substring(lastTrIndex, html.indexOf('</tr>', teamIndex));
-
-        // Extract cells: <td>Value</td>
-        const cells = teamRow.match(/<td[^>]*>(.*?)<\/td>/g)?.map(c => c.replace(/<[^>]*>/g, '').trim()) || [];
-
-        if (cells.length < 2) {
-            return NextResponse.json({ error: 'Failed to parse team row' }, { status: 500 });
-        }
-
-        // Standard Mitoo table indices (may vary, but usually):
-        // 0: POS, 1: TEAM, 2: PLD, 3: W, 4: D, 5: L, 6: F, 7: A, 8: GD, 9: PTS
-        const rawPos = cells[0];
-        const points = cells[9] || cells[cells.length - 1]; // Fallback to last cell if index is wrong
-
-        // Clean up position (e.g., "1" -> "1st", "2" -> "2nd")
-        const posInt = parseInt(rawPos);
-        let position = rawPos;
-        if (!isNaN(posInt)) {
-            const lastDigit = posInt % 10;
-            const lastTwoDigits = posInt % 100;
-            if (lastTwoDigits >= 11 && lastTwoDigits <= 13) {
-                position = `${posInt}th`;
-            } else {
-                switch (lastDigit) {
-                    case 1: position = `${posInt}st`; break;
-                    case 2: position = `${posInt}nd`; break;
-                    case 3: position = `${posInt}rd`; break;
-                    default: position = `${posInt}th`; break;
+        // Iterate over rows to find the club
+        rows.each((i, row) => {
+            const rowText = $(row).text().toLowerCase();
+            if (rowText.includes(clubName.toLowerCase())) {
+                // We found a row with the club's name!
+                // Usually the position is the very first number in the row, or the first <td>
+                const cells = $(row).find('td, th');
+                
+                // Method 1: Get the first cell text and try to parse it
+                if (cells.length > 0) {
+                    const firstCellText = $(cells[0]).text().trim();
+                    const parsedPos = parseInt(firstCellText, 10);
+                    
+                    if (!isNaN(parsedPos)) {
+                        position = parsedPos;
+                    } else {
+                        // Method 2: Fallback for sites like Mitoo which don't have a position number column
+                        // Count the preceding rows in the same table that look like valid team rows
+                        let prevTeamRows = 0;
+                        $(row).prevAll('tr').each((_, prevRow) => {
+                            const prevText = $(prevRow).text().toLowerCase();
+                            // Skip header rows
+                            if (!prevText.includes('games played') && !prevText.includes('points') && !prevText.includes('goals for') && !prevText.includes('goal difference')) {
+                                // A valid league table row usually has at least 5-6 columns (Played, Won, Drawn, Lost, Points, etc.)
+                                if ($(prevRow).find('td, th').length >= 5) {
+                                    prevTeamRows++;
+                                }
+                            }
+                        });
+                        position = prevTeamRows + 1;
+                    }
+                    
+                    foundName = $(row).text().replace(/\s+/g, ' ').trim();
+                    return false; // Break out of the each loop
                 }
             }
-        }
-
-        // 4. Update the 'League Stats' document
-        const stats = JSON.stringify({
-            position,
-            points: points || "0",
-            lastUpdated: new Date().toISOString()
         });
 
-        const { data: existing } = await supabase
-            .from('documents')
-            .select('id')
-            .eq('name', 'League Stats')
-            .maybeSingle();
-
-        if (existing) {
-            await supabase.from('documents').update({ url: stats }).eq('id', existing.id);
+        if (position !== null) {
+            return NextResponse.json({ success: true, position, foundName });
         } else {
-            await supabase.from('documents').insert([{
-                name: 'League Stats',
-                type: 'Stats',
-                category: 'General',
-                url: stats
-            }]);
+            return NextResponse.json({ 
+                success: false, 
+                error: `Could not find '${clubName}' in the league table. Make sure your club name exactly matches the name used on the league website.` 
+            }, { status: 404 });
         }
 
-        return NextResponse.json({ success: true, position, points });
     } catch (error: any) {
-        console.error('Sync Error:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
+        console.error('League Scraper Error:', error);
+        return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 }

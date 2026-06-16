@@ -42,13 +42,9 @@ const SelectTrigger = ({ className, children, ...props }: any) => {
     );
 };
 
-const SelectValue = ({ placeholder }: { placeholder?: string }) => {
+const SelectValue = ({ placeholder, children }: { placeholder?: string, children?: React.ReactNode }) => {
     const context = React.useContext(SelectContext);
-    // This is simplified; determining label from value without children inspection is hard if children are complex.
-    // But usually SelectValue displays context.value directly if no placeholder logic.
-    // We'll rely on the parent (user) to display meaningful text if value is simple, OR we assume values map to labels 1:1.
-    // Actually, SelectItem children usually contain the label.
-    // For now, let's just display the value or placeholder.
+    if (children) return <span className="pointer-events-none">{children}</span>;
     return <span className="pointer-events-none">{context?.value || placeholder}</span>;
 }
 
@@ -58,7 +54,7 @@ const SelectContent = ({ className, children, position = "popper", ...props }: a
 
     return (
         <div className={cn(
-            "absolute z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-80",
+            "absolute z-50 min-w-[8rem] max-h-[300px] overflow-y-auto overflow-x-hidden rounded-md border bg-popover text-popover-foreground shadow-md animate-in fade-in-80",
             position === "popper" && "translate-y-1",
             className
         )} {...props}>

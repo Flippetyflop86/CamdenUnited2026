@@ -70,12 +70,14 @@ export default function InventoryPage() {
             await supabase.from('inventory_items').insert([payload]);
         }
 
+        await fetchInventory();
         closeModal();
     };
 
     const deleteItem = async (id: string) => {
         if (confirm("Delete this item?")) {
             await supabase.from('inventory_items').delete().eq('id', id);
+            await fetchInventory();
         }
     };
 
@@ -169,7 +171,7 @@ export default function InventoryPage() {
                 </CardHeader>
                 <CardContent>
                     <div className="rounded-md border">
-                        <table className="w-full text-sm">
+                        <div className="overflow-x-auto w-full pb-2"><table className="w-full text-sm">
                             <thead className="bg-slate-50 border-b">
                                 <tr className="text-left text-xs font-medium text-slate-500 uppercase">
                                     <th className="px-4 py-3">Item Name</th>
@@ -234,7 +236,7 @@ export default function InventoryPage() {
                                     </tr>
                                 ))}
                             </tbody>
-                        </table>
+                        </table></div>
                     </div>
                 </CardContent>
             </Card>

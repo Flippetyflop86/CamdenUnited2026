@@ -220,6 +220,32 @@ export const FORMATIONS: Record<string, FormationPosition[]> = {
         { x: 50, y: 70, label: "CAM", number: 10 },
         { x: 85, y: 50, label: "LM", number: 11 },
     ],
+    "4-2-4": [
+        { x: 50, y: 5,  label: "GK",  number: 1 },
+        { x: 15, y: 25, label: "RB",  number: 2 },
+        { x: 85, y: 25, label: "LB",  number: 3 },
+        { x: 65, y: 25, label: "CB",  number: 4 },
+        { x: 35, y: 25, label: "CB",  number: 5 },
+        { x: 65, y: 50, label: "CDM", number: 6 },
+        { x: 20, y: 80, label: "RW",  number: 7 },
+        { x: 35, y: 50, label: "CDM", number: 8 },
+        { x: 35, y: 80, label: "ST",  number: 9 },
+        { x: 65, y: 80, label: "ST",  number: 10 },
+        { x: 80, y: 80, label: "LW",  number: 11 },
+    ],
+    "3-2-5": [
+        { x: 50, y: 5,  label: "GK",  number: 1 },
+        { x: 20, y: 55, label: "RW",  number: 2 },
+        { x: 80, y: 55, label: "LW",  number: 3 },
+        { x: 75, y: 25, label: "CB",  number: 4 },
+        { x: 25, y: 25, label: "CB",  number: 5 },
+        { x: 50, y: 25, label: "CB",  number: 6 },
+        { x: 35, y: 80, label: "ST",  number: 7 },
+        { x: 65, y: 45, label: "CM",  number: 8 },
+        { x: 50, y: 80, label: "ST",  number: 9 },
+        { x: 35, y: 45, label: "CM",  number: 10 },
+        { x: 65, y: 80, label: "ST",  number: 11 },
+    ],
 };
 
 // Formations ordered logically: 4 at the back, then 3 at the back, then 5 at the back
@@ -234,12 +260,14 @@ export const FORMATION_NAMES = [
     "4-1-2-1-2",
     "4-2-2-2",
     "4-4-1-1",
+    "4-2-4",
     // 3 at the back
     "3-5-2",
     "3-4-3",
     "3-4-1-2",
     "3-4-2-1",
     "3-1-4-2",
+    "3-2-5",
     // 5 at the back
     "5-3-2",
     "5-4-1",

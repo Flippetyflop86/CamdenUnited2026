@@ -69,10 +69,22 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
 
     const squadLabel = SQUAD_LABELS[player.squad] || player.squad;
 
+    let displayAge = player.age;
+    if (player.dateOfBirth) {
+        const birthDate = new Date(player.dateOfBirth);
+        const today = new Date();
+        let age = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+            age--;
+        }
+        displayAge = age;
+    }
+
     return (
         <Card className={`overflow-hidden hover:shadow-lg transition-all duration-200 group relative border-2 bg-slate-950 ${positionBorderClass} flex flex-col h-full`}>
-            <CardHeader className="p-0">
-                <div className="bg-slate-900 p-6 flex flex-col items-center justify-center relative border-b border-slate-800">
+            <CardHeader className="p-0 flex-1 flex flex-col">
+                <div className="bg-slate-900 p-6 flex flex-col items-center justify-center flex-1 relative border-b border-slate-800">
                     {onDelete && (
                         <button
                             onClick={(e) => {
@@ -117,23 +129,36 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                     </Avatar>
                     <div className="mt-4 text-center">
                         <CardTitle className="text-white text-lg">{player.firstName} {player.lastName}</CardTitle>
-                        <p className="text-slate-400 text-sm font-medium">{player.position} • {squadLabel} • {player.age} yo</p>
+                        <p className="text-slate-400 text-sm font-medium">{player.position} • {squadLabel} • {displayAge} yo</p>
+
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="p-4 grid grid-cols-3 gap-2 text-center text-sm">
+            <CardContent className="p-4 flex justify-between items-center text-center text-sm overflow-x-auto no-scrollbar">
                 <div className="space-y-1">
                     <p className="text-slate-500 text-xs">Apps</p>
-                    <p className="font-bold">{player.appearances}</p>
+                    <p className="font-bold text-white">{player.appearances ?? 0}</p>
                 </div>
                 <div className="space-y-1">
                     <p className="text-slate-500 text-xs">Goals</p>
-                    <p className="font-bold">{player.goals}</p>
+                    <p className="font-bold text-white">{player.goals ?? 0}</p>
                 </div>
                 <div className="space-y-1">
                     <p className="text-slate-500 text-xs">Assists</p>
-                    <p className="font-bold">{player.assists}</p>
+                    <p className="font-bold text-white">{player.assists ?? 0}</p>
                 </div>
+                {player.yellow_cards !== undefined && player.yellow_cards > 0 && (
+                    <div className="space-y-1">
+                        <p className="text-yellow-400 text-xs font-bold">YC</p>
+                        <p className="font-bold text-white">{player.yellow_cards}</p>
+                    </div>
+                )}
+                {player.red_cards !== undefined && player.red_cards > 0 && (
+                    <div className="space-y-1">
+                        <p className="text-red-500 text-xs font-bold">RC</p>
+                        <p className="font-bold text-white">{player.red_cards}</p>
+                    </div>
+                )}
             </CardContent>
             <CardFooter className="p-4 pt-0 mt-auto">
                 <Button asChild className="w-full bg-slate-900 hover:bg-slate-800">

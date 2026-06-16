@@ -74,11 +74,11 @@ export default function SponsorsPage() {
             name: formData.name,
             amount: formData.amount,
             frequency: formData.frequency,
-            description: formData.description,
-            website: formData.website,
-            start_date: formData.startDate,
-            end_date: formData.endDate,
-            responsibilities: formData.responsibilities
+            description: formData.description || null,
+            website: formData.website || null,
+            start_date: formData.startDate ? formData.startDate : null,
+            end_date: formData.endDate ? formData.endDate : null,
+            responsibilities: formData.responsibilities || null
         };
 
         if (editingId) {
@@ -86,12 +86,14 @@ export default function SponsorsPage() {
         } else {
             await supabase.from('sponsors').insert([payload]);
         }
+        await fetchSponsors();
         closeModal();
     };
 
     const handleDelete = async (id: string) => {
         if (confirm("Are you sure you want to remove this sponsor? This will also remove them from the Finance dashboard.")) {
             await supabase.from('sponsors').delete().eq('id', id);
+            await fetchSponsors();
         }
     };
 
