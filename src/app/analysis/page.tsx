@@ -613,7 +613,7 @@ export default function AnalysisPage() {
                         </div>
                         <div className="space-y-2">
                             <Label>Build-Up Type</Label>
-                            <Select value={shotForm.buildUp} onValueChange={(v) => setShotForm({ ...shotForm, buildUp: v as BuildUpType })}>
+                            <Select value={shotForm.buildUp || ""} onValueChange={(v) => setShotForm({ ...shotForm, buildUp: v as BuildUpType })}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="How did the chance start?" />
                                 </SelectTrigger>
@@ -627,7 +627,7 @@ export default function AnalysisPage() {
                         </div>
                         <div className="space-y-2">
                             <Label>Chance Quality</Label>
-                            <Select value={shotForm.quality} onValueChange={(v) => setShotForm({ ...shotForm, quality: v as ChanceQuality })}>
+                            <Select value={shotForm.quality || ""} onValueChange={(v) => setShotForm({ ...shotForm, quality: v as ChanceQuality })}>
                                 <SelectTrigger>
                                     <SelectValue placeholder="Rate the chance" />
                                 </SelectTrigger>
