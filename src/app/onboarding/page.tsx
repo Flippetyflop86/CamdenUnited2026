@@ -329,7 +329,7 @@ export default function OnboardingWizard() {
                                 </div>
                                 <CardTitle className="text-3xl text-white">You're all set!</CardTitle>
                                 <CardDescription className="text-slate-400 text-lg mt-2">
-                                    Your secure, isolated workspace is ready for action.
+                                    Your secure ClubCore is ready for action.
                                 </CardDescription>
                             </CardHeader>
                             <CardFooter className="bg-slate-950/50 p-8 border-t border-slate-800 mt-4">
