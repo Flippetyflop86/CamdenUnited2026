@@ -6,6 +6,7 @@ interface ClubSettings {
     name: string;
     logo: string | null;
     primaryColor: string;
+    secondaryColor: string;
     financeStartingBalance?: number;
     isOnboarded: boolean;
     leagueUrl: string | null;
@@ -23,6 +24,7 @@ const defaultSettings: ClubSettings = {
     name: "My Club",
     logo: null,
     primaryColor: "#ef4444", // red-500
+    secondaryColor: "#0f172a", // slate-900
     isOnboarded: false,
     leagueUrl: null,
     leaguePosition: null,
@@ -53,6 +55,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         name: data.name || "My Club",
                         logo: data.logo || null,
                         primaryColor: data.primary_color || "#ef4444",
+                        secondaryColor: data.secondary_color || "#0f172a",
                         isOnboarded: data.is_onboarded || false,
                         leagueUrl: data.league_url || null,
                         leaguePosition: data.league_position || null,
@@ -86,6 +89,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                             name: newData.name || prev.name,
                             logo: newData.logo || null,
                             primaryColor: newData.primary_color || prev.primaryColor,
+                            secondaryColor: newData.secondary_color || prev.secondaryColor,
                             isOnboarded: newData.is_onboarded ?? prev.isOnboarded,
                             leagueUrl: newData.league_url ?? prev.leagueUrl,
                             leaguePosition: newData.league_position ?? prev.leaguePosition,
@@ -111,6 +115,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             name: updated.name,
             logo: updated.logo,
             primary_color: updated.primaryColor,
+            secondary_color: updated.secondaryColor,
             is_onboarded: updated.isOnboarded,
             league_url: updated.leagueUrl,
             league_position: updated.leaguePosition
