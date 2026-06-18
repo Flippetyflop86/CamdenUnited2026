@@ -169,9 +169,9 @@ export default function OnboardingWizard() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 flex flex-col md:flex-row">
-            {/* Left side: Wizard */}
-            <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 overflow-y-auto">
+        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center">
+            {/* Wizard Container */}
+            <div className="w-full max-w-xl flex flex-col items-center justify-center p-4 md:p-8">
                 <div className="w-full max-w-xl space-y-8 relative z-10">
                     
                     {/* Progress Indicator */}
@@ -459,61 +459,6 @@ export default function OnboardingWizard() {
                             )}
                         </form>
                     </Card>
-                </div>
-            </div>
-
-            {/* Right side: Live Preview (Hidden on mobile) */}
-            <div className="hidden md:flex md:w-1/2 lg:w-[45%] bg-slate-950 items-center justify-center p-8 border-l border-slate-800 relative overflow-hidden">
-                {/* Background decorative elements based on selected colors */}
-                <div className="absolute inset-0 opacity-20 pointer-events-none transition-colors duration-700" style={{ backgroundImage: `radial-gradient(circle at top right, ${primaryColor}, transparent 50%), radial-gradient(circle at bottom left, ${secondaryColor}, transparent 50%)`}}></div>
-                
-                <div className="w-full max-w-sm space-y-6 relative z-10">
-                    <div className="text-center mb-8">
-                        <span className="text-slate-500 font-medium tracking-widest uppercase text-sm border border-slate-800 px-4 py-1.5 rounded-full bg-slate-900/50 backdrop-blur-sm">Live Preview</span>
-                    </div>
-
-                    {/* Preview Dashboard Card */}
-                    <div className="bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 overflow-hidden transform hover:scale-[1.02] transition-transform duration-300">
-                        {/* Header preview themed with colors */}
-                        <div className="h-24 transition-colors duration-500" style={{ backgroundColor: secondaryColor }}>
-                            <div className="h-full w-full opacity-20" style={{ backgroundImage: `linear-gradient(45deg, ${primaryColor} 25%, transparent 25%, transparent 75%, ${primaryColor} 75%, ${primaryColor}), linear-gradient(45deg, ${primaryColor} 25%, transparent 25%, transparent 75%, ${primaryColor} 75%, ${primaryColor})`, backgroundSize: '20px 20px', backgroundPosition: '0 0, 10px 10px' }}></div>
-                        </div>
-                        
-                        <div className="px-6 pb-6 pt-0 relative">
-                            {/* Logo */}
-                            <div className="absolute -top-12 left-6 w-24 h-24 rounded-2xl bg-slate-800 border-4 border-slate-900 shadow-xl overflow-hidden flex items-center justify-center">
-                                {logoPreview ? (
-                                    <img src={logoPreview} alt="Preview" className="w-full h-full object-contain bg-white" />
-                                ) : (
-                                    <ShieldCheck className="w-10 h-10 text-slate-500" />
-                                )}
-                            </div>
-                            
-                            <div className="mt-14 space-y-4">
-                                <div>
-                                    <h3 className="text-xl font-bold text-white transition-all">{clubName || "Your Club Name"}</h3>
-                                    <p className="text-sm text-slate-400 mt-1">Dashboard Ready</p>
-                                </div>
-
-                                <div className="space-y-2 pt-2 border-t border-slate-800/50">
-                                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Active Squads</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {selectedSquads.length > 0 ? selectedSquads.map(sq => (
-                                            <span key={sq} className="text-xs px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">{sq}</span>
-                                        )) : (
-                                            <span className="text-xs px-2.5 py-1 rounded-full border border-dashed border-slate-700 text-slate-500">None selected</span>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="pt-4">
-                                    <div className="h-10 rounded-lg w-full transition-colors duration-500 flex items-center justify-center" style={{ backgroundColor: primaryColor }}>
-                                        <span className="text-white font-medium text-sm">Main Action Button</span>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
