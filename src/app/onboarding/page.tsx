@@ -28,6 +28,7 @@ export default function OnboardingWizard() {
 
     const availableSquads = ["First Team", "Reserves", "Under-18s", "Under-16s", "Women's Team", "Academy"];
     const [selectedSquads, setSelectedSquads] = useState<string[]>(settings.squads || ["First Team", "Reserves"]);
+    const [customSquadInput, setCustomSquadInput] = useState("");
     
     const [staffInvites, setStaffInvites] = useState([{ name: "", email: "", role: "Assistant Manager" }]);
     const [leagueUrl, setLeagueUrl] = useState(settings.leagueUrl || "");
@@ -151,6 +152,13 @@ export default function OnboardingWizard() {
         setSelectedSquads(prev => 
             prev.includes(squad) ? prev.filter(s => s !== squad) : [...prev, squad]
         );
+    };
+
+    const addCustomSquad = () => {
+        if (customSquadInput.trim() && !selectedSquads.includes(customSquadInput.trim())) {
+            setSelectedSquads(prev => [...prev, customSquadInput.trim()]);
+        }
+        setCustomSquadInput("");
     };
 
     const addStaffField = () => {
@@ -330,9 +338,9 @@ export default function OnboardingWizard() {
                                                 Which squads do you run? This makes organizing players a breeze.
                                             </CardDescription>
                                         </CardHeader>
-                                        <CardContent className="pt-4">
+                                        <CardContent className="pt-4 space-y-4">
                                             <div className="grid grid-cols-2 gap-3">
-                                                {availableSquads.map(squad => {
+                                                {Array.from(new Set([...availableSquads, ...selectedSquads])).map(squad => {
                                                     const isSelected = selectedSquads.includes(squad);
                                                     return (
                                                         <div 
@@ -347,6 +355,23 @@ export default function OnboardingWizard() {
                                                         </div>
                                                     )
                                                 })}
+                                            </div>
+
+                                            <div className="flex gap-2 pt-2 border-t border-slate-800/50">
+                                                <Input 
+                                                    placeholder="Add a custom squad (e.g. Under-12s)"
+                                                    value={customSquadInput}
+                                                    onChange={(e) => setCustomSquadInput(e.target.value)}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addCustomSquad(); } }}
+                                                    className="bg-slate-800 border-slate-700 text-white"
+                                                />
+                                                <Button 
+                                                    type="button" 
+                                                    onClick={addCustomSquad}
+                                                    className="bg-slate-700 hover:bg-slate-600 text-white"
+                                                >
+                                                    Add
+                                                </Button>
                                             </div>
                                         </CardContent>
                                     </motion.div>
