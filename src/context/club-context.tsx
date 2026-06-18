@@ -12,12 +12,15 @@ interface ClubSettings {
     leagueUrl: string | null;
     leaguePosition: number | null;
     squads: string[];
-    homeKitColor: string;
-    awayKitColor: string;
+    homeKitShirt: string;
+    homeKitShorts: string;
+    homeKitSocks: string;
+    awayKitShirt: string;
+    awayKitShorts: string;
+    awayKitSocks: string;
     sponsorLogo: string | null;
     monthlySubs: number;
     finesEnabled: boolean;
-    honors: { year: string; title: string }[];
 }
 
 interface ClubContextType {
@@ -35,12 +38,15 @@ const defaultSettings: ClubSettings = {
     leagueUrl: null,
     leaguePosition: null,
     squads: ["First Team", "Academy"],
-    homeKitColor: "#ffffff",
-    awayKitColor: "#000000",
+    homeKitShirt: "#ffffff",
+    homeKitShorts: "#ffffff",
+    homeKitSocks: "#ffffff",
+    awayKitShirt: "#000000",
+    awayKitShorts: "#000000",
+    awayKitSocks: "#000000",
     sponsorLogo: null,
     monthlySubs: 0,
-    finesEnabled: false,
-    honors: []
+    finesEnabled: false
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -72,12 +78,15 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         leagueUrl: data.league_url || null,
                         leaguePosition: data.league_position || null,
                         squads: data.squads || ["First Team", "Academy"],
-                        homeKitColor: data.home_kit_color || "#ffffff",
-                        awayKitColor: data.away_kit_color || "#000000",
+                        homeKitShirt: data.home_kit_shirt || "#ffffff",
+                        homeKitShorts: data.home_kit_shorts || "#ffffff",
+                        homeKitSocks: data.home_kit_socks || "#ffffff",
+                        awayKitShirt: data.away_kit_shirt || "#000000",
+                        awayKitShorts: data.away_kit_shorts || "#000000",
+                        awayKitSocks: data.away_kit_socks || "#000000",
                         sponsorLogo: data.sponsor_logo || null,
                         monthlySubs: data.monthly_subs || 0,
-                        finesEnabled: data.fines_enabled || false,
-                        honors: data.honors || []
+                        finesEnabled: data.fines_enabled || false
                     });
                 }
             } catch (err) {
@@ -112,12 +121,15 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                             leagueUrl: newData.league_url ?? prev.leagueUrl,
                             leaguePosition: newData.league_position ?? prev.leaguePosition,
                             squads: newData.squads || prev.squads,
-                            homeKitColor: newData.home_kit_color || prev.homeKitColor,
-                            awayKitColor: newData.away_kit_color || prev.awayKitColor,
+                            homeKitShirt: newData.home_kit_shirt || prev.homeKitShirt,
+                            homeKitShorts: newData.home_kit_shorts || prev.homeKitShorts,
+                            homeKitSocks: newData.home_kit_socks || prev.homeKitSocks,
+                            awayKitShirt: newData.away_kit_shirt || prev.awayKitShirt,
+                            awayKitShorts: newData.away_kit_shorts || prev.awayKitShorts,
+                            awayKitSocks: newData.away_kit_socks || prev.awayKitSocks,
                             sponsorLogo: newData.sponsor_logo || null,
                             monthlySubs: newData.monthly_subs ?? prev.monthlySubs,
-                            finesEnabled: newData.fines_enabled ?? prev.finesEnabled,
-                            honors: newData.honors || prev.honors
+                            finesEnabled: newData.fines_enabled ?? prev.finesEnabled
                         }));
                     }
                 }
@@ -143,12 +155,15 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             is_onboarded: updated.isOnboarded,
             league_url: updated.leagueUrl,
             league_position: updated.leaguePosition,
-            home_kit_color: updated.homeKitColor,
-            away_kit_color: updated.awayKitColor,
+            home_kit_shirt: updated.homeKitShirt,
+            home_kit_shorts: updated.homeKitShorts,
+            home_kit_socks: updated.homeKitSocks,
+            away_kit_shirt: updated.awayKitShirt,
+            away_kit_shorts: updated.awayKitShorts,
+            away_kit_socks: updated.awayKitSocks,
             sponsor_logo: updated.sponsorLogo,
             monthly_subs: updated.monthlySubs,
-            fines_enabled: updated.finesEnabled,
-            honors: updated.honors
+            fines_enabled: updated.finesEnabled
         };
         if ('squads' in newSettings) updates.squads = newSettings.squads;
 

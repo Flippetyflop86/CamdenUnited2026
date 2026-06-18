@@ -30,17 +30,18 @@ export default function OnboardingWizard() {
     // Step 2: Colors & Kits
     const [primaryColor, setPrimaryColor] = useState(settings.primaryColor || "#ef4444");
     const [secondaryColor, setSecondaryColor] = useState(settings.secondaryColor || "#0f172a");
-    const [homeKitColor, setHomeKitColor] = useState(settings.homeKitColor || "#ffffff");
-    const [awayKitColor, setAwayKitColor] = useState(settings.awayKitColor || "#000000");
+    const [homeKitShirt, setHomeKitShirt] = useState(settings.homeKitShirt || "#ffffff");
+    const [homeKitShorts, setHomeKitShorts] = useState(settings.homeKitShorts || "#ffffff");
+    const [homeKitSocks, setHomeKitSocks] = useState(settings.homeKitSocks || "#ffffff");
+    const [awayKitShirt, setAwayKitShirt] = useState(settings.awayKitShirt || "#000000");
+    const [awayKitShorts, setAwayKitShorts] = useState(settings.awayKitShorts || "#000000");
+    const [awayKitSocks, setAwayKitSocks] = useState(settings.awayKitSocks || "#000000");
 
     // Step 3: Details & History
     const [homeGroundName, setHomeGroundName] = useState("");
     const [postcode, setPostcode] = useState("");
     const [twitterHandle, setTwitterHandle] = useState("");
     const [instagramHandle, setInstagramHandle] = useState("");
-    const [honors, setHonors] = useState<{ year: string; title: string }[]>(settings.honors || []);
-    const [newHonorYear, setNewHonorYear] = useState("");
-    const [newHonorTitle, setNewHonorTitle] = useState("");
 
     // Step 4: Finance & Operations
     const [monthlySubs, setMonthlySubs] = useState(settings.monthlySubs?.toString() || "35");
@@ -176,12 +177,15 @@ export default function OnboardingWizard() {
                 secondaryColor,
                 squads: selectedSquads,
                 leagueUrl: leagueUrl || null,
-                homeKitColor,
-                awayKitColor,
+                homeKitShirt,
+                homeKitShorts,
+                homeKitSocks,
+                awayKitShirt,
+                awayKitShorts,
+                awayKitSocks,
                 sponsorLogo: finalSponsorUrl,
                 monthlySubs: parseFloat(monthlySubs) || 0,
                 finesEnabled,
-                honors,
                 isOnboarded: true 
             });
 
@@ -215,18 +219,6 @@ export default function OnboardingWizard() {
         const newStaff = [...staffInvites];
         newStaff[index][field] = value;
         setStaffInvites(newStaff);
-    };
-
-    const addHonor = () => {
-        if (newHonorYear.trim() && newHonorTitle.trim()) {
-            setHonors(prev => [...prev, { year: newHonorYear.trim(), title: newHonorTitle.trim() }]);
-            setNewHonorYear("");
-            setNewHonorTitle("");
-        }
-    };
-
-    const removeHonor = (index: number) => {
-        setHonors(prev => prev.filter((_, i) => i !== index));
     };
 
     const animations = {
@@ -355,7 +347,6 @@ export default function OnboardingWizard() {
                                                         <Label className="text-slate-300">Primary Color</Label>
                                                         <div className="flex gap-3">
                                                             <Input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="w-14 h-14 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
-                                                            <Input type="text" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="flex-1 bg-slate-800 border-slate-700 text-white h-14 font-mono uppercase"/>
                                                         </div>
                                                         <div className="flex flex-wrap gap-2 pt-2">
                                                             {presetColors.map(color => (
@@ -367,7 +358,6 @@ export default function OnboardingWizard() {
                                                         <Label className="text-slate-300">Secondary Color</Label>
                                                         <div className="flex gap-3">
                                                             <Input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="w-14 h-14 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
-                                                            <Input type="text" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="flex-1 bg-slate-800 border-slate-700 text-white h-14 font-mono uppercase"/>
                                                         </div>
                                                         <div className="flex flex-wrap gap-2 pt-2">
                                                             {presetColors.map(color => (
@@ -380,19 +370,39 @@ export default function OnboardingWizard() {
 
                                             <div className="space-y-4 pt-2 border-t border-slate-800/50">
                                                 <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Physical Kit Colors</h3>
-                                                <div className="grid grid-cols-2 gap-4">
+                                                <div className="grid grid-cols-2 gap-8">
                                                     <div className="space-y-3">
-                                                        <Label className="text-slate-300">Home Kit Color</Label>
-                                                        <div className="flex gap-3">
-                                                            <Input type="color" value={homeKitColor} onChange={(e) => setHomeKitColor(e.target.value)} className="w-14 h-14 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
-                                                            <Input type="text" value={homeKitColor} onChange={(e) => setHomeKitColor(e.target.value)} className="flex-1 bg-slate-800 border-slate-700 text-white h-14 font-mono uppercase"/>
+                                                        <Label className="text-slate-300">Home Kit</Label>
+                                                        <div className="flex gap-2">
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <Input type="color" value={homeKitShirt} onChange={(e) => setHomeKitShirt(e.target.value)} className="w-10 h-10 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
+                                                                <span className="text-[10px] text-slate-500 uppercase">Shirt</span>
+                                                            </div>
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <Input type="color" value={homeKitShorts} onChange={(e) => setHomeKitShorts(e.target.value)} className="w-10 h-10 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
+                                                                <span className="text-[10px] text-slate-500 uppercase">Shorts</span>
+                                                            </div>
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <Input type="color" value={homeKitSocks} onChange={(e) => setHomeKitSocks(e.target.value)} className="w-10 h-10 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
+                                                                <span className="text-[10px] text-slate-500 uppercase">Socks</span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                     <div className="space-y-3">
-                                                        <Label className="text-slate-300">Away Kit Color</Label>
-                                                        <div className="flex gap-3">
-                                                            <Input type="color" value={awayKitColor} onChange={(e) => setAwayKitColor(e.target.value)} className="w-14 h-14 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
-                                                            <Input type="text" value={awayKitColor} onChange={(e) => setAwayKitColor(e.target.value)} className="flex-1 bg-slate-800 border-slate-700 text-white h-14 font-mono uppercase"/>
+                                                        <Label className="text-slate-300">Away Kit</Label>
+                                                        <div className="flex gap-2">
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <Input type="color" value={awayKitShirt} onChange={(e) => setAwayKitShirt(e.target.value)} className="w-10 h-10 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
+                                                                <span className="text-[10px] text-slate-500 uppercase">Shirt</span>
+                                                            </div>
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <Input type="color" value={awayKitShorts} onChange={(e) => setAwayKitShorts(e.target.value)} className="w-10 h-10 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
+                                                                <span className="text-[10px] text-slate-500 uppercase">Shorts</span>
+                                                            </div>
+                                                            <div className="flex flex-col items-center gap-1">
+                                                                <Input type="color" value={awayKitSocks} onChange={(e) => setAwayKitSocks(e.target.value)} className="w-10 h-10 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
+                                                                <span className="text-[10px] text-slate-500 uppercase">Socks</span>
+                                                            </div>
                                                         </div>
                                                     </div>
                                                 </div>
@@ -435,26 +445,6 @@ export default function OnboardingWizard() {
                                                     <div className="space-y-2">
                                                         <Label className="text-slate-400 flex items-center gap-2"><Instagram className="w-4 h-4 text-pink-500"/> Instagram</Label>
                                                         <Input placeholder="@clubname" value={instagramHandle} onChange={(e) => setInstagramHandle(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-4 pt-4 border-t border-slate-800/50">
-                                                <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2"><Award className="w-4 h-4 text-yellow-500"/> Digital Trophy Cabinet</h3>
-                                                <div className="space-y-2">
-                                                    {honors.map((h, i) => (
-                                                        <div key={i} className="flex gap-2 items-center bg-slate-800 p-2 rounded-lg border border-slate-700">
-                                                            <div className="bg-slate-900 px-3 py-1 rounded text-slate-300 font-mono text-sm border border-slate-700">{h.year}</div>
-                                                            <div className="flex-1 text-white font-medium pl-2">{h.title}</div>
-                                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeHonor(i)} className="text-slate-400 hover:text-red-400">
-                                                                <Trash2 className="w-4 h-4" />
-                                                            </Button>
-                                                        </div>
-                                                    ))}
-                                                    <div className="flex gap-2 pt-2">
-                                                        <Input placeholder="Year (e.g. 2023)" value={newHonorYear} onChange={(e) => setNewHonorYear(e.target.value)} className="w-1/3 bg-slate-800 border-slate-700 text-white" />
-                                                        <Input placeholder="Trophy Name (e.g. League Champions)" value={newHonorTitle} onChange={(e) => setNewHonorTitle(e.target.value)} className="flex-1 bg-slate-800 border-slate-700 text-white" onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); addHonor(); } }}/>
-                                                        <Button type="button" onClick={addHonor} className="bg-slate-700 hover:bg-slate-600 text-white"><Plus className="w-4 h-4"/></Button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -679,7 +669,7 @@ export default function OnboardingWizard() {
                                                 type="button" 
                                                 variant="outline"
                                                 onClick={handleSkip}
-                                                className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                                                className="border-slate-600 bg-slate-800 text-white hover:bg-slate-700 font-medium shadow-md h-12"
                                                 disabled={isLoading}
                                             >
                                                 Skip for now
