@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Upload, CheckCircle2, ChevronRight, Image as ImageIcon, Users, Palette, Trophy, ShieldCheck } from "lucide-react";
+import { AlertCircle, Upload, CheckCircle2, ChevronRight, Image as ImageIcon, Users, Palette, Trophy, ShieldCheck, MapPin, Twitter, Instagram } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
@@ -32,13 +32,17 @@ export default function OnboardingWizard() {
     
     const [staffInvites, setStaffInvites] = useState([{ name: "", email: "", role: "Assistant Manager" }]);
     const [leagueUrl, setLeagueUrl] = useState(settings.leagueUrl || "");
+    const [homeGroundName, setHomeGroundName] = useState("");
+    const [postcode, setPostcode] = useState("");
+    const [twitterHandle, setTwitterHandle] = useState("");
+    const [instagramHandle, setInstagramHandle] = useState("");
     
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
 
     const presetColors = ["#FFFFFF", "#000000", "#EF4444", "#3B82F6", "#10B981", "#F59E0B", "#1E40AF", "#0F172A"];
 
-    const totalSteps = 5;
+    const totalSteps = 6;
 
     const handleNext = () => setStep(prev => prev + 1);
     const handleBack = () => setStep(prev => prev - 1);
@@ -98,7 +102,7 @@ export default function OnboardingWizard() {
             return;
         }
 
-        if (step === 3 && selectedSquads.length === 0) {
+        if (step === 4 && selectedSquads.length === 0) {
             setError("Please select at least one squad.");
             return;
         }
@@ -136,10 +140,11 @@ export default function OnboardingWizard() {
                 secondaryColor,
                 squads: selectedSquads,
                 leagueUrl: leagueUrl || null,
+                // We're passing these in for later usage if club context is extended, or we can just send to DB directly
                 isOnboarded: true 
             });
 
-            setStep(6); // Success screen
+            setStep(7); // Success screen
         } catch (err: any) {
             console.error(err);
             setError(err.message || "Failed to save settings.");
@@ -188,7 +193,7 @@ export default function OnboardingWizard() {
                     {step <= totalSteps && (
                         <div className="flex justify-between items-center px-4 mb-8 relative">
                             <div className="absolute left-6 right-6 top-1/2 h-0.5 bg-slate-800 -z-10" />
-                            {[1, 2, 3, 4, 5].map((num) => (
+                            {[1, 2, 3, 4, 5, 6].map((num) => (
                                 <div key={num} className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs transition-colors duration-300 ${step >= num ? 'bg-red-600 text-white shadow-lg shadow-red-900/50' : 'bg-slate-800 text-slate-500'}`}>
                                     {num}
                                 </div>
@@ -329,9 +334,70 @@ export default function OnboardingWizard() {
                                     </motion.div>
                                 )}
 
-                                {/* STEP 3: Squads */}
+                                {/* STEP 3: Club Details */}
                                 {step === 3 && (
                                     <motion.div key="step3" {...animations}>
+                                        <CardHeader>
+                                            <CardTitle className="text-2xl text-white flex items-center gap-2"><MapPin className="text-red-500"/> Club Details</CardTitle>
+                                            <CardDescription className="text-slate-400 text-lg">
+                                                Where do you play? And where can fans find you online?
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="space-y-6 pt-4">
+                                            <div className="space-y-4">
+                                                <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Home Ground</h3>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <Label className="text-slate-400">Ground Name</Label>
+                                                        <Input 
+                                                            placeholder="e.g. The Emirates" 
+                                                            value={homeGroundName}
+                                                            onChange={(e) => setHomeGroundName(e.target.value)}
+                                                            className="bg-slate-800 border-slate-700 text-white" 
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label className="text-slate-400">Postcode</Label>
+                                                        <Input 
+                                                            placeholder="e.g. N5 1BU" 
+                                                            value={postcode}
+                                                            onChange={(e) => setPostcode(e.target.value)}
+                                                            className="bg-slate-800 border-slate-700 text-white" 
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="space-y-4 pt-2 border-t border-slate-800/50">
+                                                <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Social Media (Optional)</h3>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <Label className="text-slate-400 flex items-center gap-2"><Twitter className="w-4 h-4 text-sky-500"/> Twitter (X)</Label>
+                                                        <Input 
+                                                            placeholder="@clubname" 
+                                                            value={twitterHandle}
+                                                            onChange={(e) => setTwitterHandle(e.target.value)}
+                                                            className="bg-slate-800 border-slate-700 text-white" 
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label className="text-slate-400 flex items-center gap-2"><Instagram className="w-4 h-4 text-pink-500"/> Instagram</Label>
+                                                        <Input 
+                                                            placeholder="@clubname" 
+                                                            value={instagramHandle}
+                                                            onChange={(e) => setInstagramHandle(e.target.value)}
+                                                            className="bg-slate-800 border-slate-700 text-white" 
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </CardContent>
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 4: Squads */}
+                                {step === 4 && (
+                                    <motion.div key="step4" {...animations}>
                                         <CardHeader>
                                             <CardTitle className="text-2xl text-white flex items-center gap-2"><ShieldCheck className="text-red-500"/> Squad Setup</CardTitle>
                                             <CardDescription className="text-slate-400 text-lg">
@@ -377,9 +443,9 @@ export default function OnboardingWizard() {
                                     </motion.div>
                                 )}
 
-                                {/* STEP 4: Staff Invites */}
-                                {step === 4 && (
-                                    <motion.div key="step4" {...animations}>
+                                {/* STEP 5: Staff Invites */}
+                                {step === 5 && (
+                                    <motion.div key="step5" {...animations}>
                                         <CardHeader>
                                             <CardTitle className="text-2xl text-white flex items-center gap-2"><Users className="text-red-500"/> Invite Coaching Staff</CardTitle>
                                             <CardDescription className="text-slate-400 text-lg">
@@ -433,9 +499,9 @@ export default function OnboardingWizard() {
                                     </motion.div>
                                 )}
 
-                                {/* STEP 5: League Table */}
-                                {step === 5 && (
-                                    <motion.div key="step5" {...animations}>
+                                {/* STEP 6: League Table */}
+                                {step === 6 && (
+                                    <motion.div key="step6" {...animations}>
                                         <CardHeader>
                                             <CardTitle className="text-2xl text-white flex items-center gap-2"><Trophy className="text-red-500"/> League Standings</CardTitle>
                                             <CardDescription className="text-slate-400 text-lg">
@@ -457,9 +523,9 @@ export default function OnboardingWizard() {
                                     </motion.div>
                                 )}
 
-                                {/* STEP 6: Complete */}
-                                {step === 6 && (
-                                    <motion.div key="step6" {...animations} className="text-center">
+                                {/* STEP 7: Complete */}
+                                {step === 7 && (
+                                    <motion.div key="step7" {...animations} className="text-center">
                                         <CardHeader className="pt-12 pb-6">
                                             <div className="mx-auto w-24 h-24 bg-green-500/20 rounded-full flex items-center justify-center mb-6">
                                                 <CheckCircle2 className="h-12 w-12 text-green-500" />
@@ -484,7 +550,7 @@ export default function OnboardingWizard() {
                             </AnimatePresence>
 
                             {/* Global Footer Navigation */}
-                            {step < 6 && (
+                            {step < 7 && (
                                 <CardFooter className="bg-slate-950/50 p-6 border-t border-slate-800 flex justify-between gap-4 relative z-20">
                                     {step > 1 ? (
                                         <Button 
