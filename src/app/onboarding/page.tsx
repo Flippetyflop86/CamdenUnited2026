@@ -26,7 +26,7 @@ export default function OnboardingWizard() {
     const [primaryColor, setPrimaryColor] = useState(settings.primaryColor || "#ef4444");
     const [secondaryColor, setSecondaryColor] = useState(settings.secondaryColor || "#0f172a");
 
-    const availableSquads = ["First Team", "Reserves", "Under-18s", "Under-16s", "Women's Team", "Academy"];
+    const availableSquads = ["First Team", "Reserves", "Under-18s", "Under-16s", "Women's Team", "Academy", "Pan-Disability"];
     const [selectedSquads, setSelectedSquads] = useState<string[]>(settings.squads || ["First Team", "Reserves"]);
     const [customSquadInput, setCustomSquadInput] = useState("");
     
