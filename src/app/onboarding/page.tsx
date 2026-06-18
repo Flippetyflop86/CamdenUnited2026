@@ -439,7 +439,7 @@ export default function OnboardingWizard() {
                                         <CardHeader>
                                             <CardTitle className="text-2xl text-white flex items-center gap-2"><Trophy className="text-red-500"/> League Standings</CardTitle>
                                             <CardDescription className="text-slate-400 text-lg">
-                                                Paste your FA Full-Time link so we can pull your standings directly into your dashboard.
+                                                Paste the public URL to your league's official standings page so we can pull it directly into your dashboard.
                                             </CardDescription>
                                         </CardHeader>
                                         <CardContent className="space-y-6 pt-4">
@@ -447,7 +447,7 @@ export default function OnboardingWizard() {
                                                 <Label htmlFor="leagueUrl" className="text-slate-300 text-base">League Table URL (Optional)</Label>
                                                 <Input
                                                     id="leagueUrl"
-                                                    placeholder="https://fulltime.thefa.com/..."
+                                                    placeholder="e.g. https://fulltime.thefa.com/... or any league website"
                                                     value={leagueUrl}
                                                     onChange={(e) => setLeagueUrl(e.target.value)}
                                                     className="bg-slate-800 border-slate-700 text-white text-lg h-14 px-4 placeholder:text-slate-500 focus-visible:ring-red-500"
