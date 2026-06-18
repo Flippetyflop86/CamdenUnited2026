@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Upload, CheckCircle2, ChevronRight, Image as ImageIcon, Users, Palette, Trophy, ShieldCheck, MapPin, Twitter, Instagram } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, Upload, CheckCircle2, ChevronRight, Image as ImageIcon, Users, Palette, Trophy, ShieldCheck, MapPin, Twitter, Instagram, Banknote, ShieldAlert, Award, Plus, Trash2 } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { motion, AnimatePresence } from "framer-motion";
@@ -19,43 +19,73 @@ export default function OnboardingWizard() {
     const router = useRouter();
 
     const [step, setStep] = useState(1);
+    
+    // Step 1: Identity & Sponsors
     const [clubName, setClubName] = useState(settings.name);
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(settings.logo);
-    
+    const [sponsorLogoFile, setSponsorLogoFile] = useState<File | null>(null);
+    const [sponsorLogoPreview, setSponsorLogoPreview] = useState<string | null>(settings.sponsorLogo);
+
+    // Step 2: Colors & Kits
     const [primaryColor, setPrimaryColor] = useState(settings.primaryColor || "#ef4444");
     const [secondaryColor, setSecondaryColor] = useState(settings.secondaryColor || "#0f172a");
+    const [homeKitColor, setHomeKitColor] = useState(settings.homeKitColor || "#ffffff");
+    const [awayKitColor, setAwayKitColor] = useState(settings.awayKitColor || "#000000");
 
-    const availableSquads = ["First Team", "Reserves", "Under-18s", "Under-16s", "Women's Team", "Academy", "Pan-Disability"];
-    const [selectedSquads, setSelectedSquads] = useState<string[]>(["First Team"]);
-    const [customSquadInput, setCustomSquadInput] = useState("");
-    
-    const [staffInvites, setStaffInvites] = useState([{ name: "", email: "", role: "Assistant Manager" }]);
-    const [leagueUrl, setLeagueUrl] = useState(settings.leagueUrl || "");
+    // Step 3: Details & History
     const [homeGroundName, setHomeGroundName] = useState("");
     const [postcode, setPostcode] = useState("");
     const [twitterHandle, setTwitterHandle] = useState("");
     const [instagramHandle, setInstagramHandle] = useState("");
-    
+    const [honors, setHonors] = useState<{ year: string; title: string }[]>(settings.honors || []);
+    const [newHonorYear, setNewHonorYear] = useState("");
+    const [newHonorTitle, setNewHonorTitle] = useState("");
+
+    // Step 4: Finance & Operations
+    const [monthlySubs, setMonthlySubs] = useState(settings.monthlySubs?.toString() || "35");
+    const [finesEnabled, setFinesEnabled] = useState(settings.finesEnabled || false);
+
+    // Step 5: Squads
+    const availableSquads = ["First Team", "Reserves", "Under-18s", "Under-16s", "Women's Team", "Academy", "Pan-Disability"];
+    const [selectedSquads, setSelectedSquads] = useState<string[]>(["First Team"]);
+    const [customSquadInput, setCustomSquadInput] = useState("");
+
+    // Step 6: Committee & Staff
+    const [staffInvites, setStaffInvites] = useState([
+        { name: "", email: "", role: "Chairman" },
+        { name: "", email: "", role: "Secretary" },
+        { name: "", email: "", role: "Treasurer" }
+    ]);
+
+    // Step 7: League
+    const [leagueUrl, setLeagueUrl] = useState(settings.leagueUrl || "");
+
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
 
     const presetColors = ["#FFFFFF", "#000000", "#EF4444", "#3B82F6", "#10B981", "#F59E0B", "#1E40AF", "#0F172A"];
 
-    const totalSteps = 6;
+    const totalSteps = 7;
 
     const handleNext = () => setStep(prev => prev + 1);
     const handleBack = () => setStep(prev => prev - 1);
+    const handleSkip = () => handleNext();
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'sponsor') => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
-            setLogoFile(file);
-            setLogoPreview(URL.createObjectURL(file));
+            if (type === 'logo') {
+                setLogoFile(file);
+                setLogoPreview(URL.createObjectURL(file));
+            } else {
+                setSponsorLogoFile(file);
+                setSponsorLogoPreview(URL.createObjectURL(file));
+            }
         }
     };
 
-    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+    const handlePaste = (e: React.ClipboardEvent<HTMLDivElement>, type: 'logo' | 'sponsor') => {
         const items = e.clipboardData?.items;
         if (!items) return;
 
@@ -63,8 +93,13 @@ export default function OnboardingWizard() {
             if (items[i].type.indexOf("image") !== -1) {
                 const file = items[i].getAsFile();
                 if (file) {
-                    setLogoFile(file);
-                    setLogoPreview(URL.createObjectURL(file));
+                    if (type === 'logo') {
+                        setLogoFile(file);
+                        setLogoPreview(URL.createObjectURL(file));
+                    } else {
+                        setSponsorLogoFile(file);
+                        setSponsorLogoPreview(URL.createObjectURL(file));
+                    }
                     e.preventDefault();
                     break;
                 }
@@ -72,25 +107,25 @@ export default function OnboardingWizard() {
         }
     };
 
-    const uploadLogoIfAny = async () => {
-        if (logoFile && user) {
-            const fileExt = logoFile.name.split('.').pop() || 'png';
+    const uploadFileIfAny = async (file: File | null, existingUrl: string | null, bucket: string) => {
+        if (file && user) {
+            const fileExt = file.name.split('.').pop() || 'png';
             const fileName = `${user.id}-${Math.random()}.${fileExt}`;
             const filePath = `${fileName}`;
 
             const { error: uploadError } = await supabase.storage
-                .from('club_logos')
-                .upload(filePath, logoFile, { upsert: true });
+                .from(bucket)
+                .upload(filePath, file, { upsert: true });
 
             if (uploadError) throw uploadError;
 
             const { data: publicUrlData } = supabase.storage
-                .from('club_logos')
+                .from(bucket)
                 .getPublicUrl(filePath);
 
             return publicUrlData.publicUrl;
         }
-        return logoPreview;
+        return existingUrl;
     };
 
     const handleSaveAndNext = async (e: React.FormEvent) => {
@@ -102,7 +137,7 @@ export default function OnboardingWizard() {
             return;
         }
 
-        if (step === 4 && selectedSquads.length === 0) {
+        if (step === 5 && selectedSquads.length === 0) {
             setError("Please select at least one squad.");
             return;
         }
@@ -118,7 +153,8 @@ export default function OnboardingWizard() {
         setIsLoading(true);
         setError("");
         try {
-            const finalLogoUrl = await uploadLogoIfAny();
+            const finalLogoUrl = await uploadFileIfAny(logoFile, logoPreview, 'club_logos');
+            const finalSponsorUrl = await uploadFileIfAny(sponsorLogoFile, sponsorLogoPreview, 'club_logos');
 
             // Handle Staff Invites (Mocking it by saving to staff table without auth for now)
             const validStaff = staffInvites.filter(s => s.name.trim() && s.email.trim());
@@ -140,11 +176,16 @@ export default function OnboardingWizard() {
                 secondaryColor,
                 squads: selectedSquads,
                 leagueUrl: leagueUrl || null,
-                // We're passing these in for later usage if club context is extended, or we can just send to DB directly
+                homeKitColor,
+                awayKitColor,
+                sponsorLogo: finalSponsorUrl,
+                monthlySubs: parseFloat(monthlySubs) || 0,
+                finesEnabled,
+                honors,
                 isOnboarded: true 
             });
 
-            setStep(7); // Success screen
+            setStep(8); // Success screen
         } catch (err: any) {
             console.error(err);
             setError(err.message || "Failed to save settings.");
@@ -176,6 +217,18 @@ export default function OnboardingWizard() {
         setStaffInvites(newStaff);
     };
 
+    const addHonor = () => {
+        if (newHonorYear.trim() && newHonorTitle.trim()) {
+            setHonors(prev => [...prev, { year: newHonorYear.trim(), title: newHonorTitle.trim() }]);
+            setNewHonorYear("");
+            setNewHonorTitle("");
+        }
+    };
+
+    const removeHonor = (index: number) => {
+        setHonors(prev => prev.filter((_, i) => i !== index));
+    };
+
     const animations = {
         initial: { opacity: 0, x: 20 },
         animate: { opacity: 1, x: 0 },
@@ -184,16 +237,16 @@ export default function OnboardingWizard() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center">
+        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center py-10">
             {/* Wizard Container */}
-            <div className="w-full max-w-xl flex flex-col items-center justify-center p-4 md:p-8">
-                <div className="w-full max-w-xl space-y-8 relative z-10">
+            <div className="w-full max-w-2xl flex flex-col items-center justify-center p-4 md:p-8">
+                <div className="w-full space-y-8 relative z-10">
                     
                     {/* Progress Indicator */}
                     {step <= totalSteps && (
                         <div className="flex justify-between items-center px-4 mb-8 relative">
                             <div className="absolute left-6 right-6 top-1/2 h-0.5 bg-slate-800 -z-10" />
-                            {[1, 2, 3, 4, 5, 6].map((num) => (
+                            {[1, 2, 3, 4, 5, 6, 7].map((num) => (
                                 <div key={num} className={`h-8 w-8 rounded-full flex items-center justify-center font-bold text-xs transition-colors duration-300 ${step >= num ? 'bg-red-600 text-white shadow-lg shadow-red-900/50' : 'bg-slate-800 text-slate-500'}`}>
                                     {num}
                                 </div>
@@ -212,7 +265,7 @@ export default function OnboardingWizard() {
                         <form onSubmit={handleSaveAndNext}>
                             <AnimatePresence mode="wait">
                                 
-                                {/* STEP 1: Identity */}
+                                {/* STEP 1: Identity & Sponsors */}
                                 {step === 1 && (
                                     <motion.div key="step1" {...animations} className="flex flex-col h-full">
                                         <CardHeader>
@@ -233,100 +286,114 @@ export default function OnboardingWizard() {
                                                     className="bg-slate-800 border-slate-700 text-white text-lg h-14 px-4 placeholder:text-slate-500 focus-visible:ring-red-500"
                                                 />
                                             </div>
-                                            <div className="space-y-3">
-                                                <Label className="text-slate-300 text-base">Club Badge</Label>
-                                                <div 
-                                                    className="relative group cursor-pointer w-full h-40 rounded-xl bg-slate-800 border-2 border-dashed border-slate-600 hover:border-red-500 transition-colors flex items-center justify-center overflow-hidden"
-                                                    onPaste={handlePaste}
-                                                    tabIndex={0}
-                                                >
-                                                    <input 
-                                                        type="file" 
-                                                        accept="image/*" 
-                                                        onChange={handleFileSelect} 
-                                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                                                    />
-                                                    {logoPreview ? (
-                                                        <img src={logoPreview} alt="Preview" className="w-full h-full object-contain p-2" />
-                                                    ) : (
-                                                        <div className="flex flex-col items-center text-slate-500 group-hover:text-red-400 transition-colors">
-                                                            <ImageIcon className="h-10 w-10 mb-2" />
-                                                            <span className="font-medium text-center px-4">Click to upload or Paste screenshot</span>
-                                                        </div>
-                                                    )}
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                                <div className="space-y-3">
+                                                    <Label className="text-slate-300 text-base">Club Badge</Label>
+                                                    <div 
+                                                        className="relative group cursor-pointer w-full h-32 rounded-xl bg-slate-800 border-2 border-dashed border-slate-600 hover:border-red-500 transition-colors flex items-center justify-center overflow-hidden"
+                                                        onPaste={(e) => handlePaste(e, 'logo')}
+                                                        tabIndex={0}
+                                                    >
+                                                        <input 
+                                                            type="file" 
+                                                            accept="image/*" 
+                                                            onChange={(e) => handleFileSelect(e, 'logo')} 
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                        />
+                                                        {logoPreview ? (
+                                                            <img src={logoPreview} alt="Preview" className="w-full h-full object-contain p-2" />
+                                                        ) : (
+                                                            <div className="flex flex-col items-center text-slate-500 group-hover:text-red-400 transition-colors">
+                                                                <ImageIcon className="h-8 w-8 mb-2" />
+                                                                <span className="font-medium text-xs text-center px-4">Upload Badge</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-3">
+                                                    <Label className="text-slate-300 text-base">Main Sponsor Logo (Optional)</Label>
+                                                    <div 
+                                                        className="relative group cursor-pointer w-full h-32 rounded-xl bg-slate-800 border-2 border-dashed border-slate-600 hover:border-blue-500 transition-colors flex items-center justify-center overflow-hidden"
+                                                        onPaste={(e) => handlePaste(e, 'sponsor')}
+                                                        tabIndex={0}
+                                                    >
+                                                        <input 
+                                                            type="file" 
+                                                            accept="image/*" 
+                                                            onChange={(e) => handleFileSelect(e, 'sponsor')} 
+                                                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                                                        />
+                                                        {sponsorLogoPreview ? (
+                                                            <img src={sponsorLogoPreview} alt="Preview" className="w-full h-full object-contain p-2" />
+                                                        ) : (
+                                                            <div className="flex flex-col items-center text-slate-500 group-hover:text-blue-400 transition-colors">
+                                                                <Upload className="h-8 w-8 mb-2" />
+                                                                <span className="font-medium text-xs text-center px-4">Upload Sponsor Logo</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         </CardContent>
                                     </motion.div>
                                 )}
 
-                                {/* STEP 2: Colors */}
+                                {/* STEP 2: Colors & Kits */}
                                 {step === 2 && (
                                     <motion.div key="step2" {...animations}>
                                         <CardHeader>
-                                            <CardTitle className="text-2xl text-white flex items-center gap-2"><Palette className="text-red-500"/> Theme & Colors</CardTitle>
+                                            <CardTitle className="text-2xl text-white flex items-center gap-2"><Palette className="text-red-500"/> Theme & Kits</CardTitle>
                                             <CardDescription className="text-slate-400 text-lg">
-                                                Make the platform feel like home. These colors will be used across your dashboard.
+                                                Set your digital app theme and your physical kit colors.
                                             </CardDescription>
                                         </CardHeader>
                                         <CardContent className="space-y-6 pt-4">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-3">
-                                                    <Label className="text-slate-300">Primary Color</Label>
-                                                    <div className="flex gap-3">
-                                                        <Input
-                                                            type="color"
-                                                            value={primaryColor}
-                                                            onChange={(e) => setPrimaryColor(e.target.value)}
-                                                            className="w-14 h-14 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"
-                                                        />
-                                                        <Input 
-                                                            type="text" 
-                                                            value={primaryColor}
-                                                            onChange={(e) => setPrimaryColor(e.target.value)}
-                                                            className="flex-1 bg-slate-800 border-slate-700 text-white h-14 font-mono uppercase"
-                                                        />
+                                            <div className="space-y-4">
+                                                <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">App Theme Colors</h3>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-3">
+                                                        <Label className="text-slate-300">Primary Color</Label>
+                                                        <div className="flex gap-3">
+                                                            <Input type="color" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="w-14 h-14 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
+                                                            <Input type="text" value={primaryColor} onChange={(e) => setPrimaryColor(e.target.value)} className="flex-1 bg-slate-800 border-slate-700 text-white h-14 font-mono uppercase"/>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2 pt-2">
+                                                            {presetColors.map(color => (
+                                                                <button key={color} type="button" onClick={() => setPrimaryColor(color)} className={`w-6 h-6 rounded-full border-2 transition-all ${primaryColor.toUpperCase() === color ? 'border-white scale-110' : 'border-slate-700 hover:scale-110'}`} style={{ backgroundColor: color }} title={color}/>
+                                                            ))}
+                                                        </div>
                                                     </div>
-                                                    <div className="flex flex-wrap gap-2 pt-2">
-                                                        {presetColors.map(color => (
-                                                            <button
-                                                                key={color}
-                                                                type="button"
-                                                                onClick={() => setPrimaryColor(color)}
-                                                                className={`w-6 h-6 rounded-full border-2 transition-all ${primaryColor.toUpperCase() === color ? 'border-white scale-110' : 'border-slate-700 hover:scale-110'}`}
-                                                                style={{ backgroundColor: color }}
-                                                                title={color}
-                                                            />
-                                                        ))}
+                                                    <div className="space-y-3">
+                                                        <Label className="text-slate-300">Secondary Color</Label>
+                                                        <div className="flex gap-3">
+                                                            <Input type="color" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="w-14 h-14 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
+                                                            <Input type="text" value={secondaryColor} onChange={(e) => setSecondaryColor(e.target.value)} className="flex-1 bg-slate-800 border-slate-700 text-white h-14 font-mono uppercase"/>
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-2 pt-2">
+                                                            {presetColors.map(color => (
+                                                                <button key={color} type="button" onClick={() => setSecondaryColor(color)} className={`w-6 h-6 rounded-full border-2 transition-all ${secondaryColor.toUpperCase() === color ? 'border-white scale-110' : 'border-slate-700 hover:scale-110'}`} style={{ backgroundColor: color }} title={color}/>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                                <div className="space-y-3">
-                                                    <Label className="text-slate-300">Secondary Color</Label>
-                                                    <div className="flex gap-3">
-                                                        <Input
-                                                            type="color"
-                                                            value={secondaryColor}
-                                                            onChange={(e) => setSecondaryColor(e.target.value)}
-                                                            className="w-14 h-14 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"
-                                                        />
-                                                        <Input 
-                                                            type="text" 
-                                                            value={secondaryColor}
-                                                            onChange={(e) => setSecondaryColor(e.target.value)}
-                                                            className="flex-1 bg-slate-800 border-slate-700 text-white h-14 font-mono uppercase"
-                                                        />
+                                            </div>
+
+                                            <div className="space-y-4 pt-2 border-t border-slate-800/50">
+                                                <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Physical Kit Colors</h3>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-3">
+                                                        <Label className="text-slate-300">Home Kit Color</Label>
+                                                        <div className="flex gap-3">
+                                                            <Input type="color" value={homeKitColor} onChange={(e) => setHomeKitColor(e.target.value)} className="w-14 h-14 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
+                                                            <Input type="text" value={homeKitColor} onChange={(e) => setHomeKitColor(e.target.value)} className="flex-1 bg-slate-800 border-slate-700 text-white h-14 font-mono uppercase"/>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex flex-wrap gap-2 pt-2">
-                                                        {presetColors.map(color => (
-                                                            <button
-                                                                key={color}
-                                                                type="button"
-                                                                onClick={() => setSecondaryColor(color)}
-                                                                className={`w-6 h-6 rounded-full border-2 transition-all ${secondaryColor.toUpperCase() === color ? 'border-white scale-110' : 'border-slate-700 hover:scale-110'}`}
-                                                                style={{ backgroundColor: color }}
-                                                                title={color}
-                                                            />
-                                                        ))}
+                                                    <div className="space-y-3">
+                                                        <Label className="text-slate-300">Away Kit Color</Label>
+                                                        <div className="flex gap-3">
+                                                            <Input type="color" value={awayKitColor} onChange={(e) => setAwayKitColor(e.target.value)} className="w-14 h-14 p-1 cursor-pointer bg-slate-800 border-slate-700 rounded-lg"/>
+                                                            <Input type="text" value={awayKitColor} onChange={(e) => setAwayKitColor(e.target.value)} className="flex-1 bg-slate-800 border-slate-700 text-white h-14 font-mono uppercase"/>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -334,60 +401,60 @@ export default function OnboardingWizard() {
                                     </motion.div>
                                 )}
 
-                                {/* STEP 3: Club Details */}
+                                {/* STEP 3: Details & History */}
                                 {step === 3 && (
                                     <motion.div key="step3" {...animations}>
                                         <CardHeader>
-                                            <CardTitle className="text-2xl text-white flex items-center gap-2"><MapPin className="text-red-500"/> Club Details</CardTitle>
+                                            <CardTitle className="text-2xl text-white flex items-center gap-2"><MapPin className="text-red-500"/> Details & History</CardTitle>
                                             <CardDescription className="text-slate-400 text-lg">
-                                                Where do you play? And where can fans find you online?
+                                                Where do you play? And what have you won?
                                             </CardDescription>
                                         </CardHeader>
-                                        <CardContent className="space-y-6 pt-4">
+                                        <CardContent className="space-y-6 pt-4 max-h-[400px] overflow-y-auto custom-scrollbar">
                                             <div className="space-y-4">
                                                 <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Home Ground</h3>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div className="space-y-2">
                                                         <Label className="text-slate-400">Ground Name</Label>
-                                                        <Input 
-                                                            placeholder="e.g. The Emirates" 
-                                                            value={homeGroundName}
-                                                            onChange={(e) => setHomeGroundName(e.target.value)}
-                                                            className="bg-slate-800 border-slate-700 text-white" 
-                                                        />
+                                                        <Input placeholder="e.g. The Emirates" value={homeGroundName} onChange={(e) => setHomeGroundName(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
                                                     </div>
                                                     <div className="space-y-2">
                                                         <Label className="text-slate-400">Postcode</Label>
-                                                        <Input 
-                                                            placeholder="e.g. N5 1BU" 
-                                                            value={postcode}
-                                                            onChange={(e) => setPostcode(e.target.value)}
-                                                            className="bg-slate-800 border-slate-700 text-white" 
-                                                        />
+                                                        <Input placeholder="e.g. N5 1BU" value={postcode} onChange={(e) => setPostcode(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
                                                     </div>
                                                 </div>
                                             </div>
                                             
-                                            <div className="space-y-4 pt-2 border-t border-slate-800/50">
+                                            <div className="space-y-4 pt-4 border-t border-slate-800/50">
                                                 <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider">Social Media (Optional)</h3>
                                                 <div className="grid grid-cols-2 gap-4">
                                                     <div className="space-y-2">
                                                         <Label className="text-slate-400 flex items-center gap-2"><Twitter className="w-4 h-4 text-sky-500"/> Twitter (X)</Label>
-                                                        <Input 
-                                                            placeholder="@clubname" 
-                                                            value={twitterHandle}
-                                                            onChange={(e) => setTwitterHandle(e.target.value)}
-                                                            className="bg-slate-800 border-slate-700 text-white" 
-                                                        />
+                                                        <Input placeholder="@clubname" value={twitterHandle} onChange={(e) => setTwitterHandle(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
                                                     </div>
                                                     <div className="space-y-2">
                                                         <Label className="text-slate-400 flex items-center gap-2"><Instagram className="w-4 h-4 text-pink-500"/> Instagram</Label>
-                                                        <Input 
-                                                            placeholder="@clubname" 
-                                                            value={instagramHandle}
-                                                            onChange={(e) => setInstagramHandle(e.target.value)}
-                                                            className="bg-slate-800 border-slate-700 text-white" 
-                                                        />
+                                                        <Input placeholder="@clubname" value={instagramHandle} onChange={(e) => setInstagramHandle(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-4 pt-4 border-t border-slate-800/50">
+                                                <h3 className="text-sm font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-2"><Award className="w-4 h-4 text-yellow-500"/> Digital Trophy Cabinet</h3>
+                                                <div className="space-y-2">
+                                                    {honors.map((h, i) => (
+                                                        <div key={i} className="flex gap-2 items-center bg-slate-800 p-2 rounded-lg border border-slate-700">
+                                                            <div className="bg-slate-900 px-3 py-1 rounded text-slate-300 font-mono text-sm border border-slate-700">{h.year}</div>
+                                                            <div className="flex-1 text-white font-medium pl-2">{h.title}</div>
+                                                            <Button type="button" variant="ghost" size="icon" onClick={() => removeHonor(i)} className="text-slate-400 hover:text-red-400">
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                    <div className="flex gap-2 pt-2">
+                                                        <Input placeholder="Year (e.g. 2023)" value={newHonorYear} onChange={(e) => setNewHonorYear(e.target.value)} className="w-1/3 bg-slate-800 border-slate-700 text-white" />
+                                                        <Input placeholder="Trophy Name (e.g. League Champions)" value={newHonorTitle} onChange={(e) => setNewHonorTitle(e.target.value)} className="flex-1 bg-slate-800 border-slate-700 text-white" onKeyDown={(e) => { if(e.key === 'Enter') { e.preventDefault(); addHonor(); } }}/>
+                                                        <Button type="button" onClick={addHonor} className="bg-slate-700 hover:bg-slate-600 text-white"><Plus className="w-4 h-4"/></Button>
                                                     </div>
                                                 </div>
                                             </div>
@@ -395,9 +462,50 @@ export default function OnboardingWizard() {
                                     </motion.div>
                                 )}
 
-                                {/* STEP 4: Squads */}
+                                {/* STEP 4: Finance & Operations */}
                                 {step === 4 && (
                                     <motion.div key="step4" {...animations}>
+                                        <CardHeader>
+                                            <CardTitle className="text-2xl text-white flex items-center gap-2"><Banknote className="text-green-500"/> Finance & Operations</CardTitle>
+                                            <CardDescription className="text-slate-400 text-lg">
+                                                Set your baseline subs and club rules.
+                                            </CardDescription>
+                                        </CardHeader>
+                                        <CardContent className="space-y-8 pt-4">
+                                            <div className="space-y-3">
+                                                <Label className="text-slate-300 text-base">Standard Monthly Player Subs (£)</Label>
+                                                <div className="relative">
+                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg font-medium">£</span>
+                                                    <Input 
+                                                        type="number"
+                                                        value={monthlySubs}
+                                                        onChange={(e) => setMonthlySubs(e.target.value)}
+                                                        className="bg-slate-800 border-slate-700 text-white text-lg h-14 pl-10 placeholder:text-slate-500 focus-visible:ring-green-500"
+                                                    />
+                                                </div>
+                                                <p className="text-slate-500 text-sm">We use this to auto-populate your finance dashboard expectations.</p>
+                                            </div>
+
+                                            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 flex items-start justify-between gap-4">
+                                                <div className="space-y-1.5">
+                                                    <Label className="text-white text-base flex items-center gap-2"><ShieldAlert className="w-5 h-5 text-yellow-500"/> Fines System Module</Label>
+                                                    <p className="text-slate-400 text-sm leading-relaxed">
+                                                        Enable the Fines Tracker module on your dashboard? This allows you to track and collect fines for yellow cards, red cards, lateness, or dirty boots.
+                                                    </p>
+                                                </div>
+                                                <Switch 
+                                                    checked={finesEnabled} 
+                                                    onCheckedChange={setFinesEnabled}
+                                                    className="data-[state=checked]:bg-green-500"
+                                                />
+                                            </div>
+                                        </CardContent>
+                                    </motion.div>
+                                )}
+
+                                {/* STEP 5: Squads */}
+                                {step === 5 && (
+                                    <motion.div key="step5" {...animations}>
                                         <CardHeader>
                                             <CardTitle className="text-2xl text-white flex items-center gap-2"><ShieldCheck className="text-red-500"/> Squad Setup</CardTitle>
                                             <CardDescription className="text-slate-400 text-lg">
@@ -443,18 +551,18 @@ export default function OnboardingWizard() {
                                     </motion.div>
                                 )}
 
-                                {/* STEP 5: Staff Invites */}
-                                {step === 5 && (
-                                    <motion.div key="step5" {...animations}>
+                                {/* STEP 6: Committee & Staff */}
+                                {step === 6 && (
+                                    <motion.div key="step6" {...animations}>
                                         <CardHeader>
-                                            <CardTitle className="text-2xl text-white flex items-center gap-2"><Users className="text-red-500"/> Invite Coaching Staff</CardTitle>
+                                            <CardTitle className="text-2xl text-white flex items-center gap-2"><Users className="text-red-500"/> Committee & Staff</CardTitle>
                                             <CardDescription className="text-slate-400 text-lg">
-                                                Teamwork makes the dream work. Add your assistants, physios, or admins.
+                                                Teamwork makes the dream work. Add your committee members, coaches, or admins.
                                             </CardDescription>
                                         </CardHeader>
                                         <CardContent className="space-y-4 pt-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
                                             {staffInvites.map((staff, idx) => (
-                                                <div key={idx} className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3">
+                                                <div key={idx} className="bg-slate-800 p-4 rounded-xl border border-slate-700 space-y-3 relative group">
                                                     <div className="flex gap-3">
                                                         <div className="flex-1 space-y-1.5">
                                                             <Label className="text-xs text-slate-400 uppercase tracking-wider font-semibold">Name</Label>
@@ -499,9 +607,9 @@ export default function OnboardingWizard() {
                                     </motion.div>
                                 )}
 
-                                {/* STEP 6: League Table */}
-                                {step === 6 && (
-                                    <motion.div key="step6" {...animations}>
+                                {/* STEP 7: League Table */}
+                                {step === 7 && (
+                                    <motion.div key="step7" {...animations}>
                                         <CardHeader>
                                             <CardTitle className="text-2xl text-white flex items-center gap-2"><Trophy className="text-red-500"/> League Standings</CardTitle>
                                             <CardDescription className="text-slate-400 text-lg">
@@ -523,9 +631,9 @@ export default function OnboardingWizard() {
                                     </motion.div>
                                 )}
 
-                                {/* STEP 7: Complete */}
-                                {step === 7 && (
-                                    <motion.div key="step7" {...animations} className="text-center">
+                                {/* STEP 8: Complete */}
+                                {step === 8 && (
+                                    <motion.div key="step8" {...animations} className="text-center">
                                         <CardHeader className="pt-12 pb-6">
                                             <div className="mx-auto w-24 h-24 bg-green-500/20 rounded-full flex items-center justify-center mb-6">
                                                 <CheckCircle2 className="h-12 w-12 text-green-500" />
@@ -550,7 +658,7 @@ export default function OnboardingWizard() {
                             </AnimatePresence>
 
                             {/* Global Footer Navigation */}
-                            {step < 7 && (
+                            {step < 8 && (
                                 <CardFooter className="bg-slate-950/50 p-6 border-t border-slate-800 flex justify-between gap-4 relative z-20">
                                     {step > 1 ? (
                                         <Button 
@@ -565,13 +673,26 @@ export default function OnboardingWizard() {
                                     ) : (
                                         <div></div>
                                     )}
-                                    <Button 
-                                        type="submit" 
-                                        className="bg-red-600 hover:bg-red-700 text-white font-medium px-8 h-12"
-                                        disabled={isLoading}
-                                    >
-                                        {isLoading ? "Saving..." : step === totalSteps ? "Finish Setup" : "Next"} <ChevronRight className="ml-2 w-4 h-4" />
-                                    </Button>
+                                    <div className="flex gap-3">
+                                        {step > 1 && step < totalSteps && (
+                                            <Button 
+                                                type="button" 
+                                                variant="outline"
+                                                onClick={handleSkip}
+                                                className="border-slate-700 text-slate-300 hover:bg-slate-800 hover:text-white"
+                                                disabled={isLoading}
+                                            >
+                                                Skip for now
+                                            </Button>
+                                        )}
+                                        <Button 
+                                            type="submit" 
+                                            className="bg-red-600 hover:bg-red-700 text-white font-medium px-8 h-12"
+                                            disabled={isLoading}
+                                        >
+                                            {isLoading ? "Saving..." : step === totalSteps ? "Finish Setup" : "Next"} <ChevronRight className="ml-2 w-4 h-4" />
+                                        </Button>
+                                    </div>
                                 </CardFooter>
                             )}
                         </form>
