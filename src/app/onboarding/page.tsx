@@ -35,6 +35,8 @@ export default function OnboardingWizard() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
 
+    const presetColors = ["#FFFFFF", "#000000", "#EF4444", "#3B82F6", "#10B981", "#F59E0B", "#1E40AF", "#0F172A"];
+
     const totalSteps = 5;
 
     const handleNext = () => setStep(prev => prev + 1);
@@ -272,6 +274,18 @@ export default function OnboardingWizard() {
                                                             className="flex-1 bg-slate-800 border-slate-700 text-white h-14 font-mono uppercase"
                                                         />
                                                     </div>
+                                                    <div className="flex flex-wrap gap-2 pt-2">
+                                                        {presetColors.map(color => (
+                                                            <button
+                                                                key={color}
+                                                                type="button"
+                                                                onClick={() => setPrimaryColor(color)}
+                                                                className={`w-6 h-6 rounded-full border-2 transition-all ${primaryColor.toUpperCase() === color ? 'border-white scale-110' : 'border-slate-700 hover:scale-110'}`}
+                                                                style={{ backgroundColor: color }}
+                                                                title={color}
+                                                            />
+                                                        ))}
+                                                    </div>
                                                 </div>
                                                 <div className="space-y-3">
                                                     <Label className="text-slate-300">Secondary Color</Label>
@@ -288,6 +302,18 @@ export default function OnboardingWizard() {
                                                             onChange={(e) => setSecondaryColor(e.target.value)}
                                                             className="flex-1 bg-slate-800 border-slate-700 text-white h-14 font-mono uppercase"
                                                         />
+                                                    </div>
+                                                    <div className="flex flex-wrap gap-2 pt-2">
+                                                        {presetColors.map(color => (
+                                                            <button
+                                                                key={color}
+                                                                type="button"
+                                                                onClick={() => setSecondaryColor(color)}
+                                                                className={`w-6 h-6 rounded-full border-2 transition-all ${secondaryColor.toUpperCase() === color ? 'border-white scale-110' : 'border-slate-700 hover:scale-110'}`}
+                                                                style={{ backgroundColor: color }}
+                                                                title={color}
+                                                            />
+                                                        ))}
                                                     </div>
                                                 </div>
                                             </div>
