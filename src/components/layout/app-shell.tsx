@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { Menu } from "lucide-react";
 import { useClub } from "@/context/club-context";
@@ -19,10 +19,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         return <main className="min-h-screen bg-slate-50">{children}</main>;
     }
 
-    if (isLoaded && !settings.isOnboarded) {
-        if (typeof window !== 'undefined') {
-            window.location.href = '/onboarding';
+    useEffect(() => {
+        if (isLoaded && !settings.isOnboarded && !isAuthPage && !isOnboardingPage) {
+            if (typeof window !== 'undefined') {
+                window.location.href = '/onboarding';
+            }
         }
+    }, [isLoaded, settings.isOnboarded, isAuthPage, isOnboardingPage]);
+
+    if (isLoaded && !settings.isOnboarded && !isAuthPage && !isOnboardingPage) {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
