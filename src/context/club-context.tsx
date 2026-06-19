@@ -140,6 +140,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         return () => {
             supabase.removeChannel(channel);
         };
+        */
     }, []);
 
     const updateSettings = async (newSettings: Partial<ClubSettings>) => {
