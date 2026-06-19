@@ -143,16 +143,9 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                 {section.title}
                             </h3>
                             <ul className="space-y-1" role="list">
-                                {section.items
-                                    .filter(item => {
-                                        if (role === "Manager" && (item.href === "/sponsors" || item.href === "/inventory")) {
-                                            return false;
-                                        }
-                                        return true;
-                                    })
-                                    .map((item) => {
-                                        const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
-                                        return (
+                                {section.items.map((item) => {
+                                    const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+                                    return (
                                         <li key={item.label}>
                                             <Link
                                                 href={item.href}

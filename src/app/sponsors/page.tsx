@@ -23,25 +23,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 
 export default function SponsorsPage() {
-    const { role } = useAuth();
     const [sponsors, setSponsors] = useState<Sponsor[]>([]);
-
-    if (role === "Manager") {
-        return (
-            <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-6 bg-slate-900 text-white rounded-lg border border-slate-800">
-                <div className="h-16 w-16 bg-red-950/30 rounded-full flex items-center justify-center mb-6 text-red-500 border border-red-500/20">
-                    <AlertCircle className="h-8 w-8" />
-                </div>
-                <h2 className="text-2xl font-bold">Access Denied</h2>
-                <p className="text-slate-400 mt-2 max-w-md">
-                    Sponsorship information is restricted to assistant coaches and other authorized personnel.
-                </p>
-                <Button className="mt-6 bg-red-600 hover:bg-red-500 text-white" onClick={() => window.location.href = "/dashboard"}>
-                    Return to Dashboard
-                </Button>
-            </div>
-        );
-    }
 
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
