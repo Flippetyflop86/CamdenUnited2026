@@ -28,28 +28,28 @@ CREATE POLICY "Members can manage invitations" ON public.club_invitations
     USING (club_id = public.get_my_club_id())
     WITH CHECK (club_id = public.get_my_club_id());
 
--- 2. Configure RLS on club_members to allow team members to see each other
+-- 2. Define helper function to get current user's role securely
+CREATE OR REPLACE FUNCTION public.get_my_role()
+RETURNS text AS $$
+  SELECT role 
+  FROM public.club_members 
+  WHERE user_id = auth.uid() 
+  LIMIT 1;
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- 3. Configure RLS on club_members to allow team members to see each other
 ALTER TABLE public.club_members ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Members can view club_members" ON public.club_members;
 CREATE POLICY "Members can view club_members" ON public.club_members
     FOR SELECT
-    USING (club_id IN (
-        SELECT cm.club_id 
-        FROM public.club_members cm 
-        WHERE cm.user_id = auth.uid()
-    ));
+    USING (user_id = auth.uid() OR club_id = public.get_my_club_id());
 
 DROP POLICY IF EXISTS "Managers can manage club_members" ON public.club_members;
 CREATE POLICY "Managers can manage club_members" ON public.club_members
     FOR ALL
-    USING (
-        club_id IN (
-            SELECT cm.club_id 
-            FROM public.club_members cm 
-            WHERE cm.user_id = auth.uid() AND cm.role = 'Manager'
-        )
-    );
+    USING (club_id = public.get_my_club_id() AND public.get_my_role() = 'Manager')
+    WITH CHECK (club_id = public.get_my_club_id() AND public.get_my_role() = 'Manager');
 
 -- 3. Replace/Create Auth User Created Trigger to support invitations
 CREATE OR REPLACE FUNCTION public.handle_new_user()
