@@ -15,10 +15,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const isAuthPage = ["/login", "/signup", "/reset-password", "/update-password"].includes(pathname);
     const isOnboardingPage = pathname === "/onboarding";
 
-    if (isAuthPage || isOnboardingPage) {
-        return <main className="min-h-screen bg-slate-50">{children}</main>;
-    }
-
     useEffect(() => {
         if (isLoaded && !settings.isOnboarded && !isAuthPage && !isOnboardingPage) {
             if (typeof window !== 'undefined') {
@@ -26,6 +22,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             }
         }
     }, [isLoaded, settings.isOnboarded, isAuthPage, isOnboardingPage]);
+
+    if (isAuthPage || isOnboardingPage) {
+        return <main className="min-h-screen bg-slate-50">{children}</main>;
+    }
 
     if (isLoaded && !settings.isOnboarded && !isAuthPage && !isOnboardingPage) {
         return (
