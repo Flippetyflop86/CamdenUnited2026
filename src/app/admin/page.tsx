@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useClub } from "@/context/club-context";
+import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,6 +53,79 @@ export default function AdminPage() {
 
     const [isMigrating, setIsMigrating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+
+    const { user, role: userRole } = useAuth();
+    const [teamMembers, setTeamMembers] = useState<any[]>([]);
+    const [invitations, setInvitations] = useState<any[]>([]);
+    const [inviteEmail, setInviteEmail] = useState("");
+    const [inviteRole, setInviteRole] = useState("Assistant Coach");
+    const [isInviting, setIsInviting] = useState(false);
+
+    useEffect(() => {
+        if (settings.isOnboarded) {
+            fetchTeamAccess();
+        }
+    }, [settings]);
+
+    const fetchTeamAccess = async () => {
+        try {
+            const { data: members, error: mErr } = await supabase.from('club_members').select('*');
+            if (members) setTeamMembers(members);
+            
+            const { data: invites, error: iErr } = await supabase.from('club_invitations').select('*');
+            if (invites) setInvitations(invites);
+        } catch (err) {
+            console.error("Error fetching team access:", err);
+        }
+    };
+
+    const handleSendInvite = async () => {
+        if (!inviteEmail.trim()) return;
+        setIsInviting(true);
+        try {
+            // Get current club ID
+            const { data: currentMember } = await supabase
+                .from('club_members')
+                .select('club_id')
+                .eq('user_id', user?.id)
+                .single();
+
+            if (!currentMember) {
+                alert("Could not find your club association.");
+                setIsInviting(false);
+                return;
+            }
+
+            const { error } = await supabase.from('club_invitations').insert([
+                {
+                    club_id: currentMember.club_id,
+                    email: inviteEmail.trim().toLowerCase(),
+                    role: inviteRole
+                }
+            ]);
+
+            if (error) throw error;
+
+            setInviteEmail("");
+            await fetchTeamAccess();
+            alert("Invitation sent successfully!");
+        } catch (err: any) {
+            alert("Failed to send invitation: " + (err.message || JSON.stringify(err)));
+        } finally {
+            setIsInviting(false);
+        }
+    };
+
+    const handleDeleteInvite = async (id: string) => {
+        if (!confirm("Are you sure you want to cancel this invitation?")) return;
+        try {
+            const { error } = await supabase.from('club_invitations').delete().eq('id', id);
+            if (error) throw error;
+            await fetchTeamAccess();
+        } catch (err: any) {
+            alert("Failed to delete invitation: " + err.message);
+        }
+    };
 
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [sponsorFile, setSponsorFile] = useState<File | null>(null);
@@ -236,12 +310,13 @@ export default function AdminPage() {
             </div>
 
             <Tabs defaultValue="identity" className="w-full">
-                <TabsList className="grid w-full max-w-4xl grid-cols-6">
+                <TabsList className="grid w-full max-w-4xl grid-cols-7">
                     <TabsTrigger value="identity">Identity</TabsTrigger>
                     <TabsTrigger value="squads">Squads</TabsTrigger>
                     <TabsTrigger value="kits">Kits & Colors</TabsTrigger>
                     <TabsTrigger value="finance">Finance</TabsTrigger>
                     <TabsTrigger value="staff">Staff</TabsTrigger>
+                    <TabsTrigger value="access">Access</TabsTrigger>
                     <TabsTrigger value="advanced">Advanced</TabsTrigger>
                 </TabsList>
 
@@ -599,6 +674,138 @@ export default function AdminPage() {
                             <Button variant="outline" onClick={() => window.location.href = '/staff'}>
                                 Go to Staff Page
                             </Button>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* ACCESS TAB */}
+                <TabsContent value="access" className="space-y-6 mt-6">
+                    <Card className="max-w-2xl bg-slate-900 border-slate-800 text-white shadow-xl">
+                        <CardHeader>
+                            <CardTitle>Invite Team Members</CardTitle>
+                            <CardDescription className="text-slate-400">
+                                Grant other coaches or administrators access to your club workspace.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex flex-col sm:flex-row gap-4 items-end">
+                                <div className="space-y-2 flex-1 w-full">
+                                    <Label htmlFor="inviteEmail" className="text-slate-300">Email Address</Label>
+                                    <Input
+                                        id="inviteEmail"
+                                        type="email"
+                                        placeholder="assistant-coach@example.com"
+                                        value={inviteEmail}
+                                        onChange={(e) => setInviteEmail(e.target.value)}
+                                        className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus-visible:ring-red-500"
+                                    />
+                                </div>
+                                <div className="space-y-2 w-full sm:w-[180px]">
+                                    <Label htmlFor="inviteRole" className="text-slate-300">Assign Role</Label>
+                                    <select
+                                        id="inviteRole"
+                                        className="flex h-10 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white focus-visible:ring-2 focus-visible:ring-red-500"
+                                        value={inviteRole}
+                                        onChange={(e) => setInviteRole(e.target.value)}
+                                    >
+                                        <option value="Assistant Coach" className="bg-slate-950 text-white">Assistant Coach</option>
+                                        <option value="Manager" className="bg-slate-950 text-white">Manager (Head Coach)</option>
+                                    </select>
+                                </div>
+                                <Button
+                                    onClick={handleSendInvite}
+                                    disabled={isInviting || !inviteEmail}
+                                    className="bg-red-600 hover:bg-red-500 text-white h-10 px-6 shrink-0 w-full sm:w-auto"
+                                >
+                                    {isInviting ? "Inviting..." : "Send Invite"}
+                                </Button>
+                            </div>
+                            <p className="text-xs text-slate-500">
+                                Invited members will automatically join this club workspace when they register with their email.
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="max-w-2xl bg-slate-900 border-slate-800 text-white shadow-xl">
+                        <CardHeader>
+                            <CardTitle>Active Members & Invitations</CardTitle>
+                            <CardDescription className="text-slate-400">
+                                Manage access rights for all users linked to this club.
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="space-y-2">
+                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Members</h3>
+                                <div className="rounded-md border border-slate-800 bg-slate-950 overflow-hidden">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-slate-900 border-b border-slate-800">
+                                            <tr className="text-left text-xs font-medium text-slate-400 uppercase">
+                                                <th className="px-4 py-3">User</th>
+                                                <th className="px-4 py-3">Role</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-800">
+                                            {teamMembers.map((member) => (
+                                                <tr key={member.user_id} className="hover:bg-slate-900/50 transition-colors">
+                                                    <td className="px-4 py-3 font-medium text-slate-200">
+                                                        {member.user_id === user?.id ? (
+                                                            <span>{user?.email || "You"} <span className="text-xs text-red-500 font-normal ml-1">(Logged in)</span></span>
+                                                        ) : (
+                                                            <span className="text-xs text-slate-500">User ID: {member.user_id.substring(0, 8)}...</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                                            member.role === 'Manager' ? 'bg-red-950/40 text-red-400 border border-red-500/20' : 'bg-slate-800 text-slate-300'
+                                                        }`}>
+                                                            {member.role}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {invitations.length > 0 && (
+                                <div className="space-y-2 pt-4 border-t border-slate-800">
+                                    <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Pending Invitations</h3>
+                                    <div className="rounded-md border border-slate-800 bg-slate-950 overflow-hidden">
+                                        <table className="w-full text-sm">
+                                            <thead className="bg-slate-900 border-b border-slate-800">
+                                                <tr className="text-left text-xs font-medium text-slate-400 uppercase">
+                                                    <th className="px-4 py-3">Email</th>
+                                                    <th className="px-4 py-3">Role</th>
+                                                    <th className="px-4 py-3 text-right">Action</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-800">
+                                                {invitations.map((invite) => (
+                                                    <tr key={invite.id} className="hover:bg-slate-900/50 transition-colors">
+                                                        <td className="px-4 py-3 font-medium text-slate-300">{invite.email}</td>
+                                                        <td className="px-4 py-3">
+                                                            <span className="inline-flex items-center rounded-full bg-slate-850 border border-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-400">
+                                                                {invite.role}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => handleDeleteInvite(invite.id)}
+                                                                className="text-red-400 hover:text-red-300 hover:bg-red-950/20 p-1 h-8 w-8"
+                                                            >
+                                                                <Trash2 className="h-4 w-4" />
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
