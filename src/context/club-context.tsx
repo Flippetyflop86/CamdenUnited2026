@@ -142,28 +142,24 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const updateSettings = async (newSettings: Partial<ClubSettings>) => {
-        // Optimistic Update
-        const updated = { ...settings, ...newSettings };
-        setSettings(updated);
-
-        // Update DB
+        // Update DB first
         const updates: any = {
-            name: updated.name,
-            logo: updated.logo,
-            primary_color: updated.primaryColor,
-            secondary_color: updated.secondaryColor,
-            is_onboarded: updated.isOnboarded,
-            league_url: updated.leagueUrl,
-            league_position: updated.leaguePosition,
-            home_kit_shirt: updated.homeKitShirt,
-            home_kit_shorts: updated.homeKitShorts,
-            home_kit_socks: updated.homeKitSocks,
-            away_kit_shirt: updated.awayKitShirt,
-            away_kit_shorts: updated.awayKitShorts,
-            away_kit_socks: updated.awayKitSocks,
-            sponsor_logo: updated.sponsorLogo,
-            monthly_subs: updated.monthlySubs,
-            fines_enabled: updated.finesEnabled
+            name: newSettings.name ?? settings.name,
+            logo: newSettings.logo ?? settings.logo,
+            primary_color: newSettings.primaryColor ?? settings.primaryColor,
+            secondary_color: newSettings.secondaryColor ?? settings.secondaryColor,
+            is_onboarded: newSettings.isOnboarded ?? settings.isOnboarded,
+            league_url: newSettings.leagueUrl ?? settings.leagueUrl,
+            league_position: newSettings.leaguePosition ?? settings.leaguePosition,
+            home_kit_shirt: newSettings.homeKitShirt ?? settings.homeKitShirt,
+            home_kit_shorts: newSettings.homeKitShorts ?? settings.homeKitShorts,
+            home_kit_socks: newSettings.homeKitSocks ?? settings.homeKitSocks,
+            away_kit_shirt: newSettings.awayKitShirt ?? settings.awayKitShirt,
+            away_kit_shorts: newSettings.awayKitShorts ?? settings.awayKitShorts,
+            away_kit_socks: newSettings.awayKitSocks ?? settings.awayKitSocks,
+            sponsor_logo: newSettings.sponsorLogo ?? settings.sponsorLogo,
+            monthly_subs: newSettings.monthlySubs ?? settings.monthlySubs,
+            fines_enabled: newSettings.finesEnabled ?? settings.finesEnabled
         };
         if ('squads' in newSettings) updates.squads = newSettings.squads;
 
@@ -177,6 +173,10 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             console.error("Failed to save settings:", error);
             throw error;
         }
+
+        // Apply Update to State after DB succeeds
+        const updated = { ...settings, ...newSettings };
+        setSettings(updated);
     };
 
     if (!isLoaded) {
