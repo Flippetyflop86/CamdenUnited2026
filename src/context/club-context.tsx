@@ -163,15 +163,28 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         };
         if ('squads' in newSettings) updates.squads = newSettings.squads;
 
-        const { error } = await supabase
-            .from("clubs")
-            .update(updates)
-            // A simple trick to update our own row without knowing its UUID
-            .neq("name", "FORCE_UPDATE_EVERYTHING");
+        // Check if row exists
+        const { data: existing } = await supabase.from("clubs").select("id").limit(1).maybeSingle();
+
+        let error;
+        if (existing) {
+            const { error: updateErr } = await supabase
+                .from("clubs")
+                .update(updates)
+                .eq("id", existing.id);
+            error = updateErr;
+        } else {
+            const { error: insertErr } = await supabase
+                .from("clubs")
+                .insert([updates]);
+            error = insertErr;
+        }
 
         if (error) {
-            console.error("Failed to save settings:", error);
-            throw error;
+            const errorObj = error as any;
+            const errorMsg = errorObj.message || errorObj.details || JSON.stringify(errorObj);
+            console.error("Failed to save settings:", errorMsg, errorObj);
+            throw new Error(errorMsg);
         }
 
         // Apply Update to State after DB succeeds
