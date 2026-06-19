@@ -281,7 +281,7 @@ export default function OnboardingWizard() {
                                 {step === 1 && (
                                     <motion.div key="step1" {...animations} className="flex flex-col h-full">
                                         <CardHeader>
-                                            <CardTitle className="text-2xl text-white text-center">Welcome to ClubCore!</CardTitle>
+                                            <CardTitle className="text-2xl text-white text-center">Welcome to ClubFlow!</CardTitle>
                                             <CardDescription className="text-slate-400 text-center text-lg">
                                                 Let's start by establishing your club's identity.
                                             </CardDescription>
@@ -654,7 +654,7 @@ export default function OnboardingWizard() {
                                             </div>
                                             <CardTitle className="text-3xl text-white">You're all set!</CardTitle>
                                             <CardDescription className="text-slate-400 text-lg mt-2">
-                                                Your secure ClubCore is ready for action.
+                                                Your ClubFlow workspace is ready for action.
                                             </CardDescription>
                                         </CardHeader>
                                         <CardFooter className="bg-slate-950/50 p-8 border-t border-slate-800 mt-4">

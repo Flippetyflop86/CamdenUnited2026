@@ -10,10 +10,10 @@ import { SearchCommand } from "@/components/layout/search-command";
 import AppShell from "@/components/layout/app-shell";
 
 export const metadata: Metadata = {
-    title: "ClubCore",
-    description: "Club Management Platform",
+    title: "ClubFlow",
+    description: "ClubFlow — The operating system for football clubs. Manage players, fixtures, finances and staff in one place.",
     icons: {
-        icon: "/logo-2.jpeg",
+        icon: "/clubflow-logo.png",
     }
 };
 
