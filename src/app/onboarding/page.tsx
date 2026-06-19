@@ -15,7 +15,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 export default function OnboardingWizard() {
     const { settings, updateSettings } = useClub();
-    const { user } = useAuth();
+    const { user, signOut } = useAuth();
     const router = useRouter();
 
     const [step, setStep] = useState(1);
@@ -252,6 +252,11 @@ export default function OnboardingWizard() {
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center py-10">
             {/* Wizard Container */}
             <div className="w-full max-w-2xl flex flex-col items-center justify-center p-4 md:p-8">
+                <div className="w-full flex justify-end mb-2 relative z-20">
+                    <Button variant="ghost" onClick={signOut} className="text-slate-400 hover:text-white hover:bg-slate-800 text-xs">
+                        Sign Out / Back to Login
+                    </Button>
+                </div>
                 <div className="w-full space-y-8 relative z-10">
                     
                     {/* Progress Indicator */}
