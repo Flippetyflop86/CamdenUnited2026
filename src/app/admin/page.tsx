@@ -310,14 +310,14 @@ export default function AdminPage() {
             </div>
 
             <Tabs defaultValue="identity" className="w-full">
-                <TabsList className="grid w-full max-w-4xl grid-cols-7">
-                    <TabsTrigger value="identity">Identity</TabsTrigger>
-                    <TabsTrigger value="squads">Squads</TabsTrigger>
-                    <TabsTrigger value="kits">Kits & Colors</TabsTrigger>
-                    <TabsTrigger value="finance">Finance</TabsTrigger>
-                    <TabsTrigger value="staff">Staff</TabsTrigger>
-                    <TabsTrigger value="access">Access</TabsTrigger>
-                    <TabsTrigger value="advanced">Advanced</TabsTrigger>
+                <TabsList className="flex w-full max-w-4xl overflow-x-auto whitespace-nowrap gap-1 md:grid md:grid-cols-7 md:gap-0 bg-slate-100 p-1 rounded-lg scrollbar-none">
+                    <TabsTrigger value="identity" className="flex-shrink-0 px-4 py-2">Identity</TabsTrigger>
+                    <TabsTrigger value="squads" className="flex-shrink-0 px-4 py-2">Squads</TabsTrigger>
+                    <TabsTrigger value="kits" className="flex-shrink-0 px-4 py-2">Kits & Colors</TabsTrigger>
+                    <TabsTrigger value="finance" className="flex-shrink-0 px-4 py-2">Finance</TabsTrigger>
+                    <TabsTrigger value="staff" className="flex-shrink-0 px-4 py-2">Staff</TabsTrigger>
+                    <TabsTrigger value="access" className="flex-shrink-0 px-4 py-2">Access</TabsTrigger>
+                    <TabsTrigger value="advanced" className="flex-shrink-0 px-4 py-2">Advanced</TabsTrigger>
                 </TabsList>
 
                 {/* IDENTITY TAB */}
