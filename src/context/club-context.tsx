@@ -99,6 +99,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         fetchSettings();
 
         // Real-time Subscription to clubs table
+        /*
         const channel = supabase
             .channel("club_changes")
             .on(
