@@ -254,7 +254,7 @@ export default function OnboardingWizard() {
                             </div>
                         )}
                         
-                        <form onSubmit={handleSaveAndNext}>
+                        <div className="w-full">
                             <AnimatePresence mode="wait">
                                 
                                 {/* STEP 1: Identity & Sponsors */}
@@ -676,7 +676,8 @@ export default function OnboardingWizard() {
                                             </Button>
                                         )}
                                         <Button 
-                                            type="submit" 
+                                            type="button" 
+                                            onClick={handleSaveAndNext}
                                             className="bg-red-600 hover:bg-red-700 text-white font-medium px-8 h-12"
                                             disabled={isLoading}
                                         >
@@ -685,7 +686,7 @@ export default function OnboardingWizard() {
                                     </div>
                                 </CardFooter>
                             )}
-                        </form>
+                        </div>
                     </Card>
                 </div>
             </div>
