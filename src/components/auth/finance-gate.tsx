@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Lock, UserCheck, Eye, EyeOff, LogIn, Key, RefreshCw, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/auth-context";
 
 export function FinanceGate({
     children,
@@ -37,16 +38,27 @@ export function FinanceGate({
 
     // Admin Reset State
     const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+    const { user } = useAuth();
 
     useEffect(() => {
         // Check session storage
         const authValues = sessionStorage.getItem("finance-auth-session");
         if (authValues) {
             const session = JSON.parse(authValues);
-            setIsAuthorized(true);
-            setCurrentUser(session);
+            if (user && session.supabaseUserId && session.supabaseUserId !== user.id) {
+                // Clear session if Supabase user switched
+                setIsAuthorized(false);
+                setCurrentUser(null);
+                sessionStorage.removeItem("finance-auth-session");
+            } else {
+                setIsAuthorized(true);
+                setCurrentUser(session);
+            }
+        } else {
+            setIsAuthorized(false);
+            setCurrentUser(null);
         }
-    }, []);
+    }, [user]);
 
     // Fetch users for Admin Panel
     useEffect(() => {
@@ -73,7 +85,7 @@ export function FinanceGate({
             .single();
 
         if (data) {
-            const sessionData = { username: data.username, name: data.name, role: data.role };
+            const sessionData = { username: data.username, name: data.name, role: data.role, supabaseUserId: user?.id || null };
             setIsAuthorized(true);
             setCurrentUser(sessionData);
             sessionStorage.setItem("finance-auth-session", JSON.stringify(sessionData));

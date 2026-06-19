@@ -22,7 +22,12 @@ import {
     Briefcase,
     X,
     Target,
-    ShieldAlert
+    ShieldAlert,
+    Twitter,
+    Instagram,
+    Coins,
+    Wallet,
+    Lock
 } from "lucide-react";
 
 
@@ -34,7 +39,6 @@ const navSections = [
             { href: "/training", label: "Training", icon: CalendarDays },
             { href: "/matches", label: "Fixtures", icon: Activity },
             { href: "/matchday-xi", label: "Matchday XI", icon: Shield },
-            { href: "/recruitment", label: "Recruitment", icon: UserPlus },
         ]
     },
     {
@@ -43,7 +47,7 @@ const navSections = [
             { href: "/analysis", label: "Match Analysis", icon: Target },
             { href: "/opposition", label: "Opposition Reports", icon: ShieldHalf },
             { href: "/league", label: "League Table", icon: Trophy },
-            { href: "/stats", label: "Stats", icon: BarChart },
+            { href: "/stats", label: "Stats", icon: BarChart, isLocked: true },
         ]
     },
     {
@@ -51,8 +55,9 @@ const navSections = [
         items: [
             { href: "/league-setup", label: "League Setup", icon: ShieldAlert },
             { href: "/sponsors", label: "Sponsorships", icon: Briefcase },
-            { href: "/finance", label: "Finance", icon: PoundSterling },
-            { href: "/budgets", label: "Player Budgets", icon: PoundSterling },
+            { href: "/recruitment", label: "Recruitment", icon: UserPlus },
+            { href: "/finance", label: "Finance", icon: Coins },
+            { href: "/budgets", label: "Player Budgets", icon: Wallet },
             { href: "/inventory", label: "Inventory", icon: Clipboard },
             { href: "/staff", label: "Staff", icon: Users },
             { href: "/documents", label: "Documents", icon: FileText },
@@ -154,7 +159,8 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                                 )}
                                             >
                                                 <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                <span className="truncate">{item.label}</span>
+                                                <span className="truncate flex-1">{item.label}</span>
+                                                {('isLocked' in item) && item.isLocked && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
                                             </Link>
                                         </li>
                                     );
@@ -165,6 +171,22 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 </div>
             </nav>
             <div className="border-t border-slate-800 p-4">
+                {(settings.twitterUrl || settings.instagramUrl) && (
+                    <div className="flex flex-col gap-2 mb-4">
+                        {settings.instagramUrl && (
+                            <a href={settings.instagramUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-md bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white hover:opacity-90 transition-opacity font-medium text-xs w-full shadow-md border border-white/10 group">
+                                <Instagram className="h-4 w-4 shrink-0 group-hover:scale-110 transition-transform" />
+                                <span className="truncate">Club Instagram</span>
+                            </a>
+                        )}
+                        {settings.twitterUrl && (
+                            <a href={settings.twitterUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-md bg-[#1DA1F2] text-white hover:opacity-90 transition-opacity font-medium text-xs w-full shadow-md border border-white/10 group">
+                                <Twitter className="h-4 w-4 shrink-0 group-hover:scale-110 transition-transform" />
+                                <span className="truncate">Club Twitter (X)</span>
+                            </a>
+                        )}
+                    </div>
+                )}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 overflow-hidden">
                         <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0">

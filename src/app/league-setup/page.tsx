@@ -11,12 +11,14 @@ interface LeagueTeam {
     id: string;
     name: string;
     badge_url: string | null;
+    instagram_handle: string | null;
 }
 
 export default function LeagueSetupPage() {
     const [teams, setTeams] = useState<LeagueTeam[]>([]);
     const [name, setName] = useState("");
     const [badgeUrl, setBadgeUrl] = useState("");
+    const [instagram, setInstagram] = useState("");
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -42,7 +44,8 @@ export default function LeagueSetupPage() {
 
         const payload = {
             name: name.trim(),
-            badge_url: badgeUrl.trim() || null
+            badge_url: badgeUrl.trim() || null,
+            instagram_handle: instagram.trim() || null
         };
 
         const { data, error } = await supabase
@@ -57,6 +60,7 @@ export default function LeagueSetupPage() {
             setTeams([...teams, data].sort((a, b) => a.name.localeCompare(b.name)));
             setName("");
             setBadgeUrl("");
+            setInstagram("");
         }
     };
 
@@ -108,6 +112,15 @@ export default function LeagueSetupPage() {
                                 />
                                 <p className="text-xs text-slate-500">Paste an image link for the opponent's badge</p>
                             </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium text-slate-700">Instagram Handle (Optional)</label>
+                                <Input 
+                                    value={instagram}
+                                    onChange={(e) => setInstagram(e.target.value)}
+                                    placeholder="e.g. afcrichmond"
+                                />
+                                <p className="text-xs text-slate-500">Opponent team's Instagram handle</p>
+                            </div>
                             <Button type="submit" className="w-full bg-slate-900 hover:bg-slate-800">
                                 <Plus className="h-4 w-4 mr-2" /> Add Team
                             </Button>
@@ -140,7 +153,12 @@ export default function LeagueSetupPage() {
                                                     <ShieldAlert className="h-4 w-4 text-slate-400" />
                                                 </div>
                                             )}
-                                            <span className="font-medium text-slate-700 truncate">{team.name}</span>
+                                            <div className="flex flex-col overflow-hidden">
+                                                <span className="font-medium text-slate-700 truncate">{team.name}</span>
+                                                {team.instagram_handle && (
+                                                    <span className="text-xs text-slate-400 truncate">@{team.instagram_handle.replace("@", "")}</span>
+                                                )}
+                                            </div>
                                         </div>
                                         <Button 
                                             variant="ghost" 

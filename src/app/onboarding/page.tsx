@@ -42,6 +42,7 @@ export default function OnboardingWizard() {
     const [postcode, setPostcode] = useState("");
     const [twitterHandle, setTwitterHandle] = useState("");
     const [instagramHandle, setInstagramHandle] = useState("");
+    const [whatsappPollMessage, setWhatsAppPollMessage] = useState(settings.whatsappPollMessage || "");
 
     // Step 4: Finance & Operations
     const [monthlySubs, setMonthlySubs] = useState(settings.monthlySubs?.toString() || "35");
@@ -76,6 +77,19 @@ export default function OnboardingWizard() {
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'sponsor') => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
+            
+            if (file.size > 2 * 1024 * 1024) {
+                setError("File is too large. Maximum size allowed is 2MB.");
+                return;
+            }
+
+            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/svg+xml', 'image/webp'];
+            if (!allowedTypes.includes(file.type)) {
+                setError("Invalid file type. Only JPEG, PNG, WEBP, GIF, and SVG images are allowed.");
+                return;
+            }
+
+            setError("");
             if (type === 'logo') {
                 setLogoFile(file);
                 setLogoPreview(URL.createObjectURL(file));
@@ -94,6 +108,11 @@ export default function OnboardingWizard() {
             if (items[i].type.indexOf("image") !== -1) {
                 const file = items[i].getAsFile();
                 if (file) {
+                    if (file.size > 2 * 1024 * 1024) {
+                        setError("Pasted image is too large. Maximum size allowed is 2MB.");
+                        return;
+                    }
+                    setError("");
                     if (type === 'logo') {
                         setLogoFile(file);
                         setLogoPreview(URL.createObjectURL(file));
@@ -186,6 +205,7 @@ export default function OnboardingWizard() {
                 sponsorLogo: finalSponsorUrl,
                 monthlySubs: parseFloat(monthlySubs) || 0,
                 finesEnabled,
+                whatsappPollMessage: whatsappPollMessage || null,
                 isOnboarded: true 
             });
 
@@ -445,6 +465,10 @@ export default function OnboardingWizard() {
                                                     <div className="space-y-2">
                                                         <Label className="text-slate-400 flex items-center gap-2"><Instagram className="w-4 h-4 text-pink-500"/> Instagram</Label>
                                                         <Input placeholder="@clubname" value={instagramHandle} onChange={(e) => setInstagramHandle(e.target.value)} className="bg-slate-800 border-slate-700 text-white" />
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label className="text-slate-400 flex items-center gap-2"><AlertCircle className="w-4 h-4 text-green-500"/> WhatsApp Poll Message</Label>
+                                                        <textarea placeholder="Enter poll message..." value={whatsappPollMessage} onChange={(e) => setWhatsAppPollMessage(e.target.value)} className="w-full bg-slate-800 border-slate-700 text-white p-2 rounded" rows={3} />
                                                     </div>
                                                 </div>
                                             </div>

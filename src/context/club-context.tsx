@@ -21,6 +21,14 @@ interface ClubSettings {
     sponsorLogo: string | null;
     monthlySubs: number;
     finesEnabled: boolean;
+    homeGround: string | null;
+    foundingYear: number | null;
+    twitterUrl: string | null;
+    instagramUrl: string | null;
+    whatsappPollMessage: string | null;
+    fineCategories: { name: string, amount: number }[];
+    notificationsEnabled: boolean;
+    notificationEmail: string | null;
 }
 
 interface ClubContextType {
@@ -46,7 +54,19 @@ const defaultSettings: ClubSettings = {
     awayKitSocks: "#000000",
     sponsorLogo: null,
     monthlySubs: 0,
-    finesEnabled: false
+    finesEnabled: false,
+    homeGround: null,
+    foundingYear: null,
+    twitterUrl: null,
+    instagramUrl: null,
+    whatsappPollMessage: null,
+    fineCategories: [
+        { name: "Yellow Card", amount: 10 },
+        { name: "Red Card", amount: 25 },
+        { name: "Late to Match", amount: 5 }
+    ],
+    notificationsEnabled: false,
+    notificationEmail: null
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -86,7 +106,15 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         awayKitSocks: data.away_kit_socks || "#000000",
                         sponsorLogo: data.sponsor_logo || null,
                         monthlySubs: data.monthly_subs || 0,
-                        finesEnabled: data.fines_enabled || false
+                        finesEnabled: data.fines_enabled || false,
+                        homeGround: data.home_ground || null,
+                        foundingYear: data.founding_year || null,
+                        twitterUrl: data.twitter_url || null,
+                        instagramUrl: data.instagram_url || null,
+                        whatsappPollMessage: data.whatsapp_poll_message || null,
+                        fineCategories: data.fine_categories || defaultSettings.fineCategories,
+                        notificationsEnabled: data.notifications_enabled || false,
+                        notificationEmail: data.notification_email || null
                     });
                 }
             } catch (err) {
@@ -161,7 +189,15 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             away_kit_socks: newSettings.awayKitSocks ?? settings.awayKitSocks,
             sponsor_logo: newSettings.sponsorLogo ?? settings.sponsorLogo,
             monthly_subs: newSettings.monthlySubs ?? settings.monthlySubs,
-            fines_enabled: newSettings.finesEnabled ?? settings.finesEnabled
+            fines_enabled: newSettings.finesEnabled ?? settings.finesEnabled,
+            home_ground: newSettings.homeGround ?? settings.homeGround,
+            founding_year: newSettings.foundingYear ?? settings.foundingYear,
+            twitter_url: newSettings.twitterUrl ?? settings.twitterUrl,
+            instagram_url: newSettings.instagramUrl ?? settings.instagramUrl,
+            whatsapp_poll_message: newSettings.whatsappPollMessage ?? settings.whatsappPollMessage,
+            fine_categories: newSettings.fineCategories ?? settings.fineCategories,
+            notifications_enabled: newSettings.notificationsEnabled ?? settings.notificationsEnabled,
+            notification_email: newSettings.notificationEmail ?? settings.notificationEmail
         };
         if ('squads' in newSettings) updates.squads = newSettings.squads;
 
