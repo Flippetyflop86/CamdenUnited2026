@@ -202,7 +202,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         }
 
         fetchSettings();
-    }, [user, clubId]);
+    }, [user, clubId, authLoading]);
 
     const updateSettings = async (newSettings: Partial<ClubSettings>) => {
         let finalSecondaryColor = newSettings.secondaryColor ?? settings.secondaryColor;
