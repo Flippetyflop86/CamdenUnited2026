@@ -495,43 +495,63 @@ export default function MatchdayXIPage() {
     const handleCopyToWhatsApp = () => {
         if (!lineup) return;
         
-        let msg = `⚽ *MATCHDAY SQUAD* ⚽\n`;
-        
+        let msgTemplate = `⚽ *MATCHDAY SQUAD* ⚽\n`;
         if (nextMatch) {
-            msg += `*${nextMatch.isHome ? '🏠 Home' : '🚌 Away'} vs ${nextMatch.opponent}*\n`;
-            msg += `🏆 ${nextMatch.competition || "Match"}\n`;
-            msg += `📅 ${new Date(nextMatch.date).toLocaleDateString()}\n`;
-            msg += `⏰ Kick-off: ${nextMatch.time}\n\n`;
+            msgTemplate += `*${nextMatch.isHome ? '🏠 Home' : '🚌 Away'} vs {opponent}*\n`;
+            msgTemplate += `🏆 {competition}\n`;
+            msgTemplate += `📅 {date}\n`;
+            msgTemplate += `⏰ Kick-off: {time}\n\n`;
         } else {
-            msg += `*Upcoming Match TBD*\n\n`;
+            msgTemplate += `*Upcoming Match TBD*\n\n`;
+        }
+        msgTemplate += `📋 *Formation:* {formation}\n\n`;
+        msgTemplate += `👕 *Starting XI:*\n{starting_xi}\n`;
+        msgTemplate += `\n💺 *Bench:*\n{bench}\n`;
+        msgTemplate += `\n🔴 Please confirm if you are driving directly or need a lift! Let's go boys!`;
+
+        try {
+            if (settings.whatsappPollMessage) {
+                const parsed = JSON.parse(settings.whatsappPollMessage);
+                if (parsed.match) msgTemplate = parsed.match;
+            }
+        } catch (e) {
+            if (settings.whatsappPollMessage) msgTemplate = settings.whatsappPollMessage;
         }
 
-        msg += `📋 *Formation:* ${lineup.formation}\n\n`;
-        
         const formationMap = FORMATIONS[lineup.formation];
-        msg += `👕 *Starting XI:*\n`;
+        let startingXiStr = "";
         formationMap.forEach((pos, idx) => {
             const playerId = lineup.starters[idx];
             const player = playerId ? players.find(p => p.id === playerId) : null;
             const name = player ? `${player.firstName} ${player.lastName}` : "TBD";
-            msg += `${pos.label}: ${name}\n`;
+            startingXiStr += `${pos.label}: ${name}\n`;
         });
+        startingXiStr = startingXiStr.trim();
 
-        msg += `\n💺 *Bench:*\n`;
+        let benchStr = "";
         const actualSubs = lineup.substitutes.filter(Boolean);
         if (actualSubs.length > 0) {
             actualSubs.forEach((subId, idx) => {
                 const player = players.find(p => p.id === subId);
                 const name = player ? `${player.firstName} ${player.lastName}` : "TBD";
-                msg += `${idx + 1}. ${name}\n`;
+                benchStr += `${idx + 1}. ${name}\n`;
             });
         } else {
-            msg += `None\n`;
+            benchStr = "None";
         }
+        benchStr = benchStr.trim();
 
-        msg += `\n🔴 Please confirm if you are driving directly or need a lift! Let's go boys!`;
+        const formattedMsg = msgTemplate
+            .replace(/{opponent}/g, nextMatch ? nextMatch.opponent : "TBD")
+            .replace(/{venue}/g, nextMatch ? (nextMatch.isHome ? "Home" : "Away") : "TBD")
+            .replace(/{competition}/g, nextMatch ? (nextMatch.competition || "Match") : "Match")
+            .replace(/{date}/g, nextMatch ? new Date(nextMatch.date).toLocaleDateString() : new Date().toLocaleDateString())
+            .replace(/{time}/g, nextMatch ? nextMatch.time : "TBD")
+            .replace(/{formation}/g, lineup.formation)
+            .replace(/{starting_xi}/g, startingXiStr)
+            .replace(/{bench}/g, benchStr);
 
-        navigator.clipboard.writeText(msg).then(() => {
+        navigator.clipboard.writeText(formattedMsg).then(() => {
             alert("Matchday squad copied to clipboard! Paste it into WhatsApp.");
         }).catch(err => {
             console.error('Failed to copy: ', err);
@@ -722,9 +742,40 @@ export default function MatchdayXIPage() {
                                             draggable={!!playerId}
                                             onDragStart={(e) => playerId && handleDragStart(e, playerId, {type: 'pitch', index: idx})}
                                     >
-                                        <div className="w-6 h-6 sm:w-8 sm:h-8 bg-white border-2 border-red-600 rounded-full flex items-center justify-center shadow-lg mb-0.5 sm:mb-1 z-10 transition-transform group-hover:scale-110">
-                                            <span className="text-[8px] sm:text-[10px] font-bold text-slate-900">{pos.number}</span>
-                                        </div>
+                                        {/* Jersey SVG Icon colored with the actual selected Home Kit color */}
+                                        <svg 
+                                            className="w-8 h-8 sm:w-10 sm:h-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)] mb-0.5 sm:mb-1 z-10 transition-transform group-hover:scale-110" 
+                                            viewBox="0 0 100 100" 
+                                            fill="none" 
+                                            xmlns="http://www.w3.org/2000/svg"
+                                        >
+                                            {/* Shirt Body */}
+                                            <path d="M 30,20 L 70,20 L 85,35 L 75,45 L 68,38 L 68,85 L 32,85 L 32,38 L 25,45 L 15,35 Z" fill={settings.homeKitShirt || "#ffffff"} stroke="#000" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+                                            {/* Collar */}
+                                            <path d="M 40,20 Q 50,28 60,20" stroke="#000" strokeWidth="3.5" fill="none" />
+                                            {/* Number */}
+                                            <text 
+                                                x="50" 
+                                                y="58" 
+                                                textAnchor="middle" 
+                                                fill={
+                                                    (() => {
+                                                        const hex = (settings.homeKitShirt || "#ffffff").replace("#", "");
+                                                        if (hex.length !== 6) return "#000000";
+                                                        const r = parseInt(hex.substr(0, 2), 16);
+                                                        const g = parseInt(hex.substr(2, 2), 16);
+                                                        const b = parseInt(hex.substr(4, 2), 16);
+                                                        const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+                                                        return (yiq >= 128) ? "#000000" : "#ffffff";
+                                                    })()
+                                                } 
+                                                fontSize="26" 
+                                                fontWeight="bold" 
+                                                dy=".3em"
+                                            >
+                                                {pos.number}
+                                            </text>
+                                        </svg>
                                         
                                         {/* Name Tag */}
                                         <div className={`

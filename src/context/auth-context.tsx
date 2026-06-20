@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { supabase } from "@/lib/supabase";
 import { Session, User } from "@supabase/supabase-js";
 import { useRouter, usePathname } from "next/navigation";
@@ -10,8 +10,12 @@ interface AuthContextType {
     session: Session | null;
     clubId: string | null;
     role: string | null;
+    pagePermissions: string[]; // Array of permission keys the user can access
+    isManager: boolean;        // Shorthand: true if role === 'manager'
+    displayName: string | null;
     isLoading: boolean;
     signOut: () => Promise<void>;
+    refreshPermissions: () => Promise<void>; // Call after admin changes permissions
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,53 +25,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
     const [clubId, setClubId] = useState<string | null>(null);
     const [role, setRole] = useState<string | null>(null);
+    const [pagePermissions, setPagePermissions] = useState<string[]>([]);
+    const [displayName, setDisplayName] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
 
     const router = useRouter();
     const pathname = usePathname();
+    const pathnameRef = useRef(pathname);
+    useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
 
-    useEffect(() => {
-        // Get initial session
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                fetchClubMembership(session.user.id);
-            } else {
-                setIsLoading(false);
-                if (!["/login", "/signup", "/reset-password", "/update-password"].includes(pathname)) {
-                    router.push("/login");
-                }
-            }
-        });
-
-        // Listen for auth changes
-        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            setSession(session);
-            setUser(session?.user ?? null);
-            if (session?.user) {
-                fetchClubMembership(session.user.id);
-            } else {
-                setClubId(null);
-                setRole(null);
-                setIsLoading(false);
-                if (!["/login", "/signup", "/reset-password", "/update-password"].includes(pathname)) {
-                    router.push("/login");
-                }
-            }
-        });
-
-        return () => subscription.unsubscribe();
-    }, [pathname, router]);
+    const AUTH_PAGES = ["/login", "/signup", "/reset-password", "/update-password", "/join"];
 
     const fetchClubMembership = async (userId: string) => {
         try {
             const { data, error } = await supabase
                 .from("club_members")
-                .select("club_id, role")
+                .select("club_id, role, page_permissions, display_name")
                 .eq("user_id", userId)
                 .single();
-            
+
             if (error && error.code !== 'PGRST116') {
                 console.error("Error fetching club membership:", error);
             }
@@ -75,10 +51,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (data) {
                 setClubId(data.club_id);
                 setRole(data.role);
-            } else if (pathname !== "/signup") {
-                // If they have an auth account but no club member record yet
-                // we should probably redirect them to an onboarding/signup flow
-                // router.push("/signup");
+                setPagePermissions(data.page_permissions || []);
+                setDisplayName(data.display_name || null);
             }
         } catch (error) {
             console.error("Failed to load club membership:", error);
@@ -87,13 +61,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    // Exposed so the admin panel can trigger a re-fetch after changing permissions
+    const refreshPermissions = async () => {
+        if (user) await fetchClubMembership(user.id);
+    };
+
+    useEffect(() => {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+            setSession(session);
+            setUser(session?.user ?? null);
+            if (session?.user) {
+                fetchClubMembership(session.user.id);
+            } else {
+                setIsLoading(false);
+                if (!AUTH_PAGES.includes(pathnameRef.current)) {
+                    router.push("/login");
+                }
+            }
+        });
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setSession(session);
+            setUser(session?.user ?? null);
+            if (session?.user) {
+                fetchClubMembership(session.user.id);
+            } else {
+                setClubId(null);
+                setRole(null);
+                setPagePermissions([]);
+                setDisplayName(null);
+                setIsLoading(false);
+                if (!AUTH_PAGES.includes(pathnameRef.current)) {
+                    router.push("/login");
+                }
+            }
+        });
+
+        return () => subscription.unsubscribe();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const signOut = async () => {
         await supabase.auth.signOut();
         router.push("/login");
     };
 
+    const isManager = role === "manager";
+
     return (
-        <AuthContext.Provider value={{ user, session, clubId, role, isLoading, signOut }}>
+        <AuthContext.Provider value={{
+            user, session, clubId, role, pagePermissions, isManager,
+            displayName, isLoading, signOut, refreshPermissions
+        }}>
             {children}
         </AuthContext.Provider>
     );

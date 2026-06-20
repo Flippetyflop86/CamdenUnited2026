@@ -493,7 +493,8 @@ export default function OppositionReportsPage() {
 
                             <Card className="overflow-hidden border-0 shadow-md ring-1 ring-slate-200">
                                 <CardContent className="p-0">
-                                    <div className="relative w-full bg-emerald-600" style={{ paddingBottom: "105%" }}>
+                                    {/* Pitch - dots only, no overlapping labels */}
+                                    <div className="relative w-full bg-emerald-600" style={{ paddingBottom: "90%" }}>
                                         {/* Pitch markings */}
                                         <div className="absolute inset-0 opacity-40">
                                             <div className="absolute inset-4 border-2 border-white/60 rounded-sm"></div>
@@ -502,45 +503,87 @@ export default function OppositionReportsPage() {
                                             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-white rounded-full"></div>
                                             <div className="absolute left-1/2 -translate-x-1/2 top-4 w-32 h-16 border-2 border-white/60 border-t-0"></div>
                                             <div className="absolute left-1/2 -translate-x-1/2 bottom-4 w-32 h-16 border-2 border-white/60 border-b-0"></div>
-
-                                            {/* Watermark */}
                                             {settings.logo && (
                                                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-                                                    <img src={settings.logo} alt="Watermark" className="w-64 h-64 object-contain grayscale brightness-125" />
+                                                    <img src={settings.logo} alt="Watermark" className="w-48 h-48 object-contain grayscale brightness-125" />
                                                 </div>
                                             )}
                                         </div>
 
-                                        {/* Player positions */}
+                                        {/* Player dots with position label only — no name overflow */}
                                         {formation.map((pos, idx) => {
-                                            // Determine if player is in top half (GK/Def) or bottom half (Mid/Att)
-                                            // Push AWAY from the center (y=50) to prevent overlaps
-                                            // Special case: GK ALWAYS pushes DOWN to stay on the pitch
-                                            const isGk = pos.label === "GK" || pos.label === "Gk";
-                                            const isTopHalf = pos.y < 50 && !isGk;
-
+                                            const playerName = isEditing
+                                                ? editedTeam?.lineup?.[idx]
+                                                : displayTeam.lineup?.[idx];
+                                            const isTopHalf = pos.y < 50 && pos.label !== "GK";
                                             return (
                                                 <div
                                                     key={idx}
                                                     className="absolute z-10"
                                                     style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
                                                 >
-                                                    {/* The Dot - Always Centered on the Coordinate */}
-                                                    <div className="absolute -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white border-2 border-red-600 rounded-full flex items-center justify-center shadow-lg cursor-default z-20 group">
-                                                        <span className="text-[10px] font-bold text-slate-900">{pos.number}</span>
+                                                    {/* Numbered dot */}
+                                                    <div className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 bg-white border-2 border-red-600 rounded-full flex items-center justify-center shadow-lg z-20">
+                                                        <span className="text-[9px] sm:text-[10px] font-bold text-slate-900">{pos.number}</span>
                                                     </div>
-
-                                                    {/* Labels & Inputs - Positioned Relative to Dot */}
-                                                    {/* Use w-fit and pointer-events-none to prevent blocking neighbors on mobile */}
-                                                    <div className={`absolute -translate-x-1/2 flex flex-col items-center gap-1 w-max min-w-[80px] z-30 pointer-events-none ${isTopHalf ? 'bottom-5 flex-col-reverse' : 'top-5'
-                                                        }`}>
-                                                        {/* Position Label */}
-                                                        <span className="text-[9px] font-bold text-white bg-slate-900/40 px-1.5 py-0.5 rounded backdrop-blur-sm shadow-sm pointer-events-none">
+                                                    {/* Position label — small badge, no overflow */}
+                                                    <div className={`absolute -translate-x-1/2 z-30 ${isTopHalf ? 'bottom-4' : 'top-4'}`}>
+                                                        <span className="text-[8px] font-bold text-white bg-slate-900/50 px-1 py-0.5 rounded whitespace-nowrap backdrop-blur-sm">
                                                             {pos.label}
                                                         </span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
 
-                                                        {/* Player Name Edit/Display */}
-                                                        <div className="pointer-events-auto">
+                                    {/* Mobile-friendly player name roster below the pitch */}
+                                    <div className="border-t border-slate-200 bg-white">
+                                        <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Player Names</span>
+                                            <span className="text-xs text-slate-400">{formation.length} positions</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
+                                            {/* Left column */}
+                                            <div className="divide-y divide-slate-100">
+                                                {formation.slice(0, Math.ceil(formation.length / 2)).map((pos, idx) => (
+                                                    <div key={idx} className="flex items-center gap-3 px-3 py-2">
+                                                        <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center shrink-0">
+                                                            <span className="text-[9px] font-bold text-white">{pos.number}</span>
+                                                        </div>
+                                                        <span className="text-xs font-medium text-slate-500 w-10 shrink-0">{pos.label}</span>
+                                                        {isEditing ? (
+                                                            <input
+                                                                type="text"
+                                                                value={editedTeam?.lineup?.[idx] || ""}
+                                                                onChange={(e) => {
+                                                                    if (!editedTeam) return;
+                                                                    const newLineup = [...(editedTeam.lineup || [])];
+                                                                    while (newLineup.length <= idx) newLineup.push("");
+                                                                    newLineup[idx] = e.target.value;
+                                                                    setEditedTeam({ ...editedTeam, lineup: newLineup });
+                                                                }}
+                                                                className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-900 focus:ring-1 focus:ring-red-500 outline-none placeholder:text-slate-400"
+                                                                placeholder="Player name..."
+                                                            />
+                                                        ) : (
+                                                            <span className="flex-1 text-xs text-slate-700 font-medium truncate">
+                                                                {displayTeam.lineup?.[idx] || <span className="text-slate-300 italic">—</span>}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {/* Right column */}
+                                            <div className="divide-y divide-slate-100">
+                                                {formation.slice(Math.ceil(formation.length / 2)).map((pos, i) => {
+                                                    const idx = Math.ceil(formation.length / 2) + i;
+                                                    return (
+                                                        <div key={idx} className="flex items-center gap-3 px-3 py-2">
+                                                            <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center shrink-0">
+                                                                <span className="text-[9px] font-bold text-white">{pos.number}</span>
+                                                            </div>
+                                                            <span className="text-xs font-medium text-slate-500 w-10 shrink-0">{pos.label}</span>
                                                             {isEditing ? (
                                                                 <input
                                                                     type="text"
@@ -552,21 +595,19 @@ export default function OppositionReportsPage() {
                                                                         newLineup[idx] = e.target.value;
                                                                         setEditedTeam({ ...editedTeam, lineup: newLineup });
                                                                     }}
-                                                                    className="w-24 text-[10px] text-center bg-white/95 border border-slate-300 rounded px-1.5 py-1 text-slate-900 shadow-sm focus:ring-2 focus:ring-red-500 outline-none placeholder:text-slate-400 opacity-90 hover:opacity-100 transition-opacity"
-                                                                    placeholder="Player"
+                                                                    className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-900 focus:ring-1 focus:ring-red-500 outline-none placeholder:text-slate-400"
+                                                                    placeholder="Player name..."
                                                                 />
                                                             ) : (
-                                                                displayTeam.lineup && displayTeam.lineup[idx] && (
-                                                                    <span className="text-[10px] font-bold text-slate-900 bg-white px-2 py-0.5 rounded shadow-sm whitespace-nowrap border border-slate-200">
-                                                                        {displayTeam.lineup[idx]}
-                                                                    </span>
-                                                                )
+                                                                <span className="flex-1 text-xs text-slate-700 font-medium truncate">
+                                                                    {displayTeam.lineup?.[idx] || <span className="text-slate-300 italic">—</span>}
+                                                                </span>
                                                             )}
                                                         </div>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,18 +21,8 @@ export default function DocumentsPage() {
     });
     const [fileName, setFileName] = useState<string>(''); // For displaying selected filename
 
-    // ... (keep state) ...
-
-    // Load Data
-    useEffect(() => {
-        fetchDocuments();
-        const channel = supabase.channel('public:documents')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, fetchDocuments)
-            .subscribe();
-        return () => { supabase.removeChannel(channel); };
-    }, []);
-
-    const fetchDocuments = async () => {
+    // Fetch documents - defined before useEffect so subscription can reference it
+    const fetchDocuments = useCallback(async () => {
         const { data, error } = await supabase.from('documents').select('*');
         if (data) {
             setDocuments(data.map((d: any) => ({
@@ -44,7 +34,18 @@ export default function DocumentsPage() {
                 createdAt: d.created_at
             })));
         }
-    };
+    }, []);
+
+    // Load Data + real-time subscription
+    useEffect(() => {
+        fetchDocuments();
+        const channel = supabase.channel('public:documents')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'documents' }, fetchDocuments)
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [fetchDocuments]);
+
+
 
     // Note: Removed saveDocuments helper.
 
@@ -93,12 +94,18 @@ export default function DocumentsPage() {
             setIsAddOpen(false);
             setNewDoc({ name: '', type: 'Link', url: '', category: 'General' });
             setFileName('');
+            fetchDocuments();
         }
     };
 
     const deleteDocument = async (id: string) => {
         if (confirm("Delete this document?")) {
-            await supabase.from('documents').delete().eq('id', id);
+            const { error } = await supabase.from('documents').delete().eq('id', id);
+            if (error) {
+                alert("Error deleting document: " + error.message);
+            } else {
+                fetchDocuments();
+            }
         }
     };
 

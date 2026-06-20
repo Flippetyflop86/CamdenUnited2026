@@ -6,13 +6,14 @@ import { Menu } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
+import { PageGuard } from "@/components/layout/page-guard";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { settings, isLoaded } = useClub();
     const pathname = usePathname();
 
-    const isAuthPage = ["/login", "/signup", "/reset-password", "/update-password"].includes(pathname);
+    const isAuthPage = ["/login", "/signup", "/reset-password", "/update-password", "/join"].includes(pathname);
     const isOnboardingPage = pathname === "/onboarding";
 
     useEffect(() => {
@@ -86,7 +87,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </aside>
 
             <main className="flex-1 overflow-y-auto p-4 md:p-8 mt-16 md:mt-0">
-                {children}
+                <PageGuard>
+                    {children}
+                </PageGuard>
             </main>
         </div>
     );

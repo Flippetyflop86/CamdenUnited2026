@@ -74,6 +74,70 @@ const ClubContext = createContext<ClubContextType | undefined>(undefined);
 
 import { supabase } from "@/lib/supabase";
 
+function getDarkerColor(hex: string, percent = 15): string {
+    let r = parseInt(hex.slice(1, 3), 16);
+    let g = parseInt(hex.slice(3, 5), 16);
+    let b = parseInt(hex.slice(5, 7), 16);
+    
+    r = Math.max(0, Math.floor(r * (1 - percent / 100)));
+    g = Math.max(0, Math.floor(g * (1 - percent / 100)));
+    b = Math.max(0, Math.floor(b * (1 - percent / 100)));
+    
+    const toHex = (c: number) => {
+        const hexVal = c.toString(16);
+        return hexVal.length === 1 ? "0" + hexVal : hexVal;
+    };
+    return `#${toHex(r)}${toHex(g)}${toHex(b)}`;
+}
+
+function generateSecondaryColor(hex: string): string {
+    // Simple hue shift + saturation/lightness adjust for secondary complementary color
+    let r = parseInt(hex.slice(1, 3), 16);
+    let g = parseInt(hex.slice(3, 5), 16);
+    let b = parseInt(hex.slice(5, 7), 16);
+    
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h = 0, s = 0, l = (max + min) / 2;
+
+    if (max !== min) {
+        const d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch (max) {
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+    }
+
+    h = (h + 0.5) % 1; // 180 degrees shift
+    l = l > 0.5 ? 0.2 : 0.8;
+    
+    const hue2rgb = (p: number, q: number, t: number) => {
+        if (t < 0) t += 1;
+        if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+    };
+
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+
+    const r2 = Math.round(hue2rgb(p, q, h + 1/3) * 255);
+    const g2 = Math.round(hue2rgb(p, q, h) * 255);
+    const b2 = Math.round(hue2rgb(p, q, h - 1/3) * 255);
+
+    const toHex = (c: number) => {
+        const hexVal = c.toString(16);
+        return hexVal.length === 1 ? "0" + hexVal : hexVal;
+    };
+
+    return `#${toHex(r2)}${toHex(g2)}${toHex(b2)}`;
+}
+
 export function ClubProvider({ children }: { children: React.ReactNode }) {
     const { user, clubId } = useAuth();
     const [settings, setSettings] = useState<ClubSettings>(defaultSettings);
@@ -133,59 +197,20 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         }
 
         fetchSettings();
-
-        // Real-time Subscription to clubs table
-        /*
-        const channel = supabase
-            .channel("club_changes")
-            .on(
-                "postgres_changes",
-                {
-                    event: "*",
-                    schema: "public",
-                    table: "clubs"
-                },
-                (payload) => {
-                    const newData = payload.new as any;
-                    if (newData) {
-                        setSettings(prev => ({
-                            ...prev,
-                            name: newData.name || prev.name,
-                            logo: newData.logo || null,
-                            primaryColor: newData.primary_color || prev.primaryColor,
-                            secondaryColor: newData.secondary_color || prev.secondaryColor,
-                            isOnboarded: newData.is_onboarded ?? prev.isOnboarded,
-                            leagueUrl: newData.league_url ?? prev.leagueUrl,
-                            leaguePosition: newData.league_position ?? prev.leaguePosition,
-                            squads: newData.squads || prev.squads,
-                            homeKitShirt: newData.home_kit_shirt || prev.homeKitShirt,
-                            homeKitShorts: newData.home_kit_shorts || prev.homeKitShorts,
-                            homeKitSocks: newData.home_kit_socks || prev.homeKitSocks,
-                            awayKitShirt: newData.away_kit_shirt || prev.awayKitShirt,
-                            awayKitShorts: newData.away_kit_shorts || prev.awayKitShorts,
-                            awayKitSocks: newData.away_kit_socks || prev.awayKitSocks,
-                            sponsorLogo: newData.sponsor_logo || null,
-                            monthlySubs: newData.monthly_subs ?? prev.monthlySubs,
-                            finesEnabled: newData.fines_enabled ?? prev.finesEnabled
-                        }));
-                    }
-                }
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-        */
     }, [user, clubId]);
 
     const updateSettings = async (newSettings: Partial<ClubSettings>) => {
+        let finalSecondaryColor = newSettings.secondaryColor ?? settings.secondaryColor;
+        if (newSettings.primaryColor && !newSettings.secondaryColor) {
+            finalSecondaryColor = generateSecondaryColor(newSettings.primaryColor);
+        }
+
         // Update DB first
         const updates: any = {
             name: newSettings.name ?? settings.name,
             logo: newSettings.logo ?? settings.logo,
             primary_color: newSettings.primaryColor ?? settings.primaryColor,
-            secondary_color: newSettings.secondaryColor ?? settings.secondaryColor,
+            secondary_color: finalSecondaryColor,
             is_onboarded: newSettings.isOnboarded ?? settings.isOnboarded,
             league_url: newSettings.leagueUrl ?? settings.leagueUrl,
             league_position: newSettings.leaguePosition ?? settings.leaguePosition,
@@ -234,16 +259,33 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Apply Update to State after DB succeeds
-        const updated = { ...settings, ...newSettings };
+        const updated = { ...settings, ...newSettings, secondaryColor: finalSecondaryColor };
         setSettings(updated);
     };
 
     if (!isLoaded) {
-        return null; // Or a loading spinner
+        return (
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+                <div className="flex flex-col items-center gap-3">
+                    <div className="h-8 w-8 rounded-full border-4 border-red-600 border-t-transparent animate-spin" />
+                    <p className="text-slate-500 text-sm font-medium">Loading...</p>
+                </div>
+            </div>
+        );
     }
 
     return (
         <ClubContext.Provider value={{ settings, isLoaded, updateSettings }}>
+            {settings.primaryColor && (
+                <style dangerouslySetInnerHTML={{ __html: `
+                    .bg-red-600 { background-color: ${settings.primaryColor} !important; }
+                    .hover\\:bg-red-700:hover { background-color: ${getDarkerColor(settings.primaryColor)} !important; }
+                    .text-red-600, .text-red-500 { color: ${settings.primaryColor} !important; }
+                    .border-red-500, .border-red-600 { border-color: ${settings.primaryColor} !important; }
+                    .focus\\:ring-red-500:focus, .focus-visible\\:ring-red-500:focus-visible { --tw-ring-color: ${settings.primaryColor} !important; }
+                    .shadow-red-900\\/50 { --tw-shadow-color: ${settings.primaryColor}40 !important; }
+                `}} />
+            )}
             {children}
         </ClubContext.Provider>
     );
@@ -256,3 +298,4 @@ export function useClub() {
     }
     return context;
 }
+

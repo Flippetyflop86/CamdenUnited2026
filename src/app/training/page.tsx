@@ -197,27 +197,44 @@ export default function TrainingPage() {
     );
 
     const handleCopyTrainingToWhatsApp = () => {
-        let msg = `⚽ *TRAINING AVAILABILITY* ⚽\n\n`;
-        
-        const nextSession = upcomingSessions.find(s => new Date(s.date) >= new Date(new Date().setHours(0,0,0,0)));
-        
-        if (nextSession) {
-            msg += `📅 *Date:* ${formatDate(nextSession.date)}\n`;
-            msg += `⏰ *Time:* ${nextSession.time}\n`;
-            msg += `📍 *Venue:* ${nextSession.location}\n`;
-            if (nextSession.topic) {
-                msg += `📋 *Topic:* ${nextSession.topic}\n`;
+        let msgTemplate = `⚽ *TRAINING AVAILABILITY* ⚽\n\n`;
+        msgTemplate += `📅 *Date:* {date}\n`;
+        msgTemplate += `⏰ *Time:* {time}\n`;
+        msgTemplate += `📍 *Venue:* {location}\n`;
+        msgTemplate += `📋 *Topic:* {topic}\n\n`;
+        msgTemplate += `Please react below or reply if you are available to attend this week's training session!\n\n`;
+        msgTemplate += `👍 = Available\n`;
+        msgTemplate += `👎 = Unavailable\n`;
+        msgTemplate += `⏳ = Late / Maybe\n\n`;
+        msgTemplate += `🔴 *Let's get the numbers in early!*`;
+
+        try {
+            if (settings.whatsappPollMessage) {
+                const parsed = JSON.parse(settings.whatsappPollMessage);
+                if (parsed.training) msgTemplate = parsed.training;
             }
-            msg += `\n`;
+        } catch (e) {
+            // ignore parsing error, use default
         }
 
-        msg += `Please react below or reply if you are available to attend this week's training session!\n\n`;
-        msg += `👍 = Available\n`;
-        msg += `👎 = Unavailable\n`;
-        msg += `⏳ = Late / Maybe\n\n`;
-        msg += `🔴 *Let's get the numbers in early!*`;
+        const nextSession = upcomingSessions.find(s => new Date(s.date) >= new Date(new Date().setHours(0,0,0,0)));
 
-        navigator.clipboard.writeText(msg).then(() => {
+        let formattedMsg = msgTemplate;
+        if (nextSession) {
+            formattedMsg = formattedMsg
+                .replace(/{date}/g, formatDate(nextSession.date))
+                .replace(/{time}/g, nextSession.time)
+                .replace(/{location}/g, nextSession.location)
+                .replace(/{topic}/g, nextSession.topic || "General Session");
+        } else {
+            formattedMsg = formattedMsg
+                .replace(/{date}/g, "TBD")
+                .replace(/{time}/g, "TBD")
+                .replace(/{location}/g, "TBD")
+                .replace(/{topic}/g, "TBD");
+        }
+
+        navigator.clipboard.writeText(formattedMsg).then(() => {
             alert("Training availability message copied to clipboard! Paste it into WhatsApp.");
         }).catch(err => {
             console.error('Failed to copy: ', err);

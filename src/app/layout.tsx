@@ -4,8 +4,6 @@ import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
-import { SearchCommand } from "@/components/layout/search-command";
-
 
 import AppShell from "@/components/layout/app-shell";
 
@@ -39,7 +37,6 @@ export default function RootLayout({
                     <ClubProvider>
                         <AppShell>
                             {children}
-                            <SearchCommand />
                         </AppShell>
                     </ClubProvider>
                 </AuthProvider>

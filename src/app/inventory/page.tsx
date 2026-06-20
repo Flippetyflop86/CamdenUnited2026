@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,18 +25,8 @@ export default function InventoryPage() {
         notes: ''
     });
 
-    // ... (keep state) ...
-
-    // Load Data
-    useEffect(() => {
-        fetchInventory();
-        const channel = supabase.channel('public:inventory_items')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchInventory)
-            .subscribe();
-        return () => { supabase.removeChannel(channel); };
-    }, []);
-
-    const fetchInventory = async () => {
+    // Fetch inventory - defined before useEffect so subscription captures stable ref
+    const fetchInventory = useCallback(async () => {
         const { data, error } = await supabase.from('inventory_items').select('*');
         if (data) {
             setItems(data.map((i: any) => ({
@@ -50,7 +40,16 @@ export default function InventoryPage() {
                 lastUpdated: i.last_updated
             })));
         }
-    };
+    }, []);
+
+    // Load Data
+    useEffect(() => {
+        fetchInventory();
+        const channel = supabase.channel('public:inventory_items')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'inventory_items' }, fetchInventory)
+            .subscribe();
+        return () => { supabase.removeChannel(channel); };
+    }, [fetchInventory]);
 
     const handleSaveItem = async () => {
         if (!newItem.name || (newItem.quantity ?? 0) < 0) return;

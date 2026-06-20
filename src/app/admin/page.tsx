@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Upload, Save, Shield, Plus, Trash2 } from "lucide-react";
+import { Upload, Save, Shield, Plus, Trash2, Copy, Check, UserCheck, Users2, KeyRound, Link2 } from "lucide-react";
+import { ALL_PAGE_PERMISSIONS, PERMISSION_GROUPS } from "@/lib/permissions";
 import { DataExport } from "@/components/admin/data-export";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -25,11 +26,24 @@ export default function AdminPage() {
     const [foundingYear, setFoundingYear] = useState(settings.foundingYear?.toString() || "");
     const [twitterUrl, setTwitterUrl] = useState(settings.twitterUrl || "");
     const [instagramUrl, setInstagramUrl] = useState(settings.instagramUrl || "");
-    const [whatsappPollMessage, setWhatsAppPollMessage] = useState(settings.whatsappPollMessage || "");
+    const [matchPollTemplate, setMatchPollTemplate] = useState("");
+    const [trainingPollTemplate, setTrainingPollTemplate] = useState("");
+
+    useEffect(() => {
+        if (settings.whatsappPollMessage) {
+            try {
+                const parsed = JSON.parse(settings.whatsappPollMessage);
+                setMatchPollTemplate(parsed.match || "");
+                setTrainingPollTemplate(parsed.training || "");
+            } catch (e) {
+                setMatchPollTemplate(settings.whatsappPollMessage);
+                setTrainingPollTemplate("");
+            }
+        }
+    }, [settings.whatsappPollMessage]);
     
     // Colors & Kits
     const [primaryColor, setPrimaryColor] = useState(settings.primaryColor);
-    const [secondaryColor, setSecondaryColor] = useState(settings.secondaryColor);
     const [homeKitShirt, setHomeKitShirt] = useState(settings.homeKitShirt);
     const [homeKitShorts, setHomeKitShorts] = useState(settings.homeKitShorts);
     const [homeKitSocks, setHomeKitSocks] = useState(settings.homeKitSocks);
@@ -54,12 +68,28 @@ export default function AdminPage() {
     const [isMigrating, setIsMigrating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    const { user, role: userRole } = useAuth();
+    const { user, role: userRole, refreshPermissions } = useAuth();
+    const [managerName, setManagerName] = useState("");
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [invitations, setInvitations] = useState<any[]>([]);
+    // Invite form state
     const [inviteEmail, setInviteEmail] = useState("");
-    const [inviteRole, setInviteRole] = useState("Assistant Coach");
+    const [inviteDisplayName, setInviteDisplayName] = useState("");
+    const [inviteRole, setInviteRole] = useState("staff");
+    const [invitePermissions, setInvitePermissions] = useState<string[]>([]);
     const [isInviting, setIsInviting] = useState(false);
+    const [generatedLink, setGeneratedLink] = useState("");
+    const [copiedLink, setCopiedLink] = useState(false);
+    // Member permissions editing
+    const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+    const [editingPermissions, setEditingPermissions] = useState<string[]>([]);
+    const [isSavingPerms, setIsSavingPerms] = useState(false);
+
+    useEffect(() => {
+        if (user?.user_metadata?.full_name) {
+            setManagerName(user.user_metadata.full_name);
+        }
+    }, [user]);
 
     useEffect(() => {
         if (settings.isOnboarded) {
@@ -69,61 +99,102 @@ export default function AdminPage() {
 
     const fetchTeamAccess = async () => {
         try {
-            const { data: members, error: mErr } = await supabase.from('club_members').select('*');
+            const { data: members } = await supabase.from('club_members').select('*');
             if (members) setTeamMembers(members);
-            
-            const { data: invites, error: iErr } = await supabase.from('club_invitations').select('*');
+            const { data: invites } = await supabase.from('club_invitations').select('*').is('accepted_at', null);
             if (invites) setInvitations(invites);
         } catch (err) {
             console.error("Error fetching team access:", err);
         }
     };
 
+    const toggleInvitePermission = (key: string) => {
+        setInvitePermissions(prev =>
+            prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+        );
+    };
+
     const handleSendInvite = async () => {
         if (!inviteEmail.trim()) return;
         setIsInviting(true);
+        setGeneratedLink("");
         try {
-            // Get current club ID
             const { data: currentMember } = await supabase
-                .from('club_members')
-                .select('club_id')
-                .eq('user_id', user?.id)
-                .single();
+                .from('club_members').select('club_id').eq('user_id', user?.id).single();
+            if (!currentMember) { alert("Could not find your club."); setIsInviting(false); return; }
 
-            if (!currentMember) {
-                alert("Could not find your club association.");
-                setIsInviting(false);
-                return;
-            }
+            // Generate a unique token
+            const token = crypto.randomUUID();
 
-            const { error } = await supabase.from('club_invitations').insert([
-                {
-                    club_id: currentMember.club_id,
-                    email: inviteEmail.trim().toLowerCase(),
-                    role: inviteRole
-                }
-            ]);
-
+            const { error } = await supabase.from('club_invitations').insert([{
+                club_id: currentMember.club_id,
+                email: inviteEmail.trim().toLowerCase(),
+                display_name: inviteDisplayName.trim() || null,
+                role: inviteRole,
+                page_permissions: inviteRole === 'manager' ? [] : invitePermissions,
+                token,
+            }]);
             if (error) throw error;
 
+            // Build the invite link
+            const link = `${window.location.origin}/join?token=${token}`;
+            setGeneratedLink(link);
             setInviteEmail("");
+            setInviteDisplayName("");
+            setInvitePermissions([]);
             await fetchTeamAccess();
-            alert("Invitation sent successfully!");
         } catch (err: any) {
-            alert("Failed to send invitation: " + (err.message || JSON.stringify(err)));
+            alert("Failed to create invite: " + (err.message || JSON.stringify(err)));
         } finally {
             setIsInviting(false);
         }
     };
 
+    const handleCopyLink = async () => {
+        if (!generatedLink) return;
+        await navigator.clipboard.writeText(generatedLink);
+        setCopiedLink(true);
+        setTimeout(() => setCopiedLink(false), 2000);
+    };
+
     const handleDeleteInvite = async (id: string) => {
-        if (!confirm("Are you sure you want to cancel this invitation?")) return;
+        if (!confirm("Cancel this invitation?")) return;
         try {
             const { error } = await supabase.from('club_invitations').delete().eq('id', id);
             if (error) throw error;
             await fetchTeamAccess();
         } catch (err: any) {
             alert("Failed to delete invitation: " + err.message);
+        }
+    };
+
+    const startEditingMember = (member: any) => {
+        setEditingMemberId(member.user_id);
+        setEditingPermissions(member.page_permissions || []);
+    };
+
+    const toggleEditPermission = (key: string) => {
+        setEditingPermissions(prev =>
+            prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+        );
+    };
+
+    const handleSavePermissions = async (userId: string) => {
+        setIsSavingPerms(true);
+        try {
+            const { error } = await supabase
+                .from('club_members')
+                .update({ page_permissions: editingPermissions })
+                .eq('user_id', userId);
+            if (error) throw error;
+            await fetchTeamAccess();
+            // If we just edited our own perms, refresh context
+            if (userId === user?.id) await refreshPermissions();
+            setEditingMemberId(null);
+        } catch (err: any) {
+            alert("Failed to save: " + err.message);
+        } finally {
+            setIsSavingPerms(false);
         }
     };
 
@@ -185,17 +256,26 @@ export default function AdminPage() {
             const finalLogo = await uploadFileIfAny(logoFile, logo, 'club_logos');
             const finalSponsor = await uploadFileIfAny(sponsorFile, sponsorLogo, 'club_logos');
 
+            if (managerName.trim()) {
+                const { error: userUpdateErr } = await supabase.auth.updateUser({
+                    data: { full_name: managerName }
+                });
+                if (userUpdateErr) console.warn("Failed to update manager name:", userUpdateErr);
+            }
+
             await updateSettings({ 
                 name, 
                 logo: finalLogo,
                 primaryColor,
-                secondaryColor,
                 squads,
                 homeGround,
                 foundingYear: foundingYear ? parseInt(foundingYear) : null,
                 twitterUrl,
                 instagramUrl,
-                whatsappPollMessage,
+                whatsappPollMessage: JSON.stringify({
+                    match: matchPollTemplate,
+                    training: trainingPollTemplate
+                }),
                 homeKitShirt,
                 homeKitShorts,
                 homeKitSocks,
@@ -277,10 +357,15 @@ export default function AdminPage() {
     };
 
     const handleArchiveSeason = async () => {
-        if (!confirm("Are you sure? This will reset all current player contract statuses and clear training squads to prepare for a new season. Match history is kept safe!")) return;
+        if (!confirm(
+            "Archive Season & Start Fresh?\n\n" +
+            "✅ KEPT: All players, their profiles and match history\n" +
+            "🔄 RESET: Contract statuses and training squad assignments\n\n" +
+            "Your full squad remains intact — you can re-contract returning players for the new season. Proceed?"
+        )) return;
         setIsArchiving(true);
         try {
-            // Un-contract everyone and clear training squads
+            // Reset contract/training status only — players themselves are NOT deleted
             const { error } = await supabase.from('players').update({
                 is_contracted: false,
                 is_in_training_squad: false,
@@ -288,7 +373,7 @@ export default function AdminPage() {
             }).neq('id', '00000000-0000-0000-0000-000000000000'); // update all
             
             if (error) throw error;
-            alert("Season successfully archived! You can now assign new contracts and training squads.");
+            alert("✅ Season archived!\n\nAll players have been kept. Contract statuses and training squads have been cleared so you can set up the new season. Re-contract returning players from the Squad page.");
         } catch (err: any) {
             alert("Error archiving: " + err.message);
         } finally {
@@ -313,7 +398,7 @@ export default function AdminPage() {
                 <TabsList className="flex w-full max-w-4xl overflow-x-auto whitespace-nowrap gap-1 md:grid md:grid-cols-7 md:gap-0 bg-slate-100 p-1 rounded-lg scrollbar-none">
                     <TabsTrigger value="identity" className="flex-shrink-0 px-4 py-2">Identity</TabsTrigger>
                     <TabsTrigger value="squads" className="flex-shrink-0 px-4 py-2">Squads</TabsTrigger>
-                    <TabsTrigger value="kits" className="flex-shrink-0 px-4 py-2">Kits & Colors</TabsTrigger>
+                    <TabsTrigger value="kits" className="flex-shrink-0 px-4 py-2">Kits</TabsTrigger>
                     <TabsTrigger value="finance" className="flex-shrink-0 px-4 py-2">Finance</TabsTrigger>
                     <TabsTrigger value="staff" className="flex-shrink-0 px-4 py-2">Staff</TabsTrigger>
                     <TabsTrigger value="access" className="flex-shrink-0 px-4 py-2">Access</TabsTrigger>
@@ -337,6 +422,16 @@ export default function AdminPage() {
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     placeholder="e.g. Camden United FC"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="managerName">Manager Name</Label>
+                                <Input
+                                    id="managerName"
+                                    value={managerName}
+                                    onChange={(e) => setManagerName(e.target.value)}
+                                    placeholder="e.g. Ted Lasso"
                                 />
                             </div>
 
@@ -398,9 +493,30 @@ export default function AdminPage() {
                                         <Label className="text-xs">Instagram</Label>
                                         <Input value={instagramUrl} onChange={e => setInstagramUrl(e.target.value)} placeholder="https://instagram.com/..." className="text-sm" />
                                     </div>
-                                    <div className="space-y-2 col-span-2">
-                                        <Label className="text-xs">WhatsApp Poll Message</Label>
-                                        <Textarea value={whatsappPollMessage} onChange={e => setWhatsAppPollMessage(e.target.value)} placeholder="e.g. Hi team, please vote for availability for this weekend's match..." className="text-sm min-h-[80px]" />
+                                    <div className="space-y-2 col-span-2 border-t border-slate-100 pt-4">
+                                        <h5 className="font-semibold text-slate-700 text-xs uppercase tracking-wider mb-2">WhatsApp Templates</h5>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-semibold">Matchday Poll Template</Label>
+                                                <Textarea 
+                                                    value={matchPollTemplate} 
+                                                    onChange={e => setMatchPollTemplate(e.target.value)} 
+                                                    placeholder="e.g. ⚽ *MATCHDAY SQUAD* ⚽..." 
+                                                    className="text-xs min-h-[160px] font-sans" 
+                                                />
+                                                <p className="text-[10px] text-slate-400">Available: {`{opponent}, {venue}, {competition}, {date}, {time}, {formation}, {starting_xi}, {bench}`}</p>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-semibold">Training Poll Template</Label>
+                                                <Textarea 
+                                                    value={trainingPollTemplate} 
+                                                    onChange={e => setTrainingPollTemplate(e.target.value)} 
+                                                    placeholder="e.g. ⚽ *TRAINING AVAILABILITY* ⚽..." 
+                                                    className="text-xs min-h-[160px] font-sans" 
+                                                />
+                                                <p className="text-[10px] text-slate-400">Available: {`{date}, {time}, {location}, {topic}`}</p>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -453,7 +569,7 @@ export default function AdminPage() {
 
                 {/* KITS TAB */}
                 <TabsContent value="kits" className="space-y-6 mt-6">
-                    <Card className="max-w-2xl">
+                    <Card className="max-w-4xl">
                         <CardHeader>
                             <CardTitle>Kit Colors</CardTitle>
                             <CardDescription>
@@ -461,82 +577,90 @@ export default function AdminPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-8">
-                            <div className="space-y-4">
-                                <h4 className="font-semibold text-slate-700 flex items-center gap-2">
-                                    <Shield className="h-4 w-4 text-slate-400" />
-                                    Home Kit
-                                </h4>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-xs">Shirt</Label>
-                                        <div className="flex gap-2">
-                                            <input type="color" value={homeKitShirt} onChange={e => setHomeKitShirt(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
-                                            <Input value={homeKitShirt} onChange={e => setHomeKitShirt(e.target.value)} className="font-mono text-xs" />
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
+                                {/* Pickers Column */}
+                                <div className="md:col-span-8 space-y-6">
+                                    <div className="space-y-4">
+                                        <h4 className="font-semibold text-slate-700 flex items-center gap-2">
+                                            <Shield className="h-4 w-4 text-slate-400" />
+                                            Home Kit
+                                        </h4>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs">Shirt</Label>
+                                                <div className="flex gap-2">
+                                                    <input type="color" value={homeKitShirt} onChange={e => setHomeKitShirt(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
+                                                    <Input value={homeKitShirt} onChange={e => setHomeKitShirt(e.target.value)} className="font-mono text-xs" />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs">Shorts</Label>
+                                                <div className="flex gap-2">
+                                                    <input type="color" value={homeKitShorts} onChange={e => setHomeKitShorts(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
+                                                    <Input value={homeKitShorts} onChange={e => setHomeKitShorts(e.target.value)} className="font-mono text-xs" />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs">Socks</Label>
+                                                <div className="flex gap-2">
+                                                    <input type="color" value={homeKitSocks} onChange={e => setHomeKitSocks(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
+                                                    <Input value={homeKitSocks} onChange={e => setHomeKitSocks(e.target.value)} className="font-mono text-xs" />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-xs">Shorts</Label>
-                                        <div className="flex gap-2">
-                                            <input type="color" value={homeKitShorts} onChange={e => setHomeKitShorts(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
-                                            <Input value={homeKitShorts} onChange={e => setHomeKitShorts(e.target.value)} className="font-mono text-xs" />
+                                    
+                                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                                        <h4 className="font-semibold text-slate-700 flex items-center gap-2">
+                                            <Shield className="h-4 w-4 text-slate-400" />
+                                            Away Kit
+                                        </h4>
+                                        <div className="grid grid-cols-3 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs">Shirt</Label>
+                                                <div className="flex gap-2">
+                                                    <input type="color" value={awayKitShirt} onChange={e => setAwayKitShirt(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
+                                                    <Input value={awayKitShirt} onChange={e => setAwayKitShirt(e.target.value)} className="font-mono text-xs" />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs">Shorts</Label>
+                                                <div className="flex gap-2">
+                                                    <input type="color" value={awayKitShorts} onChange={e => setAwayKitShorts(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
+                                                    <Input value={awayKitShorts} onChange={e => setAwayKitShorts(e.target.value)} className="font-mono text-xs" />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="text-xs">Socks</Label>
+                                                <div className="flex gap-2">
+                                                    <input type="color" value={awayKitSocks} onChange={e => setAwayKitSocks(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
+                                                    <Input value={awayKitSocks} onChange={e => setAwayKitSocks(e.target.value)} className="font-mono text-xs" />
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-xs">Socks</Label>
-                                        <div className="flex gap-2">
-                                            <input type="color" value={homeKitSocks} onChange={e => setHomeKitSocks(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
-                                            <Input value={homeKitSocks} onChange={e => setHomeKitSocks(e.target.value)} className="font-mono text-xs" />
+
+                                    <div className="space-y-4 pt-4 border-t border-slate-100">
+                                        <h4 className="font-semibold text-slate-700">Club Color</h4>
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="text-xs">Primary Club Colour</Label>
+                                                <div className="flex gap-2">
+                                                    <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
+                                                    <Input value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="font-mono text-xs" />
+                                                </div>
+                                                <p className="text-xs text-slate-500">Automatically becomes the app accent color across ClubFlow. Secondary shades are generated internally.</p>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                            
-                            <div className="space-y-4 pt-4 border-t border-slate-100">
-                                <h4 className="font-semibold text-slate-700 flex items-center gap-2">
-                                    <Shield className="h-4 w-4 text-slate-400" />
-                                    Away Kit
-                                </h4>
-                                <div className="grid grid-cols-3 gap-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-xs">Shirt</Label>
-                                        <div className="flex gap-2">
-                                            <input type="color" value={awayKitShirt} onChange={e => setAwayKitShirt(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
-                                            <Input value={awayKitShirt} onChange={e => setAwayKitShirt(e.target.value)} className="font-mono text-xs" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-xs">Shorts</Label>
-                                        <div className="flex gap-2">
-                                            <input type="color" value={awayKitShorts} onChange={e => setAwayKitShorts(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
-                                            <Input value={awayKitShorts} onChange={e => setAwayKitShorts(e.target.value)} className="font-mono text-xs" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-xs">Socks</Label>
-                                        <div className="flex gap-2">
-                                            <input type="color" value={awayKitSocks} onChange={e => setAwayKitSocks(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
-                                            <Input value={awayKitSocks} onChange={e => setAwayKitSocks(e.target.value)} className="font-mono text-xs" />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <div className="space-y-4 pt-4 border-t border-slate-100">
-                                <h4 className="font-semibold text-slate-700">App Theme Colors</h4>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-xs">Primary Brand Color</Label>
-                                        <div className="flex gap-2">
-                                            <input type="color" value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
-                                            <Input value={primaryColor} onChange={e => setPrimaryColor(e.target.value)} className="font-mono text-xs" />
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-xs">Secondary Brand Color</Label>
-                                        <div className="flex gap-2">
-                                            <input type="color" value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} className="h-10 w-10 cursor-pointer rounded border border-slate-200" />
-                                            <Input value={secondaryColor} onChange={e => setSecondaryColor(e.target.value)} className="font-mono text-xs" />
-                                        </div>
+
+                                {/* Preview Column */}
+                                <div className="md:col-span-4 flex flex-col justify-center gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 shrink-0">
+                                    <h4 className="font-bold text-[10px] uppercase tracking-wider text-slate-500 text-center">Live Preview</h4>
+                                    <div className="space-y-4">
+                                        <KitPreview shirt={homeKitShirt} shorts={homeKitShorts} socks={homeKitSocks} label="Home Kit" />
+                                        <KitPreview shirt={awayKitShirt} shorts={awayKitShorts} socks={awayKitSocks} label="Away Kit" />
                                     </div>
                                 </div>
                             </div>
@@ -680,134 +804,270 @@ export default function AdminPage() {
 
                 {/* ACCESS TAB */}
                 <TabsContent value="access" className="space-y-6 mt-6">
-                    <Card className="max-w-2xl bg-slate-900 border-slate-800 text-white shadow-xl">
+
+                    {/* --- INVITE NEW STAFF --- */}
+                    <Card className="max-w-3xl bg-slate-900 border-slate-800 text-white shadow-xl">
                         <CardHeader>
-                            <CardTitle>Invite Team Members</CardTitle>
-                            <CardDescription className="text-slate-400">
-                                Grant other coaches or administrators access to your club workspace.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex flex-col sm:flex-row gap-4 items-end">
-                                <div className="space-y-2 flex-1 w-full">
-                                    <Label htmlFor="inviteEmail" className="text-slate-300">Email Address</Label>
-                                    <Input
-                                        id="inviteEmail"
-                                        type="email"
-                                        placeholder="assistant-coach@example.com"
-                                        value={inviteEmail}
-                                        onChange={(e) => setInviteEmail(e.target.value)}
-                                        className="bg-slate-950 border-slate-800 text-white placeholder-slate-500 focus-visible:ring-red-500"
-                                    />
+                            <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 rounded-lg bg-red-600/20 flex items-center justify-center">
+                                    <UserCheck className="h-5 w-5 text-red-400" />
                                 </div>
-                                <div className="space-y-2 w-full sm:w-[180px]">
-                                    <Label htmlFor="inviteRole" className="text-slate-300">Assign Role</Label>
-                                    <select
-                                        id="inviteRole"
-                                        className="flex h-10 w-full rounded-md border border-slate-800 bg-slate-950 px-3 py-2 text-sm text-white focus-visible:ring-2 focus-visible:ring-red-500"
-                                        value={inviteRole}
-                                        onChange={(e) => setInviteRole(e.target.value)}
-                                    >
-                                        <option value="Assistant Coach" className="bg-slate-950 text-white">Assistant Coach</option>
-                                        <option value="Manager" className="bg-slate-950 text-white">Manager (Head Coach)</option>
+                                <div>
+                                    <CardTitle className="text-white">Invite Staff Member</CardTitle>
+                                    <CardDescription className="text-slate-400">Create an invite link and choose exactly what they can see.</CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-5">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="inviteEmail" className="text-slate-300 text-sm">Email Address</Label>
+                                    <Input id="inviteEmail" type="email" placeholder="coach@example.com" value={inviteEmail}
+                                        onChange={(e) => setInviteEmail(e.target.value)}
+                                        className="bg-slate-950 border-slate-700 text-white placeholder-slate-500 focus-visible:ring-red-500" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="inviteDisplayName" className="text-slate-300 text-sm">Their Name</Label>
+                                    <Input id="inviteDisplayName" placeholder="e.g. James Smith" value={inviteDisplayName}
+                                        onChange={(e) => setInviteDisplayName(e.target.value)}
+                                        className="bg-slate-950 border-slate-700 text-white placeholder-slate-500 focus-visible:ring-red-500" />
+                                </div>
+                                <div className="space-y-1.5 sm:col-span-2">
+                                    <Label htmlFor="inviteRole" className="text-slate-300 text-sm">Role</Label>
+                                    <select id="inviteRole" value={inviteRole} onChange={(e) => setInviteRole(e.target.value)}
+                                        className="flex h-10 w-full sm:w-64 rounded-md border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white focus-visible:ring-2 focus-visible:ring-red-500">
+                                        <option value="staff">Staff (Custom permissions)</option>
+                                        <option value="assistant coach">Assistant Coach</option>
+                                        <option value="physio">Physio</option>
+                                        <option value="coach">Coach</option>
+                                        <option value="manager">Manager (Full Access)</option>
                                     </select>
                                 </div>
-                                <Button
-                                    onClick={handleSendInvite}
-                                    disabled={isInviting || !inviteEmail}
-                                    className="bg-red-600 hover:bg-red-500 text-white h-10 px-6 shrink-0 w-full sm:w-auto"
-                                >
-                                    {isInviting ? "Inviting..." : "Send Invite"}
+                            </div>
+
+                            {/* Page permissions grid — only shown for non-manager roles */}
+                            {inviteRole !== 'manager' && (
+                                <div className="pt-4 border-t border-slate-800">
+                                    <p className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
+                                        <KeyRound className="h-4 w-4 text-slate-400" /> Page Access
+                                    </p>
+                                    <div className="space-y-4">
+                                        {PERMISSION_GROUPS.map(group => (
+                                            <div key={group}>
+                                                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{group}</p>
+                                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                    {ALL_PAGE_PERMISSIONS.filter(p => p.group === group).map(perm => (
+                                                        <label key={perm.key} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
+                                                            invitePermissions.includes(perm.key)
+                                                                ? 'border-red-500 bg-red-500/10 text-white'
+                                                                : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                                                        }`}>
+                                                            <input type="checkbox" className="sr-only"
+                                                                checked={invitePermissions.includes(perm.key)}
+                                                                onChange={() => toggleInvitePermission(perm.key)} />
+                                                            <div className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-all ${
+                                                                invitePermissions.includes(perm.key) ? 'bg-red-600 border-red-600' : 'border-slate-600'
+                                                            }`}>
+                                                                {invitePermissions.includes(perm.key) && <Check className="h-3 w-3 text-white" />}
+                                                            </div>
+                                                            <span className="text-xs font-medium">{perm.label}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button type="button" onClick={() => setInvitePermissions(inviteRole === 'manager' ? [] : ALL_PAGE_PERMISSIONS.map(p => p.key))}
+                                        className="mt-3 text-xs text-red-400 hover:text-red-300 underline">
+                                        Select all pages
+                                    </button>
+                                    {invitePermissions.length > 0 && (
+                                        <button type="button" onClick={() => setInvitePermissions([])}
+                                            className="mt-3 ml-4 text-xs text-slate-500 hover:text-slate-400 underline">
+                                            Clear all
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="pt-4 border-t border-slate-800 flex items-center justify-between">
+                                <Button onClick={handleSendInvite} disabled={isInviting || !inviteEmail.trim()}
+                                    className="bg-red-600 hover:bg-red-500 text-white h-10 px-6">
+                                    <Link2 className="h-4 w-4 mr-2" />
+                                    {isInviting ? "Generating..." : "Generate Invite Link"}
                                 </Button>
                             </div>
-                            <p className="text-xs text-slate-500">
-                                Invited members will automatically join this club workspace when they register with their email.
-                            </p>
-                        </CardContent>
-                    </Card>
 
-                    <Card className="max-w-2xl bg-slate-900 border-slate-800 text-white shadow-xl">
-                        <CardHeader>
-                            <CardTitle>Active Members & Invitations</CardTitle>
-                            <CardDescription className="text-slate-400">
-                                Manage access rights for all users linked to this club.
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="space-y-2">
-                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Members</h3>
-                                <div className="rounded-md border border-slate-800 bg-slate-950 overflow-hidden">
-                                    <table className="w-full text-sm">
-                                        <thead className="bg-slate-900 border-b border-slate-800">
-                                            <tr className="text-left text-xs font-medium text-slate-400 uppercase">
-                                                <th className="px-4 py-3">User</th>
-                                                <th className="px-4 py-3">Role</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-800">
-                                            {teamMembers.map((member) => (
-                                                <tr key={member.user_id} className="hover:bg-slate-900/50 transition-colors">
-                                                    <td className="px-4 py-3 font-medium text-slate-200">
-                                                        {member.user_id === user?.id ? (
-                                                            <span>{user?.email || "You"} <span className="text-xs text-red-500 font-normal ml-1">(Logged in)</span></span>
-                                                        ) : (
-                                                            <span className="text-xs text-slate-500">User ID: {member.user_id.substring(0, 8)}...</span>
-                                                        )}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                                                            member.role === 'Manager' ? 'bg-red-950/40 text-red-400 border border-red-500/20' : 'bg-slate-800 text-slate-300'
-                                                        }`}>
-                                                            {member.role}
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            {invitations.length > 0 && (
-                                <div className="space-y-2 pt-4 border-t border-slate-800">
-                                    <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Pending Invitations</h3>
-                                    <div className="rounded-md border border-slate-800 bg-slate-950 overflow-hidden">
-                                        <table className="w-full text-sm">
-                                            <thead className="bg-slate-900 border-b border-slate-800">
-                                                <tr className="text-left text-xs font-medium text-slate-400 uppercase">
-                                                    <th className="px-4 py-3">Email</th>
-                                                    <th className="px-4 py-3">Role</th>
-                                                    <th className="px-4 py-3 text-right">Action</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-slate-800">
-                                                {invitations.map((invite) => (
-                                                    <tr key={invite.id} className="hover:bg-slate-900/50 transition-colors">
-                                                        <td className="px-4 py-3 font-medium text-slate-300">{invite.email}</td>
-                                                        <td className="px-4 py-3">
-                                                            <span className="inline-flex items-center rounded-full bg-slate-850 border border-slate-700 px-2 py-0.5 text-xs font-semibold text-slate-400">
-                                                                {invite.role}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right">
-                                                            <Button
-                                                                variant="ghost"
-                                                                size="sm"
-                                                                onClick={() => handleDeleteInvite(invite.id)}
-                                                                className="text-red-400 hover:text-red-300 hover:bg-red-950/20 p-1 h-8 w-8"
-                                                            >
-                                                                <Trash2 className="h-4 w-4" />
-                                                            </Button>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
+                            {/* Generated link box */}
+                            {generatedLink && (
+                                <div className="rounded-lg bg-green-950/40 border border-green-700/50 p-4">
+                                    <p className="text-xs font-semibold text-green-400 mb-2">✅ Invite link created! Share this with the staff member:</p>
+                                    <div className="flex gap-2">
+                                        <code className="flex-1 text-xs text-green-300 bg-slate-950 rounded px-3 py-2 break-all border border-slate-800">{generatedLink}</code>
+                                        <Button size="sm" onClick={handleCopyLink}
+                                            className="shrink-0 bg-green-700 hover:bg-green-600 text-white h-auto px-3">
+                                            {copiedLink ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                                        </Button>
                                     </div>
+                                    <p className="text-xs text-slate-500 mt-2">The link expires once used. They'll be asked to set a password when they sign up.</p>
                                 </div>
                             )}
                         </CardContent>
                     </Card>
+
+                    {/* --- ACTIVE MEMBERS --- */}
+                    <Card className="max-w-3xl bg-slate-900 border-slate-800 text-white shadow-xl">
+                        <CardHeader>
+                            <div className="flex items-center gap-3">
+                                <div className="h-9 w-9 rounded-lg bg-slate-700/50 flex items-center justify-center">
+                                    <Users2 className="h-5 w-5 text-slate-300" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-white">Active Members</CardTitle>
+                                    <CardDescription className="text-slate-400">Edit page permissions for each staff member.</CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {teamMembers.length === 0 ? (
+                                <p className="text-sm text-slate-500 text-center py-4">No members yet. Send an invite above.</p>
+                            ) : teamMembers.map((member) => {
+                                const isMe = member.user_id === user?.id;
+                                const isManagerRole = member.role === 'manager';
+                                const isEditing = editingMemberId === member.user_id;
+                                return (
+                                    <div key={member.user_id} className="rounded-lg border border-slate-800 bg-slate-950 overflow-hidden">
+                                        {/* Member header */}
+                                        <div className="flex items-center justify-between px-4 py-3 bg-slate-900">
+                                            <div className="flex items-center gap-3">
+                                                <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold">
+                                                    {(member.display_name || member.role || "?").charAt(0).toUpperCase()}
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-semibold text-white">
+                                                        {member.display_name || (isMe ? "You" : `Member #${member.user_id.substring(0,6)}`)}
+                                                        {isMe && <span className="ml-2 text-xs text-red-400 font-normal">(You)</span>}
+                                                    </p>
+                                                    <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
+                                                        isManagerRole ? 'bg-red-900/40 text-red-400 border border-red-500/20' : 'bg-slate-800 text-slate-300'
+                                                    }`}>{member.role}</span>
+                                                </div>
+                                            </div>
+                                            {!isManagerRole && (
+                                                <Button variant="ghost" size="sm" onClick={() => isEditing ? setEditingMemberId(null) : startEditingMember(member)}
+                                                    className="text-slate-400 hover:text-white text-xs">
+                                                    {isEditing ? "Cancel" : "Edit Access"}
+                                                </Button>
+                                            )}
+                                            {isManagerRole && (
+                                                <span className="text-xs text-slate-500">Full access</span>
+                                            )}
+                                        </div>
+
+                                        {/* Permission chips (view mode) */}
+                                        {!isEditing && !isManagerRole && (
+                                            <div className="px-4 py-3">
+                                                {(member.page_permissions || []).length === 0 ? (
+                                                    <p className="text-xs text-slate-600 italic">No pages assigned — click Edit Access</p>
+                                                ) : (
+                                                    <div className="flex flex-wrap gap-1.5">
+                                                        {(member.page_permissions as string[]).map((key: string) => (
+                                                            <span key={key} className="text-xs bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full capitalize">
+                                                                {key.replace(/-/g, ' ')}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Permissions editor (edit mode) */}
+                                        {isEditing && (
+                                            <div className="px-4 py-4 border-t border-slate-800 space-y-4">
+                                                {PERMISSION_GROUPS.map(group => (
+                                                    <div key={group}>
+                                                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{group}</p>
+                                                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                                            {ALL_PAGE_PERMISSIONS.filter(p => p.group === group).map(perm => (
+                                                                <label key={perm.key} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
+                                                                    editingPermissions.includes(perm.key)
+                                                                        ? 'border-red-500 bg-red-500/10 text-white'
+                                                                        : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                                                                }`}>
+                                                                    <input type="checkbox" className="sr-only"
+                                                                        checked={editingPermissions.includes(perm.key)}
+                                                                        onChange={() => toggleEditPermission(perm.key)} />
+                                                                    <div className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-all ${
+                                                                        editingPermissions.includes(perm.key) ? 'bg-red-600 border-red-600' : 'border-slate-600'
+                                                                    }`}>
+                                                                        {editingPermissions.includes(perm.key) && <Check className="h-3 w-3 text-white" />}
+                                                                    </div>
+                                                                    <span className="text-xs font-medium">{perm.label}</span>
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                <div className="flex gap-3 pt-2">
+                                                    <Button size="sm" onClick={() => handleSavePermissions(member.user_id)} disabled={isSavingPerms}
+                                                        className="bg-red-600 hover:bg-red-500 text-white">
+                                                        {isSavingPerms ? "Saving..." : "Save Permissions"}
+                                                    </Button>
+                                                    <Button size="sm" variant="ghost" onClick={() => setEditingMemberId(null)}
+                                                        className="text-slate-400">
+                                                        Cancel
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </CardContent>
+                    </Card>
+
+                    {/* --- PENDING INVITATIONS --- */}
+                    {invitations.length > 0 && (
+                        <Card className="max-w-3xl bg-slate-900 border-slate-800 text-white shadow-xl">
+                            <CardHeader>
+                                <CardTitle className="text-white">Pending Invitations</CardTitle>
+                                <CardDescription className="text-slate-400">These links have been generated but not yet used.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="divide-y divide-slate-800">
+                                    {invitations.map((invite) => (
+                                        <div key={invite.id} className="flex items-center justify-between py-3">
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-200">{invite.email}</p>
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className="text-xs bg-slate-800 text-slate-400 px-2 py-0.5 rounded-full capitalize">{invite.role}</span>
+                                                    {(invite.page_permissions || []).length > 0 && (
+                                                        <span className="text-xs text-slate-500">{invite.page_permissions.length} pages</span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {invite.token && (
+                                                    <Button variant="ghost" size="sm" onClick={() => {
+                                                        const link = `${window.location.origin}/join?token=${invite.token}`;
+                                                        navigator.clipboard.writeText(link);
+                                                        setCopiedLink(true);
+                                                        setTimeout(() => setCopiedLink(false), 2000);
+                                                    }} className="text-slate-400 hover:text-white h-8 w-8 p-0">
+                                                        <Copy className="h-4 w-4" />
+                                                    </Button>
+                                                )}
+                                                <Button variant="ghost" size="sm" onClick={() => handleDeleteInvite(invite.id)}
+                                                    className="text-red-400 hover:text-red-300 hover:bg-red-950/20 h-8 w-8 p-0">
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </TabsContent>
 
                 {/* ADVANCED TAB */}
@@ -833,10 +1093,17 @@ export default function AdminPage() {
 
                             <div className="pt-4 border-t border-slate-100">
                                 <Label className="text-red-600 font-semibold mb-2 block">End of Season Archive</Label>
-                                <p className="text-xs text-slate-500 mb-4">
-                                    This will reset all current player contract statuses and clear training squads. 
-                                    Your match history and stats are safely kept per season automatically.
-                                </p>
+                                <div className="mb-4 rounded-lg bg-amber-50 border border-amber-200 p-3 space-y-1">
+                                    <p className="text-xs font-semibold text-amber-800">What gets reset vs kept:</p>
+                                    <div className="flex items-center gap-2 text-xs text-green-700">
+                                        <span className="text-base">✅</span>
+                                        <span><strong>Kept:</strong> All players and their profiles, full match history and stats</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 text-xs text-amber-700">
+                                        <span className="text-base">🔄</span>
+                                        <span><strong>Reset:</strong> Contract statuses and training squad assignments only</span>
+                                    </div>
+                                </div>
                                 <Button onClick={handleArchiveSeason} disabled={isArchiving} variant="destructive">
                                     {isArchiving ? "Archiving..." : "Archive Season & Start Fresh"}
                                 </Button>
@@ -866,6 +1133,35 @@ export default function AdminPage() {
                     <DataExport />
                 </TabsContent>
             </Tabs>
+        </div>
+    );
+}
+
+function KitPreview({ shirt, shorts, socks, label }: { shirt: string; shorts: string; socks: string; label: string }) {
+    return (
+        <div className="flex flex-col items-center p-4 bg-slate-50 rounded-xl border border-slate-200 w-full relative">
+            <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-3">{label}</span>
+            <div className="flex items-end justify-center gap-3 h-24 w-full relative">
+                {/* Shirt */}
+                <svg className="w-14 h-14 drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M 30,20 L 70,20 L 85,35 L 75,45 L 68,38 L 68,85 L 32,85 L 32,38 L 25,45 L 15,35 Z" fill={shirt} stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M 40,20 Q 50,28 60,20" stroke="#000" strokeWidth="2.5" fill="none" />
+                </svg>
+                {/* Shorts */}
+                <svg className="w-11 h-11 drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M 20,10 L 80,10 L 85,75 L 53,75 L 50,45 L 47,75 L 15,75 Z" fill={shorts} stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {/* Socks */}
+                <svg className="w-6 h-12 drop-shadow-[0_4px_6px_rgba(0,0,0,0.15)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M 20,10 L 40,10 L 40,75 C 40,82 55,82 55,95 L 15,95 C 15,82 20,82 20,75 Z" fill={socks} stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M 60,10 L 80,10 L 80,75 C 80,82 95,82 95,95 L 55,95 C 55,82 60,82 60,75 Z" fill={socks} stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+            </div>
+            <div className="flex gap-1.5 mt-3">
+                <div className="w-3.5 h-3.5 rounded-full border border-slate-400 shadow-inner" style={{ backgroundColor: shirt }} title="Shirt" />
+                <div className="w-3.5 h-3.5 rounded-full border border-slate-400 shadow-inner" style={{ backgroundColor: shorts }} title="Shorts" />
+                <div className="w-3.5 h-3.5 rounded-full border border-slate-400 shadow-inner" style={{ backgroundColor: socks }} title="Socks" />
+            </div>
         </div>
     );
 }
