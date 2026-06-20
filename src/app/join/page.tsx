@@ -71,14 +71,14 @@ function JoinPageInner() {
             if (signupError) throw signupError;
             if (!authData.user) throw new Error("Signup failed — no user returned.");
 
-            // 2. Create the club_members record with permissions from invite
-            const { error: memberError } = await supabase.from("club_members").insert([{
+            // 2. Create or update the club_members record with permissions from invite (trigger might have already inserted it)
+            const { error: memberError } = await supabase.from("club_members").upsert([{
                 user_id: authData.user.id,
                 club_id: invite.club_id,
                 role: invite.role || "staff",
                 page_permissions: invite.page_permissions || [],
                 display_name: name.trim(),
-            }]);
+            }], { onConflict: 'user_id,club_id' });
 
             if (memberError) throw memberError;
 
