@@ -109,6 +109,12 @@ export default function OnboardingWizard() {
         }
     }, [isLoaded, settings, user]);
 
+    useEffect(() => {
+        if (isLoaded && settings?.isOnboarded && step !== 8) {
+            router.push('/dashboard');
+        }
+    }, [isLoaded, settings, step, router]);
+
     const handleNext = () => setStep(prev => prev + 1);
     const handleBack = () => setStep(prev => prev - 1);
     const handleSkip = () => handleNext();

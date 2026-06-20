@@ -50,7 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (data) {
                 setClubId(data.club_id);
-                setRole(data.role);
+                setRole(data.role ? data.role.toLowerCase() : null);
                 setPagePermissions(data.page_permissions || []);
                 setDisplayName(data.display_name || null);
             }

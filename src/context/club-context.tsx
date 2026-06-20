@@ -139,12 +139,17 @@ function generateSecondaryColor(hex: string): string {
 }
 
 export function ClubProvider({ children }: { children: React.ReactNode }) {
-    const { user, clubId } = useAuth();
+    const { user, clubId, isLoading: authLoading } = useAuth();
     const [settings, setSettings] = useState<ClubSettings>(defaultSettings);
     const [isLoaded, setIsLoaded] = useState(false);
 
     // Initial Fetch
     useEffect(() => {
+        if (authLoading) {
+            setIsLoaded(false);
+            return;
+        }
+
         if (!user) {
             setSettings(defaultSettings);
             setIsLoaded(true);
