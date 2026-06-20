@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useState } from "react";
+import { useAuth } from "./auth-context";
 
 interface ClubSettings {
     name: string;
@@ -74,11 +75,18 @@ const ClubContext = createContext<ClubContextType | undefined>(undefined);
 import { supabase } from "@/lib/supabase";
 
 export function ClubProvider({ children }: { children: React.ReactNode }) {
+    const { user, clubId } = useAuth();
     const [settings, setSettings] = useState<ClubSettings>(defaultSettings);
     const [isLoaded, setIsLoaded] = useState(false);
 
     // Initial Fetch
     useEffect(() => {
+        if (!user) {
+            setSettings(defaultSettings);
+            setIsLoaded(true);
+            return;
+        }
+
         async function fetchSettings() {
             try {
                 // RLS automatically filters this to ONLY the current user's club
@@ -169,7 +177,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             supabase.removeChannel(channel);
         };
         */
-    }, []);
+    }, [user, clubId]);
 
     const updateSettings = async (newSettings: Partial<ClubSettings>) => {
         // Update DB first
