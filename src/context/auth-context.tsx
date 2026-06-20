@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .single();
 
             if (error && error.code !== 'PGRST116') {
-                console.error("Error fetching club membership:", error);
+                console.error("Error fetching club membership:", error.message, error.details, error.hint, error.code);
             }
 
             if (data) {
