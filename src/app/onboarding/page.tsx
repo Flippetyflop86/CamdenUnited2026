@@ -367,13 +367,10 @@ export default function OnboardingWizard() {
                 </Button>
             </header>
 
-            {/* Main Content (2-Column) */}
+            {/* Main Content */}
             <div className="flex-1 flex items-center justify-center p-4 md:p-8">
-                <div className="w-full max-w-6xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
-                    
-                    {/* Left Column: Multi-Step Card */}
-                    <div className="lg:col-span-7 flex flex-col justify-center">
-                        <div className="w-full space-y-4">
+                <div className="w-full max-w-2xl flex flex-col justify-center">
+                    <div className="w-full space-y-4">
                             
                             {/* Progress Dots */}
                             {step <= totalSteps && (
@@ -907,139 +904,7 @@ export default function OnboardingWizard() {
                             </Card>
                         </div>
                     </div>
-
-                    {/* Right Column: Live Preview Card */}
-                    <div className="lg:col-span-5 flex flex-col justify-center">
-                        <div className="sticky top-8">
-                            <Card className="border-slate-800 bg-slate-900/30 border border-slate-900 shadow-2xl overflow-hidden">
-                                <div className="p-3 bg-slate-900/80 border-b border-slate-900 flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full bg-red-500/80" />
-                                    <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-                                    <div className="w-3 h-3 rounded-full bg-green-500/80" />
-                                    <span className="text-[10px] font-bold font-mono tracking-widest text-slate-500 uppercase ml-auto">Live App Preview</span>
-                                </div>
-                                <CardContent className="p-6 space-y-6">
-                                    {/* Mini Desktop Window Mockup representing the actual ClubFlow App */}
-                                    <div className="bg-slate-950 rounded-2xl border border-slate-800 overflow-hidden shadow-2xl flex flex-col h-64 select-none">
-                                        {/* Window Chrome */}
-                                        <div className="bg-slate-900 px-4 py-2 border-b border-slate-950 flex items-center gap-1.5 shrink-0">
-                                            <div className="w-2 h-2 rounded-full bg-red-500/80" />
-                                            <div className="w-2 h-2 rounded-full bg-yellow-500/80" />
-                                            <div className="w-2 h-2 rounded-full bg-green-500/80" />
-                                            <span className="text-[8px] font-mono text-slate-500 ml-2">clubflow.app/{clubName.toLowerCase().replace(/\s+/g, '-')}</span>
-                                        </div>
-                                        
-                                        <div className="flex flex-1 min-h-0">
-                                            {/* Mini Sidebar */}
-                                            <div className="w-28 bg-slate-900 border-r border-slate-950 p-2 flex flex-col gap-3 shrink-0">
-                                                {/* Header */}
-                                                <div className="flex items-center gap-1.5 overflow-hidden">
-                                                    {logoPreview ? (
-                                                        <img src={logoPreview} alt="Logo" className="h-4.5 w-4.5 object-contain shrink-0" />
-                                                    ) : (
-                                                        <div className="h-4.5 w-4.5 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
-                                                            <span className="text-[8px] font-bold text-white">{(clubName || "C").charAt(0).toUpperCase()}</span>
-                                                        </div>
-                                                    )}
-                                                    <span className="text-[8px] font-bold text-white truncate">{clubName || "Camden United"}</span>
-                                                </div>
-                                                
-                                                {/* Mini links */}
-                                                <div className="flex flex-col gap-1">
-                                                    <div className="h-4 rounded px-1.5 flex items-center text-[7px] font-bold text-white" style={{ backgroundColor: primaryColor }}>
-                                                        Dashboard
-                                                    </div>
-                                                    <div className="h-4 rounded px-1.5 flex items-center text-[7px] text-slate-400 font-semibold">
-                                                        Squad
-                                                    </div>
-                                                    <div className="h-4 rounded px-1.5 flex items-center text-[7px] text-slate-400 font-semibold">
-                                                        Fixtures
-                                                    </div>
-                                                    <div className="h-4 rounded px-1.5 flex items-center text-[7px] text-slate-400 font-semibold">
-                                                        Finance
-                                                    </div>
-                                                    <div className="h-4 rounded px-1.5 flex items-center text-[7px] text-slate-400 font-semibold">
-                                                        Settings
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Mini Content Area */}
-                                            <div className="flex-1 bg-slate-950 p-3 flex flex-col gap-2 overflow-y-auto">
-                                                <h4 className="text-[9px] font-bold text-white">Dashboard</h4>
-                                                
-                                                {/* Next Match Card */}
-                                                <div className="bg-slate-900 rounded-lg p-2 border border-slate-800 flex items-center justify-between gap-2 relative overflow-hidden">
-                                                    <div className="absolute left-0 top-0 bottom-0 w-0.5" style={{ backgroundColor: primaryColor }} />
-                                                    <div className="space-y-0.5 min-w-0">
-                                                        <span className="text-[6px] font-bold uppercase tracking-wider text-slate-500">Upcoming Match</span>
-                                                        <p className="text-[8px] font-bold text-white truncate">{clubName || "Camden United"} vs AFC Richmond</p>
-                                                    </div>
-                                                    <div className="text-right shrink-0">
-                                                        <span className="text-[6px] font-semibold text-slate-400">Sat 15:00</span>
-                                                    </div>
-                                                </div>
-
-                                                {/* Quick Stats Grid */}
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="bg-slate-900 rounded-lg p-1.5 border border-slate-800">
-                                                        <span className="text-[5px] text-slate-500 font-bold uppercase block">Active Players</span>
-                                                        <span className="text-[10px] font-bold text-white">24</span>
-                                                    </div>
-                                                    <div className="bg-slate-900 rounded-lg p-1.5 border border-slate-800">
-                                                        <span className="text-[5px] text-slate-500 font-bold uppercase block">Monthly Subs</span>
-                                                        <span className="text-[10px] font-bold text-white">£{monthlySubs}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Kit Visualizers */}
-                                    <div className="grid grid-cols-2 gap-4">
-                                        {/* Home Kit */}
-                                        <KitPreview shirt={homeKitShirt} shorts={homeKitShorts} socks={homeKitSocks} label="Home Kit" />
-                                        {/* Away Kit */}
-                                        <KitPreview shirt={awayKitShirt} shorts={awayKitShorts} socks={awayKitSocks} label="Away Kit" />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </div>
-
                 </div>
             </div>
-        </div>
-    );
-}
-
-// Visual jersey and shorts builder for live preview
-function KitPreview({ shirt, shorts, socks, label }: { shirt: string; shorts: string; socks: string; label: string }) {
-    return (
-        <div className="flex flex-col items-center p-4 bg-slate-900/80 rounded-2xl border border-slate-800/50 w-full relative">
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">{label}</span>
-            <div className="flex items-end justify-center gap-3 h-24 w-full relative">
-                {/* Shirt */}
-                <svg className="w-14 h-14 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M 30,20 L 70,20 L 85,35 L 75,45 L 68,38 L 68,85 L 32,85 L 32,38 L 25,45 L 15,35 Z" fill={shirt} stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M 40,20 Q 50,28 60,20" stroke="#000" strokeWidth="2.5" fill="none" />
-                </svg>
-                {/* Shorts */}
-                <svg className="w-11 h-11 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M 20,10 L 80,10 L 85,75 L 53,75 L 50,45 L 47,75 L 15,75 Z" fill={shorts} stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-                {/* Socks */}
-                <svg className="w-6 h-12 drop-shadow-[0_4px_6px_rgba(0,0,0,0.4)]" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M 20,10 L 40,10 L 40,75 C 40,82 55,82 55,95 L 15,95 C 15,82 20,82 20,75 Z" fill={socks} stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M 60,10 L 80,10 L 80,75 C 80,82 95,82 95,95 L 55,95 C 55,82 60,82 60,75 Z" fill={socks} stroke="#000" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-            </div>
-            
-            <div className="flex gap-1.5 mt-4">
-                <div className="w-3.5 h-3.5 rounded-full border border-slate-950 shadow-inner" style={{ backgroundColor: shirt }} title="Shirt" />
-                <div className="w-3.5 h-3.5 rounded-full border border-slate-950 shadow-inner" style={{ backgroundColor: shorts }} title="Shorts" />
-                <div className="w-3.5 h-3.5 rounded-full border border-slate-950 shadow-inner" style={{ backgroundColor: socks }} title="Socks" />
-            </div>
-        </div>
-    );
-}
+        );
+    }
