@@ -235,40 +235,27 @@ export default function DashboardPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-5">
-                <div className="relative h-16 w-16 shrink-0 flex items-center justify-center">
-                    {/* Brand circular arc motif wrapping the club logo */}
-                    <div className="absolute inset-0 rounded-full border border-dashed border-red-500/20 animate-[spin_40s_linear_infinite]" />
-                    <svg className="absolute inset-[-4px] h-[72px] w-[72px]" viewBox="0 0 100 100" fill="none">
-                        <path d="M 20 50 A 30 30 0 0 1 80 50" stroke="#dc2626" strokeWidth="6" strokeLinecap="round" />
-                        <path d="M 20 50 A 30 30 0 0 0 50 80" stroke="#ffffff" strokeWidth="6" strokeLinecap="round" />
-                        <path d="M 50 80 A 30 30 0 0 0 80 50" stroke="#dc2626" strokeWidth="6" strokeLinecap="round" />
-                    </svg>
-                    {settings.logo ? (
+            <div className="flex items-center gap-4">
+                {settings.logo && (
+                    <div className="h-16 w-16 relative flex-shrink-0">
                         <img
                             src={settings.logo}
                             alt={settings.name}
-                            className="h-11 w-11 rounded-full object-contain relative z-10"
+                            className="h-full w-full object-contain drop-shadow-sm"
                         />
-                    ) : (
-                        <div className="h-11 w-11 rounded-full bg-slate-800 flex items-center justify-center shrink-0 relative z-10">
-                            <span className="text-lg font-black text-white">{settings.name.charAt(0).toUpperCase()}</span>
-                        </div>
-                    )}
-                </div>
+                    </div>
+                )}
                 <div>
-                    <h2 className="text-3xl font-black tracking-tight text-white">{settings.name} Dashboard</h2>
-                    <p className="text-slate-400 text-sm mt-1">Welcome back, Coach. Here's what's happening at {settings.name}.</p>
+                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">{settings.name} Dashboard</h2>
+                    <p className="text-slate-500">Welcome back, Coach. Here's what's happening at {settings.name}.</p>
                 </div>
             </div>
 
-            <div className="clubflow-divider" />
-
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 {stats.map((stat) => (
-                    <Card key={stat.title} className="bg-slate-900 border-slate-800 shadow-xl transition-all duration-200 hover:border-red-500/30">
+                    <Card key={stat.title}>
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-semibold text-slate-400">
+                            <CardTitle className="text-sm font-medium text-slate-600">
                                 {stat.title}
                             </CardTitle>
                             <div className="flex items-center gap-2">
@@ -279,32 +266,32 @@ export default function DashboardPage() {
                                             syncLeague();
                                         }}
                                         disabled={isSyncing || !settings.leagueUrl}
-                                        className={`p-1 rounded-full hover:bg-slate-800 transition-colors ${isSyncing ? 'animate-spin' : ''} ${syncSuccess ? 'text-green-600' : 'text-slate-400'}`}
+                                        className={`p-1 rounded-full hover:bg-slate-100 transition-colors ${isSyncing ? 'animate-spin' : ''} ${syncSuccess ? 'text-green-600' : 'text-slate-400'}`}
                                         title="Sync with League Table"
                                     >
                                         {syncSuccess ? <Check className="h-3.5 w-3.5" /> : <RefreshCw className={`h-3.5 w-3.5 ${isSyncing ? 'animate-spin' : ''}`} />}
                                     </button>
                                 )}
-                                <stat.icon className="h-4 w-4 text-slate-400" />
+                                <stat.icon className="h-4 w-4 text-slate-500" />
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-black text-white">
+                            <div className="text-2xl font-bold text-slate-900">
                                 {stat.value}
                             </div>
                             
                             {(stat as any).link ? (
-                                <a href={(stat as any).link} className="text-xs text-red-500 mt-1 flex items-center hover:text-red-400 font-bold transition-colors">
+                                <a href={(stat as any).link} className="text-xs text-red-600 mt-1 flex items-center hover:text-red-700 font-medium">
                                     {stat.description} <ArrowUpRight className="h-3 w-3 ml-1" />
                                 </a>
                             ) : (
-                                <p className="text-xs text-slate-500 mb-1 mt-1 font-medium">{stat.description}</p>
+                                <p className="text-xs text-slate-500 mb-1">{stat.description}</p>
                             )}
- 
+
                             {stat.trend && (
-                                <div className={`flex items-center text-xs mt-1 font-bold ${stat.title === "Last Result"
+                                <div className={`flex items-center text-xs ${stat.title === "Last Result"
                                     ? getResultColor(stat.trend)
-                                    : stat.trendUp ? 'text-green-500' : 'text-red-500'
+                                    : stat.trendUp ? 'text-green-600' : 'text-red-600'
                                     }`}>
                                     {stat.title !== "Last Result" && (
                                         stat.trendUp ? <ArrowUpRight className="h-3 w-3 mr-1" /> : <ArrowDownRight className="h-3 w-3 mr-1" />
@@ -316,12 +303,12 @@ export default function DashboardPage() {
                     </Card>
                 ))}
             </div>
- 
+
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-                <Card className="col-span-7 lg:col-span-4 bg-slate-900 border-slate-800">
+                <Card className="col-span-7 lg:col-span-4">
                     <CardHeader>
-                        <CardTitle className="text-lg font-bold text-slate-200">Recent Form</CardTitle>
-                        <CardDescription className="text-slate-500 text-xs">
+                        <CardTitle>Recent Form</CardTitle>
+                        <CardDescription>
                             Last 5 matches performance
                         </CardDescription>
                     </CardHeader>
@@ -336,45 +323,34 @@ export default function DashboardPage() {
                                         .reverse()
                                         .map((match, i) => (
                                             <div key={i} className="flex flex-col items-center gap-1 relative group">
-                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-white cursor-pointer transition-transform hover:scale-110 ${match.result === "Win" ? "bg-green-600" :
-                                                    match.result === "Loss" ? "bg-red-600" :
-                                                        "bg-amber-600"
+                                                <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-white cursor-pointer transition-transform hover:scale-110 ${match.result === "Win" ? "bg-green-500" :
+                                                    match.result === "Loss" ? "bg-red-500" :
+                                                        "bg-amber-500"
                                                     }`}>
                                                     {match.result?.[0]}
                                                 </div>
-                                                <span className="text-[10px] text-slate-500 font-semibold">{formatDate(match.date)}</span>
- 
+                                                <span className="text-[10px] text-slate-500">{formatDate(match.date)}</span>
+
                                                 {/* Hover Tooltip */}
-                                                <div className="absolute bottom-full mb-2 hidden group-hover:block z-10 bg-slate-950 border border-slate-800 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
+                                                <div className="absolute bottom-full mb-2 hidden group-hover:block z-10 bg-slate-900 text-white text-xs rounded-lg px-3 py-2 whitespace-nowrap shadow-lg">
                                                     <div className="font-semibold">{match.isHome ? 'vs' : '@'} {match.opponent}</div>
                                                     <div className="text-slate-300">{match.scoreline}</div>
-                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-950"></div>
+                                                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900"></div>
                                                 </div>
                                             </div>
                                         ))}
                                 </div>
                             ) : (
-                                <div className="flex flex-col items-center justify-center text-center">
-                                    <div className="relative h-16 w-16 mb-3 flex items-center justify-center">
-                                        <div className="absolute inset-0 rounded-full border border-dashed border-red-500/15 animate-[spin_60s_linear_infinite]" />
-                                        <svg className="absolute inset-[-4px] h-[72px] w-[72px]" viewBox="0 0 100 100" fill="none" opacity="0.35">
-                                            <path d="M 20 50 A 30 30 0 0 1 80 50" stroke="#dc2626" strokeWidth="6" strokeLinecap="round" />
-                                            <path d="M 20 50 A 30 30 0 0 0 50 80" stroke="#ffffff" strokeWidth="6" strokeLinecap="round" />
-                                            <path d="M 50 80 A 30 30 0 0 0 80 50" stroke="#dc2626" strokeWidth="6" strokeLinecap="round" />
-                                        </svg>
-                                        <Activity className="h-6 w-6 text-slate-500 relative z-10" />
-                                    </div>
-                                    <p className="text-slate-500 text-xs font-semibold">No match data available</p>
-                                </div>
+                                <p className="text-slate-400">No match data available</p>
                             )}
                         </div>
                     </CardContent>
                 </Card>
- 
-                <Card className="col-span-7 lg:col-span-3 bg-slate-900 border-slate-800">
+
+                <Card className="col-span-7 lg:col-span-3">
                     <CardHeader>
-                        <CardTitle className="text-lg font-bold text-slate-200">Upcoming Fixtures</CardTitle>
-                        <CardDescription className="text-slate-500 text-xs">
+                        <CardTitle>Upcoming Fixtures</CardTitle>
+                        <CardDescription>
                             Next {upcomingFixtures.length} games
                         </CardDescription>
                     </CardHeader>
@@ -382,34 +358,23 @@ export default function DashboardPage() {
                         <div className="space-y-4">
                             {upcomingFixtures.length > 0 ? (
                                 upcomingFixtures.map((match, i) => (
-                                    <div key={i} className="flex items-center justify-between border-b border-slate-800/80 pb-2 last:border-0 last:pb-0">
+                                    <div key={i} className="flex items-center justify-between border-b pb-2 last:border-0 last:pb-0">
                                         <div>
-                                            <p className="font-semibold text-sm text-slate-200">{match.opponent}</p>
+                                            <p className="font-medium text-sm">{match.opponent}</p>
                                             <p className="text-xs text-slate-500">
                                                 {match.isHome ? "Home" : "Away"} • {match.competition}
                                             </p>
                                         </div>
-                                        <div className="text-xs font-bold text-slate-400">{formatDate(match.date)}</div>
+                                        <div className="text-sm font-semibold text-slate-600">{formatDate(match.date)}</div>
                                     </div>
                                 ))
                             ) : (
-                                <div className="flex flex-col items-center justify-center text-center py-6">
-                                    <div className="relative h-16 w-16 mb-3 flex items-center justify-center">
-                                        <div className="absolute inset-0 rounded-full border border-dashed border-red-500/15 animate-[spin_60s_linear_infinite]" />
-                                        <svg className="absolute inset-[-4px] h-[72px] w-[72px]" viewBox="0 0 100 100" fill="none" opacity="0.35">
-                                            <path d="M 20 50 A 30 30 0 0 1 80 50" stroke="#dc2626" strokeWidth="6" strokeLinecap="round" />
-                                            <path d="M 20 50 A 30 30 0 0 0 50 80" stroke="#ffffff" strokeWidth="6" strokeLinecap="round" />
-                                            <path d="M 50 80 A 30 30 0 0 0 80 50" stroke="#dc2626" strokeWidth="6" strokeLinecap="round" />
-                                        </svg>
-                                        <CalendarDays className="h-6 w-6 text-slate-500 relative z-10" />
-                                    </div>
-                                    <p className="text-xs text-slate-500 font-semibold">No upcoming fixtures</p>
-                                </div>
+                                <p className="text-sm text-slate-400 text-center py-4">No upcoming fixtures</p>
                             )}
                         </div>
                     </CardContent>
                 </Card>
             </div>
-        </div>
+        </div >
     );
 }

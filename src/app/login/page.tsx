@@ -171,24 +171,17 @@ export default function LoginPage() {
 
                 {/* HERO: Logo image centred, large, glowing */}
                 <div className="my-auto flex flex-col items-center text-center space-y-8">
-                    {/* Ambient Glow & logo container */}
-                    <div className="relative flex items-center justify-center">
-                        <div className="absolute inset-[-40px] rounded-full border border-dashed border-red-500/10 animate-[spin_60s_linear_infinite] pointer-events-none" />
-                        <div className="absolute inset-[-20px] rounded-full border border-red-500/5 animate-[spin_40s_linear_infinite_reverse] pointer-events-none" />
-                        <svg className="absolute inset-[-12px] h-[calc(100%+24px)] w-[calc(100%+24px)] opacity-30 animate-[spin_10s_ease-in-out_infinite_alternate]" viewBox="0 0 100 100" fill="none">
-                            <path d="M 15 50 A 35 35 0 0 1 85 50" stroke="#dc2626" strokeWidth="5" strokeLinecap="round" />
-                            <path d="M 15 50 A 35 35 0 0 0 50 85" stroke="#ffffff" strokeWidth="5" strokeLinecap="round" />
-                            <path d="M 50 85 A 35 35 0 0 0 85 50" stroke="#dc2626" strokeWidth="5" strokeLinecap="round" />
-                        </svg>
-                        
-                        <div className="relative rounded-full overflow-hidden border-4 border-slate-900 shadow-2xl bg-slate-950 p-1 flex items-center justify-center">
+                    {/* Glow container */}
+                    <div className="relative">
+                        <div className="absolute inset-0 rounded-3xl bg-red-500/10 blur-3xl scale-110 pointer-events-none" />
+                        <div className="relative rounded-2xl overflow-hidden border border-slate-800/60 shadow-2xl shadow-red-950/30 bg-slate-950/60 backdrop-blur-sm">
                             <Image
                                 src="/clubflow-logo.png"
-                                alt="ClubFlow Logo"
-                                width={260}
-                                height={260}
+                                alt="ClubFlow — From Stadium to Spreadsheet"
+                                width={480}
+                                height={320}
                                 priority
-                                className="object-contain rounded-full"
+                                className="object-contain"
                             />
                         </div>
                     </div>
@@ -226,17 +219,7 @@ export default function LoginPage() {
             <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-12 relative z-10 bg-slate-950/20">
                 {/* Mobile Header Branding */}
                 <div className="flex flex-col items-center mb-8 text-center md:hidden">
-                    <div className="relative flex items-center justify-center mb-6">
-                        <div className="absolute inset-[-20px] rounded-full border border-dashed border-red-500/20 animate-[spin_40s_linear_infinite]" />
-                        <svg className="absolute inset-[-6px] h-[calc(100%+12px)] w-[calc(100%+12px)] opacity-35 animate-[spin_8s_ease-in-out_infinite_alternate]" viewBox="0 0 100 100" fill="none">
-                            <path d="M 15 50 A 35 35 0 0 1 85 50" stroke="#dc2626" strokeWidth="5" strokeLinecap="round" />
-                            <path d="M 15 50 A 35 35 0 0 0 50 85" stroke="#ffffff" strokeWidth="5" strokeLinecap="round" />
-                            <path d="M 50 85 A 35 35 0 0 0 85 50" stroke="#dc2626" strokeWidth="5" strokeLinecap="round" />
-                        </svg>
-                        <div className="relative rounded-full overflow-hidden border-2 border-slate-900 bg-slate-950 p-0.5">
-                            <Image src="/clubflow-logo.png" alt="ClubFlow" width={100} height={100} className="object-contain rounded-full" />
-                        </div>
-                    </div>
+                    <Image src="/clubflow-logo.png" alt="ClubFlow" width={240} height={160} className="object-contain mb-3" />
                     <h1 className="text-2xl font-bold tracking-tight text-white mt-2">
                         Welcome back.
                     </h1>

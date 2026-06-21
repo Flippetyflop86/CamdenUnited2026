@@ -26,20 +26,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }, [isLoaded, settings.isOnboarded, isAuthPage, isOnboardingPage]);
 
     if (isAuthPage || isOnboardingPage) {
-        return <main className="min-h-screen bg-slate-950">{children}</main>;
+        return <main className="min-h-screen bg-slate-50">{children}</main>;
     }
 
     if (isLoaded && !settings.isOnboarded && !isAuthPage && !isOnboardingPage) {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">
-                    <div className="relative h-12 w-12 flex items-center justify-center">
-                        <svg className="animate-spin h-12 w-12" viewBox="0 0 100 100" fill="none">
-                            <path d="M 15 50 A 35 35 0 0 1 85 50" stroke="#dc2626" strokeWidth="8" strokeLinecap="round" />
-                            <path d="M 15 50 A 35 35 0 0 0 50 85" stroke="#ffffff" strokeWidth="8" strokeLinecap="round" />
-                            <path d="M 50 85 A 35 35 0 0 0 85 50" stroke="#dc2626" strokeWidth="8" strokeLinecap="round" />
-                        </svg>
-                    </div>
+                    <div className="h-8 w-8 rounded-full border-4 border-red-600 border-t-transparent animate-spin" />
                     <p className="text-slate-400 font-medium">Redirecting to setup...</p>
                 </div>
             </div>
@@ -47,27 +41,18 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="flex h-screen w-full bg-slate-950 overflow-hidden text-white">
+        <div className="flex h-screen w-full bg-slate-50 overflow-hidden">
             {/* Mobile Header */}
             <header className="fixed top-0 left-0 right-0 h-16 bg-slate-900 flex items-center px-4 justify-between z-40 md:hidden">
-                <div className="flex items-center gap-2 overflow-hidden">
-                    <div className="relative h-8 w-8 shrink-0 flex items-center justify-center">
-                        <div className="absolute inset-0 rounded-full border border-dashed border-red-500/20 animate-[spin_30s_linear_infinite]" />
-                        <svg className="absolute inset-[-2px] h-[36px] w-[36px]" viewBox="0 0 100 100" fill="none">
-                            <path d="M 20 50 A 30 30 0 0 1 80 50" stroke="#dc2626" strokeWidth="6" strokeLinecap="round" />
-                            <path d="M 20 50 A 30 30 0 0 0 50 80" stroke="#ffffff" strokeWidth="6" strokeLinecap="round" />
-                            <path d="M 50 80 A 30 30 0 0 0 80 50" stroke="#dc2626" strokeWidth="6" strokeLinecap="round" />
-                        </svg>
-                        {settings.logo ? (
-                            <img src={settings.logo} alt={settings.name} className="h-5.5 w-5.5 rounded-full object-contain relative z-10" />
-                        ) : (
-                            <span className="text-[10px] font-black text-white relative z-10">{settings.name.charAt(0).toUpperCase()}</span>
-                        )}
-                    </div>
-                    <div className="ml-1 text-left">
-                        <span className="font-bold text-white text-sm block leading-tight truncate max-w-[150px]">{settings.name}</span>
-                        <span className="text-[8px] font-bold tracking-widest text-red-500 uppercase leading-none block">ClubFlow Space</span>
-                    </div>
+                <div className="flex items-center gap-3 overflow-hidden">
+                    {settings.logo ? (
+                        <img src={settings.logo} alt={settings.name} className="h-8 w-8 object-contain" />
+                    ) : (
+                        <div className="h-8 w-8 rounded-full bg-slate-800 flex items-center justify-center shrink-0">
+                            <span className="text-sm font-bold text-white">{settings.name.charAt(0).toUpperCase()}</span>
+                        </div>
+                    )}
+                    <span className="font-bold text-white truncate">{settings.name}</span>
                 </div>
                 <button
                     onClick={() => setIsMobileMenuOpen(true)}

@@ -81,25 +81,15 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
 
     return (
         <div className="flex h-full w-64 flex-col bg-slate-900 text-white">
-            <div className="flex h-16 items-center px-5 border-b border-slate-800 gap-2 shrink-0">
-                <div className="relative h-9 w-9 shrink-0 flex items-center justify-center">
-                    {/* Brand circular arc motif wrapping the club logo/letter */}
-                    <div className="absolute inset-0 rounded-full border border-dashed border-red-500/20 animate-[spin_30s_linear_infinite]" />
-                    <svg className="absolute inset-[-2px] h-[40px] w-[40px]" viewBox="0 0 100 100" fill="none">
-                        <path d="M 20 50 A 30 30 0 0 1 80 50" stroke="#dc2626" strokeWidth="6" strokeLinecap="round" />
-                        <path d="M 20 50 A 30 30 0 0 0 50 80" stroke="#ffffff" strokeWidth="6" strokeLinecap="round" />
-                        <path d="M 50 80 A 30 30 0 0 0 80 50" stroke="#dc2626" strokeWidth="6" strokeLinecap="round" />
-                    </svg>
-                    {settings.logo ? (
-                        <img src={settings.logo} alt={settings.name} className="h-6 w-6 rounded-full object-contain relative z-10" />
-                    ) : (
-                        <span className="text-xs font-black text-white relative z-10">{settings.name.charAt(0).toUpperCase()}</span>
-                    )}
-                </div>
-                <div className="flex-1 min-w-0 ml-1.5">
-                    <h1 className="text-sm font-black text-white truncate leading-tight" title={settings.name}>{settings.name}</h1>
-                    <span className="text-[9px] font-bold tracking-widest text-red-500 uppercase leading-none block mt-0.5">ClubFlow Space</span>
-                </div>
+            <div className="flex h-16 items-center px-6 border-b border-slate-800 gap-3 shrink-0">
+                {settings.logo ? (
+                    <img src={settings.logo} alt={settings.name} className="h-8 w-8 object-contain" />
+                ) : (
+                    <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
+                        <span className="text-sm font-bold text-white">{settings.name.charAt(0).toUpperCase()}</span>
+                    </div>
+                )}
+                <h1 className="flex-1 text-lg font-bold text-white truncate text-ellipsis">{settings.name}</h1>
                 {onClose && (
                     <button
                         onClick={onClose}
