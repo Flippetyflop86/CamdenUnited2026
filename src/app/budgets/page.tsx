@@ -28,8 +28,8 @@ export default function PlayerBudgetsPage() {
             .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetchData)
             .subscribe();
             
-        const settingsChannel = supabase.channel('public:club_settings')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'club_settings' }, fetchSettings)
+        const settingsChannel = supabase.channel('public:clubs')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'clubs' }, fetchSettings)
             .subscribe();
 
         return () => {
@@ -65,14 +65,17 @@ export default function PlayerBudgetsPage() {
     };
 
     const fetchSettings = async () => {
-        const { data } = await supabase.from('club_settings').select('weekly_budget_allowance').eq('id', 1).single();
+        const { data } = await supabase.from('clubs').select('weekly_budget_allowance').limit(1).maybeSingle();
         if (data && data.weekly_budget_allowance !== null) {
             setBudgetAllowance(Number(data.weekly_budget_allowance));
         }
     };
 
     const saveBudget = async () => {
-        await supabase.from('club_settings').update({ weekly_budget_allowance: tempBudget }).eq('id', 1);
+        const { data: existing } = await supabase.from('clubs').select('id').limit(1).maybeSingle();
+        if (existing) {
+            await supabase.from('clubs').update({ weekly_budget_allowance: tempBudget }).eq('id', existing.id);
+        }
         setBudgetAllowance(tempBudget);
         setIsEditingBudget(false);
     };

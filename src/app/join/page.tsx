@@ -32,19 +32,27 @@ function JoinPageInner() {
             setIsLoadingInvite(false);
             return;
         }
-        // Look up the invite
+        // Look up the invite securely via RPC
         supabase
-            .from("club_invitations")
-            .select("*, clubs(name, logo)")
-            .eq("token", token)
-            .is("accepted_at", null)
-            .single()
+            .rpc("get_invitation_by_token", { token_val: token })
             .then(({ data, error }) => {
-                if (error || !data) {
+                if (error || !data || data.length === 0) {
                     setInviteError("This invite link is invalid or has already been used.");
                 } else {
-                    setInvite(data);
-                    setName(data.display_name || "");
+                    const inviteData = data[0] as any;
+                    setInvite({
+                        id: inviteData.id,
+                        club_id: inviteData.club_id,
+                        email: inviteData.email,
+                        role: inviteData.role,
+                        display_name: inviteData.display_name,
+                        page_permissions: inviteData.page_permissions,
+                        clubs: {
+                            name: inviteData.club_name,
+                            logo: inviteData.club_logo
+                        }
+                    });
+                    setName(inviteData.display_name || "");
                 }
                 setIsLoadingInvite(false);
             });
