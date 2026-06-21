@@ -326,7 +326,7 @@ export default function FinancePage() {
 
         // Sponsors (amortized)
         sponsors.forEach(s => {
-            if (s.status !== 'Potential') {
+            if (s.status === 'Secured') {
                 if (s.frequency === 'Monthly') monthlyIncome += s.amount;
                 if (s.frequency === 'Yearly') monthlyIncome += (s.amount / 12);
             }
@@ -626,7 +626,7 @@ export default function FinancePage() {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-2">
-                                        {sponsors.filter(s => s.status !== 'Potential').map(s => (
+                                        {sponsors.filter(s => s.status === 'Secured').map(s => (
                                             <div key={s.id} className="group flex justify-between items-center text-sm p-2 hover:bg-slate-50 rounded">
                                                 <div>
                                                     <p className="font-medium">{s.name}</p>

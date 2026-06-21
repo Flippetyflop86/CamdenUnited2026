@@ -84,7 +84,10 @@ create table sponsors (
   start_date date,
   end_date date,
   responsibilities text,
-  status text not null default 'Secured'
+  status text not null default 'Secured',
+  contract_url text,
+  contract_name text,
+  exposure_stats jsonb default '{"impressions":0,"matches":0,"clicks":0}'::jsonb
 );
 
 -- 7. Subscriptions

@@ -165,8 +165,11 @@ export interface Sponsor {
     website?: string;
     startDate?: string;
     endDate?: string;
-    responsibilities?: string; // Stored as a newline-separated string or simple text block
-    status?: 'Secured' | 'Potential';
+    responsibilities?: string; // Stored as a newline-separated string or JSON string
+    status?: 'Secured' | 'Lead' | 'Contacted' | 'Proposal' | 'Review';
+    contractUrl?: string;
+    contractName?: string;
+    exposureStats?: { impressions: number; matches: number; clicks: number };
 }
 
 export interface Subscription {
