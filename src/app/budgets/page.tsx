@@ -4,7 +4,6 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { FinanceGate } from "@/components/auth/finance-gate";
 import { supabase } from "@/lib/supabase";
 import { Player } from "@/types";
 import { PoundSterling, TrendingDown, TrendingUp, Users, Calendar, Settings, Plus, Trash2, Edit2 } from "lucide-react";
@@ -150,11 +149,7 @@ export default function PlayerBudgetsPage() {
     const isOverBudget = remainingBudget < 0;
 
     return (
-        <FinanceGate
-            title="Player Budgets"
-            description="Manage contracted players and squad wage budgets."
-        >
-            <div className="space-y-6 pb-12">
+        <div className="space-y-6 pb-12">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h2 className="text-3xl font-bold tracking-tight text-slate-900">Player Budgets</h2>
@@ -302,7 +297,6 @@ export default function PlayerBudgetsPage() {
                         )}
                     </CardContent>
                 </Card>
-            </div>
 
             {/* QUICK EDIT MODAL */}
             <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
@@ -373,7 +367,6 @@ export default function PlayerBudgetsPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-
-        </FinanceGate>
+        </div>
     );
 }

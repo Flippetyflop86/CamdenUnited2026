@@ -460,54 +460,6 @@ export default function StatsPage() {
     };
 
     return (
-        <div className="relative min-h-[80vh] flex flex-col items-center justify-center p-4">
-            {/* Blurred background preview */}
-            <div className="absolute inset-0 filter blur-[6px] opacity-20 pointer-events-none select-none overflow-hidden max-w-5xl mx-auto flex flex-col gap-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h2 className="text-3xl font-bold tracking-tight text-slate-900">Season Statistics</h2>
-                        <p className="text-slate-500">Performance overview.</p>
-                    </div>
-                </div>
-                <div className="grid gap-4 md:grid-cols-3">
-                    <Card className="bg-white border-slate-200 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Win Rate</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">78%</div></CardContent></Card>
-                    <Card className="bg-white border-slate-200 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Goals Scored</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-green-600">42</div></CardContent></Card>
-                    <Card className="bg-white border-slate-200 shadow-sm"><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Goals Conceded</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold text-red-600">12</div></CardContent></Card>
-                </div>
-                <div className="h-64 bg-slate-100 rounded-xl border border-dashed border-slate-300 flex items-center justify-center">
-                    <span className="text-slate-400 text-sm">Interactive Pitch Analytics Map</span>
-                </div>
-            </div>
-
-            {/* Lock Modal */}
-            <Card className="relative z-10 max-w-md w-full bg-slate-900 border-slate-800 text-white shadow-2xl p-8 flex flex-col items-center text-center">
-                <div className="h-14 w-14 bg-red-500/10 rounded-full flex items-center justify-center mb-6 text-red-500 border border-red-500/20">
-                    <Lock className="h-6 w-6" />
-                </div>
-                <CardTitle className="text-2xl font-black tracking-tight mb-2">Premium Analytics Suite</CardTitle>
-                <CardDescription className="text-slate-400 text-sm mb-6 leading-relaxed">
-                    Unlock advanced shot maps, conversion rates, pitch-surface performance analysis, and automated player ratings to elevate your team's matchday strategy.
-                </CardDescription>
-                <div className="w-full bg-slate-950/50 rounded-xl p-4 mb-6 border border-slate-800 text-left space-y-2.5">
-                    <div className="flex items-center gap-2.5 text-xs text-slate-300">
-                        <span className="text-green-500 font-bold">✓</span> Shot origin mapping & heatmaps
-                    </div>
-                    <div className="flex items-center gap-2.5 text-xs text-slate-300">
-                        <span className="text-green-500 font-bold">✓</span> Individual player conversion analytics
-                    </div>
-                    <div className="flex items-center gap-2.5 text-xs text-slate-300">
-                        <span className="text-green-500 font-bold">✓</span> Historical season-on-season filters
-                    </div>
-                </div>
-                <Button className="w-full bg-red-600 hover:bg-red-700 text-white font-medium h-12 text-sm shadow-lg shadow-red-900/50">
-                    Upgrade to Premium
-                </Button>
-            </Card>
-        </div>
-    );
-
-    // Legacy un-locked return:
-    return (
         <div className="h-full flex flex-col gap-6 max-w-5xl mx-auto">
             {/* Header */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

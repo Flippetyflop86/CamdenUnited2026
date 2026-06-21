@@ -54,12 +54,19 @@ export default function TrainingPage() {
     }>({
         date: "",
         time: "20:15",
-        location: "Harris Lowe Academy",
-        squad: currentSquads[0],
+        location: settings.trainingLocation || "",
+        squad: currentSquads[0] || "First Team",
         topic: ""
     });
 
     const [squadFilter, setSquadFilter] = useState<string>("All");
+
+    useEffect(() => {
+        if (settings.trainingLocation && !newSession.location && !editingSessionId) {
+            setNewSession(prev => ({ ...prev, location: settings.trainingLocation || "" }));
+        }
+    }, [settings.trainingLocation, editingSessionId]);
+
 
     useEffect(() => {
         fetchData();
@@ -146,8 +153,8 @@ export default function TrainingPage() {
             setNewSession({
                 date: "",
                 time: "20:15",
-                location: "Harris Lowe Academy",
-                squad: currentSquads[0],
+                location: settings.trainingLocation || "",
+                squad: currentSquads[0] || "First Team",
                 topic: ""
             });
             setEditingSessionId(null);
@@ -185,14 +192,28 @@ export default function TrainingPage() {
         setNewSession({
             date: "",
             time: "20:15",
-            location: "Harris Lowe Academy",
-            squad: currentSquads[0],
+            location: settings.trainingLocation || "",
+            squad: currentSquads[0] || "First Team",
             topic: ""
         });
         setIsDialogOpen(true);
     };
 
-    const upcomingSessions = sessions.sort((a, b) =>
+    const getSessionAttendanceStats = (session: TrainingSession) => {
+        const attendedCount = session.attendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
+        const eligiblePlayers = players.filter(p => 
+            session.squad === "All" 
+                ? (p.squad === currentSquads[0] || p.isInTrainingSquad) 
+                : p.squad === session.squad
+        );
+        const totalEligible = eligiblePlayers.length;
+        const percentage = totalEligible > 0 ? Math.round((attendedCount / totalEligible) * 100) : 0;
+        return { attendedCount, totalEligible, percentage };
+    };
+
+    const filteredSessions = sessions.filter(s => squadFilter === "All" || s.squad === squadFilter);
+
+    const upcomingSessions = filteredSessions.sort((a, b) =>
         new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
@@ -268,15 +289,20 @@ export default function TrainingPage() {
         return d >= seasonStartDate && (d <= now || hasAttendance);
     });
 
-    const playerStats = players
-        .filter(p => p.squad === currentSquads[0] || p.isInTrainingSquad) // primary squad + tracked players
+    const leaderboardSessions = seasonSessions.filter(s => squadFilter === "All" || s.squad === squadFilter);
+
+    const leaderboardPlayers = squadFilter === "All"
+        ? players.filter(p => p.squad === currentSquads[0] || p.isInTrainingSquad)
+        : players.filter(p => p.squad === squadFilter);
+
+    const playerStats = leaderboardPlayers
         .map(player => {
-            const attended = seasonSessions.filter(s => {
+            const attended = leaderboardSessions.filter(s => {
                 const record = s.attendance.find(a => a.playerId === player.id);
                 return record?.status === 'Present' || record?.status === 'Late'; // Late counts as present? Let's say yes for attendance stats, or maybe distinguish. Usually "Attended" includes late.
             }).length;
 
-            const total = seasonSessions.length;
+            const total = leaderboardSessions.length;
             const percentage = total > 0 ? Math.round((attended / total) * 100) : 0;
 
             return { ...player, stats: { attended, total, percentage } };
@@ -315,7 +341,19 @@ export default function TrainingPage() {
                     <h2 className="text-3xl font-bold tracking-tight text-slate-900">Training</h2>
                     <p className="text-slate-500">Manage sessions and track attendance.</p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                    <select
+                        value={squadFilter}
+                        onChange={(e) => setSquadFilter(e.target.value)}
+                        className="flex h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 cursor-pointer text-slate-700 font-medium"
+                    >
+                        <option value="All">All Squads</option>
+                        {currentSquads.map((squad) => (
+                            <option key={squad} value={squad}>
+                                {squad}
+                            </option>
+                        ))}
+                    </select>
                     <div className="flex bg-slate-100 p-1 rounded-lg">
                         <button
                             onClick={() => setActiveTab('sessions')}
@@ -327,7 +365,7 @@ export default function TrainingPage() {
                             onClick={() => setActiveTab('stats')}
                             className={`flex items-center px-3 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === 'stats' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
                         >
-                            <BarChart3 className="h-4 w-4 mr-2" /> Season Stats
+                            <BarChart3 className="h-4 w-4 mr-2" /> Training Attendance
                         </button>
                     </div>
                     {activeTab === 'sessions' && (
@@ -370,10 +408,15 @@ export default function TrainingPage() {
                                         <MapPin className="h-4 w-4 text-slate-400" />
                                         <span>{session.location}</span>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Users className="h-4 w-4 text-slate-400" />
-                                        <span>{session.attendance.filter(a => a.status === 'Present' || a.status === 'Late').length} players attended</span>
-                                    </div>
+                                    {(() => {
+                                        const { attendedCount, totalEligible, percentage } = getSessionAttendanceStats(session);
+                                        return (
+                                            <div className="flex items-center gap-2">
+                                                <Users className="h-4 w-4 text-slate-400" />
+                                                <span>{attendedCount} / {totalEligible} ({percentage}%) players attended</span>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
                                 <Button variant="secondary" className="w-full mt-4" asChild>
                                     <Link href={`/training/${session.id}`}>Manage Session</Link>
@@ -392,7 +435,7 @@ export default function TrainingPage() {
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <div>
-                                <CardTitle>Attendance Leaderboard</CardTitle>
+                                <CardTitle>Training Attendance</CardTitle>
                                 <CardDescription>Tracking {displaySeasonLabel}</CardDescription>
                             </div>
                             <div className="flex items-center gap-4">
@@ -401,7 +444,7 @@ export default function TrainingPage() {
                                 </Button>
                                 <div className="text-right">
                                     <p className="text-sm font-medium text-slate-500">Total Sessions</p>
-                                    <p className="text-2xl font-bold">{seasonSessions.length}</p>
+                                    <p className="text-2xl font-bold">{leaderboardSessions.length}</p>
                                 </div>
                             </div>
                         </div>
@@ -414,8 +457,8 @@ export default function TrainingPage() {
                                         <th className="px-4 py-3 rounded-l-lg">Player</th>
                                         <th className="px-4 py-3">Squad</th>
                                         <th className="px-4 py-3 text-center">Attended</th>
-                                        <th className="px-4 py-3 text-center">% Rate</th>
-                                        <th className="px-4 py-3 rounded-r-lg">Status</th>
+                                        <th className="px-4 py-3 text-center">Attendance %</th>
+                                        <th className="px-4 py-3 rounded-r-lg">Progress</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y">
@@ -431,7 +474,10 @@ export default function TrainingPage() {
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-slate-500">{formatSquad(player.squad)}</td>
-                                            <td className="px-4 py-3 text-center font-medium">{player.stats.attended} / {player.stats.total}</td>
+                                            <td className="px-4 py-3 text-center">
+                                                <div className="font-medium">{player.stats.attended}/{player.stats.total}</div>
+                                                <div className="text-xs text-slate-500 mt-0.5">{player.stats.percentage}%</div>
+                                            </td>
                                             <td className="px-4 py-3 text-center">
                                                 <Badge variant={player.stats.percentage >= 80 ? 'default' : player.stats.percentage >= 50 ? 'secondary' : 'destructive'}>
                                                     {player.stats.percentage}%

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Upload, Save, Shield, Plus, Trash2, Copy, Check, UserCheck, Users2, KeyRound, Link2 } from "lucide-react";
-import { ALL_PAGE_PERMISSIONS, PERMISSION_GROUPS } from "@/lib/permissions";
+import { ALL_PAGE_PERMISSIONS, PERMISSION_GROUPS, DEFAULT_GRANTED_PERMISSIONS } from "@/lib/permissions";
 import { DataExport } from "@/components/admin/data-export";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
@@ -68,7 +68,7 @@ export default function AdminPage() {
     const [isMigrating, setIsMigrating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    const { user, role: userRole, refreshPermissions } = useAuth();
+    const { user, role: userRole, isManager, refreshPermissions } = useAuth();
     const [managerName, setManagerName] = useState("");
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [invitations, setInvitations] = useState<any[]>([]);
@@ -76,7 +76,7 @@ export default function AdminPage() {
     const [inviteEmail, setInviteEmail] = useState("");
     const [inviteDisplayName, setInviteDisplayName] = useState("");
     const [inviteRole, setInviteRole] = useState("staff");
-    const [invitePermissions, setInvitePermissions] = useState<string[]>([]);
+    const [invitePermissions, setInvitePermissions] = useState<string[]>(DEFAULT_GRANTED_PERMISSIONS);
     const [isInviting, setIsInviting] = useState(false);
     const [generatedLink, setGeneratedLink] = useState("");
     const [copiedLink, setCopiedLink] = useState(false);
@@ -168,7 +168,7 @@ export default function AdminPage() {
             setGeneratedLink(link);
             setInviteEmail("");
             setInviteDisplayName("");
-            setInvitePermissions([]);
+            setInvitePermissions(DEFAULT_GRANTED_PERMISSIONS);
             await fetchTeamAccess();
         } catch (err: any) {
             alert("Failed to create invite: " + (err.message || JSON.stringify(err)));
@@ -846,7 +846,21 @@ export default function AdminPage() {
                 {/* ACCESS TAB */}
                 <TabsContent value="access" className="space-y-6 mt-6">
 
-                    {/* --- INVITE NEW STAFF --- */}
+                    {/* --- INFO BANNER --- */}
+                    <div className="max-w-3xl rounded-xl bg-slate-800 border border-slate-600 p-4 flex items-start gap-3">
+                        <div className="h-8 w-8 rounded-lg bg-slate-700 flex items-center justify-center shrink-0 mt-0.5">
+                            <KeyRound className="h-4 w-4 text-slate-300" />
+                        </div>
+                        <div>
+                            <p className="text-sm font-semibold text-white mb-1">How access works</p>
+                            <p className="text-xs text-slate-300 leading-relaxed">
+                                Invite staff below and choose which pages they can see. <strong className="text-white">Sponsorships, Finance, and Player Budgets</strong> are ticked by default on new invites but can be removed. All other pages are off by default. Granting someone the <strong className="text-white">Manager</strong> role gives them full access and the ability to send invite links.
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* --- INVITE NEW STAFF — managers only --- */}
+                    {isManager && (
                     <Card className="max-w-3xl bg-slate-900 border-slate-800 text-white shadow-xl">
                         <CardHeader>
                             <div className="flex items-center gap-3">
@@ -898,21 +912,25 @@ export default function AdminPage() {
                                                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{group}</p>
                                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                                     {ALL_PAGE_PERMISSIONS.filter(p => p.group === group).map(perm => (
-                                                        <label key={perm.key} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
-                                                            invitePermissions.includes(perm.key)
-                                                                ? 'border-red-500 bg-red-500/10 text-white'
-                                                                : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
-                                                        }`}>
-                                                            <input type="checkbox" className="sr-only"
-                                                                checked={invitePermissions.includes(perm.key)}
-                                                                onChange={() => toggleInvitePermission(perm.key)} />
+                                                        <div
+                                                            key={perm.key}
+                                                            role="checkbox"
+                                                            aria-checked={invitePermissions.includes(perm.key)}
+                                                            tabIndex={0}
+                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleInvitePermission(perm.key); }}
+                                                            onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleInvitePermission(perm.key); } }}
+                                                            className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all select-none ${
+                                                                invitePermissions.includes(perm.key)
+                                                                    ? 'border-red-500 bg-red-500/10 text-white'
+                                                                    : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                                                            }`}>
                                                             <div className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-all ${
                                                                 invitePermissions.includes(perm.key) ? 'bg-red-600 border-red-600' : 'border-slate-600'
                                                             }`}>
                                                                 {invitePermissions.includes(perm.key) && <Check className="h-3 w-3 text-white" />}
                                                             </div>
                                                             <span className="text-xs font-medium">{perm.label}</span>
-                                                        </label>
+                                                        </div>
                                                     ))}
                                                 </div>
                                             </div>
@@ -955,6 +973,9 @@ export default function AdminPage() {
                             )}
                         </CardContent>
                     </Card>
+                    )}
+
+
 
                     {/* --- ACTIVE MEMBERS --- */}
                     <Card className="max-w-3xl bg-slate-900 border-slate-800 text-white shadow-xl">
@@ -1040,21 +1061,25 @@ export default function AdminPage() {
                                                         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">{group}</p>
                                                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                                             {ALL_PAGE_PERMISSIONS.filter(p => p.group === group).map(perm => (
-                                                                <label key={perm.key} className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
-                                                                    editingPermissions.includes(perm.key)
-                                                                        ? 'border-red-500 bg-red-500/10 text-white'
-                                                                        : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
-                                                                }`}>
-                                                                    <input type="checkbox" className="sr-only"
-                                                                        checked={editingPermissions.includes(perm.key)}
-                                                                        onChange={() => toggleEditPermission(perm.key)} />
+                                                                <div
+                                                                    key={perm.key}
+                                                                    role="checkbox"
+                                                                    aria-checked={editingPermissions.includes(perm.key)}
+                                                                    tabIndex={0}
+                                                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleEditPermission(perm.key); }}
+                                                                    onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleEditPermission(perm.key); } }}
+                                                                    className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-all select-none ${
+                                                                        editingPermissions.includes(perm.key)
+                                                                            ? 'border-red-500 bg-red-500/10 text-white'
+                                                                            : 'border-slate-700 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                                                                    }`}>
                                                                     <div className={`h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-all ${
                                                                         editingPermissions.includes(perm.key) ? 'bg-red-600 border-red-600' : 'border-slate-600'
                                                                     }`}>
                                                                         {editingPermissions.includes(perm.key) && <Check className="h-3 w-3 text-white" />}
                                                                     </div>
                                                                     <span className="text-xs font-medium">{perm.label}</span>
-                                                                </label>
+                                                                </div>
                                                             ))}
                                                         </div>
                                                     </div>

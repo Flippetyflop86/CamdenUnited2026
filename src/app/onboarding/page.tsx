@@ -56,6 +56,7 @@ export default function OnboardingWizard() {
     const [twitterHandle, setTwitterHandle] = useState(settings.twitterUrl || "");
     const [instagramHandle, setInstagramHandle] = useState(settings.instagramUrl || "");
     const [whatsappPollMessage, setWhatsAppPollMessage] = useState(settings.whatsappPollMessage || "");
+    const [trainingLocation, setTrainingLocation] = useState(settings.trainingLocation || "");
 
     // Step 4: Finance & Operations
     const [monthlySubs, setMonthlySubs] = useState(settings.monthlySubs?.toString() || "35");
@@ -102,6 +103,7 @@ export default function OnboardingWizard() {
             setTwitterHandle(settings.twitterUrl || "");
             setInstagramHandle(settings.instagramUrl || "");
             setWhatsAppPollMessage(settings.whatsappPollMessage || "");
+            setTrainingLocation(settings.trainingLocation || "");
             setMonthlySubs(settings.monthlySubs?.toString() || "35");
             setFinesEnabled(settings.finesEnabled || false);
             setSelectedSquads(settings.squads || ["First Team"]);
@@ -306,6 +308,7 @@ export default function OnboardingWizard() {
                 twitterUrl: twitterHandle || null,
                 instagramUrl: instagramHandle || null,
                 whatsappPollMessage: whatsappPollMessage || null,
+                trainingLocation: trainingLocation || null,
                 isOnboarded: true 
             });
 
@@ -626,6 +629,10 @@ export default function OnboardingWizard() {
                                                         <Label className="text-slate-300">Postcode</Label>
                                                         <Input placeholder="e.g. NW1 8PP" value={postcode} onChange={(e) => setPostcode(e.target.value)} className="bg-slate-900/60 border-slate-800 text-white" />
                                                     </div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label className="text-slate-300">Training Location</Label>
+                                                    <Input placeholder="e.g. Market Road, N7" value={trainingLocation} onChange={(e) => setTrainingLocation(e.target.value)} className="bg-slate-900/60 border-slate-800 text-white" />
                                                 </div>
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-slate-900 pt-6">
                                                     <div className="space-y-2">

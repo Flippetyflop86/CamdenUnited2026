@@ -48,13 +48,12 @@ const navSections = [
             { href: "/analysis",   label: "Match Analysis",     icon: Target },
             { href: "/opposition", label: "Opposition Reports", icon: ShieldHalf },
             { href: "/league",     label: "League Table",        icon: Trophy },
-            { href: "/stats",      label: "Stats",               icon: BarChart, isLocked: true },
+            { href: "/stats",      label: "Stats",               icon: BarChart },
         ]
     },
     {
         title: "Off the Pitch",
         items: [
-            { href: "/league-setup",  label: "League Setup",   icon: ShieldAlert },
             { href: "/sponsors",      label: "Sponsorships",   icon: Briefcase },
             { href: "/recruitment",   label: "Recruitment",    icon: UserPlus },
             { href: "/finance",       label: "Finance",        icon: Coins },

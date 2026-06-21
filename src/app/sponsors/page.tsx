@@ -18,7 +18,6 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { FinanceGate } from "@/components/auth/finance-gate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 
@@ -132,11 +131,7 @@ export default function SponsorsPage() {
     };
 
     return (
-        <FinanceGate
-            title="Sponsorship Access"
-            description="Manage club partners and agreements."
-        >
-            <div className="space-y-6 pb-12">
+        <div className="space-y-6 pb-12">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <h2 className="text-3xl font-bold tracking-tight text-slate-900">Sponsorships</h2>
@@ -326,6 +321,5 @@ export default function SponsorsPage() {
                     </DialogContent>
                 </Dialog>
             </div>
-        </FinanceGate>
     );
 }

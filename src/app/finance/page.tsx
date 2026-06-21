@@ -22,9 +22,7 @@ import {
     Users,
 } from "lucide-react";
 
-import { FinanceGate } from "@/components/auth/finance-gate";
 import { supabase } from "@/lib/supabase";
-
 
 export default function FinancePage() {
     const { settings, updateSettings } = useClub();
@@ -379,8 +377,7 @@ export default function FinancePage() {
     });
 
     return (
-        <FinanceGate>
-            <div className="space-y-6 pb-12">
+        <div className="space-y-6 pb-12">
 
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
@@ -897,6 +894,5 @@ export default function FinancePage() {
                 )}
 
             </div>
-        </FinanceGate>
     );
 }

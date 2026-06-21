@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown } from "lucide-react";
+import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -26,6 +26,10 @@ export default function MatchesPage() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isEditingUrl, setIsEditingUrl] = useState(false);
     const [tempUrl, setTempUrl] = useState("");
+
+    const [opponentInstagram, setOpponentInstagram] = useState("");
+    const [opponentBadgeUrl, setOpponentBadgeUrl] = useState("");
+    const [isUploadingBadge, setIsUploadingBadge] = useState(false);
 
     const getCurrentSeasonStr = () => {
         const d = new Date();
@@ -178,6 +182,31 @@ export default function MatchesPage() {
                 if (error) throw error;
             }
 
+            // Sync details to league_teams inline
+            try {
+                const teamNameClean = formData.opponent.trim();
+                if (teamNameClean) {
+                    const existingTeam = leagueTeams.find(t => t.name.toLowerCase() === teamNameClean.toLowerCase());
+                    const teamPayload = {
+                        name: teamNameClean,
+                        badge_url: opponentBadgeUrl || null,
+                        instagram_handle: opponentInstagram || null
+                    };
+
+                    if (existingTeam) {
+                        await supabase.from("league_teams").update({
+                            badge_url: opponentBadgeUrl || null,
+                            instagram_handle: opponentInstagram || null
+                        }).eq("id", existingTeam.id);
+                    } else {
+                        await supabase.from("league_teams").insert([teamPayload]);
+                    }
+                    await fetchLeagueTeams();
+                }
+            } catch (teamError) {
+                console.error("Failed to sync opponent settings:", teamError);
+            }
+
             // Explicitly fetch matches to ensure the screen updates instantly
             await fetchMatches();
             resetForm();
@@ -203,6 +232,14 @@ export default function MatchesPage() {
             location: match.location || ""
         });
         setEditingId(match.id);
+        const teamMatch = leagueTeams.find(t => t.name.toLowerCase() === match.opponent.toLowerCase());
+        if (teamMatch) {
+            setOpponentInstagram(teamMatch.instagram_handle || "");
+            setOpponentBadgeUrl(teamMatch.badge_url || "");
+        } else {
+            setOpponentInstagram("");
+            setOpponentBadgeUrl("");
+        }
         setIsAddOpen(true);
     };
 
@@ -316,6 +353,45 @@ export default function MatchesPage() {
             surface: "4G",
             location: ""
         });
+        setOpponentInstagram("");
+        setOpponentBadgeUrl("");
+    };
+
+    const handleBadgeFile = async (file: File) => {
+        if (!file) return;
+        setIsUploadingBadge(true);
+        try {
+            const fileName = `${Date.now()}_${file.name}`;
+            const { data, error } = await supabase.storage
+                .from('player-avatars')
+                .upload(fileName, file, { cacheControl: '3600', upsert: false });
+
+            if (error) throw error;
+
+            const { data: { publicUrl } } = supabase.storage.from('player-avatars').getPublicUrl(data.path);
+            setOpponentBadgeUrl(publicUrl);
+        } catch (e: any) {
+            console.error("Error uploading:", e);
+            alert("Upload failed: " + e.message);
+        } finally {
+            setIsUploadingBadge(false);
+        }
+    };
+
+    const handleBadgeFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) handleBadgeFile(file);
+    };
+
+    const handleBadgeDrop = (e: React.DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files?.[0];
+        if (file) handleBadgeFile(file);
+    };
+
+    const handleBadgePaste = (e: React.ClipboardEvent<HTMLDivElement>) => {
+        const file = e.clipboardData.files?.[0];
+        if (file) handleBadgeFile(file);
     };
 
     const determineResult = (score?: string, isHome?: boolean): "Win" | "Loss" | "Draw" | "Pending" | undefined => {
@@ -399,77 +475,89 @@ export default function MatchesPage() {
         return resultSort === "desc" ? dateB - dateA : dateA - dateB;
     });
 
-    const MatchCard = ({ match, isPast }: { match: Match, isPast?: boolean }) => (
-        <Card className="overflow-hidden hover:shadow-md transition-shadow">
-            <CardHeader className="py-4 bg-slate-50/50 border-b flex flex-row items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={`bg-white ${match.competition.toLowerCase().includes("cup") ? "border-amber-200 text-amber-700" : "border-slate-200"
-                        }`}>
-                        {match.competition}
-                    </Badge>
-                    <span className="text-sm text-slate-500 flex items-center gap-1">
-                        <CalendarDays className="h-3 w-3" /> {new Date(match.date).toLocaleDateString()}
-                    </span>
-                </div>
-                <div className="flex items-center gap-1">
-                    {!isPast && <MatchStatsDialog matchId={match.id} matchDate={match.date} opponent={match.opponent} />}
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleEditMatch(match)}>
-                        <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600" onClick={() => handleDeleteMatch(match.id)}>
-                        <Trash2 className="h-4 w-4" />
-                    </Button>
-                </div>
-            </CardHeader>
-            <CardContent className="py-4">
-                <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                    {/* Home Team */}
-                    <div className="flex-1 flex items-center justify-end gap-4 text-right">
-                        <span className={`font-bold text-lg ${match.isHome ? 'text-slate-900' : 'text-slate-500'}`}>
-                            {match.isHome ? "Camden United" : match.opponent}
+    const MatchCard = ({ match, isPast }: { match: Match, isPast?: boolean }) => {
+        const teamInfo = leagueTeams.find(t => t.name.toLowerCase() === match.opponent.toLowerCase());
+        return (
+            <Card className="overflow-hidden hover:shadow-md transition-shadow">
+                <CardHeader className="py-4 bg-slate-50/50 border-b flex flex-row items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <Badge variant="outline" className={`bg-white ${match.competition.toLowerCase().includes("cup") ? "border-amber-200 text-amber-700" : "border-slate-200"
+                            }`}>
+                            {match.competition}
+                        </Badge>
+                        <span className="text-sm text-slate-500 flex items-center gap-1">
+                            <CalendarDays className="h-3 w-3" /> {new Date(match.date).toLocaleDateString()}
                         </span>
-                        {match.isHome && <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded">H</span>}
                     </div>
-
-                    {/* Score / VS */}
-                    <div className="flex flex-col items-center min-w-[100px]">
-                        <div className="text-2xl font-black text-slate-900 tracking-tight flex items-center justify-center min-w-[80px]">
-                            {match.scoreline ? (
-                                match.scoreline.includes('-') ? (
-                                    <div className="flex items-center gap-2">
-                                        <span>{match.scoreline.split('-')[0].trim() || "0"}</span>
-                                        <span className="text-slate-300">-</span>
-                                        <span>{match.scoreline.split('-')[1].trim() || "0"}</span>
-                                    </div>
-                                ) : match.scoreline
-                            ) : "v"}
-                        </div>
-                        {match.result && (
-                            <Badge variant="outline" className={`mt-1 text-[10px] uppercase px-2 py-0 ${getResultColor(match.result)}`}>
-                                {match.result}
-                            </Badge>
-                        )}
-                        {match.location && (
-                            <span className="text-xs text-slate-500 mt-1.5 flex items-center justify-center gap-1 bg-slate-100/80 px-2 py-0.5 rounded-full font-medium">
-                                <MapPin className="h-3 w-3 text-slate-400 shrink-0" /> {match.location}
+                    <div className="flex items-center gap-1">
+                        {!isPast && <MatchStatsDialog matchId={match.id} matchDate={match.date} opponent={match.opponent} />}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleEditMatch(match)}>
+                            <Edit2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600" onClick={() => handleDeleteMatch(match.id)}>
+                            <Trash2 className="h-4 w-4" />
+                        </Button>
+                    </div>
+                </CardHeader>
+                <CardContent className="py-4">
+                    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                        {/* Home Team */}
+                        <div className="flex-1 flex items-center justify-end gap-3 text-right">
+                            {!match.isHome && teamInfo?.instagram_handle && (
+                                <a href={`https://instagram.com/${teamInfo.instagram_handle.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-700 transition-colors shrink-0">
+                                    <Instagram className="h-4 w-4" />
+                                </a>
+                            )}
+                            {!match.isHome && teamInfo?.badge_url && (
+                                <img src={teamInfo.badge_url} alt="Badge" className="h-6 w-6 object-contain shrink-0" />
+                            )}
+                            <span className={`font-bold text-lg ${match.isHome ? 'text-slate-900' : 'text-slate-500'}`}>
+                                {match.isHome ? "Camden United" : match.opponent}
                             </span>
-                        )}
-                    </div>
+                            {match.isHome && <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded shrink-0">H</span>}
+                        </div>
 
-                    {/* Away Team */}
-                    <div className="flex-1 flex items-center justify-start gap-4 text-left">
-                        {!match.isHome && <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded">A</span>}
-                        <span className={`font-bold text-lg flex items-center gap-2 ${!match.isHome ? 'text-slate-900' : 'text-slate-500'}`}>
-                            {(!match.isHome && leagueTeams.find(t => t.name === match.opponent)?.badge_url) && (
-                                <img src={leagueTeams.find(t => t.name === match.opponent)?.badge_url} alt="Badge" className="h-6 w-6 object-contain" />
+                        {/* Score / VS */}
+                        <div className="flex flex-col items-center min-w-[100px]">
+                            <div className="text-2xl font-black text-slate-900 tracking-tight flex items-center justify-center min-w-[80px]">
+                                {match.scoreline ? (
+                                    match.scoreline.includes('-') ? (
+                                        <div className="flex items-center gap-2">
+                                            <span>{match.scoreline.split('-')[0].trim() || "0"}</span>
+                                            <span className="text-slate-300">-</span>
+                                            <span>{match.scoreline.split('-')[1].trim() || "0"}</span>
+                                        </div>
+                                    ) : match.scoreline
+                                ) : "v"}
+                            </div>
+                            {match.result && (
+                                <Badge variant="outline" className={`mt-1 text-[10px] uppercase px-2 py-0 ${getResultColor(match.result)}`}>
+                                    {match.result}
+                                </Badge>
                             )}
-                            {!match.isHome ? "Camden United" : match.opponent}
-                            {(match.isHome && leagueTeams.find(t => t.name === match.opponent)?.badge_url) && (
-                                <img src={leagueTeams.find(t => t.name === match.opponent)?.badge_url} alt="Badge" className="h-6 w-6 object-contain" />
+                            {match.location && (
+                                <span className="text-xs text-slate-500 mt-1.5 flex items-center justify-center gap-1 bg-slate-100/80 px-2 py-0.5 rounded-full font-medium">
+                                    <MapPin className="h-3 w-3 text-slate-400 shrink-0" /> {match.location}
+                                </span>
                             )}
-                        </span>
+                        </div>
+
+                        {/* Away Team */}
+                        <div className="flex-1 flex items-center justify-start gap-3 text-left">
+                            {!match.isHome && <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded shrink-0">A</span>}
+                            <span className={`font-bold text-lg flex items-center gap-2 ${!match.isHome ? 'text-slate-900' : 'text-slate-500'}`}>
+                                {match.isHome && teamInfo?.badge_url && (
+                                    <img src={teamInfo.badge_url} alt="Badge" className="h-6 w-6 object-contain shrink-0" />
+                                )}
+                                {!match.isHome ? "Camden United" : match.opponent}
+                            </span>
+                            {match.isHome && teamInfo?.instagram_handle && (
+                                <a href={`https://instagram.com/${teamInfo.instagram_handle.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-700 transition-colors shrink-0">
+                                    <Instagram className="h-4 w-4" />
+                                </a>
+                            )}
+                        </div>
                     </div>
-                </div>
 
                 {/* Details */}
                 {(match.goalscorers || match.assists || match.notes) && (
@@ -505,6 +593,7 @@ export default function MatchesPage() {
             )}
         </Card>
     );
+};
 
     return (
         <div className="space-y-8">
@@ -570,7 +659,18 @@ export default function MatchesPage() {
                                             list="league-teams-list"
                                             placeholder="Select or type opponent name"
                                             value={formData.opponent}
-                                            onChange={e => setFormData({ ...formData, opponent: e.target.value })}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                setFormData({ ...formData, opponent: val });
+                                                const teamMatch = leagueTeams.find(t => t.name.toLowerCase() === val.toLowerCase());
+                                                if (teamMatch) {
+                                                    setOpponentInstagram(teamMatch.instagram_handle || "");
+                                                    setOpponentBadgeUrl(teamMatch.badge_url || "");
+                                                } else {
+                                                    setOpponentInstagram("");
+                                                    setOpponentBadgeUrl("");
+                                                }
+                                            }}
                                         />
                                         <datalist id="league-teams-list">
                                             {leagueTeams.map(team => (
@@ -579,6 +679,57 @@ export default function MatchesPage() {
                                         </datalist>
                                     </div>
                                 </div>
+                                {formData.opponent && (
+                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-3 mt-1">
+                                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Opponent Team Settings</h4>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1.5">
+                                                <Label>Instagram Handle</Label>
+                                                <Input 
+                                                    placeholder="e.g. camden_utd" 
+                                                    value={opponentInstagram}
+                                                    onChange={e => setOpponentInstagram(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label>Badge Image URL</Label>
+                                                <Input 
+                                                    placeholder="https://..." 
+                                                    value={opponentBadgeUrl}
+                                                    onChange={e => setOpponentBadgeUrl(e.target.value)}
+                                                />
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="space-y-1.5">
+                                            <Label>Upload or Paste Badge Image</Label>
+                                            <div 
+                                                onDragOver={e => e.preventDefault()}
+                                                onDrop={handleBadgeDrop}
+                                                onPaste={handleBadgePaste}
+                                                className="border-2 border-dashed border-slate-200 rounded-lg p-3 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-indigo-400 transition-colors relative"
+                                            >
+                                                <input 
+                                                    type="file" 
+                                                    accept="image/*"
+                                                    onChange={handleBadgeFileChange}
+                                                    className="absolute inset-0 opacity-0 cursor-pointer"
+                                                />
+                                                <Upload className="h-5 w-5 text-slate-400 mb-1" />
+                                                <span className="text-xs text-slate-500 font-medium">
+                                                    {isUploadingBadge ? "Uploading..." : "Click, drag, or paste image here"}
+                                                </span>
+                                            </div>
+                                            {opponentBadgeUrl && (
+                                                <div className="flex items-center gap-2 mt-2 bg-white p-2 rounded border">
+                                                    <img src={opponentBadgeUrl} alt="Badge Preview" className="h-8 w-8 object-contain rounded" />
+                                                    <span className="text-xs text-slate-500 truncate flex-1">{opponentBadgeUrl}</span>
+                                                    <Button type="button" variant="ghost" size="sm" className="h-6 text-red-500 hover:text-red-600 p-1" onClick={() => setOpponentBadgeUrl("")}>Remove</Button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label>Goalscorers</Label>

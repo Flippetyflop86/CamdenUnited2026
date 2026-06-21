@@ -31,23 +31,34 @@ export const ALL_PAGE_PERMISSIONS: PagePermission[] = [
 ];
 
 // Pages that are always manager-only (never shown to staff regardless of permissions)
-export const MANAGER_ONLY_PAGES = ["/admin", "/league-setup"];
+export const MANAGER_ONLY_PAGES = ["/admin"];
 
-// Dashboard is always visible to all logged-in users
+// Dashboard is always visible to all logged-in users.
 export const ALWAYS_VISIBLE_PAGES = ["/dashboard"];
+
+// These pages are pre-ticked by default when creating an invite, but can be revoked.
+export const DEFAULT_GRANTED_PERMISSIONS = ["sponsors", "finance", "budgets"];
 
 export const PERMISSION_GROUPS = [...new Set(ALL_PAGE_PERMISSIONS.map(p => p.group))];
 
 /** Returns true if a user with the given permissions can view the given href */
 export function canAccess(href: string, role: string | null, pagePermissions: string[]): boolean {
-    // Manager sees everything
-    if (role === "manager") return true;
-    // Manager-only pages are blocked for non-managers
-    if (MANAGER_ONLY_PAGES.some(p => href.startsWith(p))) return false;
-    // Always-visible pages
+    const isManager = role === "manager";
+
+    // Admin is always accessible to managers, never to anyone else
+    if (MANAGER_ONLY_PAGES.some(p => href.startsWith(p))) return isManager;
+
+    // Always-visible pages (e.g. dashboard) — open to everyone
     if (ALWAYS_VISIBLE_PAGES.some(p => href.startsWith(p))) return true;
+
+    // If the manager has not set any explicit permissions for themselves,
+    // they see everything (default full-access state).
+    // Once they save a non-empty permissions set for themselves,
+    // it acts as their personal page filter — Admin remains accessible above.
+    if (isManager && pagePermissions.length === 0) return true;
+
     // Check the permission key for this href
     const page = ALL_PAGE_PERMISSIONS.find(p => href.startsWith(p.href));
-    if (!page) return true; // Unknown page, allow by default
+    if (!page) return true; // Unknown/unguarded page — allow by default
     return pagePermissions.includes(page.key);
 }

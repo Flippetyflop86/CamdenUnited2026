@@ -401,7 +401,9 @@ export default function AnalysisPage() {
                                 <div className="flex flex-col sm:flex-row gap-2">
                                     <Select value={goalPlayerId} onValueChange={setGoalPlayerId}>
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Add Goalscorer..." />
+                                            <SelectValue placeholder="Add Goalscorer...">
+                                                {goalPlayerId && getPlayerName(goalPlayerId)}
+                                            </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent>
                                             {players.map(p => (
@@ -438,7 +440,9 @@ export default function AnalysisPage() {
                                 <div className="flex flex-col sm:flex-row gap-2">
                                     <Select value={assistPlayerId} onValueChange={setAssistPlayerId}>
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Add Assist..." />
+                                            <SelectValue placeholder="Add Assist...">
+                                                {assistPlayerId && getPlayerName(assistPlayerId)}
+                                            </SelectValue>
                                         </SelectTrigger>
                                         <SelectContent>
                                             {players.map(p => (
@@ -446,6 +450,7 @@ export default function AnalysisPage() {
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    <Button size="sm" onClick={() => addAssistStat(assistPlayerId)}><Plus className="h-4 w-4"/></Button>
                                 </div>
                                 <div className="space-y-2">
                                     {analysis.assists.map(a => (

@@ -92,7 +92,7 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                                 e.stopPropagation();
                                 if (confirm('Delete this player?')) onDelete(player.id);
                             }}
-                            className="absolute top-3 left-3 p-2 bg-slate-800 hover:bg-red-900/50 rounded-full text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all z-20"
+                            className="absolute top-3 left-3 p-2 bg-slate-800 hover:bg-red-900/50 rounded-full text-slate-400 hover:text-red-500 z-20"
                             title="Delete Player"
                         >
                             <Trash2 className="h-4 w-4" />
@@ -105,7 +105,7 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                                 e.stopPropagation();
                                 onEdit(player);
                             }}
-                            className="absolute top-3 left-12 p-2 bg-slate-800 hover:bg-blue-900/50 rounded-full text-slate-400 hover:text-blue-500 opacity-0 group-hover:opacity-100 transition-all z-20"
+                            className="absolute top-3 left-12 p-2 bg-slate-800 hover:bg-blue-900/50 rounded-full text-slate-400 hover:text-blue-500 z-20"
                             title="Edit Player"
                         >
                             <Pencil className="h-4 w-4" />

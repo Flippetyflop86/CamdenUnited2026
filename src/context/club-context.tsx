@@ -30,6 +30,7 @@ interface ClubSettings {
     fineCategories: { name: string, amount: number }[];
     notificationsEnabled: boolean;
     notificationEmail: string | null;
+    trainingLocation: string | null;
 }
 
 interface ClubContextType {
@@ -67,7 +68,8 @@ const defaultSettings: ClubSettings = {
         { name: "Late to Match", amount: 5 }
     ],
     notificationsEnabled: false,
-    notificationEmail: null
+    notificationEmail: null,
+    trainingLocation: null
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -191,7 +193,8 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         whatsappPollMessage: data.whatsapp_poll_message || null,
                         fineCategories: data.fine_categories || defaultSettings.fineCategories,
                         notificationsEnabled: data.notifications_enabled || false,
-                        notificationEmail: data.notification_email || null
+                        notificationEmail: data.notification_email || null,
+                        trainingLocation: data.training_location || null
                     });
                 }
             } catch (err) {
@@ -235,7 +238,8 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             whatsapp_poll_message: newSettings.whatsappPollMessage ?? settings.whatsappPollMessage,
             fine_categories: newSettings.fineCategories ?? settings.fineCategories,
             notifications_enabled: newSettings.notificationsEnabled ?? settings.notificationsEnabled,
-            notification_email: newSettings.notificationEmail ?? settings.notificationEmail
+            notification_email: newSettings.notificationEmail ?? settings.notificationEmail,
+            training_location: newSettings.trainingLocation ?? settings.trainingLocation
         };
         if ('squads' in newSettings) updates.squads = newSettings.squads;
 
