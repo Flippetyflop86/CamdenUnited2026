@@ -63,7 +63,8 @@ export default function MatchesPage() {
         yellow_cards: "",
         red_cards: "",
         notes: "",
-        surface: "4G"
+        surface: "4G",
+        location: ""
     });
 
     // ... (keep state) ...
@@ -98,9 +99,15 @@ export default function MatchesPage() {
         }
 
         const mapped: Match[] = data.map((m: any) => {
+            const locationMatch = m.notes ? m.notes.match(/\[Location: (.*?)\]/) : null;
+            const location = locationMatch ? locationMatch[1] : "";
+
             const surfaceMatch = m.notes ? m.notes.match(/\[Surface: (.*?)\]/) : null;
             const surface = surfaceMatch ? surfaceMatch[1] : "4G";
-            const cleanNotes = m.notes ? m.notes.replace(/\[Surface: .*?\]\n?/, "").trim() : "";
+
+            let cleanNotes = m.notes || "";
+            cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/, "");
+            cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "").trim();
             
             return {
                 id: m.id,
@@ -116,7 +123,8 @@ export default function MatchesPage() {
                 yellow_cards: m.yellow_cards,
                 red_cards: m.red_cards,
                 notes: cleanNotes,
-                surface: surface
+                surface: surface,
+                location: location
             };
         });
 
@@ -141,6 +149,11 @@ export default function MatchesPage() {
         const result = determineResult(cleanScoreline, formData.isHome);
         const isNew = !editingId;
 
+        // Build combined metadata in the notes column
+        const locationPrefix = `[Location: ${formData.location || ""}]`;
+        const surfacePrefix = `[Surface: ${formData.surface || "4G"}]`;
+        const combinedNotes = `${locationPrefix}${surfacePrefix}\n${formData.notes || ""}`.trim();
+
         const payload = {
             date: formData.date,
             time: formData.time,
@@ -153,7 +166,7 @@ export default function MatchesPage() {
             assists: formData.assists,
             yellow_cards: formData.yellow_cards,
             red_cards: formData.red_cards,
-            notes: formData.surface ? `[Surface: ${formData.surface}]\n${formData.notes || ""}`.trim() : formData.notes
+            notes: combinedNotes
         };
 
         try {
@@ -186,7 +199,8 @@ export default function MatchesPage() {
             yellow_cards: match.yellow_cards || "",
             red_cards: match.red_cards || "",
             notes: match.notes || "",
-            surface: match.surface || "4G"
+            surface: match.surface || "4G",
+            location: match.location || ""
         });
         setEditingId(match.id);
         setIsAddOpen(true);
@@ -299,7 +313,8 @@ export default function MatchesPage() {
             yellow_cards: "",
             red_cards: "",
             notes: "",
-            surface: "4G"
+            surface: "4G",
+            location: ""
         });
     };
 
@@ -434,6 +449,11 @@ export default function MatchesPage() {
                                 {match.result}
                             </Badge>
                         )}
+                        {match.location && (
+                            <span className="text-xs text-slate-500 mt-1.5 flex items-center justify-center gap-1 bg-slate-100/80 px-2 py-0.5 rounded-full font-medium">
+                                <MapPin className="h-3 w-3 text-slate-400 shrink-0" /> {match.location}
+                            </span>
+                        )}
                     </div>
 
                     {/* Away Team */}
@@ -519,6 +539,14 @@ export default function MatchesPage() {
                                         <Label>Time</Label>
                                         <Input type="time" value={formData.time} onChange={e => setFormData({ ...formData, time: e.target.value })} />
                                     </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label>Location / Venue Address</Label>
+                                    <Input
+                                        placeholder="e.g. Market Road Pitches, N7 9PL"
+                                        value={formData.location || ""}
+                                        onChange={e => setFormData({ ...formData, location: e.target.value })}
+                                    />
                                 </div>
                                 <div className="grid grid-cols-4 gap-3 items-end">
                                     <div className="col-span-1 space-y-1.5">

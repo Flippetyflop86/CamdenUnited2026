@@ -85,24 +85,14 @@ export interface Match {
     result?: "Win" | "Loss" | "Draw" | "Pending";
     notes?: string;
     surface?: "4G" | "Grass";
+    location?: string;
 }
 
 export interface OppositionTeam {
     id: string;
     name: string;
     formation: string;
-    notes: {
-        buildUp: string;
-        inPossession: string;
-        outOfPossession: string;
-        outOfPossessionGoalKicks: string;
-        transition: string;
-        setPieces: string;
-        keyPersonnel: string;
-        consistencyOfPersonnel: string;
-        strengths: string;
-        weaknesses: string;
-    };
+    notes: string;
     lineup?: string[];
     createdAt: string;
     updatedAt: string;

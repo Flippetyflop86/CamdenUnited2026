@@ -245,20 +245,20 @@ export default function TrainingPage() {
     // Calculate Season Stats
     const now = new Date();
 
-    // Determine Season Start Date (Standard Season Logic: Starts July 1st)
+    // Determine Season Start Date (Standard Season Logic: Starts June 1st)
     const currentYear = now.getFullYear();
-    const startYear = now.getMonth() < 6 ? currentYear - 1 : currentYear; // Month 6 is July
+    const startYear = now.getMonth() < 5 ? currentYear - 1 : currentYear; // Month 5 is June
     
-    let seasonStartDate = new Date(startYear, 6, 1);
+    let seasonStartDate = new Date(startYear, 5, 1);
     
-    // Absolute minimum tracking date requested by user: July 1st 2026
-    const absoluteMinimumDate = new Date(2026, 6, 1);
+    // Absolute minimum tracking date: June 1st 2026
+    const absoluteMinimumDate = new Date(2026, 5, 1);
     if (seasonStartDate < absoluteMinimumDate) {
         seasonStartDate = absoluteMinimumDate;
     }
 
     const seasonLabelYear = seasonStartDate.getFullYear();
-    const displaySeasonLabel = `Season ${seasonLabelYear.toString().slice(-2)}/${(seasonLabelYear + 1).toString().slice(-2)} (Tracking from July 1st)`;
+    const displaySeasonLabel = `Season ${seasonLabelYear.toString().slice(-2)}/${(seasonLabelYear + 1).toString().slice(-2)} (Tracking from June 1st)`;
 
     const seasonSessions = sessions.filter(s => {
         const d = new Date(s.date);

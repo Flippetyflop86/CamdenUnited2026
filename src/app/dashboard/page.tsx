@@ -51,7 +51,33 @@ export default function DashboardPage() {
     const fetchMatches = async () => {
         const { data } = await supabase.from('matches').select('*');
         if (data) {
-            const loadedMatches: Match[] = data as any;
+            const loadedMatches: Match[] = data.map((m: any) => {
+                const locationMatch = m.notes ? m.notes.match(/\[Location: (.*?)\]/) : null;
+                const location = locationMatch ? locationMatch[1] : "";
+                
+                const surfaceMatch = m.notes ? m.notes.match(/\[Surface: (.*?)\]/) : null;
+                const surface = surfaceMatch ? surfaceMatch[1] : "4G";
+                
+                let cleanNotes = m.notes || "";
+                cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/, "");
+                cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "").trim();
+                
+                return {
+                    id: m.id,
+                    date: m.date,
+                    time: m.time,
+                    opponent: m.opponent,
+                    isHome: m.is_home,
+                    competition: m.competition,
+                    scoreline: m.scoreline,
+                    result: m.result,
+                    goalscorers: m.goalscorers,
+                    assists: m.assists,
+                    notes: cleanNotes,
+                    surface: surface,
+                    location: location
+                };
+            });
             setMatches(loadedMatches);
 
             const now = new Date();
@@ -190,7 +216,9 @@ export default function DashboardPage() {
         {
             title: "Next Match",
             value: nextMatch ? `${nextMatch.isHome ? 'vs' : '@'} ${nextMatch.opponent}` : "No fixtures",
-            description: nextMatch ? formatDateTime(nextMatch.date, nextMatch.time) : "Check Matches tab",
+            description: nextMatch 
+                ? `${formatDateTime(nextMatch.date, nextMatch.time)}${nextMatch.location ? ` • ${nextMatch.location}` : ""}` 
+                : "Check Matches tab",
             icon: CalendarDays,
             trend: nextMatch ? (nextMatch.isHome ? "Home Game" : "Away Game") : "",
             trendUp: true

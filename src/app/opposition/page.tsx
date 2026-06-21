@@ -42,11 +42,25 @@ export default function OppositionReportsPage() {
             return;
         }
 
+        const parseNotes = (notes: any): string => {
+            if (!notes) return "";
+            if (typeof notes === "string") return notes;
+            // Convert old structured JSON notes to freehand string
+            const parts: string[] = [];
+            if (notes.buildUp) parts.push(`Build Up:\n${notes.buildUp}`);
+            if (notes.inPossession) parts.push(`In Possession:\n${notes.inPossession}`);
+            if (notes.outOfPossession) parts.push(`Out Of Possession:\n${notes.outOfPossession}`);
+            if (notes.transition) parts.push(`Transition:\n${notes.transition}`);
+            if (notes.setPieces) parts.push(`Set Pieces:\n${notes.setPieces}`);
+            if (notes.keyPersonnel) parts.push(`Key Personnel:\n${notes.keyPersonnel}`);
+            return parts.join("\n\n");
+        };
+
         const mapped: OppositionTeam[] = (data || []).map((t: any) => ({
             id: t.id,
             name: t.name,
             formation: t.formation,
-            notes: t.notes || {},
+            notes: parseNotes(t.notes),
             lineup: t.lineup || [],
             createdAt: t.created_at,
             updatedAt: t.updated_at
@@ -66,18 +80,7 @@ export default function OppositionReportsPage() {
             id: "new",
             name: "",
             formation: "4-4-2",
-            notes: {
-                buildUp: "",
-                inPossession: "",
-                outOfPossession: "",
-                outOfPossessionGoalKicks: "",
-                transition: "",
-                setPieces: "",
-                keyPersonnel: "",
-                consistencyOfPersonnel: "",
-                strengths: "",
-                weaknesses: "",
-            },
+            notes: "",
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
@@ -270,30 +273,10 @@ export default function OppositionReportsPage() {
                     `).join('')}
                 </div>
 
-                <div class="grid-notes">
-                    <div class="note-section border-blue">
-                        <div class="note-title text-blue">Build Up (Goal Kicks)</div>
-                        <div class="note-content">${teamToExport.notes.buildUp || 'No notes recorded.'}</div>
-                    </div>
-                    <div class="note-section border-green">
-                        <div class="note-title text-green">In Possession</div>
-                        <div class="note-content">${teamToExport.notes.inPossession || 'No notes recorded.'}</div>
-                    </div>
-                    <div class="note-section border-red">
-                        <div class="note-title text-red">Out Of Possession</div>
-                        <div class="note-content">${teamToExport.notes.outOfPossession || 'No notes recorded.'}</div>
-                    </div>
-                    <div class="note-section border-purple">
-                        <div class="note-title text-purple">Transition</div>
-                        <div class="note-content">${teamToExport.notes.transition || 'No notes recorded.'}</div>
-                    </div>
-                    <div class="note-section border-orange">
-                        <div class="note-title text-orange">Set Pieces</div>
-                        <div class="note-content">${teamToExport.notes.setPieces || 'No notes recorded.'}</div>
-                    </div>
-                    <div class="note-section border-yellow">
-                        <div class="note-title text-yellow">Key Players</div>
-                        <div class="note-content">${teamToExport.notes.keyPersonnel || 'No notes recorded.'}</div>
+                <div style="margin-top: 30px;">
+                    <div class="note-section border-red" style="width: 100%; border-left: 4px solid #ef4444; background: #f8fafc; padding: 20px; border-radius: 8px;">
+                        <div class="note-title text-red" style="font-weight: bold; color: #b91c1c; margin-bottom: 12px; font-size: 1.1em; text-transform: uppercase; letter-spacing: 0.5px;">Scouting Notes & Match Plan</div>
+                        <div class="note-content" style="font-size: 1em; line-height: 1.6; white-space: pre-wrap; color: #334155;">${teamToExport.notes || 'No notes recorded.'}</div>
                     </div>
                 </div>
                 
@@ -310,24 +293,8 @@ export default function OppositionReportsPage() {
     const displayTeam = currentTeam || {
         name: "New Opposition Team",
         formation: "4-4-2",
-        notes: {}
+        notes: ""
     } as OppositionTeam;
-
-    // Safety check for notes
-    if (displayTeam && !displayTeam.notes) {
-        displayTeam.notes = {
-            buildUp: "",
-            inPossession: "",
-            outOfPossession: "",
-            outOfPossessionGoalKicks: "",
-            transition: "",
-            setPieces: "",
-            keyPersonnel: "",
-            consistencyOfPersonnel: "",
-            strengths: "",
-            weaknesses: "",
-        };
-    }
 
     const formation = FORMATIONS[displayTeam.formation] || [];
 
@@ -619,132 +586,24 @@ export default function OppositionReportsPage() {
                                 <li className="text-red-600 border-b-2 border-red-600 pb-2">Full Analysis</li>
                             </ul>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="rounded-lg border bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 transition-all">
-                                    <div className="px-3 py-2 border-b bg-slate-50 flex items-center gap-2 border-l-4 border-l-blue-500">
-                                        <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                                        <span className="text-xs font-bold uppercase text-blue-700">Build Up</span>
-                                    </div>
-                                    <textarea
-                                        value={isEditing ? editedTeam?.notes.buildUp : displayTeam.notes.buildUp}
-                                        onChange={(e) => {
-                                            if (isEditing && editedTeam) {
-                                                setEditedTeam({
-                                                    ...editedTeam,
-                                                    notes: { ...editedTeam.notes, buildUp: e.target.value }
-                                                });
-                                            }
-                                        }}
-                                        disabled={!isEditing}
-                                        placeholder="How do they build from the back? Goal kick strategies?"
-                                        className="w-full h-32 p-3 text-sm resize-none outline-none disabled:bg-white disabled:text-slate-700"
-                                    />
+                            <div className="rounded-lg border bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-red-500 transition-all">
+                                <div className="px-3 py-2 border-b bg-slate-50 flex items-center gap-2 border-l-4 border-l-red-500">
+                                    <span className="text-xs font-bold uppercase text-red-700">Scouting Notes & Match Plan</span>
                                 </div>
-
-                                <div className="rounded-lg border bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-green-500 transition-all">
-                                    <div className="px-3 py-2 border-b bg-slate-50 flex items-center gap-2 border-l-4 border-l-green-500">
-                                        <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                                        <span className="text-xs font-bold uppercase text-green-700">In Possession</span>
-                                    </div>
-                                    <textarea
-                                        value={isEditing ? editedTeam?.notes.inPossession : displayTeam.notes.inPossession}
-                                        onChange={(e) => {
-                                            if (isEditing && editedTeam) {
-                                                setEditedTeam({
-                                                    ...editedTeam,
-                                                    notes: { ...editedTeam.notes, inPossession: e.target.value }
-                                                });
-                                            }
-                                        }}
-                                        disabled={!isEditing}
-                                        placeholder="Attacking patterns, key combinations, style of play..."
-                                        className="w-full h-32 p-3 text-sm resize-none outline-none disabled:bg-white disabled:text-slate-700"
-                                    />
-                                </div>
-
-                                <div className="rounded-lg border bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-red-500 transition-all">
-                                    <div className="px-3 py-2 border-b bg-slate-50 flex items-center gap-2 border-l-4 border-l-red-500">
-                                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                                        <span className="text-xs font-bold uppercase text-red-700">Out Of Possession</span>
-                                    </div>
-                                    <textarea
-                                        value={isEditing ? editedTeam?.notes.outOfPossession : displayTeam.notes.outOfPossession}
-                                        onChange={(e) => {
-                                            if (isEditing && editedTeam) {
-                                                setEditedTeam({
-                                                    ...editedTeam,
-                                                    notes: { ...editedTeam.notes, outOfPossession: e.target.value }
-                                                });
-                                            }
-                                        }}
-                                        disabled={!isEditing}
-                                        placeholder="Defensive shape, pressing triggers, vulnerabilities..."
-                                        className="w-full h-32 p-3 text-sm resize-none outline-none disabled:bg-white disabled:text-slate-700"
-                                    />
-                                </div>
-
-                                <div className="rounded-lg border bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-purple-500 transition-all">
-                                    <div className="px-3 py-2 border-b bg-slate-50 flex items-center gap-2 border-l-4 border-l-purple-500">
-                                        <div className="w-2 h-2 rounded-full bg-purple-500"></div>
-                                        <span className="text-xs font-bold uppercase text-purple-700">Transition</span>
-                                    </div>
-                                    <textarea
-                                        value={isEditing ? editedTeam?.notes.transition : displayTeam.notes.transition}
-                                        onChange={(e) => {
-                                            if (isEditing && editedTeam) {
-                                                setEditedTeam({
-                                                    ...editedTeam,
-                                                    notes: { ...editedTeam.notes, transition: e.target.value }
-                                                });
-                                            }
-                                        }}
-                                        disabled={!isEditing}
-                                        placeholder="Counter-attacks, reaction to losing possession..."
-                                        className="w-full h-32 p-3 text-sm resize-none outline-none disabled:bg-white disabled:text-slate-700"
-                                    />
-                                </div>
-
-                                <div className="rounded-lg border bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-orange-500 transition-all">
-                                    <div className="px-3 py-2 border-b bg-slate-50 flex items-center gap-2 border-l-4 border-l-orange-500">
-                                        <div className="w-2 h-2 rounded-full bg-orange-500"></div>
-                                        <span className="text-xs font-bold uppercase text-orange-700">Set Pieces</span>
-                                    </div>
-                                    <textarea
-                                        value={isEditing ? editedTeam?.notes.setPieces : displayTeam.notes.setPieces}
-                                        onChange={(e) => {
-                                            if (isEditing && editedTeam) {
-                                                setEditedTeam({
-                                                    ...editedTeam,
-                                                    notes: { ...editedTeam.notes, setPieces: e.target.value }
-                                                });
-                                            }
-                                        }}
-                                        disabled={!isEditing}
-                                        placeholder="Corners, free kicks, penalties, throw-ins..."
-                                        className="w-full h-32 p-3 text-sm resize-none outline-none disabled:bg-white disabled:text-slate-700"
-                                    />
-                                </div>
-
-                                <div className="rounded-lg border bg-white shadow-sm overflow-hidden focus-within:ring-2 focus-within:ring-yellow-500 transition-all">
-                                    <div className="px-3 py-2 border-b bg-slate-50 flex items-center gap-2 border-l-4 border-l-yellow-500">
-                                        <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                                        <span className="text-xs font-bold uppercase text-yellow-700">Key Personnel</span>
-                                    </div>
-                                    <textarea
-                                        value={isEditing ? editedTeam?.notes.keyPersonnel : displayTeam.notes.keyPersonnel}
-                                        onChange={(e) => {
-                                            if (isEditing && editedTeam) {
-                                                setEditedTeam({
-                                                    ...editedTeam,
-                                                    notes: { ...editedTeam.notes, keyPersonnel: e.target.value }
-                                                });
-                                            }
-                                        }}
-                                        disabled={!isEditing}
-                                        placeholder="Danger men, weak links, player tendencies..."
-                                        className="w-full h-32 p-3 text-sm resize-none outline-none disabled:bg-white disabled:text-slate-700"
-                                    />
-                                </div>
+                                <textarea
+                                    value={isEditing ? editedTeam?.notes || "" : displayTeam.notes || ""}
+                                    onChange={(e) => {
+                                        if (isEditing && editedTeam) {
+                                            setEditedTeam({
+                                                ...editedTeam,
+                                                notes: e.target.value
+                                            });
+                                        }
+                                    }}
+                                    disabled={!isEditing}
+                                    placeholder="Write your freehand scouting notes, team weaknesses, strengths, or match plan here..."
+                                    className="w-full h-80 p-3 text-sm resize-none outline-none disabled:bg-white disabled:text-slate-700 font-sans"
+                                />
                             </div>
                         </div>
 
