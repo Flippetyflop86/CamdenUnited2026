@@ -2,8 +2,15 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
+let stripeInstance: Stripe | null = null;
+const getStripe = () => {
+    if (!stripeInstance) {
+        stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
+    }
+    return stripeInstance;
+};
+
+const getWebhookSecret = () => process.env.STRIPE_WEBHOOK_SECRET || '';
 
 // Initialize server-side Supabase client with Service Role Key to bypass RLS policies
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -29,7 +36,7 @@ export async function POST(request: Request) {
         let event: Stripe.Event;
 
         try {
-            event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);
+            event = getStripe().webhooks.constructEvent(rawBody, sig, getWebhookSecret());
         } catch (err: any) {
             console.error('Webhook signature verification failed:', err.message);
             return NextResponse.json({ error: `Webhook Error: ${err.message}` }, { status: 400 });

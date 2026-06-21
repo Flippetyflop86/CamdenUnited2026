@@ -2,7 +2,13 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import Stripe from 'stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+let stripeInstance: Stripe | null = null;
+const getStripe = () => {
+    if (!stripeInstance) {
+        stripeInstance = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
+    }
+    return stripeInstance;
+};
 
 export async function POST(request: Request) {
     try {
@@ -46,7 +52,7 @@ export async function POST(request: Request) {
         }
 
         // Create Stripe Checkout Session for subscription
-        const session = await stripe.checkout.sessions.create({
+        const session = await getStripe().checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [
                 {
