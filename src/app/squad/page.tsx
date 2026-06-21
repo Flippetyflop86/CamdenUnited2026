@@ -342,7 +342,7 @@ export default function SquadPage() {
             {editingPlayer && (
                 <div className="fixed inset-0 z-50 flex justify-end">
                     <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setEditingPlayer(null)} />
-                    <div className="relative h-screen w-full max-w-[450px] bg-white shadow-xl border-l flex flex-col animate-in slide-in-from-right duration-300">
+                    <div className="relative h-full w-full max-w-[450px] bg-white shadow-xl border-l flex flex-col animate-in slide-in-from-right duration-300">
                         <div className="p-3 border-b flex items-center justify-between shrink-0 bg-slate-50">
                             <h2 className="text-lg font-semibold text-slate-800">{editingPlayer.firstName ? "Edit Player" : "Add Player"}</h2>
                             <button onClick={() => setEditingPlayer(null)} className="text-sm text-slate-400 hover:text-slate-700 p-2">✕</button>
@@ -534,7 +534,7 @@ export default function SquadPage() {
                             </div>
                         </div>
 
-                        <div className="p-4 border-t flex justify-between items-center shrink-0 bg-slate-50">
+                        <div className="p-4 pb-8 sm:pb-4 border-t flex justify-between items-center shrink-0 bg-slate-50">
                             <button
                                 onClick={() => {
                                     if (confirm("Delete this player permanently?")) {
