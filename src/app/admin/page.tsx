@@ -197,6 +197,20 @@ export default function AdminPage() {
             setIsSavingPerms(false);
         }
     };
+    
+    const handleDeleteMember = async (memberUserId: string, memberName: string) => {
+        if (!confirm(`Are you sure you want to remove ${memberName || "this member"} from the club? This will revoke all their access.`)) return;
+        try {
+            const { error } = await supabase
+                .from('club_members')
+                .delete()
+                .eq('user_id', memberUserId);
+            if (error) throw error;
+            await fetchTeamAccess();
+        } catch (err: any) {
+            alert("Failed to delete member: " + err.message);
+        }
+    };
 
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [sponsorFile, setSponsorFile] = useState<File | null>(null);
@@ -940,24 +954,34 @@ export default function AdminPage() {
                                         {/* Member header */}
                                         <div className="flex items-center justify-between px-4 py-3 bg-slate-900">
                                             <div className="flex items-center gap-3">
-                                                <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold">
-                                                    {(member.display_name || member.role || "?").charAt(0).toUpperCase()}
+                                                <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold shrink-0">
+                                                    {(member.display_name || member.email || member.role || "?").charAt(0).toUpperCase()}
                                                 </div>
-                                                <div>
-                                                    <p className="text-sm font-semibold text-white">
-                                                        {member.display_name || (isMe ? "You" : `Member #${member.user_id.substring(0,6)}`)}
-                                                        {isMe && <span className="ml-2 text-xs text-red-400 font-normal">(You)</span>}
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-semibold text-white truncate flex items-center gap-2">
+                                                        {member.display_name || member.email || (isMe ? "You" : `Member #${member.user_id.substring(0,6)}`)}
+                                                        {isMe && <span className="text-xs text-red-400 font-normal shrink-0">(You)</span>}
                                                     </p>
-                                                    <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium capitalize ${
+                                                    {member.display_name && member.email && (
+                                                        <p className="text-xs text-slate-400 truncate">{member.email}</p>
+                                                    )}
+                                                    <span className={`inline-block text-xs px-2 py-0.5 rounded-full font-medium capitalize mt-1 ${
                                                         isManagerRole ? 'bg-red-900/40 text-red-400 border border-red-500/20' : 'bg-slate-800 text-slate-300'
                                                     }`}>{member.role}</span>
                                                 </div>
                                             </div>
                                             {!isManagerRole && (
-                                                <Button variant="ghost" size="sm" onClick={() => isEditing ? setEditingMemberId(null) : startEditingMember(member)}
-                                                    className="text-slate-400 hover:text-white text-xs">
-                                                    {isEditing ? "Cancel" : "Edit Access"}
-                                                </Button>
+                                                <div className="flex items-center gap-2">
+                                                    <Button variant="ghost" size="sm" onClick={() => isEditing ? setEditingMemberId(null) : startEditingMember(member)}
+                                                        className="text-slate-400 hover:text-white text-xs">
+                                                        {isEditing ? "Cancel" : "Edit Access"}
+                                                    </Button>
+                                                    <Button variant="ghost" size="sm" onClick={() => handleDeleteMember(member.user_id, member.display_name || member.email)}
+                                                        className="text-red-400 hover:text-red-300 hover:bg-red-950/30 text-xs flex items-center gap-1">
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                        Remove
+                                                    </Button>
+                                                </div>
                                             )}
                                             {isManagerRole && (
                                                 <span className="text-xs text-slate-500">Full access</span>
