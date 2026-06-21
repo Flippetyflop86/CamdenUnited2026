@@ -24,7 +24,8 @@ import {
     Instagram,
     Coins,
     Wallet,
-    Lock
+    Lock,
+    CreditCard
 } from "lucide-react";
 
 import { useClub } from "@/context/club-context";
@@ -120,6 +121,22 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                 >
                                     <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden="true" />
                                     <span className="truncate">Dashboard</span>
+                                </Link>
+                            </li>
+                            <li>
+                                <Link
+                                    href="/dashboard/billing"
+                                    onClick={onClose}
+                                    aria-current={pathname === "/dashboard/billing" ? "page" : undefined}
+                                    className={cn(
+                                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-red-500",
+                                        pathname === "/dashboard/billing"
+                                            ? "bg-red-600 text-white"
+                                            : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                                    )}
+                                >
+                                    <CreditCard className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    <span className="truncate">Billing & Subs</span>
                                 </Link>
                             </li>
                         </ul>
