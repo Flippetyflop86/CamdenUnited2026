@@ -39,7 +39,8 @@ export default function MatchdayXIPage() {
 
         // Subscription for realtime updates (optional but good for multi-user)
         const channel = supabase.channel('public:matchday_xis')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'matchday_xis' }, fetchLineupOnly)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'matchday_xis' }, () => fetchLineupOnly())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => fetchPlayers())
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
