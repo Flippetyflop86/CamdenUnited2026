@@ -46,9 +46,13 @@ export default function StaffPage() {
 
     async function fetchStaff() {
         try {
-            const { data, error } = await supabase.from("staff").select("*");
-            if (error) throw error;
-            const formatted = (data || []).map((s: any) => ({
+            const { data: staffData, error: staffError } = await supabase.from("staff").select("*");
+            if (staffError) throw staffError;
+
+            const { data: membersData, error: membersError } = await supabase.from("club_members").select("*");
+            if (membersError) throw membersError;
+
+            const formattedStaff = (staffData || []).map((s: any) => ({
                 id: s.id,
                 name: s.name,
                 role: s.role,
@@ -61,7 +65,76 @@ export default function StaffPage() {
                 contractStartDate: s.contract_start_date,
                 contractEndDate: s.contract_end_date
             }));
-            setStaff(formatted);
+
+            const merged: StaffMember[] = [];
+            const processedStaffIds = new Set<string>();
+            const processedEmails = new Set<string>();
+            const processedNames = new Set<string>();
+
+            // 1. Process all registered members
+            (membersData || []).forEach((m: any) => {
+                const memberEmail = m.email?.toLowerCase().trim();
+                const memberName = m.display_name?.toLowerCase().trim();
+
+                // Find matching manual staff member
+                const matchingStaff = formattedStaff.find(s => {
+                    const staffEmail = s.email?.toLowerCase().trim();
+                    const staffName = s.name?.toLowerCase().trim();
+                    return (memberEmail && staffEmail && memberEmail === staffEmail) ||
+                           (memberName && staffName && memberName === staffName);
+                });
+
+                if (matchingStaff) {
+                    processedStaffIds.add(matchingStaff.id);
+                    if (matchingStaff.email) processedEmails.add(matchingStaff.email.toLowerCase().trim());
+                    processedNames.add(matchingStaff.name.toLowerCase().trim());
+
+                    merged.push({
+                        id: `member-${m.user_id}`,
+                        name: m.display_name || matchingStaff.name || m.email || "Registered User",
+                        role: matchingStaff.role || (m.role === "manager" ? "Manager" : m.role ? m.role.charAt(0).toUpperCase() + m.role.slice(1) : "Staff"),
+                        email: m.email || matchingStaff.email,
+                        phone: matchingStaff.phone,
+                        notes: matchingStaff.notes,
+                        isContracted: matchingStaff.isContracted,
+                        contractAmount: matchingStaff.contractAmount,
+                        contractFrequency: matchingStaff.contractFrequency,
+                        contractStartDate: matchingStaff.contractStartDate,
+                        contractEndDate: matchingStaff.contractEndDate
+                    });
+                } else {
+                    merged.push({
+                        id: `member-${m.user_id}`,
+                        name: m.display_name || m.email || "Registered User",
+                        role: m.role === "manager" ? "Manager" : (m.role ? m.role.charAt(0).toUpperCase() + m.role.slice(1) : "Staff"),
+                        email: m.email,
+                        phone: "",
+                        notes: "Registered Account",
+                        isContracted: false,
+                        contractAmount: 0,
+                        contractFrequency: "Monthly"
+                    });
+                }
+                
+                if (memberEmail) processedEmails.add(memberEmail);
+                if (memberName) processedNames.add(memberName);
+            });
+
+            // 2. Add remaining manual staff members who did not match any registered member
+            formattedStaff.forEach((s: any) => {
+                if (processedStaffIds.has(s.id)) return;
+                
+                const staffEmail = s.email?.toLowerCase().trim();
+                const staffName = s.name?.toLowerCase().trim();
+                
+                if ((staffEmail && processedEmails.has(staffEmail)) || (staffName && processedNames.has(staffName))) {
+                    return; // duplicate check
+                }
+
+                merged.push(s);
+            });
+
+            setStaff(merged);
         } catch (e: any) {
             console.error("Error fetching staff:", e.message || e);
         }
@@ -71,26 +144,115 @@ export default function StaffPage() {
         if (!formData.name || !formData.role) return;
 
         const isNew = !editingId;
-        const payload = {
-            name: formData.name,
-            role: formData.role,
-            email: formData.email,
-            phone: formData.phone,
-            notes: formData.notes,
-            is_contracted: formData.isContracted,
-            contract_amount: formData.contractAmount,
-            contract_frequency: formData.contractFrequency,
-            contract_start_date: formData.contractStartDate ? formData.contractStartDate : null,
-            contract_end_date: formData.contractEndDate ? formData.contractEndDate : null
-        };
-
+        
         try {
             if (isNew) {
-                const { error } = await supabase.from("staff").insert([payload]);
-                if (error) throw error;
+                // Check if this new staff member matches an existing club_member by email/name
+                const { data: members } = await supabase.from("club_members").select("*");
+                const emailMatch = formData.email ? members?.find(m => m.email?.toLowerCase().trim() === formData.email?.toLowerCase().trim()) : null;
+                const nameMatch = members?.find(m => m.display_name?.toLowerCase().trim() === formData.name?.toLowerCase().trim());
+                const matchingMember = emailMatch || nameMatch;
+
+                if (matchingMember) {
+                    // Update the existing member's role and name in club_members
+                    const roleToSave = formData.role.toLowerCase() === "manager" ? "manager" : formData.role.toLowerCase();
+                    await supabase.from("club_members").update({
+                        display_name: formData.name,
+                        role: roleToSave
+                    }).eq("user_id", matchingMember.user_id);
+
+                    // Insert or update staff details in staff table using the email
+                    const staffPayload = {
+                        name: formData.name,
+                        role: formData.role,
+                        email: formData.email || matchingMember.email,
+                        phone: formData.phone,
+                        notes: formData.notes,
+                        is_contracted: formData.isContracted,
+                        contract_amount: formData.contractAmount,
+                        contract_frequency: formData.contractFrequency,
+                        contract_start_date: formData.contractStartDate ? formData.contractStartDate : null,
+                        contract_end_date: formData.contractEndDate ? formData.contractEndDate : null
+                    };
+
+                    const { data: existingStaff } = await supabase.from("staff").select("id").eq("email", formData.email || matchingMember.email);
+                    if (existingStaff && existingStaff.length > 0) {
+                        await supabase.from("staff").update(staffPayload).eq("id", existingStaff[0].id);
+                    } else {
+                        await supabase.from("staff").insert([staffPayload]);
+                    }
+                } else {
+                    const payload = {
+                        name: formData.name,
+                        role: formData.role,
+                        email: formData.email,
+                        phone: formData.phone,
+                        notes: formData.notes,
+                        is_contracted: formData.isContracted,
+                        contract_amount: formData.contractAmount,
+                        contract_frequency: formData.contractFrequency,
+                        contract_start_date: formData.contractStartDate ? formData.contractStartDate : null,
+                        contract_end_date: formData.contractEndDate ? formData.contractEndDate : null
+                    };
+                    const { error } = await supabase.from("staff").insert([payload]);
+                    if (error) throw error;
+                }
             } else {
-                const { error } = await supabase.from("staff").update(payload).eq("id", editingId);
-                if (error) throw error;
+                if (editingId.startsWith("member-")) {
+                    const userId = editingId.replace("member-", "");
+                    const roleToSave = formData.role.toLowerCase() === "manager" ? "manager" : formData.role.toLowerCase();
+                    
+                    // Update club_members table
+                    await supabase.from("club_members").update({
+                        display_name: formData.name,
+                        role: roleToSave
+                    }).eq("user_id", userId);
+
+                    // Update or insert staff details table
+                    const staffPayload = {
+                        name: formData.name,
+                        role: formData.role,
+                        email: formData.email,
+                        phone: formData.phone,
+                        notes: formData.notes,
+                        is_contracted: formData.isContracted,
+                        contract_amount: formData.contractAmount,
+                        contract_frequency: formData.contractFrequency,
+                        contract_start_date: formData.contractStartDate ? formData.contractStartDate : null,
+                        contract_end_date: formData.contractEndDate ? formData.contractEndDate : null
+                    };
+
+                    const { data: existingStaffByEmail } = formData.email 
+                        ? await supabase.from("staff").select("id").eq("email", formData.email) 
+                        : { data: null };
+                    
+                    const { data: existingStaffByName } = await supabase.from("staff").select("id").eq("name", formData.name);
+                    
+                    const existingStaff = (existingStaffByEmail && existingStaffByEmail.length > 0) 
+                        ? existingStaffByEmail 
+                        : existingStaffByName;
+
+                    if (existingStaff && existingStaff.length > 0) {
+                        await supabase.from("staff").update(staffPayload).eq("id", existingStaff[0].id);
+                    } else {
+                        await supabase.from("staff").insert([staffPayload]);
+                    }
+                } else {
+                    const payload = {
+                        name: formData.name,
+                        role: formData.role,
+                        email: formData.email,
+                        phone: formData.phone,
+                        notes: formData.notes,
+                        is_contracted: formData.isContracted,
+                        contract_amount: formData.contractAmount,
+                        contract_frequency: formData.contractFrequency,
+                        contract_start_date: formData.contractStartDate ? formData.contractStartDate : null,
+                        contract_end_date: formData.contractEndDate ? formData.contractEndDate : null
+                    };
+                    const { error } = await supabase.from("staff").update(payload).eq("id", editingId);
+                    if (error) throw error;
+                }
             }
             await fetchStaff();
             setIsAddOpen(false);
@@ -98,7 +260,7 @@ export default function StaffPage() {
             setFormData({ name: "", role: "Coach", email: "", phone: "", notes: "", isContracted: false, contractAmount: 0, contractFrequency: "Monthly" });
         } catch (e: any) {
             console.error("Supabase save failed:", e.message);
-            alert("Failed to save staff member. Ensure you have run the SQL script to create the staff table.");
+            alert("Failed to save staff member.");
         }
     };
 
@@ -123,8 +285,26 @@ export default function StaffPage() {
         if (!confirm("Are you sure you want to remove this staff member?")) return;
         
         try {
-            const { error } = await supabase.from("staff").delete().eq("id", id);
-            if (error) throw error;
+            if (id.startsWith("member-")) {
+                const userId = id.replace("member-", "");
+                
+                const { data: memberData } = await supabase.from("club_members").select("email, display_name").eq("user_id", userId).single();
+                
+                const { error: memberError } = await supabase.from("club_members").delete().eq("user_id", userId);
+                if (memberError) throw memberError;
+
+                if (memberData) {
+                    if (memberData.email) {
+                        await supabase.from("staff").delete().eq("email", memberData.email);
+                    }
+                    if (memberData.display_name) {
+                        await supabase.from("staff").delete().eq("name", memberData.display_name);
+                    }
+                }
+            } else {
+                const { error } = await supabase.from("staff").delete().eq("id", id);
+                if (error) throw error;
+            }
             await fetchStaff();
         } catch (e: any) {
             console.error("Delete failed:", e.message);

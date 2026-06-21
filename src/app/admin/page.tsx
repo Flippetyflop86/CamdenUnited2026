@@ -97,6 +97,33 @@ export default function AdminPage() {
         }
     }, [settings]);
 
+    useEffect(() => {
+        if (settings) {
+            setName(settings.name);
+            setLogo(settings.logo);
+            setSquads(settings.squads || []);
+            setHomeGround(settings.homeGround || "");
+            setFoundingYear(settings.foundingYear?.toString() || "");
+            setTwitterUrl(settings.twitterUrl || "");
+            setInstagramUrl(settings.instagramUrl || "");
+            setPrimaryColor(settings.primaryColor);
+            setHomeKitShirt(settings.homeKitShirt);
+            setHomeKitShorts(settings.homeKitShorts);
+            setHomeKitSocks(settings.homeKitSocks);
+            setAwayKitShirt(settings.awayKitShirt);
+            setAwayKitShorts(settings.awayKitShorts);
+            setAwayKitSocks(settings.awayKitSocks);
+            setLeagueUrl(settings.leagueUrl || "");
+            setLeaguePosition(settings.leaguePosition?.toString() || "");
+            setMonthlySubs(settings.monthlySubs?.toString() || "0");
+            setFinesEnabled(settings.finesEnabled);
+            setFineCategories(settings.fineCategories || []);
+            setSponsorLogo(settings.sponsorLogo);
+            setNotificationsEnabled(settings.notificationsEnabled || false);
+            setNotificationEmail(settings.notificationEmail || "");
+        }
+    }, [settings]);
+
     const fetchTeamAccess = async () => {
         try {
             const { data: members } = await supabase.from('club_members').select('*');

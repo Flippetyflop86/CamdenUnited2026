@@ -760,6 +760,10 @@ export default function MatchdayXIPage() {
                                 if (fullName === "Mohamed Abdalla") displayName = "Suarez";
                                 if (fullName === "Said Tahir") displayName = "Bobo";
 
+                                const kitColor = (nextMatch && !nextMatch.isHome)
+                                    ? (settings.awayKitShirt || "#000000")
+                                    : (settings.homeKitShirt || "#ffffff");
+
                                 return (
                                 <div
                                     key={idx}
@@ -776,7 +780,7 @@ export default function MatchdayXIPage() {
                                             onDragStart={(e) => playerId && handleDragStart(e, playerId, {type: 'pitch', index: idx})}
                                             onClick={() => setActiveSlot({ type: 'pitch', index: idx, label: pos.label })}
                                     >
-                                        {/* Jersey SVG Icon colored with the actual selected Home Kit color */}
+                                        {/* Jersey SVG Icon colored dynamically based on home/away venue */}
                                         <svg 
                                             className="w-8 h-8 sm:w-10 sm:h-10 drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)] mb-0.5 sm:mb-1 z-10 transition-transform group-hover:scale-110" 
                                             viewBox="0 0 100 100" 
@@ -784,7 +788,7 @@ export default function MatchdayXIPage() {
                                             xmlns="http://www.w3.org/2000/svg"
                                         >
                                             {/* Shirt Body */}
-                                            <path d="M 30,20 L 70,20 L 85,35 L 75,45 L 68,38 L 68,85 L 32,85 L 32,38 L 25,45 L 15,35 Z" fill={settings.homeKitShirt || "#ffffff"} stroke="#000" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
+                                            <path d="M 30,20 L 70,20 L 85,35 L 75,45 L 68,38 L 68,85 L 32,85 L 32,38 L 25,45 L 15,35 Z" fill={kitColor} stroke="#000" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" />
                                             {/* Collar */}
                                             <path d="M 40,20 Q 50,28 60,20" stroke="#000" strokeWidth="3.5" fill="none" />
                                             {/* Number */}
@@ -794,7 +798,7 @@ export default function MatchdayXIPage() {
                                                 textAnchor="middle" 
                                                 fill={
                                                     (() => {
-                                                        const hex = (settings.homeKitShirt || "#ffffff").replace("#", "");
+                                                        const hex = kitColor.replace("#", "");
                                                         if (hex.length !== 6) return "#000000";
                                                         const r = parseInt(hex.substr(0, 2), 16);
                                                         const g = parseInt(hex.substr(2, 2), 16);

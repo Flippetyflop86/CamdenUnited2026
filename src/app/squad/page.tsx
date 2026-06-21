@@ -13,6 +13,15 @@ import { supabase } from "@/lib/supabase";
 import imageCompression from "browser-image-compression";
 import { UploadCloud, Loader2 } from "lucide-react";
 
+const getCurrentSeasonStr = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = d.getMonth(); // 0 = Jan, 5 = Jun
+    return month >= 5 
+        ? `${year.toString().slice(2)}/${(year + 1).toString().slice(2)}`
+        : `${(year - 1).toString().slice(2)}/${year.toString().slice(2)}`;
+};
+
 export default function SquadPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [positionFilter, setPositionFilter] = useState<"All" | "GK" | "DEF" | "MID" | "FWD">("All");
@@ -28,16 +37,8 @@ export default function SquadPage() {
     const [isManageSquadsOpen, setIsManageSquadsOpen] = useState(false);
     const [editingSquads, setEditingSquads] = useState<string[]>(currentSquads);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
-    const getCurrentSeasonStr = () => {
-        const d = new Date();
-        const year = d.getFullYear();
-        const month = d.getMonth(); // 0 = Jan, 5 = Jun
-        return month >= 5 
-            ? `${year.toString().slice(2)}/${(year + 1).toString().slice(2)}`
-            : `${(year - 1).toString().slice(2)}/${year.toString().slice(2)}`;
-    };
 
-    const [seasonFilter, setSeasonFilter] = useState<string>("26/27");
+    const [seasonFilter, setSeasonFilter] = useState<string>(getCurrentSeasonStr());
     const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
 
     // 1. Initial load: Supabase
@@ -199,7 +200,7 @@ export default function SquadPage() {
         
         const matchesSearch = player.firstName.toLowerCase().includes(searchTerm.toLowerCase()) || player.lastName.toLowerCase().includes(searchTerm.toLowerCase());
         const matchesSquad = activeTab === "All" || mappedSquad === activeTab;
-        const matchesPosition = positionFilter === "All" || (positionFilter === "GK" && player.position === "GK") || (positionFilter === "DEF" && ["DEF", "LB", "CB", "RB", "LWB", "RWB"].includes(player.position)) || (positionFilter === "MID" && ["MID", "CDM", "CM", "CAM", "LM", "RM", "LW", "RW"].includes(player.position)) || (positionFilter === "FWD" && ["FWD", "CF", "ST"].includes(player.position));
+        const matchesPosition = positionFilter === "All" || (positionFilter === "GK" && player.position === "GK") || (positionFilter === "DEF" && ["DEF", "LB", "CB", "RB", "LWB", "RWB"].includes(player.position)) || (positionFilter === "MID" && ["MID", "CDM", "CM", "CAM", "LM", "RM"].includes(player.position)) || (positionFilter === "FWD" && ["FWD", "CF", "ST", "LW", "RW"].includes(player.position));
         const matchesAvailability = !showAvailableOnly || player.medicalStatus === "Available";
         return matchesSearch && matchesSquad && matchesPosition && matchesAvailability;
     });
@@ -300,18 +301,7 @@ export default function SquadPage() {
                     <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
                     <Input placeholder="Search players..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                 </div>
-                <div className="flex gap-2 shrink-0">
-                    <select
-                        value={seasonFilter}
-                        onChange={(e) => setSeasonFilter(e.target.value)}
-                        className="h-10 px-3 py-2 bg-white border border-slate-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-red-500"
-                    >
-                        <option value="All">All Seasons</option>
-                        {availableSeasons.map(s => (
-                            <option key={s} value={s}>{s} Season</option>
-                        ))}
-                    </select>
-                </div>
+
                 <div className="flex gap-2 overflow-x-auto no-scrollbar shrink-0 max-w-full">
                     {(["All", "GK", "DEF", "MID", "FWD"] as const).map((pos) => (
                         <Button key={pos} variant={positionFilter === pos ? "default" : "outline"} onClick={() => setPositionFilter(pos)}>{pos}</Button>

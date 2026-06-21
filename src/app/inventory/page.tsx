@@ -170,8 +170,9 @@ export default function InventoryPage() {
                     <CardTitle>Equipment List</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-md border">
-                        <div className="overflow-x-auto w-full pb-2"><table className="w-full text-sm">
+                    {/* Desktop View */}
+                    <div className="hidden md:block rounded-md border overflow-x-auto w-full pb-2">
+                        <table className="w-full text-sm">
                             <thead className="bg-slate-50 border-b">
                                 <tr className="text-left text-xs font-medium text-slate-500 uppercase">
                                     <th className="px-4 py-3">Item Name</th>
@@ -185,7 +186,7 @@ export default function InventoryPage() {
                             <tbody className="divide-y divide-slate-100">
                                 {filteredItems.length === 0 && (
                                     <tr>
-                                        <td colSpan={5} className="px-4 py-8 text-center text-slate-400 italic">No items found.</td>
+                                        <td colSpan={6} className="px-4 py-8 text-center text-slate-400 italic">No items found.</td>
                                     </tr>
                                 )}
                                 {filteredItems.map(item => (
@@ -218,9 +219,9 @@ export default function InventoryPage() {
                                         </td>
                                         <td className="px-4 py-3">
                                             <div className="flex items-center justify-center gap-2">
-                                                <button onClick={() => adjustQuantity(item.id, -1)} className="h-6 w-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">-</button>
+                                                <button onClick={() => adjustQuantity(item.id, -1)} className="h-6 w-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold">-</button>
                                                 <span className="w-8 text-center font-bold text-slate-900">{item.quantity}</span>
-                                                <button onClick={() => adjustQuantity(item.id, 1)} className="h-6 w-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600">+</button>
+                                                <button onClick={() => adjustQuantity(item.id, 1)} className="h-6 w-6 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold">+</button>
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-right">
@@ -236,7 +237,61 @@ export default function InventoryPage() {
                                     </tr>
                                 ))}
                             </tbody>
-                        </table></div>
+                        </table>
+                    </div>
+
+                    {/* Mobile View */}
+                    <div className="md:hidden space-y-4">
+                        {filteredItems.length === 0 && (
+                            <div className="text-center py-8 text-slate-400 italic">No items found.</div>
+                        )}
+                        {filteredItems.map(item => (
+                            <div key={item.id} className="p-4 border rounded-lg bg-white shadow-sm flex flex-col gap-3">
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <h3 className="font-semibold text-slate-900">{item.name}</h3>
+                                        {item.notes && <p className="text-xs text-slate-400 font-normal mt-0.5">{item.notes}</p>}
+                                    </div>
+                                    <div className="flex gap-1 shrink-0">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-500" onClick={() => startEdit(item)}>
+                                            <Pencil className="h-3.5 w-3.5" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-500" onClick={() => deleteItem(item.id)}>
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2 items-center">
+                                    <span className="inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700">
+                                        {item.category}
+                                    </span>
+                                    
+                                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                                        item.status === 'Good' ? 'bg-green-100 text-green-700' :
+                                        item.status === 'Damaged' ? 'bg-red-100 text-red-700' :
+                                        'bg-yellow-100 text-yellow-700'
+                                    }`}>
+                                        {item.status}
+                                    </span>
+
+                                    {item.assignedTo && (
+                                        <span className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">
+                                            <User className="h-3 w-3" /> {item.assignedTo}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center justify-between border-t pt-3 mt-1">
+                                    <span className="text-xs font-semibold text-slate-500">Quantity</span>
+                                    <div className="flex items-center gap-2">
+                                        <button onClick={() => adjustQuantity(item.id, -1)} className="h-7 w-7 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold">-</button>
+                                        <span className="w-8 text-center font-bold text-slate-900">{item.quantity}</span>
+                                        <button onClick={() => adjustQuantity(item.id, 1)} className="h-7 w-7 rounded bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 font-bold">+</button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </CardContent>
             </Card>
