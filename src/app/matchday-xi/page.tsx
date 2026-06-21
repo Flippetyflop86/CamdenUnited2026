@@ -5,7 +5,7 @@ import { MatchdayXI, Player, Match } from "@/types";
 import { FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Save, FileDown, Calendar, MapPin, Clock, GripVertical, Trophy, MessageCircle } from "lucide-react";
+import { Plus, Trash2, Save, FileDown, Calendar, MapPin, Clock, GripVertical, Trophy, MessageCircle, Search, X } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -19,6 +19,8 @@ export default function MatchdayXIPage() {
     const [draggedPlayer, setDraggedPlayer] = useState<string | null>(null);
     const [draggedSource, setDraggedSource] = useState<{type: 'squad' | 'pitch' | 'sub', index?: number} | null>(null);
     const [squadFilter, setSquadFilter] = useState<"All" | "GK" | "DEF" | "MID" | "FWD">("All");
+    const [activeSlot, setActiveSlot] = useState<{type: 'pitch' | 'sub', index: number, label: string} | null>(null);
+    const [searchQuery, setSearchQuery] = useState("");
 
     const getPositionCategory = (pos: string) => {
         const p = pos.toUpperCase();
@@ -567,6 +569,36 @@ export default function MatchdayXIPage() {
         ...lineup.substitutes
     ].filter(Boolean);
 
+    const activePlayerId = activeSlot
+        ? activeSlot.type === 'pitch'
+            ? lineup.starters[activeSlot.index]
+            : lineup.substitutes[activeSlot.index]
+        : null;
+
+    const activePlayer = activePlayerId ? players.find(p => p.id === activePlayerId) : null;
+
+    const availablePlayers = players.filter(p => !selectedPlayerIds.includes(p.id));
+
+    const targetCategory = activeSlot && activeSlot.type === 'pitch' ? getPositionCategory(activeSlot.label) : 'All';
+
+    const filteredAvailable = availablePlayers.filter(p => {
+        const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
+        return fullName.includes(searchQuery.toLowerCase()) || p.position.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+
+    const sortedPlayers = [...filteredAvailable].sort((a, b) => {
+        const catA = getPositionCategory(a.position);
+        const catB = getPositionCategory(b.position);
+        
+        if (targetCategory !== 'All') {
+            const matchA = catA === targetCategory ? 1 : 0;
+            const matchB = catB === targetCategory ? 1 : 0;
+            if (matchA !== matchB) return matchB - matchA;
+        }
+        
+        return a.lastName.localeCompare(b.lastName);
+    });
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -741,6 +773,7 @@ export default function MatchdayXIPage() {
                                     <div className="flex flex-col items-center group relative cursor-pointer"
                                             draggable={!!playerId}
                                             onDragStart={(e) => playerId && handleDragStart(e, playerId, {type: 'pitch', index: idx})}
+                                            onClick={() => setActiveSlot({ type: 'pitch', index: idx, label: pos.label })}
                                     >
                                         {/* Jersey SVG Icon colored with the actual selected Home Kit color */}
                                         <svg 
@@ -831,8 +864,9 @@ export default function MatchdayXIPage() {
                                     <div 
                                         draggable={!!subId}
                                         onDragStart={(e) => subId && handleDragStart(e, subId, {type: 'sub', index: idx})}
-                                        className={`flex-1 flex items-center justify-between p-2 border rounded-lg shadow-sm transition-all
-                                            ${subId ? 'bg-white cursor-grab hover:border-red-400 border-slate-200 group' : 'bg-slate-100 border-dashed border-slate-300 text-slate-400'}`}
+                                        onClick={() => setActiveSlot({ type: 'sub', index: idx, label: `Bench Slot ${idx + 1}` })}
+                                        className={`flex-1 flex items-center justify-between p-2 border rounded-lg shadow-sm transition-all cursor-pointer hover:border-slate-400
+                                            ${subId ? 'bg-white hover:border-red-400 border-slate-200 group' : 'bg-slate-100 border-dashed border-slate-300 text-slate-400 hover:bg-slate-200'}`}
                                     >
                                         {subId ? (
                                             <>
@@ -861,6 +895,142 @@ export default function MatchdayXIPage() {
                     </div>
                 </Card>
             </div>
+
+            {/* Assign Player Modal/Drawer */}
+            {activeSlot && (
+                <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+                    <div 
+                        className="fixed inset-0" 
+                        onClick={() => { setActiveSlot(null); setSearchQuery(""); }}
+                    />
+                    <div className="bg-slate-900 border border-slate-800 text-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl z-10 overflow-hidden animate-in slide-in-from-bottom duration-200">
+                        {/* Modal Header */}
+                        <div className="p-4 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/50 backdrop-blur-md">
+                            <div>
+                                <h3 className="text-base font-bold text-white">Assign Player</h3>
+                                <p className="text-xs text-slate-400">Select player for position: <span className="font-semibold text-red-500">{activeSlot.label}</span></p>
+                            </div>
+                            <button 
+                                onClick={() => { setActiveSlot(null); setSearchQuery(""); }}
+                                className="p-1.5 rounded-full hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+
+                        {/* Search Input */}
+                        <div className="p-3 border-b border-slate-800 bg-slate-950/40 shrink-0">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                                <input
+                                    type="text"
+                                    placeholder="Search player by name or position..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="w-full pl-9 pr-4 py-2 bg-slate-850 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Player List */}
+                        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-950/20">
+                            {/* Current Assigned Player */}
+                            {activePlayer && (
+                                <div className="p-2.5 border border-red-500/30 rounded-xl bg-red-950/10 flex items-center justify-between">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] uppercase font-bold text-red-500 tracking-wider">Currently Assigned</span>
+                                        <span className="text-sm font-bold text-white">
+                                            {activePlayer.firstName} {activePlayer.lastName}
+                                        </span>
+                                        <span className="text-[10px] text-slate-400 font-bold uppercase">{activePlayer.position}</span>
+                                    </div>
+                                    <Button
+                                        onClick={() => {
+                                            if (activeSlot.type === 'pitch') {
+                                                handleRemoveFromPitch(activeSlot.index);
+                                            } else {
+                                                handleSubChange(activeSlot.index, "");
+                                            }
+                                            setActiveSlot(null);
+                                            setSearchQuery("");
+                                        }}
+                                        variant="destructive"
+                                        size="sm"
+                                        className="h-8 text-xs bg-red-600 hover:bg-red-700 font-bold"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Divider if we have both current player and available list */}
+                            {activePlayer && sortedPlayers.length > 0 && (
+                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1 pt-1">
+                                    Available Options
+                                </div>
+                            )}
+
+                            {sortedPlayers.length > 0 ? (
+                                sortedPlayers.map(player => {
+                                    const matchesTarget = activeSlot.type === 'pitch' && getPositionCategory(player.position) === targetCategory;
+                                    const fullName = `${player.firstName} ${player.lastName}`;
+                                    let displayName = player.firstName;
+                                    if (fullName === "Mohamed Abdalla") displayName = "Suarez";
+                                    if (fullName === "Said Tahir") displayName = "Bobo";
+
+                                    return (
+                                        <button
+                                            key={player.id}
+                                            onClick={() => {
+                                                if (activeSlot.type === 'pitch') {
+                                                    handleStarterChange(activeSlot.index, player.id);
+                                                } else {
+                                                    handleSubChange(activeSlot.index, player.id);
+                                                }
+                                                setActiveSlot(null);
+                                                setSearchQuery("");
+                                            }}
+                                            className={`w-full flex items-center justify-between p-3 border rounded-xl transition-all text-left group
+                                                ${matchesTarget 
+                                                    ? 'bg-slate-800/80 border-red-500/20 hover:border-red-500/50 hover:bg-slate-800' 
+                                                    : 'bg-slate-900 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
+                                                }`}
+                                        >
+                                            <div className="flex flex-col">
+                                                <span className="text-sm font-bold text-white group-hover:text-red-400 transition-colors">
+                                                    {player.firstName} {player.lastName}
+                                                </span>
+                                                <span className="text-[10px] text-slate-400 font-semibold uppercase">
+                                                    {player.position}
+                                                </span>
+                                            </div>
+                                            {matchesTarget && (
+                                                <span className="bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                                    Ideal Position
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })
+                            ) : (
+                                <div className="text-center py-8 text-slate-500 text-sm">
+                                    No available players found
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Modal Footer */}
+                        <div className="p-3 bg-slate-950/60 border-t border-slate-800 flex justify-end shrink-0">
+                            <Button 
+                                onClick={() => { setActiveSlot(null); setSearchQuery(""); }}
+                                className="bg-slate-800 hover:bg-slate-750 text-white border-none font-bold text-xs"
+                            >
+                                Cancel
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
