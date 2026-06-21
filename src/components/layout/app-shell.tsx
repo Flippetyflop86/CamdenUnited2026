@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Menu } from "lucide-react";
+import { Menu, LayoutDashboard, Users, Activity, CreditCard } from "lucide-react";
+import Link from "next/link";
 import { useClub } from "@/context/club-context";
 import { cn } from "@/lib/utils";
 import { usePathname } from "next/navigation";
@@ -86,11 +87,55 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <Sidebar onClose={() => setIsMobileMenuOpen(false)} />
             </aside>
 
-            <main className="flex-1 overflow-y-auto p-4 md:p-8 mt-16 md:mt-0">
+            <main className="flex-1 overflow-y-auto p-4 md:p-8 mt-16 md:mt-0 pb-20 md:pb-8">
                 <PageGuard>
                     {children}
                 </PageGuard>
             </main>
+
+            {/* Mobile Bottom Navigation Bar */}
+            <nav className="fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 flex items-center justify-around z-40 md:hidden pb-safe">
+                <Link
+                    href="/dashboard"
+                    className={cn(
+                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium w-16 h-full transition-colors",
+                        pathname === "/dashboard" ? "text-red-500 font-semibold" : "text-slate-400 hover:text-white"
+                    )}
+                >
+                    <LayoutDashboard className="h-5 w-5" />
+                    <span>Dashboard</span>
+                </Link>
+                <Link
+                    href="/squad"
+                    className={cn(
+                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium w-16 h-full transition-colors",
+                        pathname === "/squad" || pathname?.startsWith("/squad/") ? "text-red-500 font-semibold" : "text-slate-400 hover:text-white"
+                    )}
+                >
+                    <Users className="h-5 w-5" />
+                    <span>Squad</span>
+                </Link>
+                <Link
+                    href="/matches"
+                    className={cn(
+                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium w-16 h-full transition-colors",
+                        pathname === "/matches" || pathname?.startsWith("/matches/") ? "text-red-500 font-semibold" : "text-slate-400 hover:text-white"
+                    )}
+                >
+                    <Activity className="h-5 w-5" />
+                    <span>Fixtures</span>
+                </Link>
+                <Link
+                    href="/dashboard/billing"
+                    className={cn(
+                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium w-16 h-full transition-colors",
+                        pathname === "/dashboard/billing" ? "text-red-500 font-semibold" : "text-slate-400 hover:text-white"
+                    )}
+                >
+                    <CreditCard className="h-5 w-5" />
+                    <span>Billing</span>
+                </Link>
+            </nav>
         </div>
     );
 }
