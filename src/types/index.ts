@@ -166,6 +166,7 @@ export interface Sponsor {
     startDate?: string;
     endDate?: string;
     responsibilities?: string; // Stored as a newline-separated string or simple text block
+    status?: 'Secured' | 'Potential';
 }
 
 export interface Subscription {

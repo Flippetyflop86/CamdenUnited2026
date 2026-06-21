@@ -83,7 +83,8 @@ create table sponsors (
   website text,
   start_date date,
   end_date date,
-  responsibilities text
+  responsibilities text,
+  status text not null default 'Secured'
 );
 
 -- 7. Subscriptions

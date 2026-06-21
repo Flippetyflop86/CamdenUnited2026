@@ -68,7 +68,7 @@ export default function AdminPage() {
     const [isMigrating, setIsMigrating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-    const { user, role: userRole, isManager, refreshPermissions } = useAuth();
+    const { user, role: userRole, isManager, pagePermissions, refreshPermissions } = useAuth();
     const [managerName, setManagerName] = useState("");
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [invitations, setInvitations] = useState<any[]>([]);
@@ -435,19 +435,25 @@ export default function AdminPage() {
                 </Button>
             </div>
 
-            <Tabs defaultValue="identity" className="w-full">
+            <Tabs key={isManager ? "manager" : "admin"} defaultValue={isManager ? "identity" : "access"} className="w-full">
                 <TabsList className="flex w-full max-w-4xl overflow-x-auto whitespace-nowrap gap-1 md:grid md:grid-cols-7 md:gap-0 bg-slate-100 p-1 rounded-lg scrollbar-none">
-                    <TabsTrigger value="identity" className="flex-shrink-0 px-4 py-2">Identity</TabsTrigger>
-                    <TabsTrigger value="squads" className="flex-shrink-0 px-4 py-2">Squads</TabsTrigger>
-                    <TabsTrigger value="kits" className="flex-shrink-0 px-4 py-2">Kits</TabsTrigger>
-                    <TabsTrigger value="finance" className="flex-shrink-0 px-4 py-2">Finance</TabsTrigger>
-                    <TabsTrigger value="staff" className="flex-shrink-0 px-4 py-2">Staff</TabsTrigger>
+                    {isManager && (
+                        <>
+                            <TabsTrigger value="identity" className="flex-shrink-0 px-4 py-2">Identity</TabsTrigger>
+                            <TabsTrigger value="squads" className="flex-shrink-0 px-4 py-2">Squads</TabsTrigger>
+                            <TabsTrigger value="kits" className="flex-shrink-0 px-4 py-2">Kits</TabsTrigger>
+                            <TabsTrigger value="finance" className="flex-shrink-0 px-4 py-2">Finance</TabsTrigger>
+                            <TabsTrigger value="staff" className="flex-shrink-0 px-4 py-2">Staff</TabsTrigger>
+                        </>
+                    )}
                     <TabsTrigger value="access" className="flex-shrink-0 px-4 py-2">Access</TabsTrigger>
-                    <TabsTrigger value="advanced" className="flex-shrink-0 px-4 py-2">Advanced</TabsTrigger>
+                    {isManager && <TabsTrigger value="advanced" className="flex-shrink-0 px-4 py-2">Advanced</TabsTrigger>}
                 </TabsList>
 
                 {/* IDENTITY TAB */}
-                <TabsContent value="identity" className="space-y-6 mt-6">
+                {isManager && (
+                    <>
+                        <TabsContent value="identity" className="space-y-6 mt-6">
                     <Card className="max-w-2xl">
                         <CardHeader>
                             <CardTitle>Club Identity</CardTitle>
@@ -842,6 +848,8 @@ export default function AdminPage() {
                         </CardContent>
                     </Card>
                 </TabsContent>
+                    </>
+                )}
 
                 {/* ACCESS TAB */}
                 <TabsContent value="access" className="space-y-6 mt-6">
@@ -860,7 +868,7 @@ export default function AdminPage() {
                     </div>
 
                     {/* --- INVITE NEW STAFF — managers only --- */}
-                    {isManager && (
+                    {(isManager || pagePermissions.includes("admin")) && (
                     <Card className="max-w-3xl bg-slate-900 border-slate-800 text-white shadow-xl">
                         <CardHeader>
                             <div className="flex items-center gap-3">
@@ -1147,7 +1155,8 @@ export default function AdminPage() {
                 </TabsContent>
 
                 {/* ADVANCED TAB */}
-                <TabsContent value="advanced" className="space-y-6 mt-6">
+                {isManager && (
+                    <TabsContent value="advanced" className="space-y-6 mt-6">
                     <Card className="max-w-2xl">
                         <CardHeader>
                             <CardTitle>Data Import & Archiving</CardTitle>
@@ -1208,6 +1217,7 @@ export default function AdminPage() {
 
                     <DataExport />
                 </TabsContent>
+                )}
             </Tabs>
         </div>
     );

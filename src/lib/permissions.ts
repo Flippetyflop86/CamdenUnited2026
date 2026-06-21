@@ -28,10 +28,11 @@ export const ALL_PAGE_PERMISSIONS: PagePermission[] = [
     { key: "inventory",    label: "Inventory",    href: "/inventory",    description: "Kit and equipment tracker",      group: "Off the Pitch" },
     { key: "staff",        label: "Staff",        href: "/staff",        description: "Staff profiles and contracts",   group: "Off the Pitch" },
     { key: "documents",    label: "Documents",    href: "/documents",    description: "Club documents and files",       group: "Off the Pitch" },
+    { key: "admin",        label: "Access Control", href: "/admin",       description: "Invite staff members and manage page permissions", group: "Off the Pitch" },
 ];
 
 // Pages that are always manager-only (never shown to staff regardless of permissions)
-export const MANAGER_ONLY_PAGES = ["/admin"];
+export const MANAGER_ONLY_PAGES: string[] = [];
 
 // Dashboard is always visible to all logged-in users.
 export const ALWAYS_VISIBLE_PAGES = ["/dashboard"];
@@ -45,8 +46,10 @@ export const PERMISSION_GROUPS = [...new Set(ALL_PAGE_PERMISSIONS.map(p => p.gro
 export function canAccess(href: string, role: string | null, pagePermissions: string[]): boolean {
     const isManager = role === "manager";
 
-    // Admin is always accessible to managers, never to anyone else
-    if (MANAGER_ONLY_PAGES.some(p => href.startsWith(p))) return isManager;
+    // Admin is accessible to managers, or anyone with 'admin' permission
+    if (href.startsWith("/admin")) {
+        return isManager || pagePermissions.includes("admin");
+    }
 
     // Always-visible pages (e.g. dashboard) — open to everyone
     if (ALWAYS_VISIBLE_PAGES.some(p => href.startsWith(p))) return true;

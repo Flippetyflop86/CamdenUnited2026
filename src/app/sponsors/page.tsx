@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
 
@@ -36,8 +37,12 @@ export default function SponsorsPage() {
         website: '',
         startDate: '',
         endDate: '',
-        responsibilities: ''
+        responsibilities: '',
+        status: 'Secured'
     });
+
+    const securedSponsors = sponsors.filter(s => s.status !== 'Potential');
+    const potentialSponsors = sponsors.filter(s => s.status === 'Potential');
 
     // ... (keep state) ...
 
@@ -61,7 +66,8 @@ export default function SponsorsPage() {
                 website: s.website,
                 startDate: s.start_date,
                 endDate: s.end_date,
-                responsibilities: s.responsibilities
+                responsibilities: s.responsibilities,
+                status: s.status || 'Secured'
             })));
         }
     };
@@ -79,7 +85,8 @@ export default function SponsorsPage() {
             website: formData.website || null,
             start_date: formData.startDate ? formData.startDate : null,
             end_date: formData.endDate ? formData.endDate : null,
-            responsibilities: formData.responsibilities || null
+            responsibilities: formData.responsibilities || null,
+            status: formData.status || 'Secured'
         };
 
         if (editingId) {
@@ -115,7 +122,8 @@ export default function SponsorsPage() {
             website: '',
             startDate: '',
             endDate: '',
-            responsibilities: ''
+            responsibilities: '',
+            status: 'Secured'
         });
     };
 
@@ -130,6 +138,119 @@ export default function SponsorsPage() {
         return "Active";
     };
 
+    const renderSponsorsGrid = (list: Sponsor[], type: 'secured' | 'potential') => {
+        if (list.length === 0) {
+            return (
+                <div className="col-span-full text-center py-12 bg-slate-50 rounded-lg border border-dashed border-slate-300">
+                    <Briefcase className="h-12 w-12 text-slate-300 mx-auto mb-3" />
+                    <h3 className="text-lg font-medium text-slate-900">
+                        {type === 'secured' ? 'No Secured Sponsors' : 'No Potential Sponsors'}
+                    </h3>
+                    <p className="text-slate-500 mb-4">
+                        {type === 'secured' 
+                            ? 'Add a new secured partner to start tracking agreements.' 
+                            : 'Add a potential partner to track progress during negotiations.'}
+                    </p>
+                    <Button variant="outline" onClick={() => {
+                        setFormData({
+                            name: '',
+                            amount: 0,
+                            frequency: 'Yearly',
+                            description: '',
+                            website: '',
+                            startDate: '',
+                            endDate: '',
+                            responsibilities: '',
+                            status: type === 'secured' ? 'Secured' : 'Potential'
+                        });
+                        setIsAddOpen(true);
+                    }}>Add Sponsor</Button>
+                </div>
+            );
+        }
+
+        return (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {list.map((sponsor) => {
+                    const status = getStatus(sponsor.endDate);
+                    return (
+                        <Card key={sponsor.id} className="hover:shadow-md transition-shadow">
+                            <CardHeader className="flex flex-row items-start justify-between pb-2">
+                                <div>
+                                    <div className="flex gap-1.5 items-center mb-2">
+                                        <Badge variant="outline" className={`
+                                            ${status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : ''}
+                                            ${status === 'Expired' ? 'bg-slate-100 text-slate-500 border-slate-200' : ''}
+                                            ${status === 'Expiring Soon' ? 'bg-amber-50 text-amber-700 border-amber-200' : ''}
+                                        `}>
+                                            {status}
+                                        </Badge>
+                                        {sponsor.status === 'Potential' && (
+                                            <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">
+                                                Negotiation
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <CardTitle className="text-xl">{sponsor.name}</CardTitle>
+                                    {sponsor.website && (
+                                        <a href={sponsor.website} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 hover:underline flex items-center gap-1 mt-1">
+                                            Visit Website <ExternalLink className="h-3 w-3" />
+                                        </a>
+                                    )}
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-lg font-bold text-slate-900">£{sponsor.amount.toLocaleString()}</div>
+                                    <div className="text-xs text-slate-500">{sponsor.frequency}</div>
+                                </div>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                {(sponsor.startDate || sponsor.endDate) && (
+                                    <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 p-2 rounded">
+                                        <Calendar className="h-3 w-3 text-slate-400" />
+                                        <span>
+                                            {sponsor.startDate ? new Date(sponsor.startDate).toLocaleDateString() : 'Start'}
+                                            {' → '}
+                                            {sponsor.endDate ? new Date(sponsor.endDate).toLocaleDateString() : 'Ongoing'}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {sponsor.description && (
+                                    <p className="text-sm text-slate-600 line-clamp-2" title={sponsor.description}>
+                                        {sponsor.description}
+                                    </p>
+                                )}
+
+                                {sponsor.responsibilities && (
+                                    <div className="border-t pt-3 mt-3">
+                                        <h4 className="text-xs font-semibold text-slate-500 uppercase mb-2">Deliverables</h4>
+                                        <ul className="text-sm space-y-1">
+                                            {sponsor.responsibilities.split('\n').map((item, i) => (
+                                                <li key={i} className="flex items-start gap-2">
+                                                    <CheckCircle2 className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" />
+                                                    <span className="text-slate-700">{item}</span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-end gap-2 pt-2 border-t mt-2">
+                                    <Button variant="ghost" size="sm" onClick={() => openEdit(sponsor)}>
+                                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                                    </Button>
+                                    <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(sponsor.id)}>
+                                        <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    );
+                })}
+            </div>
+        );
+    };
+
     return (
         <div className="space-y-6 pb-12">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -142,86 +263,19 @@ export default function SponsorsPage() {
                     </Button>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {sponsors.length === 0 && (
-                        <div className="col-span-full text-center py-12 bg-slate-50 rounded-lg border border-dashed border-slate-300">
-                            <Briefcase className="h-12 w-12 text-slate-300 mx-auto mb-3" />
-                            <h3 className="text-lg font-medium text-slate-900">No Sponsors Yet</h3>
-                            <p className="text-slate-500 mb-4">Add your first partner to start tracking agreements.</p>
-                            <Button variant="outline" onClick={() => setIsAddOpen(true)}>Add Sponsor</Button>
-                        </div>
-                    )}
+                <Tabs defaultValue="secured" className="w-full">
+                    <TabsList className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit mb-6">
+                        <TabsTrigger value="secured" className="px-4 py-1.5 text-sm font-medium">Secured ({securedSponsors.length})</TabsTrigger>
+                        <TabsTrigger value="potential" className="px-4 py-1.5 text-sm font-medium">In Negotiation ({potentialSponsors.length})</TabsTrigger>
+                    </TabsList>
 
-                    {sponsors.map((sponsor) => {
-                        const status = getStatus(sponsor.endDate);
-                        return (
-                            <Card key={sponsor.id} className="hover:shadow-md transition-shadow">
-                                <CardHeader className="flex flex-row items-start justify-between pb-2">
-                                    <div>
-                                        <Badge variant="outline" className={`mb-2 
-                                        ${status === 'Active' ? 'bg-green-50 text-green-700 border-green-200' : ''}
-                                        ${status === 'Expired' ? 'bg-slate-100 text-slate-500 border-slate-200' : ''}
-                                        ${status === 'Expiring Soon' ? 'bg-amber-50 text-amber-700 border-amber-200' : ''}
-                                    `}>
-                                            {status}
-                                        </Badge>
-                                        <CardTitle className="text-xl">{sponsor.name}</CardTitle>
-                                        {sponsor.website && (
-                                            <a href={sponsor.website} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 hover:underline flex items-center gap-1 mt-1">
-                                                Visit Website <ExternalLink className="h-3 w-3" />
-                                            </a>
-                                        )}
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-lg font-bold text-slate-900">£{sponsor.amount.toLocaleString()}</div>
-                                        <div className="text-xs text-slate-500">{sponsor.frequency}</div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {(sponsor.startDate || sponsor.endDate) && (
-                                        <div className="flex items-center gap-2 text-xs text-slate-600 bg-slate-50 p-2 rounded">
-                                            <Calendar className="h-3 w-3 text-slate-400" />
-                                            <span>
-                                                {sponsor.startDate ? new Date(sponsor.startDate).toLocaleDateString() : 'Start'}
-                                                {' → '}
-                                                {sponsor.endDate ? new Date(sponsor.endDate).toLocaleDateString() : 'Ongoing'}
-                                            </span>
-                                        </div>
-                                    )}
-
-                                    {sponsor.description && (
-                                        <p className="text-sm text-slate-600 line-clamp-2" title={sponsor.description}>
-                                            {sponsor.description}
-                                        </p>
-                                    )}
-
-                                    {sponsor.responsibilities && (
-                                        <div className="border-t pt-3 mt-3">
-                                            <h4 className="text-xs font-semibold text-slate-500 uppercase mb-2">Deliverables</h4>
-                                            <ul className="text-sm space-y-1">
-                                                {sponsor.responsibilities.split('\n').map((item, i) => (
-                                                    <li key={i} className="flex items-start gap-2">
-                                                        <CheckCircle2 className="h-3.5 w-3.5 text-indigo-500 mt-0.5 shrink-0" />
-                                                        <span className="text-slate-700">{item}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    )}
-
-                                    <div className="flex justify-end gap-2 pt-2 border-t mt-2">
-                                        <Button variant="ghost" size="sm" onClick={() => openEdit(sponsor)}>
-                                            <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
-                                        </Button>
-                                        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50" onClick={() => handleDelete(sponsor.id)}>
-                                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
-                                        </Button>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
-                </div>
+                    <TabsContent value="secured" className="mt-0">
+                        {renderSponsorsGrid(securedSponsors, 'secured')}
+                    </TabsContent>
+                    <TabsContent value="potential" className="mt-0">
+                        {renderSponsorsGrid(potentialSponsors, 'potential')}
+                    </TabsContent>
+                </Tabs>
 
                 <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
                     <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
@@ -242,6 +296,20 @@ export default function SponsorsPage() {
                                     />
                                 </div>
                                 <div className="space-y-2">
+                                    <label className="text-sm font-medium">Status</label>
+                                    <select
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
+                                        value={formData.status || 'Secured'}
+                                        onChange={e => setFormData({ ...formData, status: e.target.value as any })}
+                                    >
+                                        <option value="Secured">Secured Partner</option>
+                                        <option value="Potential">Potential Sponsor (In Negotiation)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
                                     <label className="text-sm font-medium">Website</label>
                                     <Input
                                         placeholder="https://"
@@ -249,9 +317,6 @@ export default function SponsorsPage() {
                                         onChange={e => setFormData({ ...formData, website: e.target.value })}
                                     />
                                 </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Agreement Value (£)</label>
                                     <Input
@@ -261,6 +326,9 @@ export default function SponsorsPage() {
                                         onChange={e => setFormData({ ...formData, amount: parseFloat(e.target.value) })}
                                     />
                                 </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">Payment Frequency</label>
                                     <select
@@ -272,6 +340,9 @@ export default function SponsorsPage() {
                                         <option value="Monthly">Monthly</option>
                                         <option value="Yearly">Yearly</option>
                                     </select>
+                                </div>
+                                <div className="space-y-2">
+                                    {/* Empty Column */}
                                 </div>
                             </div>
 

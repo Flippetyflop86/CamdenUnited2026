@@ -97,7 +97,7 @@ export default function FinancePage() {
 
     const fetchSponsors = async () => {
         const { data } = await supabase.from('sponsors').select('*');
-        if (data) setSponsors(data);
+        if (data) setSponsors(data.map((s: any) => ({ ...s, status: s.status || 'Secured' })));
     };
 
     const fetchSubs = async () => {
@@ -158,7 +158,8 @@ export default function FinancePage() {
             name: newSponsor.name,
             amount: newSponsor.amount,
             frequency: newSponsor.frequency,
-            description: newSponsor.description
+            description: newSponsor.description,
+            status: newSponsor.status || 'Secured'
         };
 
         if (editingId) {
@@ -325,8 +326,10 @@ export default function FinancePage() {
 
         // Sponsors (amortized)
         sponsors.forEach(s => {
-            if (s.frequency === 'Monthly') monthlyIncome += s.amount;
-            if (s.frequency === 'Yearly') monthlyIncome += (s.amount / 12);
+            if (s.status !== 'Potential') {
+                if (s.frequency === 'Monthly') monthlyIncome += s.amount;
+                if (s.frequency === 'Yearly') monthlyIncome += (s.amount / 12);
+            }
         });
 
         // Subs
@@ -623,7 +626,7 @@ export default function FinancePage() {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-2">
-                                        {sponsors.map(s => (
+                                        {sponsors.filter(s => s.status !== 'Potential').map(s => (
                                             <div key={s.id} className="group flex justify-between items-center text-sm p-2 hover:bg-slate-50 rounded">
                                                 <div>
                                                     <p className="font-medium">{s.name}</p>
