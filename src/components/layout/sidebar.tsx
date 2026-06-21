@@ -173,7 +173,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                                 >
                                                     <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
                                                     <span className="truncate flex-1">{item.label}</span>
-                                                    {('isLocked' in item) && item.isLocked && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
+                                                    {(item as any).isLocked && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
                                                 </Link>
                                             </li>
                                         );

@@ -444,7 +444,7 @@ export default function InventoryPage() {
                                 <div className="space-y-1.5">
                                     <label className="text-sm font-medium">Category</label>
                                     <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                        value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value })}>
+                                        value={newItem.category} onChange={e => setNewItem({ ...newItem, category: e.target.value as InventoryItem["category"] })}>
                                         {["Kit", "Equipment", "Medical", "Technology", "Other"].map(c => <option key={c}>{c}</option>)}
                                     </select>
                                 </div>
@@ -453,7 +453,7 @@ export default function InventoryPage() {
                             <div className="space-y-1.5">
                                 <label className="text-sm font-medium">Status</label>
                                 <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                                    value={newItem.status} onChange={e => setNewItem({ ...newItem, status: e.target.value })}>
+                                    value={newItem.status} onChange={e => setNewItem({ ...newItem, status: e.target.value as InventoryItem["status"] })}>
                                     {["Good", "In Use", "Damaged", "Lost"].map(s => <option key={s}>{s}</option>)}
                                 </select>
                             </div>
