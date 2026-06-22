@@ -190,6 +190,8 @@ export interface Transaction {
     category: 'Match Fee' | 'Sponsorship' | 'Market Road Pitch Hire' | 'MCFL Pitch Hire' | 'Officials' | 'Yellow Card Fine' | 'Red Card Fine' | 'Misconduct Fine' | 'Admin Fine' | 'Kit' | 'Public Liability Insurance' | 'Food' | 'Training Pitch Fees' | 'Loans' | 'Government Grants' | 'College Programme' | 'Other';
     isRecurring: boolean;
     frequency?: 'Weekly' | 'Monthly' | 'Yearly';
+    receiptUrl?: string;
+    receiptName?: string;
 }
 
 export interface ClubDocument {
