@@ -714,7 +714,9 @@ export default function MatchdayXIPage() {
                                         <img src={settings.logo} alt="Watermark" className="w-48 h-48 object-contain grayscale brightness-125" />
                                     </div>
                                 )}
-                                           {/* Player positions */}
+                            </div>
+
+                            {/* Player positions */}
                             {formation.map((pos, idx) => {
                                 const rawPlayerId = lineup.starters[idx];
                                 const player = rawPlayerId ? players.find(p => p.id === rawPlayerId) : null;
