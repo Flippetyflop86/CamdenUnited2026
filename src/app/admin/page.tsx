@@ -68,6 +68,35 @@ export default function AdminPage() {
     const [isMigrating, setIsMigrating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
+    const EMOJIS = ["⚽", "🏆", "📅", "⏰", "📍", "🌱", "👕", "💺", "👍", "👎", "⏳", "🔴", "🔥", "💪", "🙌"];
+    const MATCH_PLACEHOLDERS = ["opponent", "venue", "competition", "date", "time", "meet_time", "meet_location", "surface", "notes", "formation", "starting_xi", "bench"];
+    const TRAINING_PLACEHOLDERS = ["date", "time", "location", "topic"];
+
+    const insertAtCursor = (
+        value: string, 
+        setValue: (v: string) => void, 
+        textToInsert: string,
+        textareaId: string
+    ) => {
+        const textarea = document.getElementById(textareaId) as HTMLTextAreaElement;
+        if (!textarea) {
+            setValue(value + textToInsert);
+            return;
+        }
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const before = value.substring(0, start);
+        const after = value.substring(end, value.length);
+
+        setValue(before + textToInsert + after);
+
+        setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(start + textToInsert.length, start + textToInsert.length);
+        }, 0);
+    };
+
     const { user, role: userRole, isManager, pagePermissions, refreshPermissions } = useAuth();
     const [managerName, setManagerName] = useState("");
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -551,26 +580,97 @@ export default function AdminPage() {
                                     </div>
                                     <div className="space-y-2 col-span-2 border-t border-slate-100 pt-4">
                                         <h5 className="font-semibold text-slate-700 text-xs uppercase tracking-wider mb-2">WhatsApp Templates</h5>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-semibold">Matchday Poll Template</Label>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="space-y-2 bg-slate-50/50 p-3 rounded-lg border border-slate-100">
+                                                <div className="flex justify-between items-center">
+                                                    <Label className="text-xs font-bold text-slate-700">Matchday Poll Template</Label>
+                                                </div>
+                                                
+                                                {/* Emojis selection */}
+                                                <div className="flex flex-wrap gap-1 bg-white p-1.5 rounded border border-slate-100 shadow-sm">
+                                                    {EMOJIS.map(emoji => (
+                                                        <button
+                                                            key={emoji}
+                                                            type="button"
+                                                            onClick={() => insertAtCursor(matchPollTemplate, setMatchPollTemplate, emoji, "match-poll-textarea")}
+                                                            className="text-sm px-1.5 py-0.5 hover:bg-slate-100 rounded transition-colors active:scale-95"
+                                                            title={`Insert ${emoji}`}
+                                                        >
+                                                            {emoji}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
                                                 <Textarea 
+                                                    id="match-poll-textarea"
                                                     value={matchPollTemplate} 
                                                     onChange={e => setMatchPollTemplate(e.target.value)} 
                                                     placeholder="e.g. ⚽ *MATCHDAY SQUAD* ⚽..." 
-                                                    className="text-xs min-h-[160px] font-sans" 
+                                                    className="text-xs min-h-[200px] font-mono bg-white border-slate-200" 
                                                 />
-                                                <p className="text-[10px] text-slate-400">Available: {`{opponent}, {venue}, {competition}, {date}, {time}, {formation}, {starting_xi}, {bench}`}</p>
+
+                                                {/* Placeholders helper */}
+                                                <div className="space-y-1">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Click placeholders to insert:</span>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {MATCH_PLACEHOLDERS.map(p => (
+                                                            <button
+                                                                key={p}
+                                                                type="button"
+                                                                onClick={() => insertAtCursor(matchPollTemplate, setMatchPollTemplate, `{${p}}`, "match-poll-textarea")}
+                                                                className="text-[9px] font-mono px-1.5 py-0.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-100/50 rounded transition-colors"
+                                                            >
+                                                                {`{${p}}`}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-semibold">Training Poll Template</Label>
+
+                                            <div className="space-y-2 bg-slate-50/50 p-3 rounded-lg border border-slate-100">
+                                                <div className="flex justify-between items-center">
+                                                    <Label className="text-xs font-bold text-slate-700">Training Poll Template</Label>
+                                                </div>
+
+                                                {/* Emojis selection */}
+                                                <div className="flex flex-wrap gap-1 bg-white p-1.5 rounded border border-slate-100 shadow-sm">
+                                                    {EMOJIS.map(emoji => (
+                                                        <button
+                                                            key={emoji}
+                                                            type="button"
+                                                            onClick={() => insertAtCursor(trainingPollTemplate, setTrainingPollTemplate, emoji, "training-poll-textarea")}
+                                                            className="text-sm px-1.5 py-0.5 hover:bg-slate-100 rounded transition-colors active:scale-95"
+                                                            title={`Insert ${emoji}`}
+                                                        >
+                                                            {emoji}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
                                                 <Textarea 
+                                                    id="training-poll-textarea"
                                                     value={trainingPollTemplate} 
                                                     onChange={e => setTrainingPollTemplate(e.target.value)} 
                                                     placeholder="e.g. ⚽ *TRAINING AVAILABILITY* ⚽..." 
-                                                    className="text-xs min-h-[160px] font-sans" 
+                                                    className="text-xs min-h-[200px] font-mono bg-white border-slate-200" 
                                                 />
-                                                <p className="text-[10px] text-slate-400">Available: {`{date}, {time}, {location}, {topic}`}</p>
+
+                                                {/* Placeholders helper */}
+                                                <div className="space-y-1">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Click placeholders to insert:</span>
+                                                    <div className="flex flex-wrap gap-1">
+                                                        {TRAINING_PLACEHOLDERS.map(p => (
+                                                            <button
+                                                                key={p}
+                                                                type="button"
+                                                                onClick={() => insertAtCursor(trainingPollTemplate, setTrainingPollTemplate, `{${p}}`, "training-poll-textarea")}
+                                                                className="text-[9px] font-mono px-1.5 py-0.5 bg-red-50 text-red-700 hover:bg-red-100 border border-red-100/50 rounded transition-colors"
+                                                            >
+                                                                {`{${p}}`}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
