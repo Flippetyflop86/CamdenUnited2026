@@ -77,7 +77,7 @@ DECLARE
     invited_club_id uuid;
     invited_role text;
     invited_display_name text;
-    invited_page_permissions jsonb;
+    invited_page_permissions text[];
     new_club_id uuid;
     club_name_val text;
 BEGIN
@@ -97,7 +97,7 @@ BEGIN
             LOWER(invited_role), -- Keep lowercase for app consistency
             new.email,
             COALESCE(new.raw_user_meta_data->>'full_name', invited_display_name, SPLIT_PART(new.email, '@', 1)), 
-            COALESCE(invited_page_permissions, '[]'::jsonb)
+            COALESCE(invited_page_permissions, '{}'::text[])
         );
 
         -- Clean up invitation
@@ -118,7 +118,7 @@ BEGIN
             'manager', -- Normalized to lowercase 'manager'
             new.email,
             COALESCE(new.raw_user_meta_data->>'full_name', SPLIT_PART(new.email, '@', 1)),
-            '[]'::jsonb
+            '{}'::text[]
         );
     END IF;
 
@@ -141,7 +141,7 @@ RETURNS TABLE (
     email text,
     role text,
     display_name text,
-    page_permissions jsonb,
+    page_permissions text[],
     club_name text,
     club_logo text
 ) AS $$

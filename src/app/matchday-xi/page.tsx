@@ -498,7 +498,7 @@ export default function MatchdayXIPage() {
     const handleCopyToWhatsApp = () => {
         if (!lineup) return;
         
-        let msgTemplate = `⚽ *MATCHDAY SQUAD* ⚽\n`;
+        let msgTemplate = `⚽ *MATCHDAY DETAILS* ⚽\n\n`;
         if (nextMatch) {
             msgTemplate += `*${nextMatch.isHome ? '🏠 Home' : '🚌 Away'} vs {opponent}*\n`;
             msgTemplate += `🏆 {competition}\n`;
@@ -507,55 +507,20 @@ export default function MatchdayXIPage() {
         } else {
             msgTemplate += `*Upcoming Match TBD*\n\n`;
         }
-        msgTemplate += `📋 *Formation:* {formation}\n\n`;
-        msgTemplate += `👕 *Starting XI:*\n{starting_xi}\n`;
-        msgTemplate += `\n💺 *Bench:*\n{bench}\n`;
-        msgTemplate += `\n🔴 Please confirm if you are driving directly or need a lift! Let's go boys!`;
+        msgTemplate += `🔴 Please confirm if you are driving directly or need a lift! Let's go boys!`;
 
-        try {
-            if (settings.whatsappPollMessage) {
-                const parsed = JSON.parse(settings.whatsappPollMessage);
-                if (parsed.match) msgTemplate = parsed.match;
-            }
-        } catch (e) {
-            if (settings.whatsappPollMessage) msgTemplate = settings.whatsappPollMessage;
-        }
-
-        const formationMap = FORMATIONS[lineup.formation];
-        let startingXiStr = "";
-        formationMap.forEach((pos, idx) => {
-            const playerId = lineup.starters[idx];
-            const player = playerId ? players.find(p => p.id === playerId) : null;
-            const name = player ? `${player.firstName} ${player.lastName}` : "TBD";
-            startingXiStr += `${pos.label}: ${name}\n`;
-        });
-        startingXiStr = startingXiStr.trim();
-
-        let benchStr = "";
-        const actualSubs = lineup.substitutes.filter(Boolean);
-        if (actualSubs.length > 0) {
-            actualSubs.forEach((subId, idx) => {
-                const player = players.find(p => p.id === subId);
-                const name = player ? `${player.firstName} ${player.lastName}` : "TBD";
-                benchStr += `${idx + 1}. ${name}\n`;
-            });
-        } else {
-            benchStr = "None";
-        }
-        benchStr = benchStr.trim();
+        const dateFormatted = nextMatch 
+            ? new Date(nextMatch.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) 
+            : new Date().toLocaleDateString('en-GB');
 
         const formattedMsg = msgTemplate
             .replace(/{opponent}/g, nextMatch ? nextMatch.opponent : "TBD")
-            .replace(/{venue}/g, nextMatch ? (nextMatch.isHome ? "Home" : "Away") : "TBD")
             .replace(/{competition}/g, nextMatch ? (nextMatch.competition || "Match") : "Match")
-            .replace(/{date}/g, nextMatch ? new Date(nextMatch.date).toLocaleDateString() : new Date().toLocaleDateString())
-            .replace(/{time}/g, nextMatch ? nextMatch.time : "TBD")
-            .replace(/{formation}/g, lineup.formation)
-            .replace(/{starting_xi}/g, startingXiStr)
-            .replace(/{bench}/g, benchStr);
+            .replace(/{date}/g, dateFormatted)
+            .replace(/{time}/g, nextMatch ? nextMatch.time : "TBD");
 
         navigator.clipboard.writeText(formattedMsg).then(() => {
-            alert("Matchday squad copied to clipboard! Paste it into WhatsApp.");
+            alert("Matchday details copied to clipboard! Paste it into WhatsApp.");
         }).catch(err => {
             console.error('Failed to copy: ', err);
             alert("Failed to copy to clipboard.");
@@ -749,12 +714,11 @@ export default function MatchdayXIPage() {
                                         <img src={settings.logo} alt="Watermark" className="w-48 h-48 object-contain grayscale brightness-125" />
                                     </div>
                                 )}
-                            </div>
-
-                            {/* Player positions */}
+                                           {/* Player positions */}
                             {formation.map((pos, idx) => {
-                                const playerId = lineup.starters[idx];
-                                const player = playerId ? players.find(p => p.id === playerId) : null;
+                                const rawPlayerId = lineup.starters[idx];
+                                const player = rawPlayerId ? players.find(p => p.id === rawPlayerId) : null;
+                                const playerId = player ? rawPlayerId : null;
                                 const fullName = player ? `${player.firstName} ${player.lastName}` : "";
                                 let displayName = player ? player.firstName : "";
                                 if (fullName === "Mohamed Abdalla") displayName = "Suarez";
@@ -817,10 +781,10 @@ export default function MatchdayXIPage() {
                                         
                                         {/* Name Tag */}
                                         <div className={`
-                                            px-1.5 sm:px-2 py-0.5 rounded shadow-sm min-w-[60px] sm:min-w-[80px] text-center border relative
+                                            px-1 sm:px-2 py-0.5 rounded shadow-sm min-w-[52px] sm:min-w-[80px] text-center border relative
                                             ${playerId ? 'bg-slate-900 border-slate-700' : 'bg-white/90 border-dashed border-slate-400'}
                                         `}>
-                                            <span className={`text-[10px] sm:text-[12px] font-bold tracking-tight ${playerId ? 'text-white' : 'text-slate-500'}`}>
+                                            <span className={`text-[9px] sm:text-[12px] font-bold tracking-tight ${playerId ? 'text-white' : 'text-slate-500'}`}>
                                                 {playerId ? displayName : pos.label}
                                             </span>
                                             
@@ -836,7 +800,8 @@ export default function MatchdayXIPage() {
                                         </div>
                                     </div>
                                 </div>
-                            )})}
+                                );
+                            })}
                         </div>
                     </CardContent>
                 </Card>
@@ -850,8 +815,9 @@ export default function MatchdayXIPage() {
                         </button>
                     </div>
                     <div className="p-3 space-y-2 overflow-y-auto flex-1">
-                        {lineup.substitutes.map((subId, idx) => {
-                            const player = subId ? players.find(p => p.id === subId) : null;
+                        {lineup.substitutes.map((rawSubId, idx) => {
+                            const player = rawSubId ? players.find(p => p.id === rawSubId) : null;
+                            const subId = player ? rawSubId : "";
                             const fullName = player ? `${player.firstName} ${player.lastName}` : "";
                             let displayName = player ? player.firstName : "";
                             if (fullName === "Mohamed Abdalla") displayName = "Suarez";
