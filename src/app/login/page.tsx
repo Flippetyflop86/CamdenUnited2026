@@ -196,7 +196,7 @@ export default function LoginPage() {
                             In One Place.
                         </h1>
                         <p className="text-slate-400 text-sm leading-relaxed">
-                            Manage players, fixtures, availability, finances and staff from a single platform — built specifically for grassroots, amateur and semi-professional football clubs.
+                            Manage players, squad availability, matchday lineups, statistics, club finances, and equipment inventory from a single platform — built specifically for grassroots, amateur and semi-professional football clubs.
                         </p>
                     </div>
 
