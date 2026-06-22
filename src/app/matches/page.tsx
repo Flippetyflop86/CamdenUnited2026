@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram } from "lucide-react";
+import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,6 +16,8 @@ import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
 import { RefreshCw } from "lucide-react";
 import { MatchStatsDialog } from "@/components/matches/match-stats-dialog";
+import { FORMATIONS } from "@/lib/formations";
+import { calculateMeetTime, generateWhatsAppMessage } from "@/lib/whatsapp-utils";
 
 export default function MatchesPage() {
     const [matches, setMatches] = useState<Match[]>([]);
@@ -30,6 +32,15 @@ export default function MatchesPage() {
     const [opponentInstagram, setOpponentInstagram] = useState("");
     const [opponentBadgeUrl, setOpponentBadgeUrl] = useState("");
     const [isUploadingBadge, setIsUploadingBadge] = useState(false);
+
+    // WhatsApp Share Poll Generator State
+    const [activeShareMatch, setActiveShareMatch] = useState<Match | null>(null);
+    const [meetTime, setMeetTime] = useState("");
+    const [meetLocation, setMeetLocation] = useState("");
+    const [shareSurface, setShareSurface] = useState("4G");
+    const [customNotes, setCustomNotes] = useState("");
+    const [activeLineup, setActiveLineup] = useState<{ formation: string; startingXi: string; bench: string; } | null>(null);
+    const [sharePlayers, setSharePlayers] = useState<any[]>([]);
 
     const getCurrentSeasonStr = () => {
         const d = new Date();
@@ -261,6 +272,142 @@ export default function MatchesPage() {
         }
     };
 
+    const handleOpenShare = async (match: Match) => {
+        const computedMeetTime = calculateMeetTime(match.time, -60);
+        const computedMeetLocation = match.isHome ? (settings.homeGround || match.location || "") : (match.location || "");
+        
+        setActiveShareMatch(match);
+        setMeetTime(computedMeetTime);
+        setMeetLocation(computedMeetLocation);
+        setShareSurface(match.surface || "4G");
+        setCustomNotes("");
+        setActiveLineup(null);
+
+        // Fetch players if not loaded
+        let loadedPlayers = sharePlayers;
+        if (loadedPlayers.length === 0) {
+            const { data: pData } = await supabase.from("players").select("*");
+            if (pData) {
+                loadedPlayers = pData.map((p: any) => ({
+                    id: p.id,
+                    firstName: p.first_name,
+                    lastName: p.last_name,
+                    position: p.position
+                }));
+                setSharePlayers(loadedPlayers);
+            }
+        }
+
+        // Fetch latest lineup
+        const { data: lineupData } = await supabase
+            .from("matchday_xis")
+            .select("*")
+            .order("created_at", { ascending: false })
+            .limit(1);
+
+        let startingXiStr = "TBD";
+        let benchStr = "TBD";
+        let formationName = "4-2-3-1";
+
+        if (lineupData && lineupData.length > 0) {
+            const lineupObj = lineupData[0];
+            formationName = lineupObj.formation || "4-2-3-1";
+            
+            const startersObj = lineupObj.starters || {};
+            const substitutesArr = lineupObj.substitutes || [];
+
+            const formationPositions = FORMATIONS[formationName] || [];
+            
+            let parts: string[] = [];
+            formationPositions.forEach((pos, idx) => {
+                const playerId = startersObj[idx];
+                const player = playerId ? loadedPlayers.find(p => p.id === playerId) : null;
+                const name = player ? `${player.firstName} ${player.lastName}` : "TBD";
+                parts.push(`${pos.label}: ${name}`);
+            });
+            startingXiStr = parts.join("\n");
+
+            let benchParts: string[] = [];
+            const actualSubs = substitutesArr.filter(Boolean);
+            if (actualSubs.length > 0) {
+                actualSubs.forEach((subId: string, idx: number) => {
+                    const player = loadedPlayers.find(p => p.id === subId);
+                    const name = player ? `${player.firstName} ${player.lastName}` : "TBD";
+                    benchParts.push(`${idx + 1}. ${name}`);
+                });
+                benchStr = benchParts.join("\n");
+            } else {
+                benchStr = "None";
+            }
+        }
+
+        setActiveLineup({
+            formation: formationName,
+            startingXi: startingXiStr,
+            bench: benchStr
+        });
+    };
+
+    const getShareMessageText = () => {
+        if (!activeShareMatch) return "";
+
+        let msgTemplate = `⚽ *MATCHDAY SQUAD* ⚽
+*Venue:* {venue} vs {opponent}
+🏆 *Competition:* {competition}
+📅 *Date:* {date}
+⏰ *Kick-off:* {time}
+📍 *Meet:* {meet_time} @ {meet_location}
+🌱 *Pitch:* {surface}
+
+📋 *Formation:* {formation}
+
+👕 *Starting XI:*
+{starting_xi}
+
+💺 *Bench:*
+{bench}
+
+{notes}
+
+🔴 Let's go boys!`;
+
+        try {
+            if (settings.whatsappPollMessage) {
+                const parsed = JSON.parse(settings.whatsappPollMessage);
+                if (parsed.match) msgTemplate = parsed.match;
+            }
+        } catch (e) {
+            if (settings.whatsappPollMessage) msgTemplate = settings.whatsappPollMessage;
+        }
+
+        return generateWhatsAppMessage(msgTemplate, activeShareMatch, {
+            meetTime,
+            meetLocation,
+            surface: shareSurface,
+            notes: customNotes,
+            formation: activeLineup?.formation || "TBD",
+            startingXi: activeLineup?.startingXi || "TBD",
+            bench: activeLineup?.bench || "TBD"
+        });
+    };
+
+    const handleCopyShareText = () => {
+        const text = getShareMessageText();
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            alert("WhatsApp message copied to clipboard!");
+        }).catch(err => {
+            console.error("Failed to copy text:", err);
+            alert("Failed to copy to clipboard.");
+        });
+    };
+
+    const handleSendWhatsApp = () => {
+        const text = getShareMessageText();
+        if (!text) return;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+    };
+
     const handleSyncFixtures = async () => {
         if (!settings.leagueUrl) {
             alert("Please set your League URL in the Club Settings (Settings -> League Integration) first.");
@@ -490,6 +637,11 @@ export default function MatchesPage() {
                         </span>
                     </div>
                     <div className="flex items-center gap-1">
+                        {!isPast && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" onClick={() => handleOpenShare(match)}>
+                                <MessageCircle className="h-4 w-4" />
+                            </Button>
+                        )}
                         {!isPast && <MatchStatsDialog matchId={match.id} matchDate={match.date} opponent={match.opponent} />}
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleEditMatch(match)}>
                             <Edit2 className="h-4 w-4" />
@@ -1012,6 +1164,104 @@ export default function MatchesPage() {
                     )}
                 </TabsContent>
             </Tabs>
+
+            {/* Share WhatsApp Poll Modal */}
+            <Dialog open={activeShareMatch !== null} onOpenChange={(open) => { if (!open) setActiveShareMatch(null); }}>
+                <DialogContent className="sm:max-w-[620px] max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-emerald-700">
+                            <MessageCircle className="h-5 w-5" /> Generate WhatsApp Poll
+                        </DialogTitle>
+                        <DialogDescription>
+                            Customize meet details, surface type, and custom notes for {activeShareMatch?.opponent ? `vs ${activeShareMatch.opponent}` : ""}.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {activeShareMatch && (
+                        <div className="grid gap-4 py-2 text-slate-800">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">Meet Time</Label>
+                                    <Input
+                                        type="time"
+                                        value={meetTime}
+                                        onChange={(e) => setMeetTime(e.target.value)}
+                                        className="text-sm border-slate-200"
+                                    />
+                                    <p className="text-[10px] text-slate-400">Prefilled to 60 mins before kick-off ({activeShareMatch.time})</p>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">Pitch Surface</Label>
+                                    <Select
+                                        value={shareSurface}
+                                        onValueChange={setShareSurface}
+                                    >
+                                        <SelectTrigger className="border-slate-200">
+                                            <SelectValue placeholder="Select Surface" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Grass">Grass</SelectItem>
+                                            <SelectItem value="4G">4G</SelectItem>
+                                            <SelectItem value="3G">3G</SelectItem>
+                                            <SelectItem value="Astro">Astro</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-semibold">Meet Location / Venue Address</Label>
+                                <Input
+                                    value={meetLocation}
+                                    onChange={(e) => setMeetLocation(e.target.value)}
+                                    placeholder="e.g. Market Road Pitches, N7 9PL"
+                                    className="text-sm border-slate-200"
+                                />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-semibold">Custom Notes / Kit Colors</Label>
+                                <Textarea
+                                    value={customNotes}
+                                    onChange={(e) => setCustomNotes(e.target.value)}
+                                    placeholder="e.g. Bring red kit, respect referee..."
+                                    className="text-xs min-h-[60px] border-slate-200"
+                                />
+                            </div>
+
+                            <div className="space-y-1.5 border-t border-slate-100 pt-3">
+                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Live Preview</Label>
+                                <div className="relative">
+                                    <Textarea
+                                        value={getShareMessageText()}
+                                        readOnly
+                                        className="text-xs min-h-[220px] font-mono bg-slate-50 border-slate-200 text-slate-600 focus-visible:ring-0 cursor-default"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter className="gap-2 sm:gap-0 border-t border-slate-100 pt-3">
+                        <Button variant="outline" onClick={() => setActiveShareMatch(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={handleCopyShareText}
+                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium"
+                        >
+                            <Copy className="h-4 w-4 mr-2" /> Copy Message
+                        </Button>
+                        <Button
+                            onClick={handleSendWhatsApp}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                        >
+                            <ExternalLink className="h-4 w-4 mr-2" /> Send to WhatsApp
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
