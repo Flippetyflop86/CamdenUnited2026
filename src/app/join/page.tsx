@@ -33,11 +33,9 @@ function JoinPageInner() {
             setIsLoadingInvite(false);
             return;
         }
-        // Look up the invite securely via direct SELECT query
+        // Look up the invite securely via RPC lookup (bypassing RLS safely)
         supabase
-            .from("club_invitations")
-            .select("*, clubs(name, logo)")
-            .eq("token", token)
+            .rpc("get_invitation_by_token", { token_val: token })
             .then(({ data, error }) => {
                 if (error || !data || data.length === 0) {
                     setInviteError("This invite link is invalid or has already been used.");
@@ -51,8 +49,8 @@ function JoinPageInner() {
                         display_name: inviteData.display_name,
                         page_permissions: inviteData.page_permissions,
                         clubs: {
-                            name: inviteData.clubs?.name,
-                            logo: inviteData.clubs?.logo
+                            name: inviteData.club_name,
+                            logo: inviteData.club_logo
                         }
                     });
                     setName(inviteData.display_name || "");

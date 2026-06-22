@@ -346,7 +346,16 @@ export default function AdminPage() {
 
         setIsMigrating(true);
         try {
-            const res = await fetch("/api/seed", { method: "POST" });
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token || "";
+
+            const res = await fetch("/api/seed", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                }
+            });
             const data = await res.json();
             if (res.ok) {
                 alert(`Migration Success!\nPlayers: ${data.results.players}\nMatches: ${data.results.matches}`);

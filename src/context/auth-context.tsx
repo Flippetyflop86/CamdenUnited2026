@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, setGlobalClubId } from "@/lib/supabase";
 import { Session, User } from "@supabase/supabase-js";
 import { useRouter, usePathname } from "next/navigation";
 
@@ -50,6 +50,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (data) {
                 setClubId(data.club_id);
+                setGlobalClubId(data.club_id);
                 setRole(data.role ? data.role.toLowerCase() : null);
                 setPagePermissions(data.page_permissions || []);
                 setDisplayName(data.display_name || null);
@@ -87,6 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 fetchClubMembership(session.user.id);
             } else {
                 setClubId(null);
+                setGlobalClubId(null);
                 setRole(null);
                 setPagePermissions([]);
                 setDisplayName(null);

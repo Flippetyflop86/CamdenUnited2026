@@ -38,7 +38,7 @@ export function FinanceGate({
 
     // Admin Reset State
     const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
-    const { user } = useAuth();
+    const { user, clubId } = useAuth();
 
     useEffect(() => {
         // Check session storage
@@ -68,7 +68,7 @@ export function FinanceGate({
     }, [isAdminPanelOpen, currentUser]);
 
     const fetchUsersList = async () => {
-        const { data } = await supabase.from('app_users').select('*');
+        const { data } = await supabase.from('app_users').select('*').eq('club_id', clubId);
         if (data) setUsersList(data);
     };
 
@@ -80,6 +80,7 @@ export function FinanceGate({
         const { data, error } = await supabase
             .from('app_users')
             .select('*')
+            .eq('club_id', clubId)
             .eq('username', username.toLowerCase())
             .eq('password', password)
             .single();
@@ -120,6 +121,7 @@ export function FinanceGate({
         const { error } = await supabase
             .from('app_users')
             .update({ password: newPassword })
+            .eq('club_id', clubId)
             .eq('username', currentUser.username);
 
         if (!error) {
@@ -139,7 +141,11 @@ export function FinanceGate({
     const handleAdminReset = async (targetUsername: string) => {
         // Reset to default or simple password
         const newPass = "password123";
-        const { error } = await supabase.from('app_users').update({ password: newPass }).eq('username', targetUsername);
+        const { error } = await supabase
+            .from('app_users')
+            .update({ password: newPass })
+            .eq('club_id', clubId)
+            .eq('username', targetUsername);
 
         if (!error) {
             alert(`Password for ${targetUsername} has been reset to: ${newPass}`);

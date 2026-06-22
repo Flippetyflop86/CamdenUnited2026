@@ -164,7 +164,7 @@ export default function LoginPage() {
 
                 {/* Top spacer / top-left wordmark (text only — logo image carries the brand) */}
                 <div className="flex items-center gap-2">
-                    <span className="text-sm font-extrabold tracking-widest text-white uppercase">Club<span className="text-red-500">Flow</span></span>
+                    <span className="text-sm font-extrabold tracking-widest text-red-500 uppercase">Club<span className="text-white">Flow</span></span>
                     <span className="h-1 w-1 rounded-full bg-red-500" />
                     <span className="text-xs text-slate-500 tracking-wide">Club Management Platform</span>
                 </div>
@@ -188,9 +188,12 @@ export default function LoginPage() {
 
                     {/* Supporting copy below the logo */}
                     <div className="space-y-3 max-w-md">
+                        <p className="text-red-500 text-xs font-bold tracking-widest uppercase">
+                            from stadium to spreadsheet
+                        </p>
                         <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-white leading-snug">
-                            Run Your Club.{" "}
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-400">In One Place.</span>
+                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-400">Run Your Club.</span>{" "}
+                            In One Place.
                         </h1>
                         <p className="text-slate-400 text-sm leading-relaxed">
                             Manage players, fixtures, availability, finances and staff from a single platform — built specifically for grassroots, amateur and semi-professional football clubs.
@@ -219,8 +222,11 @@ export default function LoginPage() {
             <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-12 relative z-10 bg-slate-950/20">
                 {/* Mobile Header Branding */}
                 <div className="flex flex-col items-center mb-8 text-center md:hidden">
-                    <Image src="/clubflow-logo.png" alt="ClubFlow" width={240} height={160} className="object-contain mb-3" />
-                    <h1 className="text-2xl font-bold tracking-tight text-white mt-2">
+                    <Image src="/clubflow-logo.png" alt="ClubFlow" width={240} height={160} className="object-contain mb-2" />
+                    <p className="text-red-500 text-[10px] font-bold tracking-widest uppercase mb-2">
+                        from stadium to spreadsheet
+                    </p>
+                    <h1 className="text-2xl font-bold tracking-tight text-white">
                         Welcome back.
                     </h1>
                     <p className="text-slate-400 text-sm mt-1">
