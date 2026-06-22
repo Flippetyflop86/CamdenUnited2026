@@ -6,11 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CalendarDays, MapPin, Users, Trash2, Pencil, BarChart3, List, Download, ClipboardList, MessageCircle } from "lucide-react";
+import { Plus, CalendarDays, MapPin, Users, Trash2, Pencil, BarChart3, List, Download, ClipboardList, MessageCircle, Copy, ExternalLink } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 // I'll stick to native date formatting for zero-dep speed unless complex.
 function formatDate(dateStr: string) {
@@ -60,6 +63,14 @@ export default function TrainingPage() {
     });
 
     const [squadFilter, setSquadFilter] = useState<string>("All");
+
+    // WhatsApp Generated Availability Poll State
+    const [activeShareSession, setActiveShareSession] = useState<TrainingSession | null>(null);
+    const [includeVenue, setIncludeVenue] = useState(true);
+    const [includeTopic, setIncludeTopic] = useState(true);
+    const [includeNotes, setIncludeNotes] = useState(true);
+    const [additionalNotes, setAdditionalNotes] = useState("");
+    const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
 
     useEffect(() => {
         if (settings.trainingLocation && !newSession.location && !editingSessionId) {
@@ -217,50 +228,103 @@ export default function TrainingPage() {
         new Date(a.date).getTime() - new Date(b.date).getTime()
     );
 
-    const handleCopyTrainingToWhatsApp = () => {
-        let msgTemplate = `⚽ *TRAINING AVAILABILITY* ⚽\n\n`;
-        msgTemplate += `📅 *Date:* {date}\n`;
-        msgTemplate += `⏰ *Time:* {time}\n`;
-        msgTemplate += `📍 *Venue:* {location}\n`;
-        msgTemplate += `📋 *Topic:* {topic}\n\n`;
-        msgTemplate += `Please react below or reply if you are available to attend this week's training session!\n\n`;
-        msgTemplate += `👍 = Available\n`;
-        msgTemplate += `👎 = Unavailable\n`;
-        msgTemplate += `⏳ = Late / Maybe\n\n`;
-        msgTemplate += `🔴 *Let's get the numbers in early!*`;
+    const formatTrainingDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const weekday = new Intl.DateTimeFormat("en-GB", { weekday: 'long' }).format(d);
+        const day = d.getDate();
+        const month = new Intl.DateTimeFormat("en-GB", { month: 'long' }).format(d);
+        const year = d.getFullYear();
+        return `${weekday} ${day} ${month} ${year}`;
+    };
 
-        try {
-            if (settings.whatsappPollMessage) {
-                const parsed = JSON.parse(settings.whatsappPollMessage);
-                if (parsed.training) msgTemplate = parsed.training;
-            }
-        } catch (e) {
-            // ignore parsing error, use default
+    const formatTime12h = (timeStr: string) => {
+        if (!timeStr || !timeStr.includes(':')) return { time: timeStr, emoji: "🕒" };
+        const [hStr, mStr] = timeStr.split(':');
+        let hours = parseInt(hStr, 10);
+        const minutes = parseInt(mStr, 10);
+        if (isNaN(hours) || isNaN(minutes)) return { time: timeStr, emoji: "🕒" };
+
+        const ampm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        const minutesStr = minutes < 10 ? '0' + minutes : minutes;
+        const formatted = `${hours}:${minutesStr} ${ampm}`;
+
+        let emoji = "🕒";
+        if (hours === 7) emoji = minutes >= 30 ? "🕢" : "🕖";
+        else if (hours === 8) emoji = minutes >= 30 ? "🕣" : "🕗";
+        else if (hours === 9) emoji = minutes >= 30 ? "🕤" : "🕘";
+        else if (hours === 10) emoji = minutes >= 30 ? "🕥" : "🕙";
+        else if (hours === 11) emoji = minutes >= 30 ? "🕦" : "🕚";
+        else if (hours === 12) emoji = minutes >= 30 ? "🕧" : "🕛";
+        else if (hours === 1) emoji = minutes >= 30 ? "🕜" : "🕐";
+        else if (hours === 2) emoji = minutes >= 30 ? "🕝" : "🕑";
+        else if (hours === 3) emoji = minutes >= 30 ? "🕞" : "🕒";
+        else if (hours === 4) emoji = minutes >= 30 ? "🕟" : "🕓";
+        else if (hours === 5) emoji = minutes >= 30 ? "🕠" : "🕔";
+        else if (hours === 6) emoji = minutes >= 30 ? "🕡" : "🕕";
+
+        return { time: formatted, emoji };
+    };
+
+    const handleOpenShare = (session: TrainingSession) => {
+        setActiveShareSession(session);
+        setIncludeVenue(true);
+        setIncludeTopic(true);
+        setIncludeNotes(true);
+        setAdditionalNotes("");
+        setCopyStatus("idle");
+    };
+
+    const getTrainingGeneratedPollText = () => {
+        if (!activeShareSession) return "";
+
+        let parts: string[] = [];
+        parts.push("⚽ TRAINING AVAILABILITY");
+
+        let details: string[] = [];
+        const dateFormatted = formatTrainingDate(activeShareSession.date);
+        details.push(`📅 ${dateFormatted}`);
+
+        const timeInfo = formatTime12h(activeShareSession.time);
+        details.push(`${timeInfo.emoji} ${timeInfo.time}`);
+
+        if (includeVenue && activeShareSession.location) {
+            details.push(`📍 ${activeShareSession.location}`);
         }
 
-        const nextSession = upcomingSessions.find(s => new Date(s.date) >= new Date(new Date().setHours(0,0,0,0)));
-
-        let formattedMsg = msgTemplate;
-        if (nextSession) {
-            formattedMsg = formattedMsg
-                .replace(/{date}/g, formatDate(nextSession.date))
-                .replace(/{time}/g, nextSession.time)
-                .replace(/{location}/g, nextSession.location)
-                .replace(/{topic}/g, nextSession.topic || "General Session");
-        } else {
-            formattedMsg = formattedMsg
-                .replace(/{date}/g, "TBD")
-                .replace(/{time}/g, "TBD")
-                .replace(/{location}/g, "TBD")
-                .replace(/{topic}/g, "TBD");
+        if (includeTopic && activeShareSession.topic) {
+            details.push(`📋 Topic: ${activeShareSession.topic}`);
         }
 
-        navigator.clipboard.writeText(formattedMsg).then(() => {
-            alert("Training availability message copied to clipboard! Paste it into WhatsApp.");
+        parts.push(details.join("\n"));
+
+        if (includeNotes && additionalNotes.trim()) {
+            parts.push(additionalNotes.trim());
+        }
+
+        parts.push("Please confirm your availability:\n\n✅ Available\n❌ Unavailable");
+
+        return parts.join("\n\n");
+    };
+
+    const handleCopyTrainingShareText = () => {
+        const text = getTrainingGeneratedPollText();
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            setCopyStatus("copied");
+            setTimeout(() => setCopyStatus("idle"), 2000);
         }).catch(err => {
-            console.error('Failed to copy: ', err);
+            console.error("Failed to copy text:", err);
             alert("Failed to copy to clipboard.");
         });
+    };
+
+    const handleSendTrainingWhatsApp = () => {
+        const text = getTrainingGeneratedPollText();
+        if (!text) return;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
     };
 
     // Calculate Season Stats
@@ -370,7 +434,14 @@ export default function TrainingPage() {
                     </div>
                     {activeTab === 'sessions' && (
                         <div className="flex gap-2">
-                            <Button className="bg-emerald-600 hover:bg-emerald-700 hidden sm:flex" onClick={handleCopyTrainingToWhatsApp}>
+                            <Button className="bg-emerald-600 hover:bg-emerald-700 hidden sm:flex" onClick={() => {
+                                const nextSession = upcomingSessions.find(s => new Date(s.date) >= new Date(new Date().setHours(0,0,0,0)));
+                                if (nextSession) {
+                                    handleOpenShare(nextSession);
+                                } else {
+                                    alert("No upcoming training sessions found.");
+                                }
+                            }}>
                                 <MessageCircle className="h-4 w-4 mr-2" /> WhatsApp Poll
                             </Button>
                             <Button className="bg-red-600 hover:bg-red-700" onClick={handleOpenNew}>
@@ -386,6 +457,9 @@ export default function TrainingPage() {
                     {upcomingSessions.map((session) => (
                         <Card key={session.id} className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-red-600 group relative">
                             <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" onClick={(e) => { e.stopPropagation(); handleOpenShare(session); }}>
+                                    <MessageCircle className="h-4 w-4" />
+                                </Button>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={(e) => { e.stopPropagation(); handleEdit(session); }}>
                                     <Pencil className="h-4 w-4" />
                                 </Button>
@@ -570,6 +644,105 @@ export default function TrainingPage() {
                     </div>
                 </div>
             )}
+            {/* Share WhatsApp Poll Modal */}
+            <Dialog open={activeShareSession !== null} onOpenChange={(open) => { if (!open) setActiveShareSession(null); }}>
+                <DialogContent className="sm:max-w-[620px] max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-emerald-700">
+                            <MessageCircle className="h-5 w-5" /> Generate Training Availability Poll
+                        </DialogTitle>
+                        <DialogDescription>
+                            Configure the details to generate an availability message for training.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {activeShareSession && (
+                        <div className="grid gap-4 py-2 text-slate-800">
+                            {/* Toggle switches/checkboxes */}
+                            <div className="space-y-2 border-b border-slate-100 pb-3">
+                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Include Details:</Label>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                        <input
+                                            type="checkbox"
+                                            checked={includeVenue}
+                                            onChange={(e) => setIncludeVenue(e.target.checked)}
+                                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <span>Venue</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                        <input
+                                            type="checkbox"
+                                            checked={includeTopic}
+                                            onChange={(e) => setIncludeTopic(e.target.checked)}
+                                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <span>Topic</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                        <input
+                                            type="checkbox"
+                                            checked={includeNotes}
+                                            onChange={(e) => setIncludeNotes(e.target.checked)}
+                                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <span>Notes</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            {/* Additional Notes Textarea */}
+                            {includeNotes && (
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">Additional Notes (Optional)</Label>
+                                    <Textarea
+                                        value={additionalNotes}
+                                        onChange={(e) => setAdditionalNotes(e.target.value)}
+                                        placeholder="e.g. ⚠ Bring running trainers."
+                                        className="text-xs min-h-[60px] border-slate-200"
+                                    />
+                                </div>
+                            )}
+
+                            {/* Live Preview block */}
+                            <div className="space-y-1.5 border-t border-slate-100 pt-3">
+                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Live Preview</Label>
+                                <div className="relative">
+                                    <Textarea
+                                        value={getTrainingGeneratedPollText()}
+                                        readOnly
+                                        className="text-xs min-h-[200px] font-mono bg-slate-50 border-slate-200 text-slate-600 focus-visible:ring-0 cursor-default"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter className="gap-2 sm:gap-0 border-t border-slate-100 pt-3">
+                        <Button variant="outline" onClick={() => setActiveShareSession(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            variant={copyStatus === "copied" ? "default" : "secondary"}
+                            onClick={handleCopyTrainingShareText}
+                            className={`font-semibold min-w-[160px] transition-all ${
+                                copyStatus === "copied" 
+                                    ? "bg-green-600 hover:bg-green-600 text-white" 
+                                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                            }`}
+                        >
+                            {copyStatus === "copied" ? "✓ Copied Successfully" : "Copy to Clipboard"}
+                        </Button>
+                        <Button
+                            onClick={handleSendTrainingWhatsApp}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                        >
+                            <ExternalLink className="h-4 w-4 mr-2" /> Send to WhatsApp
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -33,14 +33,17 @@ export default function MatchesPage() {
     const [opponentBadgeUrl, setOpponentBadgeUrl] = useState("");
     const [isUploadingBadge, setIsUploadingBadge] = useState(false);
 
-    // WhatsApp Share Poll Generator State
+    // WhatsApp Generated Availability Poll State
     const [activeShareMatch, setActiveShareMatch] = useState<Match | null>(null);
+    const [includeOpponent, setIncludeOpponent] = useState(true);
+    const [includeCompetition, setIncludeCompetition] = useState(true);
+    const [includeVenue, setIncludeVenue] = useState(true);
+    const [includeKickoff, setIncludeKickoff] = useState(true);
+    const [includeMeetTime, setIncludeMeetTime] = useState(true);
     const [meetTime, setMeetTime] = useState("");
     const [meetLocation, setMeetLocation] = useState("");
-    const [shareSurface, setShareSurface] = useState("4G");
-    const [customNotes, setCustomNotes] = useState("");
-    const [activeLineup, setActiveLineup] = useState<{ formation: string; startingXi: string; bench: string; } | null>(null);
-    const [sharePlayers, setSharePlayers] = useState<any[]>([]);
+    const [additionalNotes, setAdditionalNotes] = useState("");
+    const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
 
     const getCurrentSeasonStr = () => {
         const d = new Date();
@@ -272,130 +275,83 @@ export default function MatchesPage() {
         }
     };
 
-    const handleOpenShare = async (match: Match) => {
+    const formatMatchdayDate = (dateStr: string) => {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return dateStr;
+        const weekday = new Intl.DateTimeFormat("en-GB", { weekday: 'long' }).format(d);
+        const day = d.getDate();
+        const month = new Intl.DateTimeFormat("en-GB", { month: 'long' }).format(d);
+        return `${weekday} ${day} ${month}`;
+    };
+
+    const handleOpenShare = (match: Match) => {
         const computedMeetTime = calculateMeetTime(match.time, -60);
         const computedMeetLocation = match.isHome ? (settings.homeGround || match.location || "") : (match.location || "");
         
         setActiveShareMatch(match);
         setMeetTime(computedMeetTime);
         setMeetLocation(computedMeetLocation);
-        setShareSurface(match.surface || "4G");
-        setCustomNotes("");
-        setActiveLineup(null);
-
-        // Fetch players if not loaded
-        let loadedPlayers = sharePlayers;
-        if (loadedPlayers.length === 0) {
-            const { data: pData } = await supabase.from("players").select("*");
-            if (pData) {
-                loadedPlayers = pData.map((p: any) => ({
-                    id: p.id,
-                    firstName: p.first_name,
-                    lastName: p.last_name,
-                    position: p.position
-                }));
-                setSharePlayers(loadedPlayers);
-            }
-        }
-
-        // Fetch latest lineup
-        const { data: lineupData } = await supabase
-            .from("matchday_xis")
-            .select("*")
-            .order("created_at", { ascending: false })
-            .limit(1);
-
-        let startingXiStr = "TBD";
-        let benchStr = "TBD";
-        let formationName = "4-2-3-1";
-
-        if (lineupData && lineupData.length > 0) {
-            const lineupObj = lineupData[0];
-            formationName = lineupObj.formation || "4-2-3-1";
-            
-            const startersObj = lineupObj.starters || {};
-            const substitutesArr = lineupObj.substitutes || [];
-
-            const formationPositions = FORMATIONS[formationName] || [];
-            
-            let parts: string[] = [];
-            formationPositions.forEach((pos, idx) => {
-                const playerId = startersObj[idx];
-                const player = playerId ? loadedPlayers.find(p => p.id === playerId) : null;
-                const name = player ? `${player.firstName} ${player.lastName}` : "TBD";
-                parts.push(`${pos.label}: ${name}`);
-            });
-            startingXiStr = parts.join("\n");
-
-            let benchParts: string[] = [];
-            const actualSubs = substitutesArr.filter(Boolean);
-            if (actualSubs.length > 0) {
-                actualSubs.forEach((subId: string, idx: number) => {
-                    const player = loadedPlayers.find(p => p.id === subId);
-                    const name = player ? `${player.firstName} ${player.lastName}` : "TBD";
-                    benchParts.push(`${idx + 1}. ${name}`);
-                });
-                benchStr = benchParts.join("\n");
-            } else {
-                benchStr = "None";
-            }
-        }
-
-        setActiveLineup({
-            formation: formationName,
-            startingXi: startingXiStr,
-            bench: benchStr
-        });
+        setAdditionalNotes("");
+        setCopyStatus("idle");
+        
+        setIncludeOpponent(true);
+        setIncludeCompetition(true);
+        setIncludeVenue(true);
+        setIncludeKickoff(true);
+        setIncludeMeetTime(true);
     };
 
-    const getShareMessageText = () => {
+    const getGeneratedPollText = () => {
         if (!activeShareMatch) return "";
 
-        let msgTemplate = `⚽ *MATCHDAY SQUAD* ⚽
-*Venue:* {venue} vs {opponent}
-🏆 *Competition:* {competition}
-📅 *Date:* {date}
-⏰ *Kick-off:* {time}
-📍 *Meet:* {meet_time} @ {meet_location}
-🌱 *Pitch:* {surface}
+        let parts: string[] = [];
+        parts.push("⚽ MATCH AVAILABILITY");
 
-📋 *Formation:* {formation}
-
-👕 *Starting XI:*
-{starting_xi}
-
-💺 *Bench:*
-{bench}
-
-{notes}
-
-🔴 Let's go boys!`;
-
-        try {
-            if (settings.whatsappPollMessage) {
-                const parsed = JSON.parse(settings.whatsappPollMessage);
-                if (parsed.match) msgTemplate = parsed.match;
-            }
-        } catch (e) {
-            if (settings.whatsappPollMessage) msgTemplate = settings.whatsappPollMessage;
+        if (includeOpponent) {
+            const homeTeam = activeShareMatch.isHome ? "Camden United" : activeShareMatch.opponent;
+            const awayTeam = activeShareMatch.isHome ? activeShareMatch.opponent : "Camden United";
+            parts.push(`🏆 ${homeTeam} vs ${awayTeam}`);
         }
 
-        return generateWhatsAppMessage(msgTemplate, activeShareMatch, {
-            meetTime,
-            meetLocation,
-            surface: shareSurface,
-            notes: customNotes,
-            formation: activeLineup?.formation || "TBD",
-            startingXi: activeLineup?.startingXi || "TBD",
-            bench: activeLineup?.bench || "TBD"
-        });
+        let details: string[] = [];
+        const dateFormatted = formatMatchdayDate(activeShareMatch.date);
+        details.push(`📅 ${dateFormatted}`);
+
+        if (includeKickoff) {
+            details.push(`🕒 Kick Off: ${activeShareMatch.time}`);
+        }
+
+        if (includeMeetTime && meetTime) {
+            const locStr = meetLocation ? ` @ ${meetLocation}` : "";
+            details.push(`⏰ Meet: ${meetTime}${locStr}`);
+        }
+
+        if (includeVenue && activeShareMatch.location) {
+            const venueType = activeShareMatch.isHome ? "Home" : "Away";
+            details.push(`📍 Venue (${venueType}): ${activeShareMatch.location}`);
+        }
+
+        if (includeCompetition && activeShareMatch.competition) {
+            details.push(`🏆 Competition: ${activeShareMatch.competition}`);
+        }
+
+        parts.push(details.join("\n"));
+
+        if (additionalNotes.trim()) {
+            parts.push(additionalNotes.trim());
+        }
+
+        parts.push("Please confirm:\n\n✅ Available\n❌ Unavailable");
+
+        return parts.join("\n\n");
     };
 
     const handleCopyShareText = () => {
-        const text = getShareMessageText();
+        const text = getGeneratedPollText();
         if (!text) return;
         navigator.clipboard.writeText(text).then(() => {
-            alert("WhatsApp message copied to clipboard!");
+            setCopyStatus("copied");
+            setTimeout(() => setCopyStatus("idle"), 2000);
         }).catch(err => {
             console.error("Failed to copy text:", err);
             alert("Failed to copy to clipboard.");
@@ -403,7 +359,7 @@ export default function MatchesPage() {
     };
 
     const handleSendWhatsApp = () => {
-        const text = getShareMessageText();
+        const text = getGeneratedPollText();
         if (!text) return;
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
     };
@@ -1166,76 +1122,116 @@ export default function MatchesPage() {
             </Tabs>
 
             {/* Share WhatsApp Poll Modal */}
+            {/* Share WhatsApp Poll Modal */}
             <Dialog open={activeShareMatch !== null} onOpenChange={(open) => { if (!open) setActiveShareMatch(null); }}>
                 <DialogContent className="sm:max-w-[620px] max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-emerald-700">
-                            <MessageCircle className="h-5 w-5" /> Generate WhatsApp Poll
+                            <MessageCircle className="h-5 w-5" /> Generate Match Availability Poll
                         </DialogTitle>
                         <DialogDescription>
-                            Customize meet details, surface type, and custom notes for {activeShareMatch?.opponent ? `vs ${activeShareMatch.opponent}` : ""}.
+                            Configure the details to generate an availability message for {activeShareMatch?.opponent ? `vs ${activeShareMatch.opponent}` : ""}.
                         </DialogDescription>
                     </DialogHeader>
 
                     {activeShareMatch && (
                         <div className="grid gap-4 py-2 text-slate-800">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-semibold">Meet Time</Label>
-                                    <Input
-                                        type="time"
-                                        value={meetTime}
-                                        onChange={(e) => setMeetTime(e.target.value)}
-                                        className="text-sm border-slate-200"
-                                    />
-                                    <p className="text-[10px] text-slate-400">Prefilled to 60 mins before kick-off ({activeShareMatch.time})</p>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label className="text-xs font-semibold">Pitch Surface</Label>
-                                    <Select
-                                        value={shareSurface}
-                                        onValueChange={setShareSurface}
-                                    >
-                                        <SelectTrigger className="border-slate-200">
-                                            <SelectValue placeholder="Select Surface" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Grass">Grass</SelectItem>
-                                            <SelectItem value="4G">4G</SelectItem>
-                                            <SelectItem value="3G">3G</SelectItem>
-                                            <SelectItem value="Astro">Astro</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                            {/* Toggle switches/checkboxes */}
+                            <div className="space-y-2 border-b border-slate-100 pb-3">
+                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Include Details:</Label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                        <input
+                                            type="checkbox"
+                                            checked={includeOpponent}
+                                            onChange={(e) => setIncludeOpponent(e.target.checked)}
+                                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <span>Opponent</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                        <input
+                                            type="checkbox"
+                                            checked={includeCompetition}
+                                            onChange={(e) => setIncludeCompetition(e.target.checked)}
+                                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <span>Competition</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                        <input
+                                            type="checkbox"
+                                            checked={includeVenue}
+                                            onChange={(e) => setIncludeVenue(e.target.checked)}
+                                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <span>Venue Location</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                        <input
+                                            type="checkbox"
+                                            checked={includeKickoff}
+                                            onChange={(e) => setIncludeKickoff(e.target.checked)}
+                                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <span>Kick Off Time</span>
+                                    </label>
+                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                        <input
+                                            type="checkbox"
+                                            checked={includeMeetTime}
+                                            onChange={(e) => setIncludeMeetTime(e.target.checked)}
+                                            className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <span>Meet Details</span>
+                                    </label>
                                 </div>
                             </div>
 
-                            <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold">Meet Location / Venue Address</Label>
-                                <Input
-                                    value={meetLocation}
-                                    onChange={(e) => setMeetLocation(e.target.value)}
-                                    placeholder="e.g. Market Road Pitches, N7 9PL"
-                                    className="text-sm border-slate-200"
-                                />
-                            </div>
+                            {/* Meet Details Fields */}
+                            {includeMeetTime && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold">Meet Time</Label>
+                                        <Input
+                                            type="time"
+                                            value={meetTime}
+                                            onChange={(e) => setMeetTime(e.target.value)}
+                                            className="text-sm bg-white border-slate-200"
+                                        />
+                                        <p className="text-[10px] text-slate-400">Prefilled to 60 mins before kickoff ({activeShareMatch.time})</p>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold">Meet Location / Venue</Label>
+                                        <Input
+                                            value={meetLocation}
+                                            onChange={(e) => setMeetLocation(e.target.value)}
+                                            placeholder="e.g. Market Road"
+                                            className="text-sm bg-white border-slate-200"
+                                        />
+                                    </div>
+                                </div>
+                            )}
 
+                            {/* Additional Notes Textarea */}
                             <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold">Custom Notes / Kit Colors</Label>
+                                <Label className="text-xs font-semibold">Additional Notes (Optional)</Label>
                                 <Textarea
-                                    value={customNotes}
-                                    onChange={(e) => setCustomNotes(e.target.value)}
-                                    placeholder="e.g. Bring red kit, respect referee..."
+                                    value={additionalNotes}
+                                    onChange={(e) => setAdditionalNotes(e.target.value)}
+                                    placeholder="e.g. ⚠ Bring running trainers."
                                     className="text-xs min-h-[60px] border-slate-200"
                                 />
                             </div>
 
+                            {/* Live Preview block */}
                             <div className="space-y-1.5 border-t border-slate-100 pt-3">
                                 <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Live Preview</Label>
                                 <div className="relative">
                                     <Textarea
-                                        value={getShareMessageText()}
+                                        value={getGeneratedPollText()}
                                         readOnly
-                                        className="text-xs min-h-[220px] font-mono bg-slate-50 border-slate-200 text-slate-600 focus-visible:ring-0 cursor-default"
+                                        className="text-xs min-h-[200px] font-mono bg-slate-50 border-slate-200 text-slate-600 focus-visible:ring-0 cursor-default"
                                     />
                                 </div>
                             </div>
@@ -1247,11 +1243,15 @@ export default function MatchesPage() {
                             Cancel
                         </Button>
                         <Button
-                            variant="secondary"
+                            variant={copyStatus === "copied" ? "default" : "secondary"}
                             onClick={handleCopyShareText}
-                            className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium"
+                            className={`font-semibold min-w-[160px] transition-all ${
+                                copyStatus === "copied" 
+                                    ? "bg-green-600 hover:bg-green-600 text-white" 
+                                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                            }`}
                         >
-                            <Copy className="h-4 w-4 mr-2" /> Copy Message
+                            {copyStatus === "copied" ? "✓ Copied Successfully" : "Copy to Clipboard"}
                         </Button>
                         <Button
                             onClick={handleSendWhatsApp}
