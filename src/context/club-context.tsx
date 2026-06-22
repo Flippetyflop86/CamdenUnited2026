@@ -243,20 +243,39 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         };
         if ('squads' in newSettings) updates.squads = newSettings.squads;
 
-        // Check if row exists
-        const { data: existing } = await supabase.from("clubs").select("id").limit(1).maybeSingle();
+        // Check if row exists for user's clubId
+        let existingId = clubId;
+        let existingRowExists = false;
+
+        if (existingId) {
+            const { data: dbRow } = await supabase
+                .from("clubs")
+                .select("id")
+                .eq("id", existingId)
+                .maybeSingle();
+            if (dbRow) {
+                existingRowExists = true;
+            }
+        } else {
+            const { data: existing } = await supabase.from("clubs").select("id").limit(1).maybeSingle();
+            if (existing) {
+                existingId = existing.id;
+                existingRowExists = true;
+            }
+        }
 
         let error;
-        if (existing) {
+        if (existingRowExists && existingId) {
             const { error: updateErr } = await supabase
                 .from("clubs")
                 .update(updates)
-                .eq("id", existing.id);
+                .eq("id", existingId);
             error = updateErr;
         } else {
+            const insertPayload = existingId ? { id: existingId, ...updates } : updates;
             const { error: insertErr } = await supabase
                 .from("clubs")
-                .insert([updates]);
+                .insert([insertPayload]);
             error = insertErr;
         }
 

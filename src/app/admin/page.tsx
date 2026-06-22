@@ -272,7 +272,7 @@ export default function AdminPage() {
         try {
             const fileExt = file.name.split('.').pop();
             const fileName = `${Math.random()}.${fileExt}`;
-            const filePath = `${bucket}/${fileName}`;
+            const filePath = fileName;
 
             const { error: uploadError } = await supabase.storage
                 .from(bucket)
