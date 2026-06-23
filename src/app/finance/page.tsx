@@ -256,7 +256,8 @@ export default function FinancePage() {
 
     // Monthly Player Subs expectations
     const getPlayerMonthlyFee = (p: Player) => {
-        return p.contractAmount || settings.monthlySubs || 20;
+        if (p.isContracted) return 0;
+        return settings.monthlySubs || 0;
     };
 
     // Sum up player subs for the current month
@@ -323,6 +324,15 @@ export default function FinancePage() {
             if (t.frequency === "Weekly") val = t.amount * 4.33;
             else if (t.frequency === "Yearly") val = t.amount / 12;
             cost += val;
+        });
+
+        // Add player contracts (outgoing payments to contracted players)
+        players.forEach(p => {
+            if (p.isContracted && p.contractAmount) {
+                let val = p.contractAmount;
+                if (p.contractFrequency === "Weekly") val = p.contractAmount * 4.33;
+                cost += val;
+            }
         });
 
         return cost;
@@ -695,13 +705,36 @@ export default function FinancePage() {
         return matchesSearch && matchesType && matchesCategory;
     });
 
-    const filteredPlayers = players.filter(p => {
-        const dues = getPlayerDuesForMonth(p);
-        const name = `${p.firstName} ${p.lastName}`.toLowerCase();
-        const matchesSearch = name.includes(subsSearch.toLowerCase());
-        const matchesStatus = subsStatusFilter === "All" || dues.status === subsStatusFilter;
-        return matchesSearch && matchesStatus;
-    });
+    const POSITION_ORDER: Record<string, number> = {
+        "GK": 1,
+        "LB": 2,
+        "CB": 3,
+        "RB": 4,
+        "DEF": 5,
+        "CDM": 6,
+        "CM": 7,
+        "CAM": 8,
+        "MID": 9,
+        "LW": 10,
+        "RW": 11,
+        "CF": 12,
+        "FWD": 13
+    };
+
+    const filteredPlayers = players
+        .filter(p => {
+            const dues = getPlayerDuesForMonth(p);
+            const name = `${p.firstName} ${p.lastName}`.toLowerCase();
+            const matchesSearch = name.includes(subsSearch.toLowerCase());
+            const matchesStatus = subsStatusFilter === "All" || dues.status === subsStatusFilter;
+            return matchesSearch && matchesStatus;
+        })
+        .sort((a, b) => {
+            const rankA = POSITION_ORDER[a.position] ?? 99;
+            const rankB = POSITION_ORDER[b.position] ?? 99;
+            if (rankA !== rankB) return rankA - rankB;
+            return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
+        });
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto pb-24 px-4 sm:px-6">
@@ -1230,7 +1263,16 @@ export default function FinancePage() {
                                                             <span className="text-[9px] uppercase tracking-wider text-slate-400">{player.position}</span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-4 font-bold text-slate-600">£{dues.expected}</td>
+                                                    <td className="px-6 py-4 font-bold text-slate-600">
+                                                        {player.isContracted ? (
+                                                            <div className="flex flex-col">
+                                                                <span>£0</span>
+                                                                <span className="text-[9px] text-red-500 font-semibold bg-red-50/70 border border-red-100 rounded px-1.5 py-0.2 w-max mt-0.5">contracted</span>
+                                                            </div>
+                                                        ) : (
+                                                            `£${dues.expected}`
+                                                        )}
+                                                    </td>
                                                     <td className="px-6 py-4 text-center text-green-600 font-extrabold">£{dues.paid}</td>
                                                     <td className="px-6 py-4 text-center text-red-500 font-extrabold">£{dues.outstanding}</td>
                                                     <td className="px-6 py-4 text-center">
