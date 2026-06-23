@@ -42,6 +42,8 @@ export default function AdminPage() {
 
     // Finance & Sponsors
     const [monthlySubs, setMonthlySubs] = useState(settings.monthlySubs?.toString() || "0");
+    const [subsEnabled, setSubsEnabled] = useState(settings.subsEnabled !== undefined ? settings.subsEnabled : true);
+    const [contractsEnabled, setContractsEnabled] = useState(settings.contractsEnabled !== undefined ? settings.contractsEnabled : false);
     const [finesEnabled, setFinesEnabled] = useState(settings.finesEnabled);
     const [fineCategories, setFineCategories] = useState<{name: string, amount: number}[]>(settings.fineCategories || []);
     const [sponsorLogo, setSponsorLogo] = useState<string | null>(settings.sponsorLogo);
@@ -103,6 +105,8 @@ export default function AdminPage() {
             setLeagueUrl(settings.leagueUrl || "");
             setLeaguePosition(settings.leaguePosition?.toString() || "");
             setMonthlySubs(settings.monthlySubs?.toString() || "0");
+            setSubsEnabled(settings.subsEnabled !== undefined ? settings.subsEnabled : true);
+            setContractsEnabled(settings.contractsEnabled !== undefined ? settings.contractsEnabled : false);
             setFinesEnabled(settings.finesEnabled);
             setFineCategories(settings.fineCategories || []);
             setSponsorLogo(settings.sponsorLogo);
@@ -309,6 +313,8 @@ export default function AdminPage() {
                 leagueUrl,
                 leaguePosition: leaguePosition ? parseInt(leaguePosition) : null,
                 monthlySubs: parseFloat(monthlySubs) || 0,
+                subsEnabled,
+                contractsEnabled,
                 finesEnabled,
                 fineCategories,
                 notificationsEnabled,
@@ -692,19 +698,46 @@ export default function AdminPage() {
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="grid grid-cols-2 gap-6">
-                                <div className="space-y-2">
-                                    <Label>Monthly Subs Baseline (£)</Label>
-                                    <Input
-                                        type="number"
-                                        value={monthlySubs}
-                                        onChange={(e) => setMonthlySubs(e.target.value)}
-                                        placeholder="35"
-                                    />
-                                    <p className="text-xs text-slate-500">Default tracking amount.</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between p-3 border border-slate-100 rounded-xl bg-slate-50/50">
+                                        <div className="space-y-0.5">
+                                            <Label>Player Subscriptions</Label>
+                                            <p className="text-xs text-slate-500">Do players pay monthly or session fees?</p>
+                                        </div>
+                                        <Switch
+                                            checked={subsEnabled}
+                                            onCheckedChange={setSubsEnabled}
+                                        />
+                                    </div>
+
+                                    {subsEnabled && (
+                                        <div className="space-y-2 p-3 border border-indigo-100/50 rounded-xl bg-indigo-50/10">
+                                            <Label>Monthly Subs Baseline (£)</Label>
+                                            <Input
+                                                type="number"
+                                                value={monthlySubs}
+                                                onChange={(e) => setMonthlySubs(e.target.value)}
+                                                placeholder="35"
+                                            />
+                                            <p className="text-xs text-slate-500">Default tracking amount.</p>
+                                        </div>
+                                    )}
                                 </div>
-                                <div className="space-y-4 pt-2">
-                                    <div className="flex items-center justify-between">
+
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between p-3 border border-slate-100 rounded-xl bg-slate-50/50">
+                                        <div className="space-y-0.5">
+                                            <Label>Player Contracts</Label>
+                                            <p className="text-xs text-slate-500">Does the club pay player wages?</p>
+                                        </div>
+                                        <Switch
+                                            checked={contractsEnabled}
+                                            onCheckedChange={setContractsEnabled}
+                                        />
+                                    </div>
+
+                                    <div className="flex items-center justify-between p-3 border border-slate-100 rounded-xl bg-slate-50/50">
                                         <div className="space-y-0.5">
                                             <Label>Fine System</Label>
                                             <p className="text-xs text-slate-500">Track and manage squad fines.</p>

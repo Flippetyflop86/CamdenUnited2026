@@ -33,6 +33,8 @@ interface ClubSettings {
     trainingLocation: string | null;
     registrationFee?: number;
     trainingFeePerSession?: number;
+    contractsEnabled: boolean;
+    subsEnabled: boolean;
 }
 
 interface ClubContextType {
@@ -74,7 +76,9 @@ const defaultSettings: ClubSettings = {
     trainingLocation: null,
     financeStartingBalance: 0,
     registrationFee: 0,
-    trainingFeePerSession: 0
+    trainingFeePerSession: 0,
+    contractsEnabled: false,
+    subsEnabled: true
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -202,7 +206,9 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         trainingLocation: data.training_location || null,
                         financeStartingBalance: data.finance_starting_balance || 0,
                         registrationFee: Number(data.registration_fee) || 0,
-                        trainingFeePerSession: Number(data.training_fee_per_session) || 0
+                        trainingFeePerSession: Number(data.training_fee_per_session) || 0,
+                        contractsEnabled: data.contracts_enabled !== undefined ? !!data.contracts_enabled : false,
+                        subsEnabled: data.subs_enabled !== undefined ? !!data.subs_enabled : true
                     });
                 }
             } catch (err) {
@@ -250,7 +256,9 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             training_location: newSettings.trainingLocation ?? settings.trainingLocation,
             finance_starting_balance: newSettings.financeStartingBalance ?? settings.financeStartingBalance,
             registration_fee: newSettings.registrationFee ?? settings.registrationFee,
-            training_fee_per_session: newSettings.trainingFeePerSession ?? settings.trainingFeePerSession
+            training_fee_per_session: newSettings.trainingFeePerSession ?? settings.trainingFeePerSession,
+            contracts_enabled: newSettings.contractsEnabled ?? settings.contractsEnabled,
+            subs_enabled: newSettings.subsEnabled ?? settings.subsEnabled
         };
         if ('squads' in newSettings) updates.squads = newSettings.squads;
 

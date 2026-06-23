@@ -5,6 +5,7 @@ import { Sponsor, Subscription, Transaction, Player } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import { useClub } from "@/context/club-context";
 import { supabase } from "@/lib/supabase";
 import { 
@@ -31,7 +32,8 @@ import {
     FileText,
     HelpCircle,
     Info,
-    UploadCloud
+    UploadCloud,
+    RotateCcw
 } from "lucide-react";
 
 // Default categories
@@ -69,6 +71,7 @@ export default function FinancePage() {
     // Balance editing state
     const [isEditingBalance, setIsEditingBalance] = useState(false);
     const [newStartingBalance, setNewStartingBalance] = useState("");
+    const [isResetting, setIsResetting] = useState(false);
 
     // Active sub-view or tab
     const [activeSection, setActiveSection] = useState<"overview" | "subs" | "commitments" | "ledger" | "sponsors" | "fundraising" | "categories">("overview");
@@ -130,6 +133,12 @@ export default function FinancePage() {
     });
     const [viewingHistoryPlayer, setViewingHistoryPlayer] = useState<Player | null>(null);
 
+    // Player sub settings edit state
+    const [editingSubPlayer, setEditingSubPlayer] = useState<Player | null>(null);
+    const [subFormModel, setSubFormModel] = useState<"Monthly" | "Pay-As-You-Go">("Monthly");
+    const [subFormAmount, setSubFormAmount] = useState<string>("0");
+    const [isSavingSub, setIsSavingSub] = useState(false);
+
     // Search and general filter state
     const [ledgerSearch, setLedgerSearch] = useState("");
     const [ledgerTypeFilter, setLedgerTypeFilter] = useState<"All" | "Income" | "Expense">("All");
@@ -175,6 +184,74 @@ export default function FinancePage() {
             fetchTrainingSessions()
         ]);
         setNewStartingBalance((settings.financeStartingBalance || 0).toString());
+    };
+
+    const getMonthDateBounds = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = now.getMonth();
+        
+        const start = new Date(year, month, 1);
+        const end = new Date(year, month + 1, 0);
+        
+        const toIsoDate = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+        
+        return {
+            start: toIsoDate(start),
+            end: toIsoDate(end)
+        };
+    };
+
+    const handleResetSubs = async () => {
+        const { start, end } = getMonthDateBounds();
+        const monthName = new Date().toLocaleString('default', { month: 'long', year: 'numeric' });
+        
+        if (!confirm(`Are you sure you want to reset all player subscriptions for ${monthName}? This will delete all logged sub payments, set player custom sub overrides to £0, and reset the default club sub baseline to £0.`)) {
+            return;
+        }
+        
+        setIsResetting(true);
+        try {
+            // 1. Delete this month's player sub payment transactions
+            const { error: txError } = await supabase
+                .from("finance_transactions")
+                .delete()
+                .eq("type", "Income")
+                .eq("category", "Player Subs")
+                .gte("date", start)
+                .lte("date", end);
+                
+            if (txError) throw txError;
+            
+            // 2. Reset all individual player custom sub overrides to 0
+            const { error: playerError } = await supabase
+                .from("players")
+                .update({ subs_custom_amount: 0 })
+                .neq("id", "00000000-0000-0000-0000-000000000000");
+                
+            if (playerError) throw playerError;
+
+            // 3. Reset the default club baseline setting to 0
+            await updateSettings({ monthlySubs: 0 });
+            
+            // 4. Refresh local state
+            await Promise.all([
+                fetchTransactions(),
+                fetchPlayers()
+            ]);
+            
+            alert("Player subscriptions reset successfully!");
+        } catch (err: any) {
+            console.error("Failed to reset subscriptions:", err);
+            alert("Error: " + (err.message || "Failed to reset subscriptions."));
+        } finally {
+            setIsResetting(false);
+        }
     };
 
     const fetchTransactions = async () => {
@@ -247,8 +324,11 @@ export default function FinancePage() {
                 appearances: p.appearances || 0,
                 goals: p.goals || 0,
                 assists: p.assists || 0,
+                isContracted: p.is_contracted,
                 contractAmount: p.contract_amount || 0,
-                contractFrequency: p.contract_frequency || "Monthly",
+                contractFrequency: p.contract_frequency || "Weekly",
+                subsBillingModel: p.subs_billing_model || "Monthly",
+                subsCustomAmount: p.subs_custom_amount !== undefined && p.subs_custom_amount !== null ? Number(p.subs_custom_amount) : 0,
                 squad: p.squad,
                 medicalStatus: p.medical_status
             })));
@@ -330,16 +410,16 @@ export default function FinancePage() {
 
     // Monthly Player Subs expectations
     const getPlayerMonthlyFee = (p: Player) => {
-        if (p.isContracted) return 0;
+        if (!settings.subsEnabled) return 0;
         
-        if (p.contractFrequency === "Pay-As-You-Go") {
+        if (p.subsBillingModel === "Pay-As-You-Go") {
             const count = getPlayerAttendedSessionsCount(p);
-            const rate = p.contractAmount || settings.trainingFeePerSession || 5;
+            const rate = p.subsCustomAmount !== undefined && p.subsCustomAmount !== null ? p.subsCustomAmount : (settings.trainingFeePerSession || 0);
             return count * rate;
         }
 
-        if (p.contractAmount !== undefined && p.contractAmount !== null && p.contractAmount > 0) {
-            return p.contractAmount;
+        if (p.subsCustomAmount !== undefined && p.subsCustomAmount !== null && p.subsCustomAmount > 0) {
+            return p.subsCustomAmount;
         }
         return settings.monthlySubs || 0;
     };
@@ -411,13 +491,15 @@ export default function FinancePage() {
         });
 
         // Add player contracts (outgoing payments to contracted players)
-        players.forEach(p => {
-            if (p.isContracted && p.contractAmount) {
-                let val = p.contractAmount;
-                if (p.contractFrequency === "Weekly") val = p.contractAmount * 4.33;
-                cost += val;
-            }
-        });
+        if (settings.contractsEnabled) {
+            players.forEach(p => {
+                if (p.isContracted && p.contractAmount) {
+                    let val = p.contractAmount;
+                    if (p.contractFrequency === "Weekly") val = p.contractAmount * 4.33;
+                    cost += val;
+                }
+            });
+        }
 
         return cost;
     })();
@@ -534,6 +616,38 @@ export default function FinancePage() {
             triggerToast(`Logged custom payment of £${amt} for ${selectedPlayerForPayment.firstName}`);
             fetchTransactions();
             setSelectedPlayerForPayment(null);
+        }
+    };
+
+    const handleOpenSubSettingsModal = (player: Player) => {
+        setEditingSubPlayer(player);
+        setSubFormModel(player.subsBillingModel || "Monthly");
+        setSubFormAmount((player.subsCustomAmount || 0).toString());
+    };
+
+    const handleSaveSubSettings = async () => {
+        if (!editingSubPlayer) return;
+        setIsSavingSub(true);
+        try {
+            const amt = parseFloat(subFormAmount) || 0;
+            const { error } = await supabase
+                .from("players")
+                .update({
+                    subs_billing_model: subFormModel,
+                    subs_custom_amount: amt
+                })
+                .eq("id", editingSubPlayer.id);
+
+            if (error) throw error;
+
+            triggerToast(`Sub settings updated for ${editingSubPlayer.firstName} ${editingSubPlayer.lastName}`);
+            await fetchPlayers();
+            setEditingSubPlayer(null);
+        } catch (err: any) {
+            console.error("Failed to update sub settings:", err);
+            alert("Error: " + (err.message || "Failed to save settings."));
+        } finally {
+            setIsSavingSub(false);
         }
     };
 
@@ -1146,10 +1260,12 @@ export default function FinancePage() {
                             <p className="text-[10px] text-slate-500 mt-1">Based on monthly fixed commitments of £{Math.round(monthlyExpensesCommitment)}</p>
                         </div>
                         
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                            <span className="text-xs text-slate-400 font-bold uppercase">Uncollected Subs:</span>
-                            <span className="text-sm font-extrabold text-red-500">£{subsOverview.outstanding} Outstanding</span>
-                        </div>
+                        {settings.subsEnabled && (
+                            <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                                <span className="text-xs text-slate-400 font-bold uppercase">Uncollected Subs:</span>
+                                <span className="text-sm font-extrabold text-red-500">£{subsOverview.outstanding} Outstanding</span>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             </div>
@@ -1218,14 +1334,25 @@ export default function FinancePage() {
                                 </CardContent>
                             </Card>
 
-                            <Card className="border-amber-100 bg-amber-50/10 hover:shadow-md transition-shadow">
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-bold text-amber-950">Who still owes us money?</CardTitle>
-                                </CardHeader>
-                                <CardContent className="text-xs text-amber-950/80 leading-relaxed">
-                                    There are currently <strong className="text-amber-950 font-extrabold">£{subsOverview.outstanding}</strong> in uncollected player subs this month. <button onClick={() => setActiveSection("subs")} className="text-amber-900 font-bold underline">Remind them now</button>.
-                                </CardContent>
-                            </Card>
+                            {settings.subsEnabled ? (
+                                <Card className="border-amber-100 bg-amber-50/10 hover:shadow-md transition-shadow">
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm font-bold text-amber-950">Who still owes us money?</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="text-xs text-amber-950/80 leading-relaxed">
+                                        There are currently <strong className="text-amber-950 font-extrabold">£{subsOverview.outstanding}</strong> in uncollected player subs this month. <button onClick={() => setActiveSection("subs")} className="text-amber-900 font-bold underline">Remind them now</button>.
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <Card className="border-indigo-100 bg-indigo-50/10 hover:shadow-md transition-shadow">
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm font-bold text-indigo-950">Need sponsorships?</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="text-xs text-indigo-950/80 leading-relaxed">
+                                        Check out the <button onClick={() => setActiveSection("sponsors")} className="text-indigo-950 font-bold underline">Sponsors tab</button> to track your club's sponsorship pipelines and deals.
+                                    </CardContent>
+                                </Card>
+                            )}
                         </div>
 
                         {/* Recent Transactions list */}
@@ -1318,8 +1445,27 @@ export default function FinancePage() {
 
             {/* VIEW 2: PLAYER SUBS TRACKER */}
             {activeSection === "subs" && (
-                <div className="space-y-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                !settings.subsEnabled ? (
+                    <Card className="border-slate-200 shadow-md">
+                        <CardContent className="p-8 text-center flex flex-col items-center justify-center max-w-md mx-auto space-y-4">
+                            <div className="w-12 h-12 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-600">
+                                <Users className="h-6 w-6" />
+                            </div>
+                            <h3 className="text-base font-bold text-slate-800">Player Subscriptions Disabled</h3>
+                            <p className="text-xs text-slate-500 leading-relaxed">
+                                Player subscriptions tracking is currently disabled for this club. You can enable it in the settings tab to configure monthly fees, registration fees, and training session billing.
+                            </p>
+                            <Button 
+                                onClick={() => setActiveSection("categories")}
+                                className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold px-4 py-2 rounded-xl"
+                            >
+                                Go to Settings
+                            </Button>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <div className="space-y-6">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-100 pb-4">
                         <div>
                             <h3 className="text-lg font-bold text-slate-900">Player Subs Tracker</h3>
                             <p className="text-xs text-slate-500 mt-0.5">Track monthly player fees, outstanding debts, and copy reminders.</p>
@@ -1438,12 +1584,21 @@ export default function FinancePage() {
                                 <option value="Outstanding">Outstanding</option>
                             </select>
                         </div>
-                        <Button 
-                            onClick={copyBulkReminder}
-                            className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-100 flex items-center gap-2 h-10 rounded-xl px-4 text-xs"
-                        >
-                            <Share2 className="h-4 w-4" /> Copy Outstanding List
-                        </Button>
+                        <div className="flex gap-2">
+                            <Button
+                                onClick={handleResetSubs}
+                                disabled={isResetting}
+                                className="bg-red-50 hover:bg-red-100 text-red-700 font-bold border border-red-100 flex items-center gap-2 h-10 rounded-xl px-4 text-xs"
+                            >
+                                <RotateCcw className="h-4 w-4" /> {isResetting ? "Resetting..." : "Reset Subs"}
+                            </Button>
+                            <Button 
+                                onClick={copyBulkReminder}
+                                className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold border border-indigo-100 flex items-center gap-2 h-10 rounded-xl px-4 text-xs"
+                            >
+                                <Share2 className="h-4 w-4" /> Copy Outstanding List
+                            </Button>
+                        </div>
                     </Card>
 
                     {/* Player Tracker Table */}
@@ -1482,26 +1637,37 @@ export default function FinancePage() {
                                                         </div>
                                                     </td>
                                                     <td className="px-6 py-4 font-bold text-slate-600">
-                                                        {player.isContracted ? (
-                                                            <div className="flex flex-col">
-                                                                <span>£0</span>
-                                                                <span className="text-[9px] text-red-500 font-semibold bg-red-50/70 border border-red-100 rounded px-1.5 py-0.2 w-max mt-0.5">contracted</span>
+                                                        <div className="flex flex-col">
+                                                             <div className="flex items-center gap-1.5 group">
+                                                                 <span>£{dues.expected}</span>
+                                                                 {settings.subsEnabled && (
+                                                                     <button 
+                                                                         onClick={() => handleOpenSubSettingsModal(player)}
+                                                                         className="text-slate-400 hover:text-indigo-600 p-0.5 rounded hover:bg-slate-100 transition-colors opacity-100 md:opacity-0 md:group-hover:opacity-100 focus:opacity-100"
+                                                                         title="Adjust Player Subs Fee / Billing Model"
+                                                                     >
+                                                                         <Pencil className="h-3.5 w-3.5" />
+                                                                     </button>
+                                                                 )}
+                                                             </div>
+                                                            <div className="flex flex-wrap gap-1 mt-0.5">
+                                                                {settings.contractsEnabled && player.isContracted && (
+                                                                    <span className="text-[8px] text-red-500 font-bold bg-red-50 border border-red-100 rounded px-1.5 py-0.2">
+                                                                        Contract (£{player.contractAmount}/{player.contractFrequency === "Weekly" ? "wk" : "mo"})
+                                                                    </span>
+                                                                )}
+                                                                {settings.subsEnabled && player.subsBillingModel === "Pay-As-You-Go" && (
+                                                                    <span className="text-[8px] text-indigo-600 font-semibold bg-indigo-50 border border-indigo-100/55 rounded px-1.5 py-0.2">
+                                                                        PAYG ({getPlayerAttendedSessionsCount(player)} sessions)
+                                                                    </span>
+                                                                )}
+                                                                {settings.subsEnabled && player.subsBillingModel === "Monthly" && player.subsCustomAmount !== undefined && player.subsCustomAmount !== null && player.subsCustomAmount > 0 && (
+                                                                    <span className="text-[8px] text-amber-600 font-semibold bg-amber-50 border border-amber-100/55 rounded px-1.5 py-0.2">
+                                                                        custom rate
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                        ) : player.contractFrequency === "Pay-As-You-Go" ? (
-                                                            <div className="flex flex-col">
-                                                                <span>£{dues.expected}</span>
-                                                                <span className="text-[8px] text-indigo-600 font-semibold bg-indigo-50 border border-indigo-100/55 rounded px-1.5 py-0.2 w-max mt-0.5">
-                                                                    PAYG ({getPlayerAttendedSessionsCount(player)} sessions)
-                                                                </span>
-                                                            </div>
-                                                        ) : player.contractAmount && player.contractAmount > 0 ? (
-                                                            <div className="flex flex-col">
-                                                                <span>£{dues.expected}</span>
-                                                                <span className="text-[8px] text-amber-600 font-semibold bg-amber-50 border border-amber-100/55 rounded px-1.5 py-0.2 w-max mt-0.5">custom rate</span>
-                                                            </div>
-                                                        ) : (
-                                                            `£${dues.expected}`
-                                                        )}
+                                                        </div>
                                                     </td>
                                                     <td className="px-6 py-4 text-center text-green-600 font-extrabold">£{dues.paid}</td>
                                                     <td className="px-6 py-4 text-center text-red-500 font-extrabold">£{dues.outstanding}</td>
@@ -1664,7 +1830,57 @@ export default function FinancePage() {
                             </Card>
                         </div>
                     )}
+
+                    {/* Adjust Player Subscription Settings Popup */}
+                    {editingSubPlayer && (
+                        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                            <Card className="w-full max-w-sm border-slate-200 bg-white text-slate-800 shadow-xl overflow-hidden rounded-2xl">
+                                <CardHeader className="bg-slate-50 border-b border-slate-100 p-4">
+                                    <div className="flex justify-between items-center">
+                                        <CardTitle className="text-sm font-bold">Adjust Sub: {editingSubPlayer.firstName} {editingSubPlayer.lastName}</CardTitle>
+                                        <Button size="icon" variant="ghost" onClick={() => setEditingSubPlayer(null)} className="h-7 w-7"><X className="h-4 w-4" /></Button>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="p-4 space-y-4">
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase text-slate-400 font-medium">Billing Model</label>
+                                        <select
+                                            value={subFormModel}
+                                            onChange={e => setSubFormModel(e.target.value as any)}
+                                            className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        >
+                                            <option value="Monthly">Flat Monthly Subs</option>
+                                            <option value="Pay-As-You-Go">Pay-As-You-Go (Per Session)</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase text-slate-400 font-medium">
+                                            {subFormModel === "Pay-As-You-Go" ? "Custom Session Fee (£)" : "Custom Monthly Sub (£)"}
+                                        </label>
+                                        <Input 
+                                            type="number"
+                                            value={subFormAmount}
+                                            onChange={e => setSubFormAmount(e.target.value)}
+                                            placeholder="e.g. 10.00"
+                                            className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                        />
+                                        <p className="text-[10px] text-slate-400 leading-normal">
+                                            Set to 0 to use the club default ({subFormModel === "Pay-As-You-Go" ? `£${settings.trainingFeePerSession || 0}/session` : `£${settings.monthlySubs || 0}/month`}).
+                                        </p>
+                                    </div>
+                                    <Button 
+                                        onClick={handleSaveSubSettings}
+                                        disabled={isSavingSub}
+                                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-11 rounded-xl shadow-md mt-2"
+                                    >
+                                        {isSavingSub ? "Saving..." : "Save Sub Settings"}
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
                 </div>
+                )
             )}
 
             {/* VIEW 3: RECURRING COMMITMENTS */}
@@ -1898,79 +2114,7 @@ export default function FinancePage() {
                         </div>
                     </Card>
 
-                    {/* Add/Edit Transaction Modal Popup */}
-                    {isAddTxOpen && (
-                        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-                            <Card className="w-full max-w-sm border-slate-200 bg-white text-slate-800 shadow-xl overflow-hidden rounded-2xl">
-                                <CardHeader className="bg-slate-50 border-b border-slate-100 p-4">
-                                    <div className="flex justify-between items-center">
-                                        <CardTitle className="text-sm font-bold">{editingId ? "Edit" : "Add"} Ledger Transaction</CardTitle>
-                                        <Button size="icon" variant="ghost" onClick={() => setIsAddTxOpen(false)} className="h-7 w-7"><X className="h-4 w-4" /></Button>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="p-4 space-y-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold uppercase text-slate-400">Description</label>
-                                        <Input 
-                                            placeholder="e.g. Referee Fees"
-                                            value={txForm.description}
-                                            onChange={e => setTxForm({ ...txForm, description: e.target.value })}
-                                            className="bg-slate-50 border-slate-200 h-10 rounded-xl"
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold uppercase text-slate-400">Amount (£)</label>
-                                            <Input 
-                                                type="number"
-                                                value={txForm.amount}
-                                                onChange={e => setTxForm({ ...txForm, amount: e.target.value })}
-                                                className="bg-slate-50 border-slate-200 h-10 rounded-xl"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold uppercase text-slate-400">Type</label>
-                                            <select
-                                                value={txForm.type}
-                                                onChange={e => setTxForm({ ...txForm, type: e.target.value as any })}
-                                                className="w-full px-3 py-2 border rounded-xl bg-slate-50 h-10 text-xs focus:ring-indigo-500 focus:outline-none"
-                                            >
-                                                <option value="Expense">Expense</option>
-                                                <option value="Income">Income</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold uppercase text-slate-400">Transaction Date</label>
-                                        <Input 
-                                            type="date"
-                                            value={txForm.date}
-                                            onChange={e => setTxForm({ ...txForm, date: e.target.value })}
-                                            className="bg-slate-50 border-slate-200 h-10 rounded-xl"
-                                        />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold uppercase text-slate-400">Category</label>
-                                        <select
-                                            value={txForm.category}
-                                            onChange={e => setTxForm({ ...txForm, category: e.target.value })}
-                                            className="w-full px-3 py-2 border rounded-xl bg-slate-50 h-10 text-xs focus:ring-indigo-500 focus:outline-none"
-                                        >
-                                            {(txForm.type === "Income" ? incomeCategories : expenseCategories).map(cat => (
-                                                <option key={cat} value={cat}>{cat}</option>
-                                            ))}
-                                        </select>
-                                    </div>
-                                    <Button 
-                                        onClick={saveTransaction}
-                                        className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-11 rounded-xl shadow-md mt-2"
-                                    >
-                                        {editingId ? "Update" : "Save"} Transaction
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    )}
+
                 </div>
             )}
 
@@ -2311,7 +2455,83 @@ export default function FinancePage() {
             {/* VIEW 7: CATEGORIES EDITOR */}
             {activeSection === "categories" && (
                 <div className="space-y-6">
-                    <div className="flex justify-between items-center">
+                    {/* Finance Toggles & Baselines Settings */}
+                    <Card className="border-slate-200 shadow-md">
+                        <CardHeader className="bg-slate-50/50 border-b p-4">
+                            <CardTitle className="text-sm font-bold text-slate-800">Finance Modules & Baseline Fees</CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-5 space-y-5 bg-white rounded-b-2xl">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                {/* Player Subs Toggles */}
+                                <div className="space-y-4">
+                                    <div className="flex items-start justify-between gap-4 p-3 border border-slate-100 rounded-xl bg-slate-50/50">
+                                        <div className="space-y-0.5">
+                                            <label className="text-xs font-bold text-slate-800">Player Subscriptions</label>
+                                            <p className="text-[10px] text-slate-500 leading-normal">
+                                                Do players pay monthly subscription fees or session fees to play?
+                                            </p>
+                                        </div>
+                                        <Switch 
+                                            checked={settings.subsEnabled} 
+                                            onCheckedChange={(val) => updateSettings({ subsEnabled: val })}
+                                        />
+                                    </div>
+
+                                    {settings.subsEnabled && (
+                                        <div className="space-y-3 p-3 border border-indigo-100/50 rounded-xl bg-indigo-50/10">
+                                            <div className="grid grid-cols-3 gap-2">
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-bold uppercase text-slate-400">Monthly Sub (£)</label>
+                                                    <Input
+                                                        type="number"
+                                                        value={settings.monthlySubs || 0}
+                                                        onChange={(e) => updateSettings({ monthlySubs: parseFloat(e.target.value) || 0 })}
+                                                        className="h-8 text-xs bg-white border-slate-200"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-bold uppercase text-slate-400">Reg Fee (£)</label>
+                                                    <Input
+                                                        type="number"
+                                                        value={settings.registrationFee || 0}
+                                                        onChange={(e) => updateSettings({ registrationFee: parseFloat(e.target.value) || 0 })}
+                                                        className="h-8 text-xs bg-white border-slate-200"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] font-bold uppercase text-slate-400">Session Fee (£)</label>
+                                                    <Input
+                                                        type="number"
+                                                        value={settings.trainingFeePerSession || 0}
+                                                        onChange={(e) => updateSettings({ trainingFeePerSession: parseFloat(e.target.value) || 0 })}
+                                                        className="h-8 text-xs bg-white border-slate-200"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Player Contracts Toggle */}
+                                <div className="space-y-4">
+                                    <div className="flex items-start justify-between gap-4 p-3 border border-slate-100 rounded-xl bg-slate-50/50">
+                                        <div className="space-y-0.5">
+                                            <label className="text-xs font-bold text-slate-800">Player Contracts (Paid Players)</label>
+                                            <p className="text-[10px] text-slate-500 leading-normal">
+                                                Does the club contract and pay any players (e.g. wages or appearance fees)?
+                                            </p>
+                                        </div>
+                                        <Switch 
+                                            checked={settings.contractsEnabled} 
+                                            onCheckedChange={(val) => updateSettings({ contractsEnabled: val })}
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <div className="flex justify-between items-center pt-4 border-t border-slate-100">
                         <div>
                             <h3 className="text-lg font-bold text-slate-900">Custom Transaction Categories</h3>
                             <p className="text-xs text-slate-500 mt-0.5">Customize the categories you use to classify ledger transactions.</p>
@@ -2418,6 +2638,81 @@ export default function FinancePage() {
                             </Card>
                         </div>
                     )}
+
+                </div>
+            )}
+
+            {/* Add/Edit Transaction Modal Popup */}
+            {isAddTxOpen && (
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                    <Card className="w-full max-w-sm border-slate-200 bg-white text-slate-800 shadow-xl overflow-hidden rounded-2xl">
+                        <CardHeader className="bg-slate-50 border-b border-slate-100 p-4">
+                            <div className="flex justify-between items-center">
+                                <CardTitle className="text-sm font-bold">{editingId ? "Edit" : "Add"} Ledger Transaction</CardTitle>
+                                <Button size="icon" variant="ghost" onClick={() => setIsAddTxOpen(false)} className="h-7 w-7"><X className="h-4 w-4" /></Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-4 space-y-4">
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-400">Description</label>
+                                <Input 
+                                    placeholder="e.g. Referee Fees"
+                                    value={txForm.description}
+                                    onChange={e => setTxForm({ ...txForm, description: e.target.value })}
+                                    className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400">Amount (£)</label>
+                                    <Input 
+                                        type="number"
+                                        value={txForm.amount}
+                                        onChange={e => setTxForm({ ...txForm, amount: e.target.value })}
+                                        className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase text-slate-400">Type</label>
+                                    <select
+                                        value={txForm.type}
+                                        onChange={e => setTxForm({ ...txForm, type: e.target.value as any })}
+                                        className="w-full px-3 py-2 border rounded-xl bg-slate-50 h-10 text-xs focus:ring-indigo-500 focus:outline-none"
+                                    >
+                                        <option value="Expense">Expense</option>
+                                        <option value="Income">Income</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-400">Transaction Date</label>
+                                <Input 
+                                    type="date"
+                                    value={txForm.date}
+                                    onChange={e => setTxForm({ ...txForm, date: e.target.value })}
+                                    className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[10px] font-bold uppercase text-slate-400">Category</label>
+                                <select
+                                    value={txForm.category}
+                                    onChange={e => setTxForm({ ...txForm, category: e.target.value })}
+                                    className="w-full px-3 py-2 border rounded-xl bg-slate-50 h-10 text-xs focus:ring-indigo-500 focus:outline-none"
+                                >
+                                    {(txForm.type === "Income" ? incomeCategories : expenseCategories).map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <Button 
+                                onClick={saveTransaction}
+                                className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-11 rounded-xl shadow-md mt-2"
+                            >
+                                {editingId ? "Update" : "Save"} Transaction
+                            </Button>
+                        </CardContent>
+                    </Card>
                 </div>
             )}
         </div>

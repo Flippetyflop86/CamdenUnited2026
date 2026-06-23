@@ -58,7 +58,9 @@ export default function PlayerBudgetsPage() {
                 contractAmount: p.contract_amount,
                 contractFrequency: p.contract_frequency || 'Weekly',
                 contractStartDate: p.contract_start_date,
-                contractEndDate: p.contract_end_date
+                contractEndDate: p.contract_end_date,
+                subsBillingModel: p.subs_billing_model || 'Monthly',
+                subsCustomAmount: p.subs_custom_amount !== undefined && p.subs_custom_amount !== null ? Number(p.subs_custom_amount) : 0
             })));
         }
     };

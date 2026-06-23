@@ -60,7 +60,8 @@ export default function OnboardingWizard() {
 
     // Step 4: Finance & Operations
     const [monthlySubs, setMonthlySubs] = useState(settings.monthlySubs?.toString() || "35");
-    const [paysSubs, setPaysSubs] = useState(parseFloat(settings.monthlySubs?.toString() || "35") > 0);
+    const [subsEnabled, setSubsEnabled] = useState(settings.subsEnabled !== undefined ? settings.subsEnabled : parseFloat(settings.monthlySubs?.toString() || "0") > 0);
+    const [contractsEnabled, setContractsEnabled] = useState(settings.contractsEnabled !== undefined ? settings.contractsEnabled : false);
     const [registrationFee, setRegistrationFee] = useState(settings.registrationFee?.toString() || "0");
     const [trainingFeePerSession, setTrainingFeePerSession] = useState(settings.trainingFeePerSession?.toString() || "5");
     const [finesEnabled, setFinesEnabled] = useState(settings.finesEnabled || false);
@@ -108,6 +109,8 @@ export default function OnboardingWizard() {
             setWhatsAppPollMessage(settings.whatsappPollMessage || "");
             setTrainingLocation(settings.trainingLocation || "");
             setMonthlySubs(settings.monthlySubs?.toString() || "35");
+            setSubsEnabled(settings.subsEnabled !== undefined ? settings.subsEnabled : (parseFloat(settings.monthlySubs?.toString() || "0") > 0));
+            setContractsEnabled(settings.contractsEnabled !== undefined ? settings.contractsEnabled : false);
             setFinesEnabled(settings.finesEnabled || false);
             setSelectedSquads(settings.squads || ["First Team"]);
             setLeagueUrl(settings.leagueUrl || "");
@@ -304,10 +307,12 @@ export default function OnboardingWizard() {
                 homeKitSocks,
                 awayKitShirt,
                 awayKitShorts,
-                monthlySubs: paysSubs ? (parseFloat(monthlySubs) || 0) : 0,
+                monthlySubs: subsEnabled ? (parseFloat(monthlySubs) || 0) : 0,
+                subsEnabled,
+                contractsEnabled,
                 finesEnabled,
-                registrationFee: parseFloat(registrationFee) || 0,
-                trainingFeePerSession: parseFloat(trainingFeePerSession) || 0,
+                registrationFee: subsEnabled ? (parseFloat(registrationFee) || 0) : 0,
+                trainingFeePerSession: subsEnabled ? (parseFloat(trainingFeePerSession) || 0) : 0,
                 homeGround: homeGroundName || null,
                 twitterUrl: twitterHandle || null,
                 instagramUrl: instagramHandle || null,
@@ -670,62 +675,79 @@ export default function OnboardingWizard() {
                                                             <Banknote className="w-4 h-4 text-indigo-400" /> Player Subscriptions
                                                         </Label>
                                                         <p className="text-slate-400 text-xs leading-relaxed">
-                                                            Do players pay monthly subscription fees to play for the club?
+                                                            Do players pay monthly subscription fees or session fees to the club?
                                                         </p>
                                                     </div>
                                                     <Switch 
-                                                        checked={paysSubs} 
-                                                        onCheckedChange={setPaysSubs}
+                                                        checked={subsEnabled} 
+                                                        onCheckedChange={setSubsEnabled}
                                                     />
                                                 </div>
 
-                                                {paysSubs && (
-                                                    <div className="space-y-2">
-                                                        <Label className="text-slate-300">Standard Monthly Player Subs (£)</Label>
-                                                        <div className="relative">
-                                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
-                                                            <Input 
-                                                                type="number"
-                                                                value={monthlySubs}
-                                                                onChange={(e) => setMonthlySubs(e.target.value)}
-                                                                className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
-                                                                placeholder="e.g. 35"
-                                                            />
+                                                {subsEnabled && (
+                                                    <>
+                                                        <div className="space-y-2">
+                                                            <Label className="text-slate-300">Standard Monthly Player Subs (£)</Label>
+                                                            <div className="relative">
+                                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
+                                                                <Input 
+                                                                    type="number"
+                                                                    value={monthlySubs}
+                                                                    onChange={(e) => setMonthlySubs(e.target.value)}
+                                                                    className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
+                                                                    placeholder="e.g. 35"
+                                                                />
+                                                            </div>
+                                                            <p className="text-slate-500 text-xs">Used to calculate target collection goals in the Finance panel.</p>
                                                         </div>
-                                                        <p className="text-slate-500 text-xs">Used to calculate target collection goals in the Finance panel.</p>
-                                                    </div>
+
+                                                        <div className="grid grid-cols-2 gap-4">
+                                                            <div className="space-y-2">
+                                                                <Label className="text-slate-300">Club Registration Fee (£)</Label>
+                                                                <div className="relative">
+                                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
+                                                                    <Input 
+                                                                        type="number"
+                                                                        value={registrationFee}
+                                                                        onChange={(e) => setRegistrationFee(e.target.value)}
+                                                                        className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
+                                                                        placeholder="e.g. 50"
+                                                                    />
+                                                                </div>
+                                                                <p className="text-slate-500 text-xs">One-off seasonal registration fee.</p>
+                                                            </div>
+
+                                                            <div className="space-y-2">
+                                                                <Label className="text-slate-300">Training Session Fee (£)</Label>
+                                                                <div className="relative">
+                                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
+                                                                    <Input 
+                                                                        type="number"
+                                                                        value={trainingFeePerSession}
+                                                                        onChange={(e) => setTrainingFeePerSession(e.target.value)}
+                                                                        className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
+                                                                        placeholder="e.g. 5"
+                                                                    />
+                                                                </div>
+                                                                <p className="text-slate-500 text-xs">Default fee for pay-as-you-go training.</p>
+                                                            </div>
+                                                        </div>
+                                                    </>
                                                 )}
 
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="space-y-2">
-                                                        <Label className="text-slate-300">Club Registration Fee (£)</Label>
-                                                        <div className="relative">
-                                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
-                                                            <Input 
-                                                                type="number"
-                                                                value={registrationFee}
-                                                                onChange={(e) => setRegistrationFee(e.target.value)}
-                                                                className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
-                                                                placeholder="e.g. 50"
-                                                            />
-                                                        </div>
-                                                        <p className="text-slate-500 text-xs">One-off seasonal registration fee.</p>
+                                                <div className="bg-slate-900/30 border border-slate-800 rounded-xl p-5 flex items-start justify-between gap-4">
+                                                    <div className="space-y-1">
+                                                        <Label className="text-white font-semibold flex items-center gap-1.5">
+                                                            <Users className="w-4 h-4 text-rose-400" /> Player Contracts (Paid by Club)
+                                                        </Label>
+                                                        <p className="text-slate-400 text-xs leading-relaxed">
+                                                            Does the club contract and pay any players (e.g. wages or expenses)?
+                                                        </p>
                                                     </div>
-
-                                                    <div className="space-y-2">
-                                                        <Label className="text-slate-300">Training Session Fee (£)</Label>
-                                                        <div className="relative">
-                                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
-                                                            <Input 
-                                                                type="number"
-                                                                value={trainingFeePerSession}
-                                                                onChange={(e) => setTrainingFeePerSession(e.target.value)}
-                                                                className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
-                                                                placeholder="e.g. 5"
-                                                            />
-                                                        </div>
-                                                        <p className="text-slate-500 text-xs">Default fee for pay-as-you-go training.</p>
-                                                    </div>
+                                                    <Switch 
+                                                        checked={contractsEnabled} 
+                                                        onCheckedChange={setContractsEnabled}
+                                                    />
                                                 </div>
 
                                                 <div className="bg-slate-900/30 border border-slate-800 rounded-xl p-5 flex items-start justify-between gap-4">

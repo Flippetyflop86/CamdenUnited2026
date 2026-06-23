@@ -177,7 +177,9 @@ export default function SquadPage() {
                     contractAmount: p.contract_amount,
                     contractFrequency: p.contract_frequency || "Weekly",
                     contractStartDate: p.contract_start_date,
-                    contractEndDate: p.contract_end_date
+                    contractEndDate: p.contract_end_date,
+                    subsBillingModel: p.subs_billing_model || "Monthly",
+                    subsCustomAmount: p.subs_custom_amount !== undefined && p.subs_custom_amount !== null ? Number(p.subs_custom_amount) : 0
                 };
             });
 
@@ -228,7 +230,9 @@ export default function SquadPage() {
             contract_amount: updatedPlayer.contractAmount,
             contract_frequency: updatedPlayer.contractFrequency,
             contract_start_date: updatedPlayer.contractStartDate ? updatedPlayer.contractStartDate : null,
-            contract_end_date: updatedPlayer.contractEndDate ? updatedPlayer.contractEndDate : null
+            contract_end_date: updatedPlayer.contractEndDate ? updatedPlayer.contractEndDate : null,
+            subs_billing_model: updatedPlayer.subsBillingModel || "Monthly",
+            subs_custom_amount: updatedPlayer.subsCustomAmount !== undefined && updatedPlayer.subsCustomAmount !== null ? updatedPlayer.subsCustomAmount : 0
         };
         if (updatedPlayer.id === "new") await supabase.from("players").insert([payload]);
         else await supabase.from("players").update(payload).eq("id", updatedPlayer.id);
@@ -283,7 +287,7 @@ export default function SquadPage() {
                     <Button onClick={() => setIsManageSquadsOpen(true)} variant="outline" size="icon">
                         <Settings className="w-4 h-4" />
                     </Button>
-                    <Button className="bg-red-600 hover:bg-red-700" onClick={() => setEditingPlayer({ id: "new", firstName: "", lastName: "", position: "GK", squadNumber: 0, age: 0, nationality: "English", squad: currentSquads[0], medicalStatus: "Available", availability: true, contractExpiry: "", appearances: 0, goals: 0, assists: 0, imageUrl: "", isInTrainingSquad: true, isContracted: false, contractAmount: 0, contractFrequency: "Weekly", contractStartDate: "", contractEndDate: "" })}>
+                    <Button className="bg-red-600 hover:bg-red-700" onClick={() => setEditingPlayer({ id: "new", firstName: "", lastName: "", position: "GK", squadNumber: 0, age: 0, nationality: "English", squad: currentSquads[0], medicalStatus: "Available", availability: true, contractExpiry: "", appearances: 0, goals: 0, assists: 0, imageUrl: "", isInTrainingSquad: true, isContracted: false, contractAmount: 0, contractFrequency: "Weekly", contractStartDate: "", contractEndDate: "", subsBillingModel: "Monthly", subsCustomAmount: 0 })}>
                         <Plus className="h-4 w-4 mr-2" /> Add Player
                     </Button>
                 </div>
@@ -457,72 +461,81 @@ export default function SquadPage() {
                                 </div>
                             </div>
 
-                            <div className="pt-2 border-t mt-2 border-slate-100">
-                                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer mb-3">
-                                    <input
-                                        type="checkbox"
-                                        checked={editingPlayer.isContracted || false}
-                                        onChange={(e) => setEditingPlayer({ 
-                                            ...editingPlayer, 
-                                            isContracted: e.target.checked,
-                                            contractFrequency: e.target.checked ? 'Weekly' : 'Monthly'
-                                        })}
-                                        className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-                                    />
-                                    Player is Contracted (Paid by Club)
-                                </label>
+                            {/* Player Contracts Section */}
+                            {settings.contractsEnabled && (
+                                <div className="pt-2 border-t mt-2 border-slate-100">
+                                    <label className="flex items-center gap-2 text-sm font-medium text-slate-700 cursor-pointer mb-3">
+                                        <input
+                                            type="checkbox"
+                                            checked={editingPlayer.isContracted || false}
+                                            onChange={(e) => setEditingPlayer({ 
+                                                ...editingPlayer, 
+                                                isContracted: e.target.checked,
+                                                contractFrequency: e.target.checked ? (editingPlayer.contractFrequency || "Weekly") : "Weekly"
+                                            })}
+                                            className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                                        />
+                                        Player is Contracted (Paid by Club)
+                                    </label>
 
-                                {editingPlayer.isContracted ? (
-                                    <div className="grid grid-cols-2 gap-3 mb-2 p-3 bg-red-50/50 rounded border border-red-100">
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-slate-500">Contract Amount (£)</label>
-                                            <Input
-                                                type="number"
-                                                value={editingPlayer.contractAmount || ''}
-                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, contractAmount: parseFloat(e.target.value) || 0 })}
-                                                className="h-8 text-xs bg-white"
-                                            />
+                                    {editingPlayer.isContracted && (
+                                        <div className="grid grid-cols-2 gap-3 mb-2 p-3 bg-red-50/50 rounded border border-red-100">
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-medium text-slate-500">Contract Amount (£)</label>
+                                                <Input
+                                                    type="number"
+                                                    value={editingPlayer.contractAmount || ''}
+                                                    onChange={(e) => setEditingPlayer({ ...editingPlayer, contractAmount: parseFloat(e.target.value) || 0 })}
+                                                    className="h-8 text-xs bg-white"
+                                                    placeholder="0"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-medium text-slate-500">Frequency</label>
+                                                <select
+                                                    value={editingPlayer.contractFrequency || 'Weekly'}
+                                                    onChange={(e) => setEditingPlayer({ ...editingPlayer, contractFrequency: e.target.value as any })}
+                                                    className="w-full h-8 px-2 border rounded-md text-xs bg-white"
+                                                >
+                                                    <option value="Weekly">Weekly</option>
+                                                    <option value="Monthly">Monthly</option>
+                                                </select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-medium text-slate-500">Start Date</label>
+                                                <Input
+                                                    type="date"
+                                                    value={editingPlayer.contractStartDate || ''}
+                                                    onChange={(e) => setEditingPlayer({ ...editingPlayer, contractStartDate: e.target.value })}
+                                                    className="h-8 text-xs bg-white"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-xs font-medium text-slate-500">End Date</label>
+                                                <Input
+                                                    type="date"
+                                                    value={editingPlayer.contractEndDate || ''}
+                                                    onChange={(e) => setEditingPlayer({ ...editingPlayer, contractEndDate: e.target.value })}
+                                                    className="h-8 text-xs bg-white"
+                                                />
+                                            </div>
                                         </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-slate-500">Frequency</label>
-                                            <select
-                                                value={editingPlayer.contractFrequency || 'Weekly'}
-                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, contractFrequency: e.target.value as any })}
-                                                className="w-full h-8 px-2 border rounded-md text-xs bg-white"
-                                            >
-                                                <option value="Weekly">Weekly</option>
-                                                <option value="Monthly">Monthly</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-slate-500">Start Date</label>
-                                            <Input
-                                                type="date"
-                                                value={editingPlayer.contractStartDate || ''}
-                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, contractStartDate: e.target.value })}
-                                                className="h-8 text-xs bg-white"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-xs font-medium text-slate-500">End Date</label>
-                                            <Input
-                                                type="date"
-                                                value={editingPlayer.contractEndDate || ''}
-                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, contractEndDate: e.target.value })}
-                                                className="h-8 text-xs bg-white"
-                                            />
-                                        </div>
-                                    </div>
-                                ) : (
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Player Subscriptions Section */}
+                            {settings.subsEnabled && (
+                                <div className="pt-2 border-t mt-2 border-slate-100">
+                                    <div className="text-sm font-semibold text-slate-700 mb-2">Player Subscriptions Billing</div>
                                     <div className="grid grid-cols-2 gap-3 mb-2 p-3 bg-indigo-50/50 rounded border border-indigo-100">
                                         <div className="space-y-1">
                                             <label className="text-xs font-medium text-slate-500">Billing Model</label>
                                             <select
-                                                value={editingPlayer.contractFrequency === 'Pay-As-You-Go' ? 'Pay-As-You-Go' : 'Monthly'}
+                                                value={editingPlayer.subsBillingModel || 'Monthly'}
                                                 onChange={(e) => setEditingPlayer({ 
                                                     ...editingPlayer, 
-                                                    contractFrequency: e.target.value as any,
-                                                    contractAmount: 0 // Reset custom override if changing models
+                                                    subsBillingModel: e.target.value as any
                                                 })}
                                                 className="w-full h-8 px-2 border rounded-md text-xs bg-white"
                                             >
@@ -532,19 +545,19 @@ export default function SquadPage() {
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-xs font-medium text-slate-500">
-                                                {editingPlayer.contractFrequency === 'Pay-As-You-Go' ? 'Custom Session Fee (£)' : 'Custom Monthly Sub (£)'}
+                                                {editingPlayer.subsBillingModel === 'Pay-As-You-Go' ? 'Custom Session Fee (£)' : 'Custom Monthly Sub (£)'}
                                             </label>
                                             <Input
                                                 type="number"
-                                                placeholder="Optional"
-                                                value={editingPlayer.contractAmount || ''}
-                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, contractAmount: parseFloat(e.target.value) || 0 })}
+                                                placeholder="Optional (assumes 0 if empty)"
+                                                value={editingPlayer.subsCustomAmount || ''}
+                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, subsCustomAmount: parseFloat(e.target.value) || 0 })}
                                                 className="h-8 text-xs bg-white"
                                             />
                                         </div>
                                     </div>
-                                )}
-                            </div>
+                                </div>
+                            )}
 
 
                             <div className="space-y-1">
