@@ -61,6 +61,8 @@ export default function OnboardingWizard() {
     // Step 4: Finance & Operations
     const [monthlySubs, setMonthlySubs] = useState(settings.monthlySubs?.toString() || "35");
     const [paysSubs, setPaysSubs] = useState(parseFloat(settings.monthlySubs?.toString() || "35") > 0);
+    const [registrationFee, setRegistrationFee] = useState(settings.registrationFee?.toString() || "0");
+    const [trainingFeePerSession, setTrainingFeePerSession] = useState(settings.trainingFeePerSession?.toString() || "5");
     const [finesEnabled, setFinesEnabled] = useState(settings.finesEnabled || false);
 
     // Step 5: Squads
@@ -304,6 +306,8 @@ export default function OnboardingWizard() {
                 awayKitShorts,
                 monthlySubs: paysSubs ? (parseFloat(monthlySubs) || 0) : 0,
                 finesEnabled,
+                registrationFee: parseFloat(registrationFee) || 0,
+                trainingFeePerSession: parseFloat(trainingFeePerSession) || 0,
                 homeGround: homeGroundName || null,
                 twitterUrl: twitterHandle || null,
                 instagramUrl: instagramHandle || null,
@@ -691,6 +695,38 @@ export default function OnboardingWizard() {
                                                         <p className="text-slate-500 text-xs">Used to calculate target collection goals in the Finance panel.</p>
                                                     </div>
                                                 )}
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-2">
+                                                        <Label className="text-slate-300">Club Registration Fee (£)</Label>
+                                                        <div className="relative">
+                                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
+                                                            <Input 
+                                                                type="number"
+                                                                value={registrationFee}
+                                                                onChange={(e) => setRegistrationFee(e.target.value)}
+                                                                className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
+                                                                placeholder="e.g. 50"
+                                                            />
+                                                        </div>
+                                                        <p className="text-slate-500 text-xs">One-off seasonal registration fee.</p>
+                                                    </div>
+
+                                                    <div className="space-y-2">
+                                                        <Label className="text-slate-300">Training Session Fee (£)</Label>
+                                                        <div className="relative">
+                                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
+                                                            <Input 
+                                                                type="number"
+                                                                value={trainingFeePerSession}
+                                                                onChange={(e) => setTrainingFeePerSession(e.target.value)}
+                                                                className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
+                                                                placeholder="e.g. 5"
+                                                            />
+                                                        </div>
+                                                        <p className="text-slate-500 text-xs">Default fee for pay-as-you-go training.</p>
+                                                    </div>
+                                                </div>
 
                                                 <div className="bg-slate-900/30 border border-slate-800 rounded-xl p-5 flex items-start justify-between gap-4">
                                                     <div className="space-y-1">

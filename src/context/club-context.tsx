@@ -31,6 +31,8 @@ interface ClubSettings {
     notificationsEnabled: boolean;
     notificationEmail: string | null;
     trainingLocation: string | null;
+    registrationFee?: number;
+    trainingFeePerSession?: number;
 }
 
 interface ClubContextType {
@@ -70,7 +72,9 @@ const defaultSettings: ClubSettings = {
     notificationsEnabled: false,
     notificationEmail: null,
     trainingLocation: null,
-    financeStartingBalance: 0
+    financeStartingBalance: 0,
+    registrationFee: 0,
+    trainingFeePerSession: 0
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -196,7 +200,9 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         notificationsEnabled: data.notifications_enabled || false,
                         notificationEmail: data.notification_email || null,
                         trainingLocation: data.training_location || null,
-                        financeStartingBalance: data.finance_starting_balance || 0
+                        financeStartingBalance: data.finance_starting_balance || 0,
+                        registrationFee: Number(data.registration_fee) || 0,
+                        trainingFeePerSession: Number(data.training_fee_per_session) || 0
                     });
                 }
             } catch (err) {
@@ -242,7 +248,9 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             notifications_enabled: newSettings.notificationsEnabled ?? settings.notificationsEnabled,
             notification_email: newSettings.notificationEmail ?? settings.notificationEmail,
             training_location: newSettings.trainingLocation ?? settings.trainingLocation,
-            finance_starting_balance: newSettings.financeStartingBalance ?? settings.financeStartingBalance
+            finance_starting_balance: newSettings.financeStartingBalance ?? settings.financeStartingBalance,
+            registration_fee: newSettings.registrationFee ?? settings.registrationFee,
+            training_fee_per_session: newSettings.trainingFeePerSession ?? settings.trainingFeePerSession
         };
         if ('squads' in newSettings) updates.squads = newSettings.squads;
 

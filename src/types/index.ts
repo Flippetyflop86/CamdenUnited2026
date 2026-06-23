@@ -32,7 +32,7 @@ export interface Player {
     // Contract Info
     isContracted?: boolean;
     contractAmount?: number;
-    contractFrequency?: "Weekly" | "Monthly";
+    contractFrequency?: "Weekly" | "Monthly" | "Pay-As-You-Go";
     contractStartDate?: string;
     contractEndDate?: string;
 }

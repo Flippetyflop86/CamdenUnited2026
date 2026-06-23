@@ -462,20 +462,24 @@ export default function SquadPage() {
                                     <input
                                         type="checkbox"
                                         checked={editingPlayer.isContracted || false}
-                                        onChange={(e) => setEditingPlayer({ ...editingPlayer, isContracted: e.target.checked })}
+                                        onChange={(e) => setEditingPlayer({ 
+                                            ...editingPlayer, 
+                                            isContracted: e.target.checked,
+                                            contractFrequency: e.target.checked ? 'Weekly' : 'Monthly'
+                                        })}
                                         className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
                                     />
-                                    Player is Contracted
+                                    Player is Contracted (Paid by Club)
                                 </label>
 
-                                {editingPlayer.isContracted && (
+                                {editingPlayer.isContracted ? (
                                     <div className="grid grid-cols-2 gap-3 mb-2 p-3 bg-red-50/50 rounded border border-red-100">
                                         <div className="space-y-1">
                                             <label className="text-xs font-medium text-slate-500">Contract Amount (£)</label>
                                             <Input
                                                 type="number"
                                                 value={editingPlayer.contractAmount || ''}
-                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, contractAmount: parseFloat(e.target.value) })}
+                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, contractAmount: parseFloat(e.target.value) || 0 })}
                                                 className="h-8 text-xs bg-white"
                                             />
                                         </div>
@@ -505,6 +509,36 @@ export default function SquadPage() {
                                                 type="date"
                                                 value={editingPlayer.contractEndDate || ''}
                                                 onChange={(e) => setEditingPlayer({ ...editingPlayer, contractEndDate: e.target.value })}
+                                                className="h-8 text-xs bg-white"
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-2 gap-3 mb-2 p-3 bg-indigo-50/50 rounded border border-indigo-100">
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-medium text-slate-500">Billing Model</label>
+                                            <select
+                                                value={editingPlayer.contractFrequency === 'Pay-As-You-Go' ? 'Pay-As-You-Go' : 'Monthly'}
+                                                onChange={(e) => setEditingPlayer({ 
+                                                    ...editingPlayer, 
+                                                    contractFrequency: e.target.value as any,
+                                                    contractAmount: 0 // Reset custom override if changing models
+                                                })}
+                                                className="w-full h-8 px-2 border rounded-md text-xs bg-white"
+                                            >
+                                                <option value="Monthly">Flat Monthly Subs</option>
+                                                <option value="Pay-As-You-Go">Pay-As-You-Go (Per Session)</option>
+                                            </select>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-xs font-medium text-slate-500">
+                                                {editingPlayer.contractFrequency === 'Pay-As-You-Go' ? 'Custom Session Fee (£)' : 'Custom Monthly Sub (£)'}
+                                            </label>
+                                            <Input
+                                                type="number"
+                                                placeholder="Optional"
+                                                value={editingPlayer.contractAmount || ''}
+                                                onChange={(e) => setEditingPlayer({ ...editingPlayer, contractAmount: parseFloat(e.target.value) || 0 })}
                                                 className="h-8 text-xs bg-white"
                                             />
                                         </div>
