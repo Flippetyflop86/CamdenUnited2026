@@ -2,7 +2,7 @@
 // forcing refresh
 
 import { useState, useEffect, useRef } from "react";
-import { Player, SquadType } from "@/types";
+import { Player, SquadType, MedicalStatus } from "@/types";
 import { useClub } from "@/context/club-context";
 import { PlayerCard } from "@/components/squad/player-card";
 import { Input } from "@/components/ui/input";
@@ -196,6 +196,30 @@ export default function SquadPage() {
         await supabase.from("players").delete().eq("id", id);
     };
 
+    const handleStatusToggle = async (player: Player) => {
+        const statuses: MedicalStatus[] = ["Available", "Holiday", "Injured"];
+        let nextIndex = 0;
+        const currentIndex = statuses.indexOf(player.medicalStatus);
+        if (currentIndex !== -1) {
+            nextIndex = (currentIndex + 1) % statuses.length;
+        }
+        const nextStatus = statuses[nextIndex];
+
+        setPlayers((prev) =>
+            prev.map((p) => (p.id === player.id ? { ...p, medicalStatus: nextStatus } : p))
+        );
+
+        const { error } = await supabase
+            .from("players")
+            .update({ medical_status: nextStatus })
+            .eq("id", player.id);
+
+        if (error) {
+            console.error("Error updating player status:", error);
+            await fetchData();
+        }
+    };
+
     const filteredPlayers = players.filter((player) => {
         const SQUAD_LABELS: Record<string, string> = { firstTeam: "First Team", midweek: "Midweek", youth: "Youth" };
         const mappedSquad = SQUAD_LABELS[player.squad] || player.squad;
@@ -320,9 +344,7 @@ export default function SquadPage() {
                         player={player}
                         onDelete={handleDelete}
                         onEdit={handleEdit}
-                        onStatusToggle={async () => {
-                            // Dummy
-                        }}
+                        onStatusToggle={handleStatusToggle}
                     />
                 ))}
             </div>
@@ -429,6 +451,22 @@ export default function SquadPage() {
                                     <option value="RW">Right Wing (RW)</option>
                                     <option value="CF">Centre Forward (CF)</option>
                                     <option value="ST">Striker (ST)</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block text-xs font-medium text-slate-500">Status</label>
+                                <select
+                                    className="w-full h-8 border rounded px-2 text-xs bg-white focus:ring-2 focus:ring-slate-400 focus:outline-none"
+                                    value={editingPlayer.medicalStatus || "Available"}
+                                    onChange={(e) => setEditingPlayer({ ...editingPlayer, medicalStatus: e.target.value as any })}
+                                >
+                                    <option value="Available">Available</option>
+                                    <option value="Holiday">On Holiday</option>
+                                    <option value="Injured">Injured</option>
+                                    <option value="Unavailable">Unavailable</option>
+                                    <option value="Doubtful">Doubtful</option>
+                                    <option value="Suspended">Suspended</option>
                                 </select>
                             </div>
 

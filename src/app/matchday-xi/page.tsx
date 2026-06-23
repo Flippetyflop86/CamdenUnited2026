@@ -545,7 +545,7 @@ export default function MatchdayXIPage() {
 
     const activePlayer = activePlayerId ? players.find(p => p.id === activePlayerId) : null;
 
-    const availablePlayers = players.filter(p => !selectedPlayerIds.includes(p.id));
+    const availablePlayers = players.filter(p => !selectedPlayerIds.includes(p.id) && p.medicalStatus === "Available");
 
     const targetCategory = activeSlot && activeSlot.type === 'pitch' ? getPositionCategory(activeSlot.label) : 'All';
 
@@ -577,7 +577,7 @@ export default function MatchdayXIPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight text-slate-900">Matchday XI</h2>
-                    <p className="text-slate-500">Select your starting lineup and substitutes ({players.length} players available)</p>
+                    <p className="text-slate-500">Select your starting lineup and substitutes ({players.filter(p => p.medicalStatus === "Available").length} players available)</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <Button onClick={handleClearLineup} variant="outline" className="border-slate-300 hover:bg-slate-100 text-slate-700">
@@ -638,7 +638,7 @@ export default function MatchdayXIPage() {
                 >
                     <div className="p-3 bg-slate-100 font-bold text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 flex items-center justify-between">
                         <span>Available Squad</span>
-                        <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-[10px]">{players.filter(p => !selectedPlayerIds.includes(p.id)).length}</span>
+                        <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-[10px]">{players.filter(p => !selectedPlayerIds.includes(p.id) && p.medicalStatus === "Available").length}</span>
                     </div>
                     <div className="p-2 border-b border-slate-200 bg-white flex gap-1 overflow-x-auto no-scrollbar shrink-0 shadow-sm z-10">
                         {(["All", "GK", "DEF", "MID", "FWD"] as const).map(f => (
@@ -653,7 +653,7 @@ export default function MatchdayXIPage() {
                     </div>
                     <div className="p-3 space-y-2 overflow-y-auto flex-1 bg-slate-50/30">
                         {players
-                            .filter(p => !selectedPlayerIds.includes(p.id))
+                            .filter(p => !selectedPlayerIds.includes(p.id) && p.medicalStatus === "Available")
                             .filter(p => squadFilter === "All" || getPositionCategory(p.position) === squadFilter)
                             .map(player => {
                                 const fullName = `${player.firstName} ${player.lastName}`;
@@ -676,7 +676,7 @@ export default function MatchdayXIPage() {
                                     </div>
                                 );
                         })}
-                        {players.filter(p => !selectedPlayerIds.includes(p.id)).length === 0 && (
+                        {players.filter(p => !selectedPlayerIds.includes(p.id) && p.medicalStatus === "Available").length === 0 && (
                             <div className="text-center py-6 text-slate-400 text-sm border-2 border-dashed rounded-lg border-slate-200 m-2">
                                 <span className="text-xl mb-1 block">✅</span>
                                 Squad deployed!
