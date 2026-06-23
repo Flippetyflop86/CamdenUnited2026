@@ -30,7 +30,8 @@ import {
     Settings,
     FileText,
     HelpCircle,
-    Info
+    Info,
+    UploadCloud
 } from "lucide-react";
 
 // Default categories
@@ -96,7 +97,12 @@ export default function FinancePage() {
         frequency: "Yearly" as "One-off" | "Monthly" | "Yearly",
         startDate: new Date().toISOString().split("T")[0],
         endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split("T")[0],
-        status: "Secured" as "Secured" | "Lead" | "Contacted" | "Proposal" | "Review"
+        status: "Secured" as "Secured" | "Lead" | "Contacted" | "Proposal" | "Review",
+        website: "",
+        description: "",
+        responsibilities: "",
+        contractUrl: "",
+        contractName: ""
     });
 
     const [commitmentForm, setCommitmentForm] = useState({
@@ -514,13 +520,41 @@ export default function FinancePage() {
     const saveSponsor = async () => {
         if (!sponsorForm.name || !sponsorForm.amount) return;
 
+        let finalResponsibilities = sponsorForm.responsibilities || '';
+        if (finalResponsibilities) {
+            const lines = finalResponsibilities.split('\n').filter(Boolean);
+            let existingDeliverables: any[] = [];
+            if (editingId) {
+                const oldSponsor = sponsors.find(s => s.id === editingId);
+                if (oldSponsor && oldSponsor.responsibilities) {
+                    try {
+                        existingDeliverables = JSON.parse(oldSponsor.responsibilities);
+                    } catch (e) {}
+                }
+            }
+            const newDeliverables = lines.map(line => {
+                const cleanText = line.replace(/^•\s*/, '').trim();
+                const matched = existingDeliverables.find(item => item.text === cleanText);
+                return {
+                    text: cleanText,
+                    completed: matched ? matched.completed : false
+                };
+            });
+            finalResponsibilities = JSON.stringify(newDeliverables);
+        }
+
         const payload: any = {
             name: sponsorForm.name,
             amount: parseFloat(sponsorForm.amount),
             frequency: sponsorForm.frequency,
-            start_date: sponsorForm.startDate,
-            end_date: sponsorForm.endDate,
-            status: sponsorForm.status
+            start_date: sponsorForm.startDate ? sponsorForm.startDate : null,
+            end_date: sponsorForm.endDate ? sponsorForm.endDate : null,
+            status: sponsorForm.status,
+            description: sponsorForm.description || null,
+            website: sponsorForm.website || null,
+            responsibilities: finalResponsibilities || null,
+            contract_url: sponsorForm.contractUrl || null,
+            contract_name: sponsorForm.contractName || null
         };
 
         let res;
@@ -637,7 +671,12 @@ export default function FinancePage() {
             frequency: "Yearly",
             startDate: new Date().toISOString().split("T")[0],
             endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split("T")[0],
-            status: "Secured"
+            status: "Secured",
+            website: "",
+            description: "",
+            responsibilities: "",
+            contractUrl: "",
+            contractName: ""
         });
         setEditingId(null);
     };
@@ -672,13 +711,30 @@ export default function FinancePage() {
     };
 
     const startEditSponsor = (s: Sponsor) => {
+        let editingResponsibilities = s.responsibilities || '';
+        if (editingResponsibilities) {
+            try {
+                const parsed = JSON.parse(editingResponsibilities);
+                if (Array.isArray(parsed)) {
+                    editingResponsibilities = parsed.map(item => `• ${item.text}`).join('\n');
+                }
+            } catch (e) {
+                // Keep as is
+            }
+        }
+
         setSponsorForm({
             name: s.name,
             amount: s.amount.toString(),
             frequency: s.frequency,
             startDate: s.startDate || "",
             endDate: s.endDate || "",
-            status: s.status || "Secured"
+            status: s.status || "Secured",
+            website: s.website || "",
+            description: s.description || "",
+            responsibilities: editingResponsibilities,
+            contractUrl: s.contractUrl || "",
+            contractName: s.contractName || ""
         });
         setEditingId(s.id);
         setIsAddSponsorOpen(true);
@@ -1796,33 +1852,63 @@ export default function FinancePage() {
                     {/* Add/Edit Sponsor Modal Popup */}
                     {isAddSponsorOpen && (
                         <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-                            <Card className="w-full max-w-sm border-slate-200 bg-white text-slate-800 shadow-xl overflow-hidden rounded-2xl">
+                            <Card className="w-full max-w-lg border-slate-200 bg-white text-slate-800 shadow-xl overflow-hidden rounded-2xl">
                                 <CardHeader className="bg-slate-50 border-b border-slate-100 p-4">
                                     <div className="flex justify-between items-center">
                                         <CardTitle className="text-sm font-bold">{editingId ? "Edit" : "Add"} Sponsor</CardTitle>
                                         <Button size="icon" variant="ghost" onClick={() => setIsAddSponsorOpen(false)} className="h-7 w-7"><X className="h-4 w-4" /></Button>
                                     </div>
                                 </CardHeader>
-                                <CardContent className="p-4 space-y-4">
-                                    <div className="space-y-1">
-                                        <label className="text-[10px] font-bold uppercase text-slate-400">Sponsor Name</label>
-                                        <Input 
-                                            placeholder="e.g. ABC Builders"
-                                            value={sponsorForm.name}
-                                            onChange={e => setSponsorForm({ ...sponsorForm, name: e.target.value })}
-                                            className="bg-slate-50 border-slate-200 h-10 rounded-xl"
-                                        />
-                                    </div>
+                                <CardContent className="p-4 space-y-4 max-h-[75vh] overflow-y-auto">
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="space-y-1">
-                                            <label className="text-[10px] font-bold uppercase text-slate-400">Value (£)</label>
+                                            <label className="text-[10px] font-bold uppercase text-slate-400">Sponsor Name</label>
+                                            <Input 
+                                                placeholder="e.g. ABC Builders"
+                                                value={sponsorForm.name}
+                                                onChange={e => setSponsorForm({ ...sponsorForm, name: e.target.value })}
+                                                className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold uppercase text-slate-400">Status</label>
+                                            <select
+                                                value={sponsorForm.status}
+                                                onChange={e => setSponsorForm({ ...sponsorForm, status: e.target.value as any })}
+                                                className="w-full px-3 py-2 border rounded-xl bg-slate-50 h-10 text-xs focus:ring-indigo-500 focus:outline-none"
+                                            >
+                                                <option value="Secured">Secured Partner</option>
+                                                <option value="Lead">Potential: Targeted Lead</option>
+                                                <option value="Contacted">Potential: Contacted</option>
+                                                <option value="Proposal">Potential: Proposal Sent</option>
+                                                <option value="Review">Potential: Contract Review</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold uppercase text-slate-400">Website</label>
+                                            <Input 
+                                                placeholder="https://"
+                                                value={sponsorForm.website}
+                                                onChange={e => setSponsorForm({ ...sponsorForm, website: e.target.value })}
+                                                className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold uppercase text-slate-400">Agreement Value (£)</label>
                                             <Input 
                                                 type="number"
+                                                placeholder="0.00"
                                                 value={sponsorForm.amount}
                                                 onChange={e => setSponsorForm({ ...sponsorForm, amount: e.target.value })}
                                                 className="bg-slate-50 border-slate-200 h-10 rounded-xl"
                                             />
                                         </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold uppercase text-slate-400">Frequency</label>
                                             <select
@@ -1830,12 +1916,16 @@ export default function FinancePage() {
                                                 onChange={e => setSponsorForm({ ...sponsorForm, frequency: e.target.value as any })}
                                                 className="w-full px-3 py-2 border rounded-xl bg-slate-50 h-10 text-xs focus:ring-indigo-500 focus:outline-none"
                                             >
-                                                <option value="Yearly">Yearly</option>
+                                                <option value="One-off">One-off Payment</option>
                                                 <option value="Monthly">Monthly</option>
-                                                <option value="One-off">One-off</option>
+                                                <option value="Yearly">Yearly</option>
                                             </select>
                                         </div>
+                                        <div className="space-y-1">
+                                            {/* Empty space */}
+                                        </div>
                                     </div>
+
                                     <div className="grid grid-cols-2 gap-3">
                                         <div className="space-y-1">
                                             <label className="text-[10px] font-bold uppercase text-slate-400">Start Date</label>
@@ -1856,20 +1946,86 @@ export default function FinancePage() {
                                             />
                                         </div>
                                     </div>
+
                                     <div className="space-y-1">
-                                        <label className="text-[10px] font-bold uppercase text-slate-400">Status</label>
-                                        <select
-                                            value={sponsorForm.status}
-                                            onChange={e => setSponsorForm({ ...sponsorForm, status: e.target.value as any })}
-                                            className="w-full px-3 py-2 border rounded-xl bg-slate-50 h-10 text-xs focus:ring-indigo-500 focus:outline-none"
-                                        >
-                                            <option value="Secured">Secured</option>
-                                            <option value="Lead">Lead</option>
-                                            <option value="Contacted">Contacted</option>
-                                            <option value="Proposal">Proposal</option>
-                                            <option value="Review">Review</option>
-                                        </select>
+                                        <label className="text-[10px] font-bold uppercase text-slate-400">Description</label>
+                                        <Input 
+                                            placeholder="Brief description of the partnership..."
+                                            value={sponsorForm.description}
+                                            onChange={e => setSponsorForm({ ...sponsorForm, description: e.target.value })}
+                                            className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                        />
                                     </div>
+
+                                    <div className="space-y-1">
+                                        <label className="text-[10px] font-bold uppercase text-slate-400">Responsibilities & Deliverables</label>
+                                        <textarea
+                                            placeholder="• Logo on Kit&#10;• 3x Social Media Posts&#10;• Banner at Home Games"
+                                            value={sponsorForm.responsibilities}
+                                            onChange={e => setSponsorForm({ ...sponsorForm, responsibilities: e.target.value })}
+                                            className="flex min-h-[80px] w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs focus-visible:outline-none focus-visible:ring-indigo-500 focus-visible:ring-2 resize-y"
+                                        />
+                                        <p className="text-[9px] text-slate-500">Separate items with new lines.</p>
+                                    </div>
+
+                                    <div className="border-t border-slate-100 pt-3 space-y-3">
+                                        <h4 className="text-[11px] font-bold uppercase text-slate-500">Contract / Agreement</h4>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold uppercase text-slate-400">Agreement Link (URL)</label>
+                                                <Input 
+                                                    placeholder="https://drive.google.com/..."
+                                                    value={sponsorForm.contractUrl}
+                                                    onChange={e => setSponsorForm({ ...sponsorForm, contractUrl: e.target.value })}
+                                                    className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold uppercase text-slate-400">Display Name</label>
+                                                <Input 
+                                                    placeholder="e.g. Contract_2026.pdf"
+                                                    value={sponsorForm.contractName}
+                                                    onChange={e => setSponsorForm({ ...sponsorForm, contractName: e.target.value })}
+                                                    className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold uppercase text-slate-400">Or Upload Document (Max 2MB)</label>
+                                            <label className="cursor-pointer block mt-1">
+                                                <div className="flex items-center justify-center w-full h-10 px-3 py-2 text-xs border rounded-xl hover:bg-slate-100 bg-slate-50 border-dashed text-slate-500">
+                                                    <UploadCloud className="w-4 h-4 mr-2 text-slate-400" />
+                                                    {sponsorForm.contractName && sponsorForm.contractUrl?.startsWith('data:') 
+                                                        ? `Selected: ${sponsorForm.contractName}` 
+                                                        : "Upload Local PDF/Word..."}
+                                                </div>
+                                                <input 
+                                                    type="file" 
+                                                    className="hidden" 
+                                                    accept=".pdf,.doc,.docx" 
+                                                    onChange={e => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) {
+                                                            if (file.size > 2 * 1024 * 1024) {
+                                                                alert("File is too large. Max 2MB.");
+                                                                return;
+                                                                }
+                                                            const reader = new FileReader();
+                                                            reader.onloadend = () => {
+                                                                setSponsorForm(prev => ({
+                                                                    ...prev,
+                                                                    contractUrl: reader.result as string,
+                                                                    contractName: file.name
+                                                                }));
+                                                            };
+                                                            reader.readAsDataURL(file);
+                                                        }
+                                                    }} 
+                                                />
+                                            </label>
+                                        </div>
+                                    </div>
+
                                     <Button 
                                         onClick={saveSponsor}
                                         className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold h-11 rounded-xl shadow-md mt-2"
