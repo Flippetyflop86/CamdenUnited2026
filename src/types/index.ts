@@ -187,7 +187,7 @@ export interface Transaction {
     description: string;
     amount: number;
     type: 'Income' | 'Expense';
-    category: 'Match Fee' | 'Sponsorship' | 'Market Road Pitch Hire' | 'MCFL Pitch Hire' | 'Officials' | 'Yellow Card Fine' | 'Red Card Fine' | 'Misconduct Fine' | 'Admin Fine' | 'Kit' | 'Public Liability Insurance' | 'Food' | 'Training Pitch Fees' | 'Loans' | 'Government Grants' | 'College Programme' | 'Other';
+    category: string;
     isRecurring: boolean;
     frequency?: 'Weekly' | 'Monthly' | 'Yearly';
     receiptUrl?: string;

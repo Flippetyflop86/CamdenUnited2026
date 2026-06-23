@@ -69,7 +69,8 @@ const defaultSettings: ClubSettings = {
     ],
     notificationsEnabled: false,
     notificationEmail: null,
-    trainingLocation: null
+    trainingLocation: null,
+    financeStartingBalance: 0
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -194,7 +195,8 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         fineCategories: data.fine_categories || defaultSettings.fineCategories,
                         notificationsEnabled: data.notifications_enabled || false,
                         notificationEmail: data.notification_email || null,
-                        trainingLocation: data.training_location || null
+                        trainingLocation: data.training_location || null,
+                        financeStartingBalance: data.finance_starting_balance || 0
                     });
                 }
             } catch (err) {
@@ -239,7 +241,8 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             fine_categories: newSettings.fineCategories ?? settings.fineCategories,
             notifications_enabled: newSettings.notificationsEnabled ?? settings.notificationsEnabled,
             notification_email: newSettings.notificationEmail ?? settings.notificationEmail,
-            training_location: newSettings.trainingLocation ?? settings.trainingLocation
+            training_location: newSettings.trainingLocation ?? settings.trainingLocation,
+            finance_starting_balance: newSettings.financeStartingBalance ?? settings.financeStartingBalance
         };
         if ('squads' in newSettings) updates.squads = newSettings.squads;
 
