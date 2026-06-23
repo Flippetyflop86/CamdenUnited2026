@@ -115,6 +115,8 @@ export default function FinancePage() {
 
     const [newCategoryName, setNewCategoryName] = useState("");
     const [newCategoryType, setNewCategoryType] = useState<"Income" | "Expense">("Income");
+    const [isEditingSubs, setIsEditingSubs] = useState(false);
+    const [newSubsBaseline, setNewSubsBaseline] = useState("");
 
     // Player subs modal state
     const [selectedPlayerForPayment, setSelectedPlayerForPayment] = useState<Player | null>(null);
@@ -573,6 +575,13 @@ export default function FinancePage() {
             setIsAddSponsorOpen(false);
             resetSponsorForm();
         }
+    };
+
+    const saveSubsBaseline = async () => {
+        const val = parseFloat(newSubsBaseline) || 0;
+        await updateSettings({ monthlySubs: val });
+        setIsEditingSubs(false);
+        triggerToast("Subscription baseline updated");
     };
 
     const saveCommitment = async () => {
@@ -1228,6 +1237,38 @@ export default function FinancePage() {
             {/* VIEW 2: PLAYER SUBS TRACKER */}
             {activeSection === "subs" && (
                 <div className="space-y-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                        <div>
+                            <h3 className="text-lg font-bold text-slate-900">Player Subs Tracker</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">Track monthly player fees, outstanding debts, and copy reminders.</p>
+                        </div>
+                        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 shadow-xs">
+                            <span>Club Subs Baseline:</span>
+                            {isEditingSubs ? (
+                                <div className="flex items-center gap-1">
+                                    <span className="font-extrabold text-slate-800">£</span>
+                                    <Input
+                                        type="number"
+                                        value={newSubsBaseline}
+                                        onChange={e => setNewSubsBaseline(e.target.value)}
+                                        className="h-7 w-16 bg-white border-slate-200 text-slate-800 text-xs px-1 text-center font-bold"
+                                    />
+                                    <Button size="sm" onClick={saveSubsBaseline} className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] px-2 h-7 font-bold">Save</Button>
+                                    <Button size="icon" variant="ghost" onClick={() => setIsEditingSubs(false)} className="h-7 w-7"><X className="h-3 w-3" /></Button>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-extrabold bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 text-indigo-700">£{settings.monthlySubs || 0}</span>
+                                    <button 
+                                        onClick={() => { setNewSubsBaseline((settings.monthlySubs || 0).toString()); setIsEditingSubs(true); }}
+                                        className="text-[10px] text-indigo-600 hover:text-indigo-800 underline font-extrabold"
+                                    >
+                                        Edit
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </div>
                     
                     {/* Player Subs Stats */}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

@@ -60,6 +60,7 @@ export default function OnboardingWizard() {
 
     // Step 4: Finance & Operations
     const [monthlySubs, setMonthlySubs] = useState(settings.monthlySubs?.toString() || "35");
+    const [paysSubs, setPaysSubs] = useState(parseFloat(settings.monthlySubs?.toString() || "35") > 0);
     const [finesEnabled, setFinesEnabled] = useState(settings.finesEnabled || false);
 
     // Step 5: Squads
@@ -301,8 +302,7 @@ export default function OnboardingWizard() {
                 homeKitSocks,
                 awayKitShirt,
                 awayKitShorts,
-                awayKitSocks,
-                monthlySubs: parseFloat(monthlySubs) || 0,
+                monthlySubs: paysSubs ? (parseFloat(monthlySubs) || 0) : 0,
                 finesEnabled,
                 homeGround: homeGroundName || null,
                 twitterUrl: twitterHandle || null,
@@ -660,19 +660,37 @@ export default function OnboardingWizard() {
                                                 </CardDescription>
                                             </CardHeader>
                                             <CardContent className="space-y-6 pt-6">
-                                                <div className="space-y-2">
-                                                    <Label className="text-slate-300">Standard Monthly Player Subs (£)</Label>
-                                                    <div className="relative">
-                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
-                                                        <Input 
-                                                            type="number"
-                                                            value={monthlySubs}
-                                                            onChange={(e) => setMonthlySubs(e.target.value)}
-                                                            className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
-                                                        />
+                                                <div className="bg-slate-900/30 border border-slate-800 rounded-xl p-5 flex items-start justify-between gap-4">
+                                                    <div className="space-y-1">
+                                                        <Label className="text-white font-semibold flex items-center gap-1.5">
+                                                            <Banknote className="w-4 h-4 text-indigo-400" /> Player Subscriptions
+                                                        </Label>
+                                                        <p className="text-slate-400 text-xs leading-relaxed">
+                                                            Do players pay monthly subscription fees to play for the club?
+                                                        </p>
                                                     </div>
-                                                    <p className="text-slate-500 text-xs">Used to calculate target collection goals in the Finance panel.</p>
+                                                    <Switch 
+                                                        checked={paysSubs} 
+                                                        onCheckedChange={setPaysSubs}
+                                                    />
                                                 </div>
+
+                                                {paysSubs && (
+                                                    <div className="space-y-2">
+                                                        <Label className="text-slate-300">Standard Monthly Player Subs (£)</Label>
+                                                        <div className="relative">
+                                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
+                                                            <Input 
+                                                                type="number"
+                                                                value={monthlySubs}
+                                                                onChange={(e) => setMonthlySubs(e.target.value)}
+                                                                className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
+                                                                placeholder="e.g. 35"
+                                                            />
+                                                        </div>
+                                                        <p className="text-slate-500 text-xs">Used to calculate target collection goals in the Finance panel.</p>
+                                                    </div>
+                                                )}
 
                                                 <div className="bg-slate-900/30 border border-slate-800 rounded-xl p-5 flex items-start justify-between gap-4">
                                                     <div className="space-y-1">
