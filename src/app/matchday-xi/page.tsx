@@ -10,6 +10,15 @@ import { useClub } from "@/context/club-context";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+const POSITION_ORDER: { [key: string]: number } = {
+    'GK': 1,
+    'CB': 2, 'RB': 3, 'LB': 4, 'RWB': 5, 'LWB': 6, 'DEF': 7,
+    'CDM': 8, 'CM': 9, 'CAM': 10, 'RM': 11, 'LM': 12, 'MID': 13,
+    'LW': 14,
+    'RW': 15,
+    'CF': 16, 'ST': 17, 'FWD': 18
+};
+
 export default function MatchdayXIPage() {
     const { settings } = useClub();
     const [lineup, setLineup] = useState<MatchdayXI | null>(null);
@@ -96,17 +105,10 @@ export default function MatchdayXIPage() {
                 imageUrl: p.image_url, // Added mapping
             }));
 
-            // Sort logic
-            const positionOrder: { [key: string]: number } = {
-                'GK': 1,
-                'CB': 2, 'RB': 2, 'LB': 2, 'RWB': 2, 'LWB': 2, 'DEF': 2,
-                'CDM': 3, 'CM': 3, 'CAM': 3, 'MID': 3,
-                'RW': 4, 'LW': 4, 'CF': 4, 'FWD': 4
-            };
-
+            // Sort logic using global POSITION_ORDER
             setPlayers(mapped.sort((a: any, b: any) => {
-                const orderA = positionOrder[a.position] || 5;
-                const orderB = positionOrder[b.position] || 5;
+                const orderA = POSITION_ORDER[a.position.toUpperCase()] || 99;
+                const orderB = POSITION_ORDER[b.position.toUpperCase()] || 99;
                 if (orderA !== orderB) return orderA - orderB;
                 return a.lastName.localeCompare(b.lastName);
             }));
@@ -561,6 +563,11 @@ export default function MatchdayXIPage() {
             const matchB = catB === targetCategory ? 1 : 0;
             if (matchA !== matchB) return matchB - matchA;
         }
+        
+        // Group by exact position first using global POSITION_ORDER
+        const orderA = POSITION_ORDER[a.position.toUpperCase()] || 99;
+        const orderB = POSITION_ORDER[b.position.toUpperCase()] || 99;
+        if (orderA !== orderB) return orderA - orderB;
         
         return a.lastName.localeCompare(b.lastName);
     });
