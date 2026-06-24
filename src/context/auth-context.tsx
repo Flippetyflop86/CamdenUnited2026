@@ -44,7 +44,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .eq("user_id", userId)
                 .single();
 
-            if (error && error.code !== 'PGRST116') {
+            const isAbortError = 
+                error && (
+                    (error as any).name === 'AbortError' || 
+                    error.message?.includes('AbortError') || 
+                    error.message?.includes('signal is aborted')
+                );
+
+            if (error && error.code !== 'PGRST116' && !isAbortError) {
                 console.error("Error fetching club membership:", error.message, error.details, error.hint, error.code);
             }
 
