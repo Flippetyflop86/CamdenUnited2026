@@ -69,8 +69,10 @@ export default function OnboardingWizard() {
     const [finesEnabled, setFinesEnabled] = useState(settings.finesEnabled || false);
 
     // Step 5: Squads
-    const availableSquads = ["First Team", "Reserves", "Under-18s", "Under-16s", "Women's Team", "Academy", "Pan-Disability"];
-    const [selectedSquads, setSelectedSquads] = useState<string[]>(settings.squads || ["First Team"]);
+    const availableSquads = ["First Team", "Reserves", "Under-18s", "Under-16s", "Women's Team", "Academy", "Pan-Disability", "Midweek", "Youth"];
+    const [selectedSquads, setSelectedSquads] = useState<string[]>(
+        settings.isOnboarded ? (settings.squads || ["First Team"]) : ["First Team"]
+    );
     const [customSquadInput, setCustomSquadInput] = useState("");
 
     // Step 6: Committee & Staff
@@ -124,7 +126,7 @@ export default function OnboardingWizard() {
 
             setContractsEnabled(settings.contractsEnabled !== undefined ? settings.contractsEnabled : false);
             setFinesEnabled(settings.finesEnabled || false);
-            setSelectedSquads(settings.squads || ["First Team"]);
+            setSelectedSquads(settings.isOnboarded ? (settings.squads || ["First Team"]) : ["First Team"]);
             setLeagueUrl(settings.leagueUrl || "");
         }
     }, [isLoaded, settings, user]);
