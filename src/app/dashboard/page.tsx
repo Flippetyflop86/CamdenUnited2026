@@ -258,6 +258,8 @@ export default function DashboardPage() {
             value: mainSquadCount.toString(),
             description: otherSquadsStr || "No other squads",
             icon: Users,
+            link: "/squad",
+            linkText: "+ Add Players"
         },
         {
             title: "League Position",
@@ -265,7 +267,8 @@ export default function DashboardPage() {
             description: settings.leagueUrl ? "View Full Table" : "Setup League Table",
             icon: Trophy,
             trendUp: settings.leaguePosition !== null && settings.leaguePosition <= 3,
-            link: "/league"
+            link: "/league",
+            linkText: "Configure table"
         },
         {
             title: "Next Match",
@@ -275,7 +278,9 @@ export default function DashboardPage() {
                 : "Check Matches tab",
             icon: CalendarDays,
             trend: nextMatch ? (nextMatch.isHome ? "Home Game" : "Away Game") : "",
-            trendUp: true
+            trendUp: true,
+            link: "/matches",
+            linkText: "+ Schedule Match"
         },
         {
             title: "Last Result",
@@ -283,7 +288,9 @@ export default function DashboardPage() {
             description: lastResult ? `${lastResult.isHome ? 'vs' : '@'} ${lastResult.opponent}` : "No results yet",
             icon: Activity,
             trend: lastResult?.result || "",
-            trendUp: lastResult?.result === "Win"
+            trendUp: lastResult?.result === "Win",
+            link: "/matches",
+            linkText: "+ Enter Score"
         }
     ];
 
@@ -332,10 +339,14 @@ export default function DashboardPage() {
     ];
 
     const renderMiniPitch = () => {
-        if (!lineup || !players.length) return (
-            <div className="h-[280px] flex flex-col items-center justify-center border-2 border-dashed rounded-xl border-slate-200/60 text-slate-400 text-xs p-4 text-center bg-slate-50/20 backdrop-blur-sm">
-                <span className="text-2xl mb-1">📋</span>
-                <span>No Matchday XI lineup saved</span>
+        if (!lineup || !players.length || Object.keys(lineup.starters || {}).length === 0) return (
+            <div className="h-[290px] flex flex-col items-center justify-center border-2 border-dashed rounded-xl border-slate-200/60 text-slate-400 text-xs p-4 text-center bg-slate-50/20 backdrop-blur-sm">
+                <span className="text-3xl mb-2">📋</span>
+                <p className="font-bold text-slate-700 text-xs">No lineup selected</p>
+                <p className="text-[10px] text-slate-550 max-w-[160px] mx-auto mt-0.5 leading-tight">Choose your starting XI and save your formations.</p>
+                <a href="/matchday-xi" className="mt-3 px-3 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-extrabold text-[9px] rounded-full transition-colors uppercase tracking-wide">
+                    + Design Lineup
+                </a>
             </div>
         );
 
@@ -390,6 +401,20 @@ export default function DashboardPage() {
         );
     };
 
+    const hasPlayers = players.length > 0;
+    const hasMatches = matches.length > 0;
+    const hasLineup = lineup && Object.keys(lineup.starters || {}).length > 0;
+    const hasLeagueUrl = !!settings.leagueUrl;
+
+    const checklistSteps = [
+        { label: "Add Players", completed: hasPlayers, link: "/squad" },
+        { label: "Schedule Match", completed: hasMatches, link: "/matches" },
+        { label: "Pick Lineup", completed: hasLineup, link: "/matchday-xi" },
+        { label: "Link League Url", completed: hasLeagueUrl, link: "/admin" }
+    ];
+    const completedStepsCount = checklistSteps.filter(s => s.completed).length;
+    const showSetupChecklist = completedStepsCount < 4;
+
     return (
         <div className="space-y-6 relative">
             <style>{`
@@ -433,10 +458,50 @@ export default function DashboardPage() {
                 </div>
             </div>
 
+            {/* Quick Start Checklist Banner */}
+            {showSetupChecklist && (
+                <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border-slate-800 relative overflow-hidden shadow-xl mb-6 z-10 border">
+                    {/* ambient red glow inside dark card */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-red-600/10 rounded-full blur-2xl pointer-events-none" />
+                    <CardContent className="p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                        <div className="space-y-1.5 flex-1">
+                            <div className="flex items-center gap-2">
+                                <Badge className="bg-red-500 hover:bg-red-500 text-white text-[9px] uppercase font-black px-2 py-0.5 tracking-wider border-none">Quick Start</Badge>
+                                <span className="text-[11px] font-bold text-slate-400">Club Setup Progress: {completedStepsCount}/4 steps</span>
+                            </div>
+                            <h3 className="text-base font-black tracking-tight text-white">Get your Club Flowing</h3>
+                            <p className="text-slate-400 text-xs font-medium">Follow these core steps to fully unlock the power of your club operating system.</p>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 w-full md:w-auto shrink-0 text-xs">
+                            {checklistSteps.map(step => (
+                                <a 
+                                    key={step.label} 
+                                    href={step.link}
+                                    className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                                        step.completed 
+                                            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 font-semibold' 
+                                            : 'bg-white/5 border-white/10 text-slate-300 hover:bg-white/10 font-bold'
+                                    }`}
+                                >
+                                    <div className={`h-4 w-4 rounded-full flex items-center justify-center shrink-0 border ${
+                                        step.completed ? 'bg-emerald-500 border-emerald-500 text-white text-[10px]' : 'border-slate-500 text-transparent'
+                                    }`}>
+                                        ✓
+                                    </div>
+                                    <span>{step.label}</span>
+                                </a>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
             {/* Stats Card Grid */}
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 relative z-10">
                 {stats.map((stat) => {
                     const cfg = getStatCardColors(stat.title);
+                    const isEmpty = stat.value === "0" || stat.value === "Unranked" || stat.value === "No fixtures" || stat.value === "N/A";
                     return (
                         <Card 
                             key={stat.title} 
@@ -469,7 +534,7 @@ export default function DashboardPage() {
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-1">
-                                <div className="text-2xl font-black text-slate-900 tracking-tight">
+                                <div className={`text-2xl font-black tracking-tight ${isEmpty ? 'text-slate-400' : 'text-slate-900'}`}>
                                     {stat.value}
                                 </div>
                                 
@@ -480,7 +545,11 @@ export default function DashboardPage() {
                                     </div>
                                 )}
 
-                                {(stat as any).link ? (
+                                {isEmpty && stat.link ? (
+                                    <a href={stat.link} className="text-[11px] text-red-650 mt-1 flex items-center hover:text-red-700 font-extrabold group-hover:underline uppercase tracking-wide">
+                                        {stat.linkText} <ArrowUpRight className="h-3 w-3 ml-0.5" />
+                                    </a>
+                                ) : (stat as any).link ? (
                                     <a href={(stat as any).link} className="text-xs text-red-600 mt-1 flex items-center hover:text-red-700 font-bold group-hover:underline">
                                         {stat.description} <ArrowUpRight className="h-3 w-3 ml-0.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
                                     </a>
@@ -488,7 +557,7 @@ export default function DashboardPage() {
                                     <p className="text-xs text-slate-500 font-medium">{stat.description}</p>
                                 )}
 
-                                {stat.trend && (
+                                {stat.trend && !isEmpty && (
                                     <div className={`flex items-center text-xs mt-1 ${stat.title === "Last Result"
                                         ? getResultColor(stat.trend)
                                         : stat.trendUp ? 'text-green-600' : 'text-red-600'
@@ -517,7 +586,7 @@ export default function DashboardPage() {
                         {/* Interactive Form Timeline */}
                         <div className="space-y-4">
                             <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Recent Form</h4>
-                            {matches.length > 0 ? (
+                            {matches.filter(m => m.result !== "Pending").length > 0 ? (
                                 <div className="flex flex-col items-center gap-6 w-full py-2">
                                     <div className="relative flex items-center justify-center gap-3 sm:gap-4 z-10 w-full">
                                         <div className="absolute top-1/2 left-4 right-4 h-0.5 bg-slate-200/50 -translate-y-1/2 -z-10" />
@@ -546,7 +615,7 @@ export default function DashboardPage() {
                                                         </span>
 
                                                         {/* Hover Tooltip */}
-                                                        <div className="absolute bottom-full mb-3 hidden group-hover:flex flex-col z-30 bg-slate-900 text-white text-[10px] rounded-xl p-3 whitespace-nowrap shadow-xl border border-slate-800 animate-in fade-in slide-in-from-bottom-1 duration-150">
+                                                        <div className="absolute bottom-full mb-3 hidden group-hover:flex flex-col z-35 bg-slate-900 text-white text-[10px] rounded-xl p-3 whitespace-nowrap shadow-xl border border-slate-800 animate-in fade-in slide-in-from-bottom-1 duration-150">
                                                             <div className="font-bold text-xs border-b border-slate-800 pb-1 mb-1.5 flex items-center justify-between gap-4">
                                                                 <span>{match.isHome ? '🏠 Home' : '🚌 Away'} vs {match.opponent}</span>
                                                                 <span className={`text-[9px] uppercase font-black px-1.5 py-0.5 rounded ${
@@ -566,7 +635,14 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
                             ) : (
-                                <p className="text-slate-400 text-xs">No match data available</p>
+                                <div className="flex flex-col items-center justify-center py-6 text-center text-slate-400 border-2 border-dashed rounded-xl border-slate-200/50 bg-slate-50/20 p-4">
+                                    <span className="text-3xl mb-1.5 animate-pulse">📊</span>
+                                    <p className="font-bold text-[11px] text-slate-700">No match records yet</p>
+                                    <p className="text-[9px] text-slate-550 max-w-[170px] mx-auto mt-0.5 leading-tight">Match updates will automatically generate your form path here.</p>
+                                    <a href="/matches" className="mt-3 px-3 py-1 bg-red-50 hover:bg-red-100 text-red-700 font-extrabold text-[9px] rounded-full transition-colors tracking-wide uppercase">
+                                        + Schedule Match
+                                    </a>
+                                </div>
                             )}
                         </div>
 
@@ -586,25 +662,36 @@ export default function DashboardPage() {
                             <CardDescription className="text-xs">Detailed positional depth metrics</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-3.5">
-                                {positionConfigs.map(cfg => {
-                                    const percent = Math.round((cfg.count / totalPosCount) * 100) || 0;
-                                    return (
-                                        <div key={cfg.label} className="space-y-1">
-                                            <div className="flex justify-between text-xs font-bold text-slate-700">
-                                                <span>{cfg.label}</span>
-                                                <span className="text-slate-500">{cfg.count} player{cfg.count !== 1 ? 's' : ''} ({percent}%)</span>
+                            {players.length > 0 ? (
+                                <div className="space-y-3.5">
+                                    {positionConfigs.map(cfg => {
+                                        const percent = Math.round((cfg.count / totalPosCount) * 100) || 0;
+                                        return (
+                                            <div key={cfg.label} className="space-y-1">
+                                                <div className="flex justify-between text-xs font-bold text-slate-700">
+                                                    <span>{cfg.label}</span>
+                                                    <span className="text-slate-500">{cfg.count} player{cfg.count !== 1 ? 's' : ''} ({percent}%)</span>
+                                                </div>
+                                                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden relative shadow-inner">
+                                                    <div 
+                                                        className={`h-full ${cfg.color} rounded-full transition-all duration-1000 ease-out`}
+                                                        style={{ width: `${percent}%` }}
+                                                    />
+                                                </div>
                                             </div>
-                                            <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden relative shadow-inner">
-                                                <div 
-                                                    className={`h-full ${cfg.color} rounded-full transition-all duration-1000 ease-out`}
-                                                    style={{ width: `${percent}%` }}
-                                                />
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-6 text-center text-slate-450 border border-dashed border-slate-200/60 rounded-xl bg-slate-50/20 p-4">
+                                    <span className="text-3xl mb-1.5">👥</span>
+                                    <p className="font-bold text-[11px] text-slate-700">Squad list is empty</p>
+                                    <p className="text-[9px] text-slate-550 max-w-[170px] mx-auto mt-0.5 leading-tight">Add club members to see depth balance charts here.</p>
+                                    <a href="/squad" className="mt-3 px-3 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-extrabold text-[9px] rounded-full transition-colors tracking-wide uppercase">
+                                        + Add Player
+                                    </a>
+                                </div>
+                            )}
                         </CardContent>
                     </div>
 
@@ -627,7 +714,7 @@ export default function DashboardPage() {
                                         </div>
                                     ))
                                 ) : (
-                                    <p className="text-xs text-slate-400 text-center py-2">No upcoming fixtures</p>
+                                    <p className="text-xs text-slate-450 text-center py-2 font-medium">No upcoming fixtures scheduled</p>
                                 )}
                             </div>
                         </CardContent>
