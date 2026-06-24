@@ -84,7 +84,7 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
     return (
         <Card className={`overflow-hidden hover:shadow-lg transition-all duration-200 group relative border-2 bg-slate-950 ${positionBorderClass} flex flex-col h-full`}>
             <CardHeader className="p-0 flex-1 flex flex-col">
-                <div className="bg-slate-900 p-6 flex flex-col items-center justify-center flex-1 relative border-b border-slate-800">
+                <div className="bg-slate-900 p-3 sm:p-6 flex flex-col items-center justify-center flex-1 relative border-b border-slate-800">
                     {onDelete && (
                         <button
                             onClick={(e) => {
@@ -92,10 +92,10 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                                 e.stopPropagation();
                                 if (confirm('Delete this player?')) onDelete(player.id);
                             }}
-                            className="absolute top-3 left-3 p-2 bg-slate-800 hover:bg-red-900/50 rounded-full text-slate-400 hover:text-red-500 z-20"
+                            className="absolute top-2 sm:top-3 left-2 sm:left-3 p-1.5 sm:p-2 bg-slate-800 hover:bg-red-900/50 rounded-full text-slate-400 hover:text-red-500 z-20"
                             title="Delete Player"
                         >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </button>
                     )}
                     {onEdit && (
@@ -105,10 +105,10 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                                 e.stopPropagation();
                                 onEdit(player);
                             }}
-                            className="absolute top-3 left-12 p-2 bg-slate-800 hover:bg-blue-900/50 rounded-full text-slate-400 hover:text-blue-500 z-20"
+                            className="absolute top-2 sm:top-3 left-9 sm:left-12 p-1.5 sm:p-2 bg-slate-800 hover:bg-blue-900/50 rounded-full text-slate-400 hover:text-blue-500 z-20"
                             title="Edit Player"
                         >
-                            <Pencil className="h-4 w-4" />
+                            <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                         </button>
                     )}
                     <Badge
@@ -117,54 +117,53 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                             e.stopPropagation();
                             onStatusToggle?.(player);
                         }}
-                        className={`absolute top-3 right-3 border cursor-pointer select-none ${statusClass}`}
+                        className={`absolute top-2 sm:top-3 right-2 sm:right-3 border cursor-pointer select-none text-[10px] sm:text-xs px-1.5 py-0.5 ${statusClass}`}
                     >
                         {player.medicalStatus}
                     </Badge>
-                    <Avatar className="h-24 w-24 border-4 border-slate-700 shadow-xl">
+                    <Avatar className="h-16 w-16 sm:h-24 sm:w-24 border-2 sm:border-4 border-slate-700 shadow-xl mt-6 sm:mt-0">
                         <AvatarImage src={displayImage} />
-                        <AvatarFallback className="text-2xl font-bold bg-slate-200 text-slate-800">
+                        <AvatarFallback className="text-xl sm:text-2xl font-bold bg-slate-200 text-slate-800">
                             {player.firstName[0]}{player.lastName[0]}
                         </AvatarFallback>
                     </Avatar>
-                    <div className="mt-4 text-center">
-                        <CardTitle className="text-white text-lg">{player.firstName} {player.lastName}</CardTitle>
-                        <p className="text-slate-400 text-sm font-medium">{player.position} • {squadLabel} • {displayAge} yo</p>
+                    <div className="mt-2 sm:mt-4 text-center">
+                        <CardTitle className="text-white text-sm sm:text-lg truncate max-w-[140px] sm:max-w-none">{player.firstName} {player.lastName}</CardTitle>
+                        <p className="text-slate-400 text-xs sm:text-sm font-medium">{player.position} • {squadLabel} • {displayAge} yo</p>
                         {player.medicalStatus === "Holiday" && player.holidayStart && player.holidayEnd && (
-                            <p className="text-slate-300 text-xs">Holiday: {player.holidayStart} to {player.holidayEnd}</p>
+                            <p className="text-slate-300 text-[10px] sm:text-xs">Holiday: {player.holidayStart} to {player.holidayEnd}</p>
                         )}
-
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="p-4 flex justify-between items-center text-center text-sm overflow-x-auto no-scrollbar">
-                <div className="space-y-1">
-                    <p className="text-slate-500 text-xs">Apps</p>
+            <CardContent className="p-2 sm:p-4 flex justify-between items-center text-center text-xs sm:text-sm overflow-x-auto no-scrollbar">
+                <div className="space-y-0.5 sm:space-y-1">
+                    <p className="text-slate-500 text-[10px] sm:text-xs">Apps</p>
                     <p className="font-bold text-white">{player.appearances ?? 0}</p>
                 </div>
-                <div className="space-y-1">
-                    <p className="text-slate-500 text-xs">Goals</p>
+                <div className="space-y-0.5 sm:space-y-1">
+                    <p className="text-slate-500 text-[10px] sm:text-xs">Goals</p>
                     <p className="font-bold text-white">{player.goals ?? 0}</p>
                 </div>
-                <div className="space-y-1">
-                    <p className="text-slate-500 text-xs">Assists</p>
+                <div className="space-y-0.5 sm:space-y-1">
+                    <p className="text-slate-500 text-[10px] sm:text-xs">Assists</p>
                     <p className="font-bold text-white">{player.assists ?? 0}</p>
                 </div>
                 {player.yellow_cards !== undefined && player.yellow_cards > 0 && (
-                    <div className="space-y-1">
-                        <p className="text-yellow-400 text-xs font-bold">YC</p>
+                    <div className="space-y-0.5 sm:space-y-1">
+                        <p className="text-yellow-400 text-[10px] sm:text-xs font-bold">YC</p>
                         <p className="font-bold text-white">{player.yellow_cards}</p>
                     </div>
                 )}
                 {player.red_cards !== undefined && player.red_cards > 0 && (
-                    <div className="space-y-1">
-                        <p className="text-red-500 text-xs font-bold">RC</p>
+                    <div className="space-y-0.5 sm:space-y-1">
+                        <p className="text-red-500 text-[10px] sm:text-xs font-bold">RC</p>
                         <p className="font-bold text-white">{player.red_cards}</p>
                     </div>
                 )}
             </CardContent>
-            <CardFooter className="p-4 pt-0 mt-auto">
-                <Button asChild className="w-full bg-slate-900 hover:bg-slate-800">
+            <CardFooter className="p-2 sm:p-4 pt-0 sm:pt-0 mt-auto">
+                <Button asChild className="w-full h-8 sm:h-9 text-xs sm:text-sm bg-slate-900 hover:bg-slate-800">
                     <Link href={`/squad/${player.id}`}>View Profile</Link>
                 </Button>
             </CardFooter>
