@@ -44,6 +44,15 @@ interface MatchAnalysis {
     dominance: { us: DominanceStats, opposition: DominanceStats };
 }
 
+const calculateDominancePoints = (stats: DominanceStats) => {
+    if (!stats) return 0;
+    return (stats.deliveries || 0) * 1 +
+           (stats.halfChances || 0) * 2 +
+           (stats.chances || 0) * 3 +
+           (stats.ooohs || 0) * 5 +
+           (stats.goals || 0) * 10;
+};
+
 export default function AnalysisPage() {
     const [matches, setMatches] = useState<Match[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);
@@ -369,6 +378,45 @@ export default function AnalysisPage() {
                             </Button>
                         </CardHeader>
                         <CardContent className="pt-6">
+                            {(() => {
+                                const usPoints = calculateDominancePoints(analysis.dominance?.us);
+                                const oppPoints = calculateDominancePoints(analysis.dominance?.opposition);
+                                const totalPoints = usPoints + oppPoints;
+                                const usPercent = totalPoints > 0 ? (usPoints / totalPoints) * 100 : 50;
+                                const oppPercent = totalPoints > 0 ? (oppPoints / totalPoints) * 100 : 50;
+                                return (
+                                    <div className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100 max-w-2xl mx-auto">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <div className="text-left">
+                                                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Camden United</span>
+                                                <div className="text-xl font-black text-slate-900">{usPoints} <span className="text-xs font-normal text-slate-500">pts</span></div>
+                                            </div>
+                                            <div className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
+                                                Dominance Score
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Opposition</span>
+                                                <div className="text-xl font-black text-rose-700">{oppPoints} <span className="text-xs font-normal text-slate-500">pts</span></div>
+                                            </div>
+                                        </div>
+                                        
+                                        {/* Comparative Progress Bar */}
+                                        <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden flex">
+                                            <div className="bg-indigo-600 transition-all duration-500" style={{ width: `${usPercent}%` }}></div>
+                                            <div className="bg-rose-500 transition-all duration-500" style={{ width: `${oppPercent}%` }}></div>
+                                        </div>
+                                        
+                                        {/* Points Key */}
+                                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 justify-center text-[10px] text-slate-500 border-t border-slate-200/60 pt-2.5">
+                                            <span className="flex items-center gap-1 font-medium"><span className="text-indigo-600 font-bold">Goal</span> 10 pts</span>
+                                            <span className="flex items-center gap-1 font-medium"><span className="text-indigo-600 font-bold">Massive Chance</span> 5 pts</span>
+                                            <span className="flex items-center gap-1 font-medium"><span className="text-indigo-600 font-bold">Chance</span> 3 pts</span>
+                                            <span className="flex items-center gap-1 font-medium"><span className="text-indigo-600 font-bold">Half Chance</span> 2 pts</span>
+                                            <span className="flex items-center gap-1 font-medium"><span className="text-indigo-600 font-bold">Delivery</span> 1 pt</span>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-center">
                                 {/* Camden United */}
                                 <div>
