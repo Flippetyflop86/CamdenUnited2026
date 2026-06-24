@@ -171,6 +171,8 @@ export default function SquadPage() {
                     yellow_cards: s.yellow,
                     red_cards: s.red,
                     dateOfBirth: p.date_of_birth,
+                    holidayStart: p.holiday_start,
+                    holidayEnd: p.holiday_end,
                     notes: p.notes,
                     isInTrainingSquad: p.is_in_training_squad,
                     isContracted: p.is_contracted,
@@ -237,18 +239,20 @@ export default function SquadPage() {
     const handleEdit = (player: Player) => { setEditingPlayer(player); setPreviewImage(player.imageUrl || null); };
 
     const handleSavePlayer = async (updatedPlayer: Player) => {
-        const payload: any = { 
-            first_name: updatedPlayer.firstName, 
-            last_name: updatedPlayer.lastName, 
-            position: updatedPlayer.position, 
-            squad_number: updatedPlayer.squadNumber, 
-            date_of_birth: updatedPlayer.dateOfBirth, 
-            nationality: updatedPlayer.nationality, 
-            squad: updatedPlayer.squad, 
-            medical_status: updatedPlayer.medicalStatus, 
-            availability: updatedPlayer.availability, 
-            image_url: updatedPlayer.imageUrl, 
-            notes: updatedPlayer.notes, 
+        const payload: any = {
+            first_name: updatedPlayer.firstName,
+            last_name: updatedPlayer.lastName,
+            position: updatedPlayer.position,
+            squad_number: updatedPlayer.squadNumber,
+            date_of_birth: updatedPlayer.dateOfBirth,
+            nationality: updatedPlayer.nationality,
+            squad: updatedPlayer.squad,
+            medical_status: updatedPlayer.medicalStatus,
+            availability: updatedPlayer.availability,
+            image_url: updatedPlayer.imageUrl,
+            notes: updatedPlayer.notes,
+            holiday_start: updatedPlayer.holidayStart || null,
+            holiday_end: updatedPlayer.holidayEnd || null,
             is_in_training_squad: updatedPlayer.isInTrainingSquad,
             is_contracted: updatedPlayer.isContracted,
             contract_amount: updatedPlayer.contractAmount,
@@ -258,10 +262,22 @@ export default function SquadPage() {
             subs_billing_model: updatedPlayer.subsBillingModel || "Monthly",
             subs_custom_amount: updatedPlayer.subsCustomAmount !== undefined && updatedPlayer.subsCustomAmount !== null ? updatedPlayer.subsCustomAmount : 0
         };
-        if (updatedPlayer.id === "new") await supabase.from("players").insert([payload]);
-        else await supabase.from("players").update(payload).eq("id", updatedPlayer.id);
-        await fetchData();
-        setEditingPlayer(null);
+        try {
+            let error;
+            if (updatedPlayer.id === "new") {
+                const res = await supabase.from("players").insert([payload]);
+                error = res.error;
+            } else {
+                const res = await supabase.from("players").update(payload).eq("id", updatedPlayer.id);
+                error = res.error;
+            }
+            if (error) throw error;
+            await fetchData();
+            setEditingPlayer(null);
+        } catch (err: any) {
+            console.error("Save Player Error:", err);
+            alert("Database Error: " + err.message + "\n\nIf it says column 'holiday_start' or 'holiday_end' does not exist, please run this SQL query in your Supabase SQL Editor:\n\nALTER TABLE players ADD COLUMN IF NOT EXISTS holiday_start date;\nALTER TABLE players ADD COLUMN IF NOT EXISTS holiday_end date;");
+        }
     };
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -311,7 +327,7 @@ export default function SquadPage() {
                     <Button onClick={() => setIsManageSquadsOpen(true)} variant="outline" size="icon">
                         <Settings className="w-4 h-4" />
                     </Button>
-                    <Button className="bg-red-600 hover:bg-red-700" onClick={() => setEditingPlayer({ id: "new", firstName: "", lastName: "", position: "GK", squadNumber: 0, age: 0, nationality: "English", squad: currentSquads[0], medicalStatus: "Available", availability: true, contractExpiry: "", appearances: 0, goals: 0, assists: 0, imageUrl: "", isInTrainingSquad: true, isContracted: false, contractAmount: 0, contractFrequency: "Weekly", contractStartDate: "", contractEndDate: "", subsBillingModel: "Monthly", subsCustomAmount: 0 })}>
+                    <Button className="bg-red-600 hover:bg-red-700" onClick={() => setEditingPlayer({ id: "new", firstName: "", lastName: "", position: "GK", squadNumber: 0, age: 0, nationality: "English", squad: currentSquads[0], medicalStatus: "Available", availability: true, contractExpiry: "", appearances: 0, goals: 0, assists: 0, imageUrl: "", isInTrainingSquad: true, isContracted: false, contractAmount: 0, contractFrequency: "Weekly", contractStartDate: "", contractEndDate: "", subsBillingModel: "Monthly", subsCustomAmount: 0, holidayStart: "", holidayEnd: "" })}>
                         <Plus className="h-4 w-4 mr-2" /> Add Player
                     </Button>
                 </div>
@@ -471,33 +487,49 @@ export default function SquadPage() {
                             </div>
 
                             <div className="space-y-1">
-                                <label className="block text-xs font-medium text-slate-500">Date of Birth</label>
-                                <div className="flex gap-2">
-                                    <Input
-                                        type="date"
-                                        value={editingPlayer.dateOfBirth || ""}
-                                        onChange={(e) => {
-                                            const dob = e.target.value;
-                                            let computedAge = editingPlayer.age;
-                                            if (dob) {
-                                                const birthDate = new Date(dob);
-                                                const today = new Date();
-                                                let age = today.getFullYear() - birthDate.getFullYear();
-                                                const m = today.getMonth() - birthDate.getMonth();
-                                                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
-                                                    age--;
-                                                }
-                                                computedAge = age;
-                                            }
-                                            setEditingPlayer({ ...editingPlayer, dateOfBirth: dob, age: computedAge });
-                                        }}
-                                        className="w-full h-8 px-2 text-xs"
-                                    />
-                                    <div className="w-12 h-8 flex items-center justify-center bg-slate-50 border rounded text-xs font-medium text-slate-600">
-                                        {editingPlayer.age}
-                                    </div>
-                                </div>
-                            </div>
+    <label className="block text-xs font-medium text-slate-500">Date of Birth</label>
+    <div className="flex gap-2">
+        <Input
+            type="date"
+            value={editingPlayer.dateOfBirth || ""}
+            onChange={(e) => {
+                const dob = e.target.value;
+                let computedAge = editingPlayer.age;
+                if (dob) {
+                    const birthDate = new Date(dob);
+                    const today = new Date();
+                    let age = today.getFullYear() - birthDate.getFullYear();
+                    const m = today.getMonth() - birthDate.getMonth();
+                    if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                        age--;
+                    }
+                    computedAge = age;
+                }
+                setEditingPlayer({ ...editingPlayer, dateOfBirth: dob, age: computedAge });
+            }}
+            className="w-full h-8 px-2 text-xs"
+        />
+        <div className="w-12 h-8 flex items-center justify-center bg-slate-50 border rounded text-xs font-medium text-slate-600">{editingPlayer.age}</div>
+    </div>
+</div>
+<div className="space-y-1 mt-2">
+    <label className="block text-xs font-medium text-slate-500">Holiday Start</label>
+    <Input
+        type="date"
+        value={editingPlayer.holidayStart || ""}
+        onChange={e => setEditingPlayer({ ...editingPlayer, holidayStart: e.target.value })}
+        className="w-full h-8 px-2 text-xs"
+    />
+</div>
+<div className="space-y-1 mt-2">
+    <label className="block text-xs font-medium text-slate-500">Holiday End</label>
+    <Input
+        type="date"
+        value={editingPlayer.holidayEnd || ""}
+        onChange={e => setEditingPlayer({ ...editingPlayer, holidayEnd: e.target.value })}
+        className="w-full h-8 px-2 text-xs"
+    />
+</div>
 
                             {/* Player Contracts Section */}
                             {settings.contractsEnabled && (
@@ -571,26 +603,37 @@ export default function SquadPage() {
                                             <label className="text-xs font-medium text-slate-500">Billing Model</label>
                                             <select
                                                 value={editingPlayer.subsBillingModel || 'Monthly'}
-                                                onChange={(e) => setEditingPlayer({ 
-                                                    ...editingPlayer, 
-                                                    subsBillingModel: e.target.value as any
-                                                })}
+                                                onChange={(e) => {
+                                                    const val = e.target.value as any;
+                                                    setEditingPlayer({ 
+                                                        ...editingPlayer, 
+                                                        subsBillingModel: val,
+                                                        subsCustomAmount: val === "Exempt" ? 0 : editingPlayer.subsCustomAmount
+                                                    });
+                                                }}
                                                 className="w-full h-8 px-2 border rounded-md text-xs bg-white"
                                             >
                                                 <option value="Monthly">Flat Monthly Subs</option>
                                                 <option value="Pay-As-You-Go">Pay-As-You-Go (Per Session)</option>
+                                                <option value="Matchday-PAYG">Matchday-PAYG (Per Match)</option>
+                                                <option value="Both-PAYG">Both PAYG (Sessions + Matches)</option>
+                                                <option value="Exempt">Exempt (No Fee)</option>
                                             </select>
                                         </div>
                                         <div className="space-y-1">
                                             <label className="text-xs font-medium text-slate-500">
-                                                {editingPlayer.subsBillingModel === 'Pay-As-You-Go' ? 'Custom Session Fee (£)' : 'Custom Monthly Sub (£)'}
+                                                {editingPlayer.subsBillingModel === 'Pay-As-You-Go' ? 'Custom Session Fee (£)' :
+                                                 editingPlayer.subsBillingModel === 'Matchday-PAYG' ? 'Custom Matchday Fee (£)' :
+                                                 editingPlayer.subsBillingModel === 'Both-PAYG' ? 'Custom Matchday Fee (£)' :
+                                                 'Custom Monthly Sub (£)'}
                                             </label>
                                             <Input
                                                 type="number"
-                                                placeholder="Optional (assumes 0 if empty)"
+                                                placeholder={editingPlayer.subsBillingModel === 'Exempt' ? '0' : 'Optional (assumes 0 if empty)'}
+                                                disabled={editingPlayer.subsBillingModel === 'Exempt'}
                                                 value={editingPlayer.subsCustomAmount || ''}
                                                 onChange={(e) => setEditingPlayer({ ...editingPlayer, subsCustomAmount: parseFloat(e.target.value) || 0 })}
-                                                className="h-8 text-xs bg-white"
+                                                className="h-8 text-xs bg-white disabled:opacity-50"
                                             />
                                         </div>
                                     </div>

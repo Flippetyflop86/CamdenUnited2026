@@ -47,6 +47,8 @@ export default function TrainingSessionPage() {
                         nationality: p.nationality,
                         squad: p.squad,
                         medicalStatus: p.medical_status,
+                        holidayStart: p.holiday_start,
+                        holidayEnd: p.holiday_end,
                         availability: p.availability,
                         contractExpiry: p.contract_expiry,
                         imageUrl: p.image_url,
@@ -158,8 +160,14 @@ export default function TrainingSessionPage() {
         "RW": 4, "LW": 4, "CF": 4, "ST": 4, "FWD": 4
     };
 
+    const isPlayerOnHolidayOnDate = (p: Player, dateStr: string) => {
+        if (p.medicalStatus !== "Holiday") return false;
+        if (!p.holidayStart || !p.holidayEnd) return true;
+        return dateStr >= p.holidayStart && dateStr <= p.holidayEnd;
+    };
+
     const eligiblePlayers = players
-        .filter(p => p.squad === "firstTeam" || p.isInTrainingSquad)
+        .filter(p => (p.squad === "firstTeam" || p.isInTrainingSquad) && !isPlayerOnHolidayOnDate(p, session.date))
         .sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));
 
     const presentCount = session.attendance.filter(a => a.status === 'Present').length;

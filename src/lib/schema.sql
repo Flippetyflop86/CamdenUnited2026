@@ -21,7 +21,9 @@ create table players (
   goals integer default 0,
   assists integer default 0,
   notes text,
-  is_in_training_squad boolean default true
+  is_in_training_squad boolean default true,
+  holiday_start date,
+  holiday_end date
 );
 
 -- 2. Matches Table

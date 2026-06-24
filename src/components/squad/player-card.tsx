@@ -130,6 +130,9 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                     <div className="mt-4 text-center">
                         <CardTitle className="text-white text-lg">{player.firstName} {player.lastName}</CardTitle>
                         <p className="text-slate-400 text-sm font-medium">{player.position} • {squadLabel} • {displayAge} yo</p>
+                        {player.medicalStatus === "Holiday" && player.holidayStart && player.holidayEnd && (
+                            <p className="text-slate-300 text-xs">Holiday: {player.holidayStart} to {player.holidayEnd}</p>
+                        )}
 
                     </div>
                 </div>

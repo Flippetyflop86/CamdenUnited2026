@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Shield, UserPlus, Eye, EyeOff } from "lucide-react";
+import { AlertCircle, UserPlus, Eye, EyeOff } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 
@@ -82,9 +83,14 @@ export default function SignupPage() {
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
             <div className="w-full max-w-md space-y-8">
                 <div className="flex flex-col items-center justify-center text-center">
-                    <div className="h-16 w-16 bg-red-600 rounded-2xl flex items-center justify-center mb-6 shadow-lg shadow-red-600/20">
-                        <Shield className="h-8 w-8 text-white" />
-                    </div>
+                    <Image
+                        src="/clubflow-logo.png"
+                        alt="ClubFlow"
+                        width={240}
+                        height={160}
+                        priority
+                        className="object-contain mb-2"
+                    />
                     <h1 className="text-3xl font-bold text-white tracking-tight">Create your Club</h1>
                     <p className="text-slate-400 mt-2">Start managing your team with a free workspace</p>
                 </div>

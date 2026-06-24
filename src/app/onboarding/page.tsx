@@ -681,6 +681,7 @@ export default function OnboardingWizard() {
                                                     <Switch 
                                                         checked={subsEnabled} 
                                                         onCheckedChange={setSubsEnabled}
+                                                        className="data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-red-500"
                                                     />
                                                 </div>
 
@@ -698,6 +699,9 @@ export default function OnboardingWizard() {
                                                                     placeholder="e.g. 35"
                                                                 />
                                                             </div>
+                                                            <p className="text-slate-400 text-[11px] leading-normal mt-1 bg-slate-900/40 p-2.5 rounded-lg border border-slate-800">
+                                                                <strong>Note:</strong> You can mark specific players as <strong>Exempt</strong> (e.g. coaches, sponsored players) or customize their fees individually later in the Squad and Finance tabs.
+                                                            </p>
                                                             <p className="text-slate-500 text-xs">Used to calculate target collection goals in the Finance panel.</p>
                                                         </div>
 
@@ -747,6 +751,7 @@ export default function OnboardingWizard() {
                                                     <Switch 
                                                         checked={contractsEnabled} 
                                                         onCheckedChange={setContractsEnabled}
+                                                        className="data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-red-500"
                                                     />
                                                 </div>
 
@@ -762,6 +767,7 @@ export default function OnboardingWizard() {
                                                     <Switch 
                                                         checked={finesEnabled} 
                                                         onCheckedChange={setFinesEnabled}
+                                                        className="data-[state=checked]:bg-emerald-500 data-[state=unchecked]:bg-red-500"
                                                     />
                                                 </div>
                                             </CardContent>

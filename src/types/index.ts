@@ -16,6 +16,10 @@ export interface Player {
     nationality: string;
     squad: SquadType;
     medicalStatus: MedicalStatus;
+    /** ISO date (YYYY-MM-DD) when a holiday starts */
+    holidayStart?: string;
+    /** ISO date (YYYY-MM-DD) when a holiday ends */
+    holidayEnd?: string;
     medicalNotes?: string;
     contractExpiry: string; // YYYY-MM-DD
     availability: boolean; // General availability flag
@@ -37,7 +41,7 @@ export interface Player {
     contractEndDate?: string;
 
     // Subs Billing Info
-    subsBillingModel?: "Monthly" | "Pay-As-You-Go";
+    subsBillingModel?: "Monthly" | "Pay-As-You-Go" | "Matchday-PAYG" | "Both-PAYG" | "Exempt";
     subsCustomAmount?: number;
 }
 

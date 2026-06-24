@@ -122,7 +122,11 @@ export default function FinancePage() {
     const [newSubsBaseline, setNewSubsBaseline] = useState("");
     const [newRegBaseline, setNewRegBaseline] = useState("");
     const [newSessionBaseline, setNewSessionBaseline] = useState("");
+    const [newMatchdayBaseline, setNewMatchdayBaseline] = useState("");
     const [trainingSessions, setTrainingSessions] = useState<any[]>([]);
+    const [matches, setMatches] = useState<any[]>([]);
+    const [matchdayFee, setMatchdayFee] = useState<number>(10);
+    const [subsStructure, setSubsStructure] = useState<"Monthly" | "Training" | "Matchday" | "Both">("Monthly");
 
     // Player subs modal state
     const [selectedPlayerForPayment, setSelectedPlayerForPayment] = useState<Player | null>(null);
@@ -135,8 +139,10 @@ export default function FinancePage() {
 
     // Player sub settings edit state
     const [editingSubPlayer, setEditingSubPlayer] = useState<Player | null>(null);
-    const [subFormModel, setSubFormModel] = useState<"Monthly" | "Pay-As-You-Go">("Monthly");
+    const [subFormModel, setSubFormModel] = useState<"Monthly" | "Pay-As-You-Go" | "Matchday-PAYG" | "Both-PAYG" | "Exempt">("Monthly");
     const [subFormAmount, setSubFormAmount] = useState<string>("0");
+    const [subFormMatchesOverride, setSubFormMatchesOverride] = useState<string>("0");
+    const [subFormTrainingOverride, setSubFormTrainingOverride] = useState<string>("0");
     const [isSavingSub, setIsSavingSub] = useState(false);
 
     // Search and general filter state
@@ -164,6 +170,25 @@ export default function FinancePage() {
             setShowWizard(true);
         }
         
+        // Load matchday fee
+        const savedMatchdayFee = localStorage.getItem(`clubflow_matchday_fee_${settings.name}`);
+        if (savedMatchdayFee) {
+            setMatchdayFee(parseFloat(savedMatchdayFee) || 10);
+        }
+
+        // Load subs structure
+        const savedStructure = localStorage.getItem(`clubflow_subs_structure_${settings.name}`);
+        if (savedStructure) {
+            setSubsStructure(savedStructure as any);
+        } else {
+            // Default to training fee subs if no monthly sub baseline but session fee is set
+            if (settings.trainingFeePerSession && settings.trainingFeePerSession > 0 && (!settings.monthlySubs || settings.monthlySubs === 0)) {
+                setSubsStructure("Training");
+            } else {
+                setSubsStructure("Monthly");
+            }
+        }
+        
         // Load custom categories from local storage if any
         const savedCustomCats = localStorage.getItem(`clubflow_custom_categories_${settings.name}`);
         if (savedCustomCats) {
@@ -173,7 +198,7 @@ export default function FinancePage() {
                 console.error("Failed to parse custom categories", e);
             }
         }
-    }, [settings.name]);
+    }, [settings.name, settings.trainingFeePerSession, settings.monthlySubs]);
 
     const fetchFinanceData = async () => {
         await Promise.all([
@@ -181,7 +206,8 @@ export default function FinancePage() {
             fetchSponsors(),
             fetchSubscriptions(),
             fetchPlayers(),
-            fetchTrainingSessions()
+            fetchTrainingSessions(),
+            fetchMatches()
         ]);
         setNewStartingBalance((settings.financeStartingBalance || 0).toString());
     };
@@ -340,6 +366,12 @@ export default function FinancePage() {
         if (data) setTrainingSessions(data);
     };
 
+    const fetchMatches = async () => {
+        const { data, error } = await supabase.from("matches").select("*");
+        if (error) console.error("Error fetching matches", error);
+        if (data) setMatches(data);
+    };
+
     const getPlayerRegistrationStatus = (player: Player) => {
         const regFee = settings.registrationFee || 0;
         if (regFee <= 0) return { expected: 0, paid: 0, isPaid: true };
@@ -396,6 +428,10 @@ export default function FinancePage() {
     })();
 
     const getPlayerAttendedSessionsCount = (player: Player) => {
+        const override = localStorage.getItem(`clubflow_training_attended_${player.id}_${currentMonthStr}`);
+        if (override !== null) {
+            return parseInt(override) || 0;
+        }
         let count = 0;
         trainingSessions.forEach(session => {
             if (session.date && session.date.startsWith(currentMonthStr)) {
@@ -408,17 +444,54 @@ export default function FinancePage() {
         return count;
     };
 
+    const getPlayerMatchesCount = (player: Player) => {
+        const override = localStorage.getItem(`clubflow_matches_played_${player.id}_${currentMonthStr}`);
+        if (override !== null) {
+            return parseInt(override) || 0;
+        }
+        // Filter matches in current month
+        const monthlyMatches = matches.filter(m => m.date && m.date.startsWith(currentMonthStr));
+        return monthlyMatches.length;
+    };
+
     // Monthly Player Subs expectations
     const getPlayerMonthlyFee = (p: Player) => {
         if (!settings.subsEnabled) return 0;
+        if (p.subsBillingModel === "Exempt") return 0;
         
-        if (p.subsBillingModel === "Pay-As-You-Go") {
-            const count = getPlayerAttendedSessionsCount(p);
-            const rate = p.subsCustomAmount !== undefined && p.subsCustomAmount !== null ? p.subsCustomAmount : (settings.trainingFeePerSession || 0);
-            return count * rate;
+        let effectiveModel = p.subsBillingModel;
+        if (!effectiveModel) {
+            if (subsStructure === "Training") effectiveModel = "Pay-As-You-Go";
+            else if (subsStructure === "Matchday") effectiveModel = "Matchday-PAYG";
+            else if (subsStructure === "Both") effectiveModel = "Both-PAYG";
+            else effectiveModel = "Monthly";
         }
 
-        if (p.subsCustomAmount !== undefined && p.subsCustomAmount !== null && p.subsCustomAmount > 0) {
+        const trainingRate = p.subsCustomAmount !== undefined && p.subsCustomAmount !== null && p.subsCustomAmount > 0 && effectiveModel === "Pay-As-You-Go"
+            ? p.subsCustomAmount 
+            : (settings.trainingFeePerSession || 0);
+
+        const matchdayRate = p.subsCustomAmount !== undefined && p.subsCustomAmount !== null && p.subsCustomAmount > 0 && effectiveModel === "Matchday-PAYG"
+            ? p.subsCustomAmount
+            : (matchdayFee || 10);
+
+        if (effectiveModel === "Pay-As-You-Go") {
+            const count = getPlayerAttendedSessionsCount(p);
+            return count * trainingRate;
+        }
+
+        if (effectiveModel === "Matchday-PAYG") {
+            const count = getPlayerMatchesCount(p);
+            return count * matchdayRate;
+        }
+
+        if (effectiveModel === "Both-PAYG") {
+            const trainingCount = getPlayerAttendedSessionsCount(p);
+            const matchesCount = getPlayerMatchesCount(p);
+            return trainingCount * trainingRate + matchesCount * matchdayRate;
+        }
+
+        if (p.subsCustomAmount !== undefined && p.subsCustomAmount !== null && p.subsCustomAmount > 0 && effectiveModel === "Monthly") {
             return p.subsCustomAmount;
         }
         return settings.monthlySubs || 0;
@@ -441,9 +514,14 @@ export default function FinancePage() {
         const paid = payments.reduce((sum, p) => sum + p.amount, 0);
         const outstanding = Math.max(0, expected - paid);
         
-        let status: "Paid" | "Part Paid" | "Outstanding" = "Outstanding";
-        if (paid >= expected) status = "Paid";
-        else if (paid > 0) status = "Part Paid";
+        let status: "Paid" | "Part Paid" | "Outstanding" | "Exempt" = "Outstanding";
+        if (player.subsBillingModel === "Exempt") {
+            status = "Exempt";
+        } else if (paid >= expected) {
+            status = "Paid";
+        } else if (paid > 0) {
+            status = "Part Paid";
+        }
 
         return {
             expected,
@@ -467,10 +545,20 @@ export default function FinancePage() {
             outstanding += dues.outstanding;
         });
 
-        const rate = expected > 0 ? Math.round((received / expected) * 100) : 100;
+        const rate = expected > 0 ? Math.round((received / expected) * 100) : 0;
 
         return { expected, received, outstanding, rate };
     })();
+
+    // Copy friendly chaser reminder
+    const copyReminderForPlayer = (player: Player) => {
+        const dues = getPlayerDuesForMonth(player);
+        const currentMonthName = new Date().toLocaleString("default", { month: "long" });
+        const text = `Hi ${player.firstName}, hope you're well! Just a friendly reminder that you have £${dues.outstanding} outstanding for your ${currentMonthName} club subs. Could you please get this sorted when you can? Thanks!`;
+        
+        navigator.clipboard.writeText(text);
+        triggerToast(`Copied payment reminder message for ${player.firstName}`);
+    };
 
     // Monthly commitments (forecasted expenses)
     const monthlyExpensesCommitment = (() => {
@@ -623,6 +711,8 @@ export default function FinancePage() {
         setEditingSubPlayer(player);
         setSubFormModel(player.subsBillingModel || "Monthly");
         setSubFormAmount((player.subsCustomAmount || 0).toString());
+        setSubFormMatchesOverride(localStorage.getItem(`clubflow_matches_played_${player.id}_${currentMonthStr}`) || getPlayerMatchesCount(player).toString());
+        setSubFormTrainingOverride(localStorage.getItem(`clubflow_training_attended_${player.id}_${currentMonthStr}`) || getPlayerAttendedSessionsCount(player).toString());
     };
 
     const handleSaveSubSettings = async () => {
@@ -630,6 +720,20 @@ export default function FinancePage() {
         setIsSavingSub(true);
         try {
             const amt = parseFloat(subFormAmount) || 0;
+            
+            // Save overrides to local storage
+            if (subFormModel === "Matchday-PAYG" || subFormModel === "Both-PAYG") {
+                localStorage.setItem(`clubflow_matches_played_${editingSubPlayer.id}_${currentMonthStr}`, subFormMatchesOverride);
+            } else {
+                localStorage.removeItem(`clubflow_matches_played_${editingSubPlayer.id}_${currentMonthStr}`);
+            }
+
+            if (subFormModel === "Pay-As-You-Go" || subFormModel === "Both-PAYG") {
+                localStorage.setItem(`clubflow_training_attended_${editingSubPlayer.id}_${currentMonthStr}`, subFormTrainingOverride);
+            } else {
+                localStorage.removeItem(`clubflow_training_attended_${editingSubPlayer.id}_${currentMonthStr}`);
+            }
+
             const { error } = await supabase
                 .from("players")
                 .update({
@@ -771,6 +875,11 @@ export default function FinancePage() {
         const val = parseFloat(newSubsBaseline) || 0;
         const reg = parseFloat(newRegBaseline) || 0;
         const ses = parseFloat(newSessionBaseline) || 0;
+        const mat = parseFloat(newMatchdayBaseline) || 0;
+        
+        localStorage.setItem(`clubflow_matchday_fee_${settings.name}`, mat.toString());
+        setMatchdayFee(mat);
+
         await updateSettings({ 
             monthlySubs: val,
             registrationFee: reg,
@@ -1472,17 +1581,36 @@ export default function FinancePage() {
                         </div>
                         <div className="flex items-center gap-4 bg-slate-50 border border-slate-200/80 px-3.5 py-2 rounded-xl text-xs font-semibold text-slate-700 shadow-xs shrink-0">
                             {isEditingSubs ? (
-                                <div className="flex items-center gap-3">
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-[10px] text-slate-400 uppercase font-bold">Monthly:</span>
-                                        <span className="text-slate-500">£</span>
-                                        <Input
-                                            type="number"
-                                            value={newSubsBaseline}
-                                            onChange={e => setNewSubsBaseline(e.target.value)}
-                                            className="h-7 w-14 bg-white border-slate-200 text-slate-800 text-xs px-1 text-center font-bold"
-                                        />
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <div className="flex items-center gap-1.5 mr-1">
+                                        <span className="text-[10px] text-slate-400 uppercase font-bold">Structure:</span>
+                                        <select
+                                            value={subsStructure}
+                                            onChange={e => {
+                                                const struct = e.target.value as any;
+                                                setSubsStructure(struct);
+                                                localStorage.setItem(`clubflow_subs_structure_${settings.name}`, struct);
+                                            }}
+                                            className="h-7 bg-white border border-slate-200 text-slate-800 text-xs px-2 rounded-lg font-bold focus:outline-none"
+                                        >
+                                            <option value="Monthly">Monthly charge in total</option>
+                                            <option value="Training">Just training fee subs</option>
+                                            <option value="Matchday">Just matchday subs</option>
+                                            <option value="Both">Both training & matchday subs</option>
+                                        </select>
                                     </div>
+                                    {(subsStructure === "Monthly") && (
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-[10px] text-slate-400 uppercase font-bold">Monthly:</span>
+                                            <span className="text-slate-500">£</span>
+                                            <Input
+                                                type="number"
+                                                value={newSubsBaseline}
+                                                onChange={e => setNewSubsBaseline(e.target.value)}
+                                                className="h-7 w-14 bg-white border-slate-200 text-slate-800 text-xs px-1 text-center font-bold"
+                                            />
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-1">
                                         <span className="text-[10px] text-slate-400 uppercase font-bold">Reg Fee:</span>
                                         <span className="text-slate-500">£</span>
@@ -1493,38 +1621,72 @@ export default function FinancePage() {
                                             className="h-7 w-14 bg-white border-slate-200 text-slate-800 text-xs px-1 text-center font-bold"
                                         />
                                     </div>
-                                    <div className="flex items-center gap-1">
-                                        <span className="text-[10px] text-slate-400 uppercase font-bold">Training:</span>
-                                        <span className="text-slate-500">£</span>
-                                        <Input
-                                            type="number"
-                                            value={newSessionBaseline}
-                                            onChange={e => setNewSessionBaseline(e.target.value)}
-                                            className="h-7 w-14 bg-white border-slate-200 text-slate-800 text-xs px-1 text-center font-bold"
-                                        />
-                                    </div>
+                                    {(subsStructure === "Training" || subsStructure === "Both") && (
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-[10px] text-slate-400 uppercase font-bold">Training:</span>
+                                            <span className="text-slate-500">£</span>
+                                            <Input
+                                                type="number"
+                                                value={newSessionBaseline}
+                                                onChange={e => setNewSessionBaseline(e.target.value)}
+                                                className="h-7 w-14 bg-white border-slate-200 text-slate-800 text-xs px-1 text-center font-bold"
+                                            />
+                                        </div>
+                                    )}
+                                    {(subsStructure === "Matchday" || subsStructure === "Both") && (
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-[10px] text-slate-400 uppercase font-bold">Matchday:</span>
+                                            <span className="text-slate-500">£</span>
+                                            <Input
+                                                type="number"
+                                                value={newMatchdayBaseline}
+                                                onChange={e => setNewMatchdayBaseline(e.target.value)}
+                                                className="h-7 w-14 bg-white border-slate-200 text-slate-800 text-xs px-1 text-center font-bold"
+                                            />
+                                        </div>
+                                    )}
                                     <Button size="sm" onClick={saveSubsBaseline} className="bg-indigo-600 hover:bg-indigo-500 text-white text-[10px] px-2 h-7 font-bold">Save</Button>
                                     <Button size="icon" variant="ghost" onClick={() => setIsEditingSubs(false)} className="h-7 w-7"><X className="h-3 w-3" /></Button>
                                 </div>
                             ) : (
-                                <div className="flex items-center gap-4">
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-slate-500 font-medium">Monthly Subs:</span>
-                                        <span className="font-extrabold bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 text-indigo-700">£{settings.monthlySubs || 0}</span>
+                                <div className="flex flex-wrap items-center gap-4">
+                                    <div className="flex items-center gap-1">
+                                        <span className="text-[10px] text-slate-400 uppercase font-bold">Billing Model:</span>
+                                        <span className="font-extrabold bg-indigo-50 border border-indigo-100 rounded-lg px-2 py-0.5 text-indigo-700 text-[10px]">
+                                            {subsStructure === "Monthly" ? "Monthly Subs" :
+                                             subsStructure === "Training" ? "Training Only" :
+                                             subsStructure === "Matchday" ? "Matchday Only" :
+                                             "Both Training & Matchday"}
+                                        </span>
                                     </div>
+                                    {subsStructure === "Monthly" && (
+                                        <div className="flex items-center gap-1.5 border-l border-slate-200 pl-3">
+                                            <span className="text-slate-500 font-medium">Monthly Subs:</span>
+                                            <span className="font-extrabold bg-indigo-50 border border-indigo-100 rounded px-1.5 py-0.5 text-indigo-700">£{settings.monthlySubs || 0}</span>
+                                        </div>
+                                    )}
                                     <div className="flex items-center gap-1.5">
                                         <span className="text-slate-500 font-medium">Reg Fee:</span>
                                         <span className="font-extrabold bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 text-emerald-700">£{settings.registrationFee || 0}</span>
                                     </div>
-                                    <div className="flex items-center gap-1.5">
-                                        <span className="text-slate-500 font-medium">Training Fee:</span>
-                                        <span className="font-extrabold bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 text-amber-700">£{settings.trainingFeePerSession || 0}</span>
-                                    </div>
+                                    {(subsStructure === "Training" || subsStructure === "Both") && (
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-slate-500 font-medium">Training Fee:</span>
+                                            <span className="font-extrabold bg-amber-50 border border-amber-100 rounded px-1.5 py-0.5 text-amber-700">£{settings.trainingFeePerSession || 0}</span>
+                                        </div>
+                                    )}
+                                    {(subsStructure === "Matchday" || subsStructure === "Both") && (
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-slate-500 font-medium">Matchday Fee:</span>
+                                            <span className="font-extrabold bg-rose-50 border border-rose-100 rounded px-1.5 py-0.5 text-rose-700">£{matchdayFee || 0}</span>
+                                        </div>
+                                    )}
                                     <button 
                                         onClick={() => { 
                                             setNewSubsBaseline((settings.monthlySubs || 0).toString()); 
                                             setNewRegBaseline((settings.registrationFee || 0).toString());
                                             setNewSessionBaseline((settings.trainingFeePerSession || 0).toString());
+                                            setNewMatchdayBaseline((matchdayFee || 0).toString());
                                             setIsEditingSubs(true); 
                                         }}
                                         className="text-[10px] text-indigo-600 hover:text-indigo-800 underline font-extrabold ml-1"
@@ -1639,7 +1801,7 @@ export default function FinancePage() {
                                                     <td className="px-6 py-4 font-bold text-slate-600">
                                                         <div className="flex flex-col">
                                                              <div className="flex items-center gap-1.5 group">
-                                                                 <span>£{dues.expected}</span>
+                                                                 <span>{player.subsBillingModel === "Exempt" ? "—" : `£${dues.expected}`}</span>
                                                                  {settings.subsEnabled && (
                                                                      <button 
                                                                          onClick={() => handleOpenSubSettingsModal(player)}
@@ -1650,29 +1812,45 @@ export default function FinancePage() {
                                                                      </button>
                                                                  )}
                                                              </div>
-                                                            <div className="flex flex-wrap gap-1 mt-0.5">
-                                                                {settings.contractsEnabled && player.isContracted && (
-                                                                    <span className="text-[8px] text-red-500 font-bold bg-red-50 border border-red-100 rounded px-1.5 py-0.2">
-                                                                        Contract (£{player.contractAmount}/{player.contractFrequency === "Weekly" ? "wk" : "mo"})
-                                                                    </span>
-                                                                )}
-                                                                {settings.subsEnabled && player.subsBillingModel === "Pay-As-You-Go" && (
-                                                                    <span className="text-[8px] text-indigo-600 font-semibold bg-indigo-50 border border-indigo-100/55 rounded px-1.5 py-0.2">
-                                                                        PAYG ({getPlayerAttendedSessionsCount(player)} sessions)
-                                                                    </span>
-                                                                )}
-                                                                {settings.subsEnabled && player.subsBillingModel === "Monthly" && player.subsCustomAmount !== undefined && player.subsCustomAmount !== null && player.subsCustomAmount > 0 && (
-                                                                    <span className="text-[8px] text-amber-600 font-semibold bg-amber-50 border border-amber-100/55 rounded px-1.5 py-0.2">
-                                                                        custom rate
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </div>
+                                                             <div className="flex flex-wrap gap-1 mt-0.5">
+                                                                 {settings.contractsEnabled && player.isContracted && (
+                                                                     <span className="text-[8px] text-red-500 font-bold bg-red-50 border border-red-100 rounded px-1.5 py-0.2">
+                                                                         Contract (£{player.contractAmount}/{player.contractFrequency === "Weekly" ? "wk" : "mo"})
+                                                                     </span>
+                                                                 )}
+                                                                 {settings.subsEnabled && player.subsBillingModel === "Pay-As-You-Go" && (
+                                                                     <span className="text-[8px] text-indigo-600 font-semibold bg-indigo-50 border border-indigo-100/55 rounded px-1.5 py-0.2">
+                                                                         PAYG ({getPlayerAttendedSessionsCount(player)} sessions)
+                                                                     </span>
+                                                                 )}
+                                                                 {settings.subsEnabled && player.subsBillingModel === "Matchday-PAYG" && (
+                                                                     <span className="text-[8px] text-rose-600 font-semibold bg-rose-50 border border-rose-100/55 rounded px-1.5 py-0.2">
+                                                                         Matchday PAYG ({getPlayerMatchesCount(player)} matches)
+                                                                     </span>
+                                                                 )}
+                                                                 {settings.subsEnabled && player.subsBillingModel === "Both-PAYG" && (
+                                                                     <span className="text-[8px] text-teal-600 font-semibold bg-teal-50 border border-teal-100/55 rounded px-1.5 py-0.2">
+                                                                         Both PAYG ({getPlayerAttendedSessionsCount(player)}s / {getPlayerMatchesCount(player)}m)
+                                                                     </span>
+                                                                 )}
+                                                                 {settings.subsEnabled && player.subsBillingModel === "Monthly" && player.subsCustomAmount !== undefined && player.subsCustomAmount !== null && player.subsCustomAmount > 0 && (
+                                                                     <span className="text-[8px] text-amber-600 font-semibold bg-amber-50 border border-amber-100/55 rounded px-1.5 py-0.2">
+                                                                         custom rate
+                                                                     </span>
+                                                                 )}
+                                                                 {settings.subsEnabled && player.subsBillingModel === "Exempt" && (
+                                                                     <span className="text-[8px] text-slate-500 font-semibold bg-slate-100 border border-slate-200 rounded px-1.5 py-0.2">
+                                                                         exempt
+                                                                     </span>
+                                                                 )}
+                                                             </div>
+                                                         </div>
                                                     </td>
-                                                    <td className="px-6 py-4 text-center text-green-600 font-extrabold">£{dues.paid}</td>
-                                                    <td className="px-6 py-4 text-center text-red-500 font-extrabold">£{dues.outstanding}</td>
+                                                    <td className="px-6 py-4 text-center text-green-600 font-extrabold">{player.subsBillingModel === "Exempt" ? "—" : `£${dues.paid}`}</td>
+                                                    <td className="px-6 py-4 text-center text-red-500 font-extrabold">{player.subsBillingModel === "Exempt" ? "—" : `£${dues.outstanding}`}</td>
                                                     <td className="px-6 py-4 text-center">
                                                         <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-[9px] font-bold uppercase ${
+                                                            dues.status === "Exempt" ? "bg-slate-100 text-slate-600 border border-slate-200" :
                                                             dues.status === "Paid" ? "bg-green-100 text-green-800" :
                                                             dues.status === "Part Paid" ? "bg-amber-100 text-amber-800" : "bg-red-100 text-red-800"
                                                         }`}>
@@ -1680,7 +1858,9 @@ export default function FinancePage() {
                                                         </span>
                                                     </td>
                                                     <td className="px-6 py-4 text-center">
-                                                        {settings.registrationFee && settings.registrationFee > 0 ? (
+                                                        {player.subsBillingModel === "Exempt" ? (
+                                                            <span className="text-[10px] text-slate-400">Exempt</span>
+                                                        ) : settings.registrationFee && settings.registrationFee > 0 ? (
                                                             (() => {
                                                                 const reg = getPlayerRegistrationStatus(player);
                                                                 return reg.isPaid ? (
@@ -1709,8 +1889,8 @@ export default function FinancePage() {
                                                             <Button 
                                                                 size="sm" 
                                                                 onClick={() => handleQuickPay(player)} 
-                                                                disabled={dues.outstanding <= 0}
-                                                                className="bg-green-600 hover:bg-green-700 text-white font-bold text-[10px] px-2 py-1 h-7 rounded-lg"
+                                                                disabled={dues.outstanding <= 0 || player.subsBillingModel === "Exempt"}
+                                                                className="bg-green-600 hover:bg-green-700 text-white font-bold text-[10px] px-2 py-1 h-7 rounded-lg disabled:opacity-50"
                                                             >
                                                                 Mark Paid
                                                             </Button>
@@ -1718,10 +1898,23 @@ export default function FinancePage() {
                                                                 size="sm" 
                                                                 variant="outline" 
                                                                 onClick={() => handleOpenPaymentModal(player)}
-                                                                className="border-slate-200 text-slate-700 text-[10px] px-2 py-1 h-7 rounded-lg hover:bg-slate-50"
+                                                                disabled={player.subsBillingModel === "Exempt"}
+                                                                className="border-slate-200 text-slate-700 text-[10px] px-2 py-1 h-7 rounded-lg hover:bg-slate-50 disabled:opacity-50"
                                                             >
                                                                 Add Custom
                                                             </Button>
+                                                            {player.subsBillingModel !== "Exempt" && dues.outstanding > 0 && (
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    variant="outline" 
+                                                                    onClick={() => copyReminderForPlayer(player)}
+                                                                    title="Copy Friendly Reminder Message"
+                                                                    className="border-indigo-100 text-indigo-700 hover:bg-indigo-50 text-[10px] px-2 py-1 h-7 rounded-lg flex items-center gap-1"
+                                                                >
+                                                                    <MessageSquare className="h-3.5 w-3.5" />
+                                                                    <span>Remind</span>
+                                                                </Button>
+                                                            )}
                                                             <Button 
                                                                 size="icon" 
                                                                 variant="ghost" 
@@ -1846,28 +2039,74 @@ export default function FinancePage() {
                                         <label className="text-[10px] font-bold uppercase text-slate-400 font-medium">Billing Model</label>
                                         <select
                                             value={subFormModel}
-                                            onChange={e => setSubFormModel(e.target.value as any)}
+                                            onChange={e => {
+                                                const val = e.target.value as any;
+                                                setSubFormModel(val);
+                                                if (val === "Exempt") {
+                                                    setSubFormAmount("0");
+                                                }
+                                            }}
                                             className="w-full h-10 px-3 border border-slate-200 rounded-xl text-xs bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                         >
                                             <option value="Monthly">Flat Monthly Subs</option>
                                             <option value="Pay-As-You-Go">Pay-As-You-Go (Per Session)</option>
+                                            <option value="Matchday-PAYG">Matchday-PAYG (Per Match)</option>
+                                            <option value="Both-PAYG">Both PAYG (Sessions + Matches)</option>
+                                            <option value="Exempt">Exempt (No Fee)</option>
                                         </select>
                                     </div>
                                     <div className="space-y-1">
                                         <label className="text-[10px] font-bold uppercase text-slate-400 font-medium">
-                                            {subFormModel === "Pay-As-You-Go" ? "Custom Session Fee (£)" : "Custom Monthly Sub (£)"}
+                                            {subFormModel === "Pay-As-You-Go" ? "Custom Session Fee (£)" :
+                                             subFormModel === "Matchday-PAYG" ? "Custom Matchday Fee (£)" :
+                                             subFormModel === "Both-PAYG" ? "Custom Matchday Fee (£) (Session fee uses default)" :
+                                             "Custom Monthly Sub (£)"}
                                         </label>
                                         <Input 
                                             type="number"
                                             value={subFormAmount}
                                             onChange={e => setSubFormAmount(e.target.value)}
-                                            placeholder="e.g. 10.00"
-                                            className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                            placeholder={subFormModel === "Exempt" ? "0" : "e.g. 10.00"}
+                                            disabled={subFormModel === "Exempt"}
+                                            className="bg-slate-50 border-slate-200 h-10 rounded-xl disabled:opacity-50"
                                         />
                                         <p className="text-[10px] text-slate-400 leading-normal">
-                                            Set to 0 to use the club default ({subFormModel === "Pay-As-You-Go" ? `£${settings.trainingFeePerSession || 0}/session` : `£${settings.monthlySubs || 0}/month`}).
+                                            {subFormModel === "Exempt" 
+                                                ? "Player is exempt from all subscriptions."
+                                                : subFormModel === "Pay-As-You-Go" ? `Set to 0 to use default (£${settings.trainingFeePerSession || 0}/session).`
+                                                : subFormModel === "Matchday-PAYG" ? `Set to 0 to use default (£${matchdayFee || 10}/match).`
+                                                : subFormModel === "Both-PAYG" ? `Set to 0 to use defaults (£${settings.trainingFeePerSession || 0}/session + £${matchdayFee || 10}/match).`
+                                                : `Set to 0 to use default (£${settings.monthlySubs || 0}/month).`
+                                            }
                                         </p>
                                     </div>
+
+                                    {(subFormModel === "Pay-As-You-Go" || subFormModel === "Both-PAYG") && (
+                                        <div className="space-y-1 bg-amber-50/50 p-2.5 rounded-xl border border-amber-100/50">
+                                            <label className="text-[10px] font-bold uppercase text-amber-800">Training Sessions Attended (This Month)</label>
+                                            <Input 
+                                                type="number"
+                                                value={subFormTrainingOverride}
+                                                onChange={e => setSubFormTrainingOverride(e.target.value)}
+                                                className="bg-white border-amber-200 h-9 rounded-lg text-xs"
+                                            />
+                                            <p className="text-[9px] text-amber-600 font-medium">Leave as default attendance or type custom count.</p>
+                                        </div>
+                                    )}
+
+                                    {(subFormModel === "Matchday-PAYG" || subFormModel === "Both-PAYG") && (
+                                        <div className="space-y-1 bg-rose-50/50 p-2.5 rounded-xl border border-rose-100/55">
+                                            <label className="text-[10px] font-bold uppercase text-rose-800">Matches Played (This Month)</label>
+                                            <Input 
+                                                type="number"
+                                                value={subFormMatchesOverride}
+                                                onChange={e => setSubFormMatchesOverride(e.target.value)}
+                                                className="bg-white border-rose-200 h-9 rounded-lg text-xs"
+                                            />
+                                            <p className="text-[9px] text-rose-600 font-medium">Leave as default match occurrences or type custom count.</p>
+                                        </div>
+                                    )}
+
                                     <Button 
                                         onClick={handleSaveSubSettings}
                                         disabled={isSavingSub}
@@ -2479,16 +2718,35 @@ export default function FinancePage() {
 
                                     {settings.subsEnabled && (
                                         <div className="space-y-3 p-3 border border-indigo-100/50 rounded-xl bg-indigo-50/10">
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <div className="space-y-1">
-                                                    <label className="text-[9px] font-bold uppercase text-slate-400">Monthly Sub (£)</label>
-                                                    <Input
-                                                        type="number"
-                                                        value={settings.monthlySubs || 0}
-                                                        onChange={(e) => updateSettings({ monthlySubs: parseFloat(e.target.value) || 0 })}
-                                                        className="h-8 text-xs bg-white border-slate-200"
-                                                    />
-                                                </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold uppercase text-slate-400 font-medium">Club Subs Structure</label>
+                                                <select
+                                                    value={subsStructure}
+                                                    onChange={e => {
+                                                        const struct = e.target.value as any;
+                                                        setSubsStructure(struct);
+                                                        localStorage.setItem(`clubflow_subs_structure_${settings.name}`, struct);
+                                                    }}
+                                                    className="w-full h-9 px-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold text-slate-700"
+                                                >
+                                                    <option value="Monthly">Monthly charge in total</option>
+                                                    <option value="Training">Just training fee subs</option>
+                                                    <option value="Matchday">Just matchday subs</option>
+                                                    <option value="Both">Both training & matchday subs</option>
+                                                </select>
+                                            </div>
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                                                {(subsStructure === "Monthly") && (
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] font-bold uppercase text-slate-400">Monthly Sub (£)</label>
+                                                        <Input
+                                                            type="number"
+                                                            value={settings.monthlySubs || 0}
+                                                            onChange={(e) => updateSettings({ monthlySubs: parseFloat(e.target.value) || 0 })}
+                                                            className="h-8 text-xs bg-white border-slate-200"
+                                                        />
+                                                    </div>
+                                                )}
                                                 <div className="space-y-1">
                                                     <label className="text-[9px] font-bold uppercase text-slate-400">Reg Fee (£)</label>
                                                     <Input
@@ -2498,15 +2756,32 @@ export default function FinancePage() {
                                                         className="h-8 text-xs bg-white border-slate-200"
                                                     />
                                                 </div>
-                                                <div className="space-y-1">
-                                                    <label className="text-[9px] font-bold uppercase text-slate-400">Session Fee (£)</label>
-                                                    <Input
-                                                        type="number"
-                                                        value={settings.trainingFeePerSession || 0}
-                                                        onChange={(e) => updateSettings({ trainingFeePerSession: parseFloat(e.target.value) || 0 })}
-                                                        className="h-8 text-xs bg-white border-slate-200"
-                                                    />
-                                                </div>
+                                                {(subsStructure === "Training" || subsStructure === "Both") && (
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] font-bold uppercase text-slate-400">Session Fee (£)</label>
+                                                        <Input
+                                                            type="number"
+                                                            value={settings.trainingFeePerSession || 0}
+                                                            onChange={(e) => updateSettings({ trainingFeePerSession: parseFloat(e.target.value) || 0 })}
+                                                            className="h-8 text-xs bg-white border-slate-200"
+                                                        />
+                                                    </div>
+                                                )}
+                                                {(subsStructure === "Matchday" || subsStructure === "Both") && (
+                                                    <div className="space-y-1">
+                                                        <label className="text-[9px] font-bold uppercase text-slate-400">Matchday Fee (£)</label>
+                                                        <Input
+                                                            type="number"
+                                                            value={matchdayFee || 0}
+                                                            onChange={(e) => {
+                                                                const mat = parseFloat(e.target.value) || 0;
+                                                                setMatchdayFee(mat);
+                                                                localStorage.setItem(`clubflow_matchday_fee_${settings.name}`, mat.toString());
+                                                            }}
+                                                            className="h-8 text-xs bg-white border-slate-200"
+                                                        />
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     )}
