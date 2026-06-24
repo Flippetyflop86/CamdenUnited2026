@@ -6,9 +6,18 @@ import { FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Trash2, Edit2, Save, X, FileDown, History, ChevronRight } from "lucide-react";
+import { Plus, Trash2, Edit2, Save, X, FileDown, History, ChevronRight, HelpCircle } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { supabase } from "@/lib/supabase";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+
+const EXPLOIT_ZONES = [
+    { id: "behind-defense", label: "Space Behind Defense", style: { left: "15%", top: "4%", width: "70%", height: "12%" } },
+    { id: "left-wing", label: "Exploit Behind RB", style: { left: "4%", top: "18%", width: "25%", height: "20%" } },
+    { id: "right-wing", label: "Exploit Behind LB", style: { right: "4%", top: "18%", width: "25%", height: "20%" } },
+    { id: "zone-14", label: "Zone 14 (Pocket)", style: { left: "30%", top: "30%", width: "40%", height: "15%" } },
+];
 
 export default function OppositionReportsPage() {
     const { settings } = useClub();
@@ -16,6 +25,20 @@ export default function OppositionReportsPage() {
     const [selectedTeam, setSelectedTeam] = useState<OppositionTeam | null>(null);
     const [isEditing, setIsEditing] = useState(true); // Default to editing mode for new report
     const [editedTeam, setEditedTeam] = useState<OppositionTeam | null>(null);
+    const [selectedProfileIndex, setSelectedProfileIndex] = useState<number | null>(null);
+
+    const isZoneActive = (zoneId: string) => {
+        return (isEditing ? editedTeam?.exploitZones : displayTeam.exploitZones)?.includes(zoneId);
+    };
+
+    const toggleZone = (zoneId: string) => {
+        if (!isEditing || !editedTeam) return;
+        const current = editedTeam.exploitZones || [];
+        const updated = current.includes(zoneId)
+            ? current.filter(id => id !== zoneId)
+            : [...current, zoneId];
+        setEditedTeam({ ...editedTeam, exploitZones: updated });
+    };
 
     // ... (keep state) ...
 
@@ -56,15 +79,33 @@ export default function OppositionReportsPage() {
             return parts.join("\n\n");
         };
 
-        const mapped: OppositionTeam[] = (data || []).map((t: any) => ({
-            id: t.id,
-            name: t.name,
-            formation: t.formation,
-            notes: parseNotes(t.notes),
-            lineup: t.lineup || [],
-            createdAt: t.created_at,
-            updatedAt: t.updated_at
-        }));
+        const mapped: OppositionTeam[] = (data || []).map((t: any) => {
+            let notesText = "";
+            let playerProfiles = [];
+            let exploitZones = [];
+            if (t.notes) {
+                if (typeof t.notes === "string") {
+                    notesText = t.notes;
+                } else if (t.notes.text !== undefined) {
+                    notesText = t.notes.text;
+                    playerProfiles = t.notes.playerProfiles || [];
+                    exploitZones = t.notes.exploitZones || [];
+                } else {
+                    notesText = parseNotes(t.notes);
+                }
+            }
+            return {
+                id: t.id,
+                name: t.name,
+                formation: t.formation,
+                notes: notesText,
+                playerProfiles,
+                exploitZones,
+                lineup: t.lineup || [],
+                createdAt: t.created_at,
+                updatedAt: t.updated_at
+            };
+        });
 
         setTeams(mapped);
 
@@ -82,6 +123,8 @@ export default function OppositionReportsPage() {
             formation: "4-4-2",
             notes: "",
             lineup: [],
+            playerProfiles: [],
+            exploitZones: [],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
@@ -132,7 +175,11 @@ export default function OppositionReportsPage() {
         const payload = {
             name: editedTeam.name,
             formation: editedTeam.formation,
-            notes: editedTeam.notes,
+            notes: {
+                text: editedTeam.notes,
+                playerProfiles: editedTeam.playerProfiles || [],
+                exploitZones: editedTeam.exploitZones || []
+            },
             lineup: editedTeam.lineup || [],
             updated_at: new Date().toISOString()
         };
@@ -478,20 +525,42 @@ export default function OppositionReportsPage() {
                                             )}
                                         </div>
 
+                                        {/* Exploit Zones Overlays */}
+                                        {EXPLOIT_ZONES.map((zone) => {
+                                            const active = isZoneActive(zone.id);
+                                            if (!isEditing && !active) return null;
+                                            return (
+                                                <div
+                                                    key={zone.id}
+                                                    onClick={() => isEditing && toggleZone(zone.id)}
+                                                    style={zone.style}
+                                                    className={`absolute rounded flex items-center justify-center border transition-all select-none z-10 ${
+                                                        active
+                                                            ? "bg-rose-500/35 border-rose-500 shadow-md text-white font-extrabold text-[9px] uppercase tracking-wider cursor-pointer"
+                                                            : "bg-transparent border-dashed border-white/30 text-white/50 hover:bg-white/5 hover:border-white/60 font-semibold text-[8px] cursor-pointer"
+                                                    }`}
+                                                >
+                                                    <span className="px-1 text-center leading-none">{zone.label}</span>
+                                                </div>
+                                            );
+                                        })}
+
                                         {/* Player dots with position label only — no name overflow */}
                                         {formation.map((pos, idx) => {
                                             const playerName = isEditing
                                                 ? editedTeam?.lineup?.[idx]
                                                 : displayTeam.lineup?.[idx];
                                             const isTopHalf = pos.y < 50 && pos.label !== "GK";
+                                            const profile = (isEditing ? editedTeam?.playerProfiles : displayTeam.playerProfiles)?.find(p => p.positionIndex === idx);
                                             return (
                                                 <div
                                                     key={idx}
-                                                    className="absolute z-10"
+                                                    className="absolute z-20 cursor-pointer group"
                                                     style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                                                    onClick={() => setSelectedProfileIndex(idx)}
                                                 >
                                                     {/* Numbered dot */}
-                                                    <div className="absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 bg-white border-2 border-red-600 rounded-full flex items-center justify-center shadow-lg z-20">
+                                                    <div className={`absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 bg-white border-2 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform ${profile?.role ? 'border-amber-500' : 'border-red-600'}`}>
                                                         <span className="text-[9px] sm:text-[10px] font-bold text-slate-900">{pos.number}</span>
                                                     </div>
                                                     {/* Position label — small badge, no overflow */}
@@ -508,68 +577,95 @@ export default function OppositionReportsPage() {
                                     {/* Mobile-friendly player name roster below the pitch */}
                                     <div className="border-t border-slate-200 bg-white">
                                         <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-                                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Player Names</span>
+                                            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                                                Player Names
+                                                <span className="text-[9px] font-normal text-slate-400 normal-case">(💡 Click player name or dot to edit role & foot details)</span>
+                                            </span>
                                             <span className="text-xs text-slate-400">{formation.length} positions</span>
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x divide-slate-100">
                                             {/* Left column */}
                                             <div className="divide-y divide-slate-100">
-                                                {formation.slice(0, Math.ceil(formation.length / 2)).map((pos, idx) => (
-                                                    <div key={idx} className="flex items-center gap-3 px-3 py-2">
-                                                        <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center shrink-0">
-                                                            <span className="text-[9px] font-bold text-white">{pos.number}</span>
+                                                {formation.slice(0, Math.ceil(formation.length / 2)).map((pos, idx) => {
+                                                    const profile = (isEditing ? editedTeam?.playerProfiles : displayTeam.playerProfiles)?.find(p => p.positionIndex === idx);
+                                                    return (
+                                                        <div key={idx} className="flex flex-col gap-1 px-3 py-2 hover:bg-slate-50/50 cursor-pointer" onClick={() => setSelectedProfileIndex(idx)}>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center shrink-0">
+                                                                    <span className="text-[9px] font-bold text-white">{pos.number}</span>
+                                                                </div>
+                                                                <span className="text-xs font-medium text-slate-500 w-10 shrink-0">{pos.label}</span>
+                                                                {isEditing ? (
+                                                                    <input
+                                                                        type="text"
+                                                                        value={editedTeam?.lineup?.[idx] || ""}
+                                                                        onChange={(e) => {
+                                                                            if (!editedTeam) return;
+                                                                            const newLineup = [...(editedTeam.lineup || [])];
+                                                                            while (newLineup.length <= idx) newLineup.push("");
+                                                                            newLineup[idx] = e.target.value;
+                                                                            setEditedTeam({ ...editedTeam, lineup: newLineup });
+                                                                        }}
+                                                                        onClick={(e) => e.stopPropagation()} // don't open modal on text input click
+                                                                        className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-900 focus:ring-1 focus:ring-red-500 outline-none placeholder:text-slate-400"
+                                                                        placeholder="Player name..."
+                                                                    />
+                                                                ) : (
+                                                                    <span className="flex-1 text-xs text-slate-700 font-medium truncate">
+                                                                        {displayTeam.lineup?.[idx] || <span className="text-slate-300 italic">—</span>}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {(profile?.role || profile?.traits || profile?.foot) && (
+                                                                <div className="flex flex-wrap gap-1.5 pl-9 mt-0.5">
+                                                                    {profile?.role && <span className="bg-amber-50 border border-amber-200 text-amber-800 text-[9px] px-1.5 py-0.5 rounded font-semibold">{profile.role}</span>}
+                                                                    {profile?.foot && <span className="bg-slate-100 text-slate-600 text-[9px] px-1.5 py-0.5 rounded">Pref. Foot: {profile.foot}</span>}
+                                                                    {profile?.traits && <span className="text-[10px] text-slate-500 italic max-w-xs truncate">{profile.traits}</span>}
+                                                                </div>
+                                                            )}
                                                         </div>
-                                                        <span className="text-xs font-medium text-slate-500 w-10 shrink-0">{pos.label}</span>
-                                                        {isEditing ? (
-                                                            <input
-                                                                type="text"
-                                                                value={editedTeam?.lineup?.[idx] || ""}
-                                                                onChange={(e) => {
-                                                                    if (!editedTeam) return;
-                                                                    const newLineup = [...(editedTeam.lineup || [])];
-                                                                    while (newLineup.length <= idx) newLineup.push("");
-                                                                    newLineup[idx] = e.target.value;
-                                                                    setEditedTeam({ ...editedTeam, lineup: newLineup });
-                                                                }}
-                                                                className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-900 focus:ring-1 focus:ring-red-500 outline-none placeholder:text-slate-400"
-                                                                placeholder="Player name..."
-                                                            />
-                                                        ) : (
-                                                            <span className="flex-1 text-xs text-slate-700 font-medium truncate">
-                                                                {displayTeam.lineup?.[idx] || <span className="text-slate-300 italic">—</span>}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                             {/* Right column */}
                                             <div className="divide-y divide-slate-100">
                                                 {formation.slice(Math.ceil(formation.length / 2)).map((pos, i) => {
                                                     const idx = Math.ceil(formation.length / 2) + i;
+                                                    const profile = (isEditing ? editedTeam?.playerProfiles : displayTeam.playerProfiles)?.find(p => p.positionIndex === idx);
                                                     return (
-                                                        <div key={idx} className="flex items-center gap-3 px-3 py-2">
-                                                            <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center shrink-0">
-                                                                <span className="text-[9px] font-bold text-white">{pos.number}</span>
+                                                        <div key={idx} className="flex flex-col gap-1 px-3 py-2 hover:bg-slate-50/50 cursor-pointer" onClick={() => setSelectedProfileIndex(idx)}>
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center shrink-0">
+                                                                    <span className="text-[9px] font-bold text-white">{pos.number}</span>
+                                                                </div>
+                                                                <span className="text-xs font-medium text-slate-500 w-10 shrink-0">{pos.label}</span>
+                                                                {isEditing ? (
+                                                                    <input
+                                                                        type="text"
+                                                                        value={editedTeam?.lineup?.[idx] || ""}
+                                                                        onChange={(e) => {
+                                                                            if (!editedTeam) return;
+                                                                            const newLineup = [...(editedTeam.lineup || [])];
+                                                                            while (newLineup.length <= idx) newLineup.push("");
+                                                                            newLineup[idx] = e.target.value;
+                                                                            setEditedTeam({ ...editedTeam, lineup: newLineup });
+                                                                        }}
+                                                                        onClick={(e) => e.stopPropagation()} // don't open modal on text input click
+                                                                        className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-900 focus:ring-1 focus:ring-red-500 outline-none placeholder:text-slate-400"
+                                                                        placeholder="Player name..."
+                                                                    />
+                                                                ) : (
+                                                                    <span className="flex-1 text-xs text-slate-700 font-medium truncate">
+                                                                        {displayTeam.lineup?.[idx] || <span className="text-slate-300 italic">—</span>}
+                                                                    </span>
+                                                                )}
                                                             </div>
-                                                            <span className="text-xs font-medium text-slate-500 w-10 shrink-0">{pos.label}</span>
-                                                            {isEditing ? (
-                                                                <input
-                                                                    type="text"
-                                                                    value={editedTeam?.lineup?.[idx] || ""}
-                                                                    onChange={(e) => {
-                                                                        if (!editedTeam) return;
-                                                                        const newLineup = [...(editedTeam.lineup || [])];
-                                                                        while (newLineup.length <= idx) newLineup.push("");
-                                                                        newLineup[idx] = e.target.value;
-                                                                        setEditedTeam({ ...editedTeam, lineup: newLineup });
-                                                                    }}
-                                                                    className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded px-2 py-1 text-slate-900 focus:ring-1 focus:ring-red-500 outline-none placeholder:text-slate-400"
-                                                                    placeholder="Player name..."
-                                                                />
-                                                            ) : (
-                                                                <span className="flex-1 text-xs text-slate-700 font-medium truncate">
-                                                                    {displayTeam.lineup?.[idx] || <span className="text-slate-300 italic">—</span>}
-                                                                </span>
+                                                            {(profile?.role || profile?.traits || profile?.foot) && (
+                                                                <div className="flex flex-wrap gap-1.5 pl-9 mt-0.5">
+                                                                    {profile?.role && <span className="bg-amber-50 border border-amber-200 text-amber-800 text-[9px] px-1.5 py-0.5 rounded font-semibold">{profile.role}</span>}
+                                                                    {profile?.foot && <span className="bg-slate-100 text-slate-600 text-[9px] px-1.5 py-0.5 rounded">Pref. Foot: {profile.foot}</span>}
+                                                                    {profile?.traits && <span className="text-[10px] text-slate-500 italic max-w-xs truncate">{profile.traits}</span>}
+                                                                </div>
                                                             )}
                                                         </div>
                                                     );
@@ -611,6 +707,122 @@ export default function OppositionReportsPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Profile Dialog */}
+            <Dialog open={selectedProfileIndex !== null} onOpenChange={(open) => !open && setSelectedProfileIndex(null)}>
+                <DialogContent className="max-w-md bg-white rounded-2xl p-6">
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-bold text-slate-900">
+                            Position Profile: {formation[selectedProfileIndex || 0]?.label} ({formation[selectedProfileIndex || 0]?.number})
+                        </DialogTitle>
+                    </DialogHeader>
+                    {selectedProfileIndex !== null && (() => {
+                        const pos = formation[selectedProfileIndex];
+                        const name = (isEditing ? editedTeam?.lineup?.[selectedProfileIndex] : displayTeam.lineup?.[selectedProfileIndex]) || "";
+                        const currentProfile = (isEditing ? editedTeam?.playerProfiles : displayTeam.playerProfiles)?.find(p => p.positionIndex === selectedProfileIndex) || {
+                            positionIndex: selectedProfileIndex,
+                            role: "",
+                            foot: "Right",
+                            traits: ""
+                        };
+
+                        return (
+                            <div className="space-y-4 mt-4">
+                                <div>
+                                    <Label className="text-xs font-semibold text-slate-500 uppercase">Player Name</Label>
+                                    <Input 
+                                        value={name}
+                                        disabled={!isEditing}
+                                        onChange={(e) => {
+                                            if (!isEditing || !editedTeam) return;
+                                            const newLineup = [...(editedTeam.lineup || [])];
+                                            while (newLineup.length <= selectedProfileIndex) newLineup.push("");
+                                            newLineup[selectedProfileIndex] = e.target.value;
+                                            setEditedTeam({ ...editedTeam, lineup: newLineup });
+                                        }}
+                                        placeholder="e.g. Roy Kent"
+                                        className="mt-1"
+                                    />
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <Label className="text-xs font-semibold text-slate-500 uppercase">Tactical Role</Label>
+                                        <select
+                                            value={currentProfile.role}
+                                            disabled={!isEditing}
+                                            onChange={(e) => {
+                                                if (!isEditing || !editedTeam) return;
+                                                const profiles = [...(editedTeam.playerProfiles || [])];
+                                                const idx = profiles.findIndex(p => p.positionIndex === selectedProfileIndex);
+                                                const updated = { ...currentProfile, role: e.target.value };
+                                                if (idx > -1) profiles[idx] = updated;
+                                                else profiles.push(updated);
+                                                setEditedTeam({ ...editedTeam, playerProfiles: profiles });
+                                            }}
+                                            className="w-full mt-1 px-3 py-2 border rounded-md text-sm bg-white focus:ring-2 focus:ring-red-500 outline-none disabled:bg-slate-50 disabled:text-slate-500"
+                                        >
+                                            <option value="">Select Role...</option>
+                                            <option value="Sweeper Keeper">Sweeper Keeper</option>
+                                            <option value="Ball Playing Defender">Ball Playing Defender</option>
+                                            <option value="No-Nonsense CB">No-Nonsense CB</option>
+                                            <option value="Inverted Wing-Back">Inverted Wing-Back</option>
+                                            <option value="Wing-Back">Wing-Back</option>
+                                            <option value="Deep Lying Playmaker">Deep Lying Playmaker</option>
+                                            <option value="Box-to-Box Midfielder">Box-to-Box Midfielder</option>
+                                            <option value="Advanced Playmaker">Advanced Playmaker</option>
+                                            <option value="Inverted Winger">Inverted Winger</option>
+                                            <option value="Target Man">Target Man</option>
+                                            <option value="Poacher">Poacher</option>
+                                            <option value="False Nine">False Nine</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <Label className="text-xs font-semibold text-slate-500 uppercase">Preferred Foot</Label>
+                                        <select
+                                            value={currentProfile.foot}
+                                            disabled={!isEditing}
+                                            onChange={(e) => {
+                                                if (!isEditing || !editedTeam) return;
+                                                const profiles = [...(editedTeam.playerProfiles || [])];
+                                                const idx = profiles.findIndex(p => p.positionIndex === selectedProfileIndex);
+                                                const updated = { ...currentProfile, foot: e.target.value };
+                                                if (idx > -1) profiles[idx] = updated;
+                                                else profiles.push(updated);
+                                                setEditedTeam({ ...editedTeam, playerProfiles: profiles });
+                                            }}
+                                            className="w-full mt-1 px-3 py-2 border rounded-md text-sm bg-white focus:ring-2 focus:ring-red-500 outline-none disabled:bg-slate-50 disabled:text-slate-500"
+                                        >
+                                            <option value="Right">Right</option>
+                                            <option value="Left">Left</option>
+                                            <option value="Both">Both</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <Label className="text-xs font-semibold text-slate-500 uppercase">Scouting Notes & Traits</Label>
+                                    <textarea
+                                        value={currentProfile.traits}
+                                        disabled={!isEditing}
+                                        onChange={(e) => {
+                                            if (!isEditing || !editedTeam) return;
+                                            const profiles = [...(editedTeam.playerProfiles || [])];
+                                            const idx = profiles.findIndex(p => p.positionIndex === selectedProfileIndex);
+                                            const updated = { ...currentProfile, traits: e.target.value };
+                                            if (idx > -1) profiles[idx] = updated;
+                                            else profiles.push(updated);
+                                            setEditedTeam({ ...editedTeam, playerProfiles: profiles });
+                                        }}
+                                        placeholder="e.g. Dangerously fast, weak foot is poor, dislikes high pressure"
+                                        className="w-full mt-1 h-20 p-2 text-xs border rounded-md resize-none outline-none focus:ring-2 focus:ring-red-500 disabled:bg-slate-50 disabled:text-slate-500"
+                                    />
+                                </div>
+                            </div>
+                        );
+                    })()}
+                </DialogContent>
+            </Dialog>
 
         </div>
     );

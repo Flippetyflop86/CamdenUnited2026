@@ -102,6 +102,13 @@ export interface OppositionTeam {
     formation: string;
     notes: string;
     lineup?: string[];
+    playerProfiles?: {
+        positionIndex: number;
+        role: string;
+        foot: string;
+        traits: string;
+    }[];
+    exploitZones?: string[];
     createdAt: string;
     updatedAt: string;
 }
