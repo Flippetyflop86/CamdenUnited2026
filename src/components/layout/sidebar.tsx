@@ -67,6 +67,7 @@ const navSections = [
             { href: "/inventory",     label: "Inventory",      icon: Clipboard },
             { href: "/staff",         label: "Staff",          icon: Users },
             { href: "/documents",     label: "Documents",      icon: FileText },
+            { href: "/dashboard/billing", label: "Billing & Subs", icon: CreditCard, isComingSoon: true },
             { href: "/admin",         label: "Admin",          icon: Settings },
         ]
     }
@@ -82,6 +83,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     // Subscription & Gating State
     const [sub, setSub] = useState(() => getSubscription());
     const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+    const [comingSoonModalOpen, setComingSoonModalOpen] = useState(false);
     const [requiredTier, setRequiredTier] = useState<"Medium" | "High">("Medium");
 
     useEffect(() => {
@@ -101,11 +103,16 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     const billingHref = "/dashboard/billing";
 
     const isRouteLocked = (href: string) => {
-        // Leave everything open for now
         return false;
     };
 
-    const handleItemClick = (e: React.MouseEvent, href: string) => {
+    const handleItemClick = (e: React.MouseEvent, href: string, isComingSoon?: boolean) => {
+        if (isComingSoon) {
+            e.preventDefault();
+            setComingSoonModalOpen(true);
+            if (onClose) onClose();
+            return;
+        }
         if (isRouteLocked(href)) {
             e.preventDefault();
             if (isTrialExpired) {
@@ -199,7 +206,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                         const locked = isRouteLocked(item.href);
                                         const isBillingItem = item.href === "/dashboard/billing";
                                         // The billing tab can use a specific link label depending on subscription status
-                                        const labelOverride = isBillingItem ? "Billing & Subscription" : item.label;
+                                        const labelOverride = isBillingItem ? "Billing & Subs (Coming Soon)" : item.label;
                                         const linkHref = isBillingItem ? billingHref : item.href;
                                         
                                         // We map the link to keep user active status
@@ -208,7 +215,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                             <li key={item.label}>
                                                 <Link
                                                     href={linkHref}
-                                                    onClick={(e) => handleItemClick(e, linkHref)}
+                                                    onClick={(e) => handleItemClick(e, linkHref, !!item.isComingSoon)}
                                                     aria-current={isActive ? "page" : undefined}
                                                     className={cn(
                                                         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-red-500",
@@ -330,6 +337,34 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                 className="flex-1 border-slate-200"
                             >
                                 Continue Trial
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Coming Soon Dialog */}
+            <Dialog open={comingSoonModalOpen} onOpenChange={setComingSoonModalOpen}>
+                <DialogContent className="max-w-md bg-white rounded-2xl p-6 text-slate-900">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2 text-indigo-900">
+                            <CreditCard className="h-5 w-5 text-indigo-600" />
+                            Billing & Subscription
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-2">
+                        <p className="text-sm text-slate-600 leading-relaxed">
+                            Subscription billing and membership tiers are currently under development and will be launching soon.
+                        </p>
+                        <div className="bg-slate-50 border border-slate-100 p-3.5 rounded-xl text-xs text-slate-500 text-center font-medium">
+                            Thank you for testing the ClubFlow preview!
+                        </div>
+                        <div className="flex justify-end pt-2">
+                            <Button 
+                                onClick={() => setComingSoonModalOpen(false)}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold px-6"
+                            >
+                                Close
                             </Button>
                         </div>
                     </div>
