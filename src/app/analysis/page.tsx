@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Plus, Target, Activity, Trash2, ShieldHalf, LayoutDashboard } from "lucide-react";
+import { Plus, Target, Activity, Trash2, ShieldHalf, LayoutDashboard, RotateCcw } from "lucide-react";
 import Link from "next/link";
 
 type ShotOutcome = "Goal" | "Saved" | "Missed" | "Blocked";
@@ -60,6 +60,7 @@ export default function AnalysisPage() {
     // Shot Dialog State
     const [isShotDialogOpen, setIsShotDialogOpen] = useState(false);
     const [pendingShot, setPendingShot] = useState<{ x: number, y: number } | null>(null);
+    const [mousePos, setMousePos] = useState<{ x: number, y: number } | null>(null);
     const [shotForm, setShotForm] = useState<{
         playerId: string;
         outcome: ShotOutcome;
@@ -358,10 +359,28 @@ export default function AnalysisPage() {
                                         {["deliveries", "halfChances", "chances", "ooohs", "goals"].map((key) => (
                                             <div key={key} className="flex items-center justify-between bg-slate-50 p-2 rounded">
                                                 <span className="capitalize text-sm font-medium text-slate-700">{key === "ooohs" ? "Massive Chances" : key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-2">
                                                     <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => updateDominance("us", key as any, -1)}>-</Button>
                                                     <span className="w-6 font-bold text-slate-900 text-lg">{analysis.dominance?.us[key as keyof DominanceStats] || 0}</span>
                                                     <Button size="sm" variant="outline" className="h-7 w-7 p-0" onClick={() => updateDominance("us", key as any, 1)}>+</Button>
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="ghost" 
+                                                        className="h-7 w-7 p-0 text-slate-400 hover:text-red-500 hover:bg-red-50"
+                                                        onClick={() => {
+                                                            setAnalysis(prev => {
+                                                                const newDominance = { 
+                                                                    us: { ...prev.dominance.us },
+                                                                    opposition: { ...prev.dominance.opposition }
+                                                                };
+                                                                newDominance.us[key as keyof DominanceStats] = 0;
+                                                                return { ...prev, dominance: newDominance };
+                                                            });
+                                                        }}
+                                                        title="Reset metric"
+                                                    >
+                                                        <RotateCcw className="h-3 w-3" />
+                                                    </Button>
                                                 </div>
                                             </div>
                                         ))}
@@ -374,10 +393,28 @@ export default function AnalysisPage() {
                                         {["deliveries", "halfChances", "chances", "ooohs", "goals"].map((key) => (
                                             <div key={key} className="flex items-center justify-between bg-rose-50 p-2 rounded border border-rose-100">
                                                 <span className="capitalize text-sm font-medium text-rose-800">{key === "ooohs" ? "Massive Chances" : key.replace(/([A-Z])/g, ' $1').trim()}</span>
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-2">
                                                     <Button size="sm" variant="outline" className="h-7 w-7 p-0 border-rose-200 text-rose-700" onClick={() => updateDominance("opposition", key as any, -1)}>-</Button>
                                                     <span className="w-6 font-bold text-rose-900 text-lg">{analysis.dominance?.opposition[key as keyof DominanceStats] || 0}</span>
                                                     <Button size="sm" variant="outline" className="h-7 w-7 p-0 border-rose-200 text-rose-700" onClick={() => updateDominance("opposition", key as any, 1)}>+</Button>
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="ghost" 
+                                                        className="h-7 w-7 p-0 text-rose-400 hover:text-red-500 hover:bg-rose-50"
+                                                        onClick={() => {
+                                                            setAnalysis(prev => {
+                                                                const newDominance = { 
+                                                                    us: { ...prev.dominance.us },
+                                                                    opposition: { ...prev.dominance.opposition }
+                                                                };
+                                                                newDominance.opposition[key as keyof DominanceStats] = 0;
+                                                                return { ...prev, dominance: newDominance };
+                                                            });
+                                                        }}
+                                                        title="Reset metric"
+                                                    >
+                                                        <RotateCcw className="h-3 w-3" />
+                                                    </Button>
                                                 </div>
                                             </div>
                                         ))}
@@ -492,11 +529,32 @@ export default function AnalysisPage() {
                                 <div 
                                     ref={pitchRef}
                                     onClick={handlePitchClick}
+                                    onMouseMove={(e) => {
+                                        const rect = pitchRef.current?.getBoundingClientRect();
+                                        if (rect) {
+                                            const x = ((e.clientX - rect.left) / rect.width) * 100;
+                                            const y = ((e.clientY - rect.top) / rect.height) * 100;
+                                            setMousePos({ x, y });
+                                        }
+                                    }}
+                                    onMouseLeave={() => setMousePos(null)}
                                     className="relative w-full max-w-md aspect-[2/3] bg-emerald-600 rounded cursor-crosshair border-4 border-emerald-700 shadow-inner overflow-hidden"
                                     style={{
                                         backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 10%, rgba(255,255,255,0.05) 10%, rgba(255,255,255,0.05) 20%)"
                                     }}
                                 >
+                                    {/* Pinpoint hover indicator */}
+                                    {mousePos && (
+                                        <div 
+                                            className="absolute w-6 h-6 -ml-3 -mt-3 border border-white/85 rounded-full bg-white/25 pointer-events-none flex items-center justify-center animate-pulse z-20"
+                                            style={{ left: `${mousePos.x}%`, top: `${mousePos.y}%` }}
+                                        >
+                                            <div className="absolute w-full h-[1px] bg-white/50"></div>
+                                            <div className="absolute h-full w-[1px] bg-white/50"></div>
+                                            <div className="w-1.5 h-1.5 bg-red-500 rounded-full shadow-sm"></div>
+                                        </div>
+                                    )}
+
                                     {/* Pitch Markings */}
                                     <div className="absolute inset-0 border-2 border-white/50 m-2"></div>
                                     {/* Center line */}
