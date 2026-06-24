@@ -3,12 +3,13 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Match, Player } from "@/types";
-import { Trophy, TrendingUp, TrendingDown, Goal, ShieldAlert, AlertCircle, Target, Clock, Flame, Zap, Activity, Lock } from "lucide-react";
+import { Trophy, TrendingUp, TrendingDown, Goal, ShieldAlert, AlertCircle, Target, Clock, Flame, Zap, Activity, Lock, Maximize2 } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 interface ScorerStats {
     name: string;
@@ -36,6 +37,7 @@ interface Shot {
 export default function StatsPage() {
     const { settings } = useClub();
     const [matches, setMatches] = useState<Match[]>([]);
+    const [enlargedPanel, setEnlargedPanel] = useState<string | null>(null);
     // Season Filter State
     const getCurrentSeasonStr = () => {
         const d = new Date();
@@ -533,8 +535,17 @@ export default function StatsPage() {
             {/* Win Rate Breakdowns */}
             <div className="grid gap-4 md:grid-cols-2">
                 <Card className="bg-white border-slate-200 shadow-sm">
-                    <CardHeader className="pb-3">
+                    <CardHeader className="pb-3 flex flex-row items-center justify-between">
                         <CardTitle className="text-lg font-bold">Home vs Away</CardTitle>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-slate-400 hover:text-slate-600 rounded-lg p-0"
+                            onClick={() => setEnlargedPanel("home-away")}
+                            title="Enlarge Panel"
+                        >
+                            <Maximize2 className="h-4 w-4" />
+                        </Button>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -562,8 +573,17 @@ export default function StatsPage() {
                 </Card>
                 
                 <Card className="bg-white border-slate-200 shadow-sm">
-                    <CardHeader className="pb-3">
+                    <CardHeader className="pb-3 flex flex-row items-center justify-between">
                         <CardTitle className="text-lg font-bold">Surface Performance</CardTitle>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-slate-400 hover:text-slate-600 rounded-lg p-0"
+                            onClick={() => setEnlargedPanel("surface-perf")}
+                            title="Enlarge Panel"
+                        >
+                            <Maximize2 className="h-4 w-4" />
+                        </Button>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between">
@@ -601,10 +621,22 @@ export default function StatsPage() {
                                 Global Shot Map
                             </CardTitle>
                             <CardDescription>
-                                All shots taken {seasonFilter !== "All" ? `in ${seasonFilter}` : "across all seasons"}. ({boxShotPercent}% inside the box)
+                                All shots taken in current season ({getCurrentSeasonStr()}). ({boxShotPercent}% inside the box)
                             </CardDescription>
                         </div>
-                        <div className="flex flex-col md:flex-row items-start md:items-center space-y-2 md:space-y-0 md:space-x-4 mt-1">
+                        <div className="flex items-center gap-2 shrink-0">
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-7 w-7 text-slate-400 hover:text-slate-600 rounded-lg p-0"
+                                onClick={() => setEnlargedPanel("shot-map")}
+                                title="Enlarge Panel"
+                            >
+                                <Maximize2 className="h-4 w-4" />
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <div className="px-6 flex flex-col md:flex-row items-start md:items-center space-y-2 md:space-y-0 md:space-x-4 mt-1">
                             <div className="flex items-center space-x-2">
                                 <input 
                                     type="checkbox" 
@@ -626,7 +658,6 @@ export default function StatsPage() {
                                 <Label htmlFor="showOnlyGoals" className="text-xs font-medium cursor-pointer text-slate-700">Goals Only</Label>
                             </div>
                         </div>
-                    </CardHeader>
                     <CardContent className="flex flex-col items-center">
                         <div 
                             className="relative w-full max-w-sm aspect-[2/3] bg-emerald-600 rounded border-4 border-emerald-700 shadow-inner overflow-hidden"
@@ -666,7 +697,7 @@ export default function StatsPage() {
                             {allShots.filter(s => {
                                 const m = matches.find(match => match.id === s.matchId);
                                 if (!m) return false;
-                                if (seasonFilter !== "All" && getSeasonFromDate(m.date) !== seasonFilter) return false;
+                                if (getSeasonFromDate(m.date) !== getCurrentSeasonStr()) return false;
                                 
                                 if (matchTypeFilter !== "All") {
                                     const isFriendly = m.competition === "Friendly" || m.competition === "Pre-Season";
@@ -704,14 +735,25 @@ export default function StatsPage() {
                 </Card>
 
                 <Card className="col-span-1 border-rose-100 bg-rose-50/10">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-rose-700">
-                            <Flame className="h-5 w-5" />
-                            Conversion Rates
-                        </CardTitle>
-                        <CardDescription>
-                            Shot-to-Goal accuracy (from Match Analysis logs)
-                        </CardDescription>
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <div>
+                            <CardTitle className="flex items-center gap-2 text-rose-700">
+                                <Flame className="h-5 w-5" />
+                                Conversion Rates
+                            </CardTitle>
+                            <CardDescription>
+                                Shot-to-Goal accuracy (from Match Analysis logs)
+                            </CardDescription>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-slate-400 hover:text-slate-600 rounded-lg p-0"
+                            onClick={() => setEnlargedPanel("conversion-rates")}
+                            title="Enlarge Panel"
+                        >
+                            <Maximize2 className="h-4 w-4" />
+                        </Button>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
@@ -748,14 +790,25 @@ export default function StatsPage() {
 
                 {/* Build-Up Analytics */}
                 <Card className="col-span-1 border-indigo-100 bg-indigo-50/10">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-indigo-700">
-                            <Activity className="h-5 w-5" />
-                            Chance Creation
-                        </CardTitle>
-                        <CardDescription>
-                            Where your shots typically come from
-                        </CardDescription>
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <div>
+                            <CardTitle className="flex items-center gap-2 text-indigo-700">
+                                <Activity className="h-5 w-5" />
+                                Chance Creation
+                            </CardTitle>
+                            <CardDescription>
+                                Where your shots typically come from
+                            </CardDescription>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-slate-400 hover:text-slate-600 rounded-lg p-0"
+                            onClick={() => setEnlargedPanel("chance-creation")}
+                            title="Enlarge Panel"
+                        >
+                            <Maximize2 className="h-4 w-4" />
+                        </Button>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
@@ -786,14 +839,25 @@ export default function StatsPage() {
 
                 {/* Chances Conceded Analytics */}
                 <Card className="col-span-1 border-slate-200 bg-slate-50/50">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-slate-700">
-                            <ShieldAlert className="h-5 w-5" />
-                            Chances Conceded
-                        </CardTitle>
-                        <CardDescription>
-                            Where opposition shots originate from
-                        </CardDescription>
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <div>
+                            <CardTitle className="flex items-center gap-2 text-slate-700">
+                                <ShieldAlert className="h-5 w-5" />
+                                Chances Conceded
+                            </CardTitle>
+                            <CardDescription>
+                                Where opposition shots originate from
+                            </CardDescription>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-slate-400 hover:text-slate-600 rounded-lg p-0"
+                            onClick={() => setEnlargedPanel("chances-conceded")}
+                            title="Enlarge Panel"
+                        >
+                            <Maximize2 className="h-4 w-4" />
+                        </Button>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
@@ -826,14 +890,25 @@ export default function StatsPage() {
             {/* Top Scorers Section */}
             <div className="grid gap-4 md:grid-cols-2">
                 <Card className="col-span-1">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Goal className="h-5 w-5 text-slate-900" />
-                            Top Scorers
-                        </CardTitle>
-                        <CardDescription>
-                            Calculated from match report data.
-                        </CardDescription>
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <Goal className="h-5 w-5 text-slate-900" />
+                                Top Scorers
+                            </CardTitle>
+                            <CardDescription>
+                                Calculated from match report data.
+                            </CardDescription>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-slate-400 hover:text-slate-600 rounded-lg p-0"
+                            onClick={() => setEnlargedPanel("top-scorers")}
+                            title="Enlarge Panel"
+                        >
+                            <Maximize2 className="h-4 w-4" />
+                        </Button>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
@@ -885,14 +960,25 @@ export default function StatsPage() {
 
                 {/* Top Assisters */}
                 <Card className="col-span-1 border-indigo-100 bg-indigo-50/10">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <span className="h-5 w-5 flex items-center justify-center text-sm font-bold">🅰️</span>
-                            Top Assisters
-                        </CardTitle>
-                        <CardDescription>
-                            Most creative providers this season.
-                        </CardDescription>
+                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <span className="h-5 w-5 flex items-center justify-center text-sm font-bold">🅰️</span>
+                                Top Assisters
+                            </CardTitle>
+                            <CardDescription>
+                                Most creative providers this season.
+                            </CardDescription>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-slate-400 hover:text-slate-600 rounded-lg p-0"
+                            onClick={() => setEnlargedPanel("top-assisters")}
+                            title="Enlarge Panel"
+                        >
+                            <Maximize2 className="h-4 w-4" />
+                        </Button>
                     </CardHeader>
                     <CardContent>
                         <div className="space-y-4">
@@ -924,7 +1010,230 @@ export default function StatsPage() {
                     </CardContent>
                 </Card>
             </div>
-
+            {/* Enlarged Dialog Modal */}
+            <Dialog open={enlargedPanel !== null} onOpenChange={(open) => !open && setEnlargedPanel(null)}>
+                <DialogContent className={enlargedPanel === "shot-map" ? "max-w-2xl bg-white rounded-2xl" : "max-w-md bg-white rounded-2xl"}>
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-extrabold text-slate-900 border-b pb-2 flex items-center justify-between">
+                            {enlargedPanel === "shot-map" && "Global Shot Map (Current Season)"}
+                            {enlargedPanel === "conversion-rates" && "Conversion Rates"}
+                            {enlargedPanel === "chance-creation" && "Chance Creation"}
+                            {enlargedPanel === "chances-conceded" && "Chances Conceded"}
+                            {enlargedPanel === "top-scorers" && "Top Scorers"}
+                            {enlargedPanel === "top-assisters" && "Top Assisters"}
+                            {enlargedPanel === "home-away" && "Home vs Away Breakdown"}
+                            {enlargedPanel === "surface-perf" && "Surface Performance Breakdown"}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="py-4">
+                        {enlargedPanel === "shot-map" && (
+                            <div className="flex flex-col items-center w-full">
+                                <div className="flex gap-4 mb-4 text-xs font-semibold">
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={showOpposition} 
+                                            onChange={(e) => setShowOpposition(e.target.checked)}
+                                            className="rounded border-gray-300 text-rose-600 focus:ring-rose-500"
+                                        />
+                                        <span className="text-slate-700">Opposition</span>
+                                    </label>
+                                    <label className="flex items-center space-x-2 cursor-pointer">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={showOnlyGoals} 
+                                            onChange={(e) => setShowOnlyGoals(e.target.checked)}
+                                            className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500"
+                                        />
+                                        <span className="text-slate-700">Goals Only</span>
+                                    </label>
+                                </div>
+                                <div 
+                                    className="relative w-full aspect-[2/3] max-w-md bg-emerald-600 rounded border-4 border-emerald-700 shadow-inner overflow-hidden"
+                                    style={{
+                                        backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 10%, rgba(255,255,255,0.05) 10%, rgba(255,255,255,0.05) 20%)"
+                                    }}
+                                >
+                                    <div className="absolute inset-0 border-2 border-white/50 m-2"></div>
+                                    <div className="absolute top-1/2 left-2 right-2 h-px bg-white/50"></div>
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full border-2 border-white/50"></div>
+                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-white/50"></div>
+                                    <div className="absolute top-2 left-1/2 -translate-x-1/2 w-1/2 h-1/6 border-2 border-white/50 border-t-0"></div>
+                                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-1/2 h-1/6 border-2 border-white/50 border-b-0"></div>
+                                    <div className="absolute top-[12%] left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white/70"></div>
+                                    <div className="absolute bottom-[12%] left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-white/70"></div>
+                                    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-1/6 h-2 border-2 border-white/70 border-t-0 bg-emerald-600/50"></div>
+                                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1/6 h-2 border-2 border-white/70 border-b-0 bg-emerald-600/50"></div>
+                                    <div className="absolute left-1/2 top-1/4 -translate-x-1/2 text-white/20 font-black text-4xl pointer-events-none rotate-180">ATTACKING</div>
+                                    <div className="absolute left-1/2 bottom-1/4 -translate-x-1/2 text-white/20 font-black text-4xl pointer-events-none">DEFENDING</div>
+                                    
+                                    {allShots.filter(s => {
+                                        const m = matches.find(match => match.id === s.matchId);
+                                        if (!m) return false;
+                                        if (getSeasonFromDate(m.date) !== getCurrentSeasonStr()) return false;
+                                        
+                                        if (showOpposition) {
+                                            if (s.playerId !== "opposition") return false;
+                                        } else {
+                                            if (s.playerId === "opposition") return false;
+                                        }
+                                        if (showOnlyGoals && s.outcome !== "Goal") return false;
+                                        return true;
+                                    }).map((shot) => (
+                                        <div 
+                                            key={shot.id}
+                                            className={`absolute w-3.5 h-3.5 -ml-1.75 -mt-1.75 rounded-full border shadow-sm flex items-center justify-center group ${getShotColor(shot.outcome)}`}
+                                            style={{ left: `${shot.x}%`, top: `${shot.y}%` }}
+                                        >
+                                            <div className="hidden group-hover:block absolute bottom-full mb-1 bg-slate-900 text-white text-[10px] px-2 py-1 rounded whitespace-nowrap z-10 pointer-events-none">
+                                                {playersMap[shot.playerId] || "Unknown"} - {shot.outcome}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-4 flex gap-3 justify-center text-xs text-slate-500">
+                                    <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-green-500"></div> Goal</span>
+                                    <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-amber-500"></div> Saved</span>
+                                    <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-red-500"></div> Missed</span>
+                                    <span className="flex items-center gap-1"><div className="w-2.5 h-2.5 rounded-full bg-slate-500"></div> Blocked</span>
+                                </div>
+                            </div>
+                        )}
+                        {enlargedPanel === "conversion-rates" && (
+                            <div className="space-y-4">
+                                {conversionRates.map((stat, index) => (
+                                    <div key={stat.name} className="flex items-center justify-between border-b border-slate-100 last:border-0 pb-3 last:pb-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-sm font-bold text-slate-400 w-5">{index + 1}</span>
+                                            <span className="text-sm font-medium text-slate-700">{stat.name}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-bold text-slate-900 text-sm">{stat.rate}%</p>
+                                            <p className="text-[10px] text-slate-500">{stat.goals}G / {stat.shots}S</p>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {enlargedPanel === "chance-creation" && (
+                            <div className="space-y-4">
+                                {buildUpStats.map((stat) => {
+                                    const totalShots = buildUpStats.reduce((acc, curr) => acc + curr.value, 0);
+                                    const percentage = Math.round((stat.value / totalShots) * 100);
+                                    return (
+                                        <div key={stat.name} className="space-y-1">
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="font-semibold text-slate-700">{stat.name}</span>
+                                                <span className="font-bold text-slate-900">{stat.value} Shots ({percentage}%)</span>
+                                            </div>
+                                            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden">
+                                                <div className="bg-indigo-500 h-2.5 rounded-full" style={{ width: `${percentage}%` }}></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        {enlargedPanel === "chances-conceded" && (
+                            <div className="space-y-4">
+                                {concededBuildUpStats.map((stat) => {
+                                    const totalShots = concededBuildUpStats.reduce((acc, curr) => acc + curr.value, 0);
+                                    const percentage = Math.round((stat.value / totalShots) * 100);
+                                    return (
+                                        <div key={stat.name} className="space-y-1">
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="font-semibold text-slate-700">{stat.name}</span>
+                                                <span className="font-bold text-slate-900">{stat.value} Shots ({percentage}%)</span>
+                                            </div>
+                                            <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                                                <div className="bg-slate-500 h-2.5 rounded-full" style={{ width: `${percentage}%` }}></div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                        {enlargedPanel === "top-scorers" && (
+                            <div className="space-y-4">
+                                {topScorers.map((scorer, index) => (
+                                    <div key={scorer.name} className="flex items-center justify-between border-b border-slate-100 last:border-0 pb-3 last:pb-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
+                                                {index + 1}
+                                            </div>
+                                            <p className="text-sm font-semibold text-slate-900">{scorer.name}</p>
+                                        </div>
+                                        <div className="font-bold text-slate-900 text-base">{scorer.goals} Goals</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {enlargedPanel === "top-assisters" && (
+                            <div className="space-y-4">
+                                {topAssisters.map((player, index) => (
+                                    <div key={player.name} className="flex items-center justify-between border-b border-slate-100 last:border-0 pb-3 last:pb-0">
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-700 font-bold text-xs">
+                                                {index + 1}
+                                            </div>
+                                            <p className="text-sm font-semibold text-slate-900">{player.name}</p>
+                                        </div>
+                                        <div className="font-bold text-slate-900 text-base">{player.assists} Assists</div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        {enlargedPanel === "home-away" && (
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border">
+                                    <div>
+                                        <p className="font-bold text-slate-900 text-base">Home Records</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">{homeStats.played} Played</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-black text-slate-900 text-lg">{homeStats.played > 0 ? Math.round((homeStats.wins / homeStats.played) * 100) : 0}% Win Rate</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">{homeStats.wins}W, {homeStats.draws}D, {homeStats.losses}L</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border">
+                                    <div>
+                                        <p className="font-bold text-slate-900 text-base">Away Records</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">{awayStats.played} Played</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-black text-slate-900 text-lg">{awayStats.played > 0 ? Math.round((awayStats.wins / awayStats.played) * 100) : 0}% Win Rate</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">{awayStats.wins}W, {awayStats.draws}D, {awayStats.losses}L</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        {enlargedPanel === "surface-perf" && (
+                            <div className="space-y-6">
+                                <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border">
+                                    <div>
+                                        <p className="font-bold text-slate-900 text-base">Grass Surface</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">{grassStats.played} Played</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-black text-slate-900 text-lg">{grassStats.played > 0 ? Math.round((grassStats.wins / grassStats.played) * 100) : 0}% Win Rate</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">{grassStats.wins}W, {grassStats.draws}D, {grassStats.losses}L</p>
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between bg-slate-50 p-4 rounded-xl border">
+                                    <div>
+                                        <p className="font-bold text-slate-900 text-base">4G Artificial Pitch</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">{surface4GStats.played} Played</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-black text-slate-900 text-lg">{surface4GStats.played > 0 ? Math.round((surface4GStats.wins / surface4GStats.played) * 100) : 0}% Win Rate</p>
+                                        <p className="text-xs text-slate-500 mt-0.5">{surface4GStats.wins}W, {surface4GStats.draws}D, {surface4GStats.losses}L</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
