@@ -721,254 +721,280 @@ export default function MatchesPage() {
                                 <Plus className="h-4 w-4 mr-2" /> Add Match
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[600px] max-h-[85vh] overflow-y-auto">
-                            <DialogHeader>
+                        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                            <DialogHeader className="p-6 pb-2 shrink-0">
                                 <DialogTitle>{editingId ? "Edit Match" : "Add New Match"}</DialogTitle>
                                 <DialogDescription>{editingId ? "Update match details." : "Enter fixture details and scoreline."}</DialogDescription>
                             </DialogHeader>
-                            <div className="grid gap-3 py-2">
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1.5">
-                                        <Label>Date</Label>
-                                        <Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <Label>Time</Label>
-                                        <Input type="time" value={formData.time} onChange={e => setFormData({ ...formData, time: e.target.value })} />
-                                    </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label>Location / Venue Address</Label>
-                                    <Input
-                                        placeholder="e.g. Market Road Pitches, N7 9PL"
-                                        value={formData.location || ""}
-                                        onChange={e => setFormData({ ...formData, location: e.target.value })}
-                                    />
-                                </div>
-                                <div className="grid grid-cols-4 gap-3 items-end">
-                                    <div className="col-span-1 space-y-1.5">
-                                        <Label>Venue</Label>
-                                        <Select
-                                            value={formData.isHome ? "Home" : "Away"}
-                                            onValueChange={(v: string) => setFormData({ ...formData, isHome: v === "Home" })}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Home">Home</SelectItem>
-                                                <SelectItem value="Away">Away</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div className="col-span-3 space-y-1.5">
-                                        <Label>Opponent</Label>
-                                        <Input
-                                            list="league-teams-list"
-                                            placeholder="Select or type opponent name"
-                                            value={formData.opponent}
-                                            onChange={e => {
-                                                const val = e.target.value;
-                                                setFormData({ ...formData, opponent: val });
-                                                const teamMatch = leagueTeams.find(t => t.name.toLowerCase() === val.toLowerCase());
-                                                if (teamMatch) {
-                                                    setOpponentInstagram(teamMatch.instagram_handle || "");
-                                                    setOpponentBadgeUrl(teamMatch.badge_url || "");
-                                                } else {
-                                                    setOpponentInstagram("");
-                                                    setOpponentBadgeUrl("");
-                                                }
-                                            }}
-                                        />
-                                        <datalist id="league-teams-list">
-                                            {leagueTeams.map(team => (
-                                                <option key={team.id} value={team.name} />
-                                            ))}
-                                        </datalist>
-                                    </div>
-                                </div>
-                                {formData.opponent && (
-                                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-3 mt-1">
-                                        <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Opponent Team Settings</h4>
+
+                            <Tabs defaultValue="fixture" className="flex-1 flex flex-col min-h-0">
+                                <TabsList className="grid grid-cols-2 mx-6 my-2 shrink-0">
+                                    <TabsTrigger value="fixture" className="text-xs font-bold">1. Fixture Info</TabsTrigger>
+                                    <TabsTrigger value="result" className="text-xs font-bold">2. Match Record</TabsTrigger>
+                                </TabsList>
+
+                                <div className="flex-1 overflow-y-auto px-6 py-2 space-y-4">
+                                    <TabsContent value="fixture" className="space-y-3 mt-0 py-1">
                                         <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1.5">
-                                                <Label>Instagram Handle</Label>
-                                                <Input 
-                                                    placeholder="e.g. camden_utd" 
-                                                    value={opponentInstagram}
-                                                    onChange={e => setOpponentInstagram(e.target.value)}
-                                                />
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500">Date</Label>
+                                                <Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="h-9 text-xs" />
                                             </div>
-                                            <div className="space-y-1.5">
-                                                <Label>Badge Image URL</Label>
-                                                <Input 
-                                                    placeholder="https://..." 
-                                                    value={opponentBadgeUrl}
-                                                    onChange={e => setOpponentBadgeUrl(e.target.value)}
-                                                />
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500">Time</Label>
+                                                <Input type="time" value={formData.time} onChange={e => setFormData({ ...formData, time: e.target.value })} className="h-9 text-xs" />
                                             </div>
                                         </div>
                                         
-                                        <div className="space-y-1.5">
-                                            <Label>Upload or Paste Badge Image</Label>
-                                            <div 
-                                                onDragOver={e => e.preventDefault()}
-                                                onDrop={handleBadgeDrop}
-                                                onPaste={handleBadgePaste}
-                                                className="border-2 border-dashed border-slate-200 rounded-lg p-3 flex flex-col items-center justify-center bg-white cursor-pointer hover:border-indigo-400 transition-colors relative"
-                                            >
-                                                <input 
-                                                    type="file" 
-                                                    accept="image/*"
-                                                    onChange={handleBadgeFileChange}
-                                                    className="absolute inset-0 opacity-0 cursor-pointer"
-                                                />
-                                                <Upload className="h-5 w-5 text-slate-400 mb-1" />
-                                                <span className="text-xs text-slate-500 font-medium">
-                                                    {isUploadingBadge ? "Uploading..." : "Click, drag, or paste image here"}
-                                                </span>
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div className="col-span-1 space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500">Venue</Label>
+                                                <Select
+                                                    value={formData.isHome ? "Home" : "Away"}
+                                                    onValueChange={(v: string) => setFormData({ ...formData, isHome: v === "Home" })}
+                                                >
+                                                    <SelectTrigger className="h-9 text-xs">
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="Home" className="text-xs">Home</SelectItem>
+                                                        <SelectItem value="Away" className="text-xs">Away</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
                                             </div>
-                                            {opponentBadgeUrl && (
-                                                <div className="flex items-center gap-2 mt-2 bg-white p-2 rounded border">
-                                                    <img src={opponentBadgeUrl} alt="Badge Preview" className="h-8 w-8 object-contain rounded" />
-                                                    <span className="text-xs text-slate-500 truncate flex-1">{opponentBadgeUrl}</span>
-                                                    <Button type="button" variant="ghost" size="sm" className="h-6 text-red-500 hover:text-red-600 p-1" onClick={() => setOpponentBadgeUrl("")}>Remove</Button>
-                                                </div>
-                                            )}
+                                            <div className="col-span-2 space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500">Opponent</Label>
+                                                <Input
+                                                    list="league-teams-list"
+                                                    placeholder="Type opponent name"
+                                                    value={formData.opponent}
+                                                    onChange={e => {
+                                                        const val = e.target.value;
+                                                        setFormData({ ...formData, opponent: val });
+                                                        const teamMatch = leagueTeams.find(t => t.name.toLowerCase() === val.toLowerCase());
+                                                        if (teamMatch) {
+                                                            setOpponentInstagram(teamMatch.instagram_handle || "");
+                                                            setOpponentBadgeUrl(teamMatch.badge_url || "");
+                                                        } else {
+                                                            setOpponentInstagram("");
+                                                            setOpponentBadgeUrl("");
+                                                        }
+                                                    }}
+                                                    className="h-9 text-xs"
+                                                />
+                                                <datalist id="league-teams-list">
+                                                    {leagueTeams.map(team => (
+                                                        <option key={team.id} value={team.name} />
+                                                    ))}
+                                                </datalist>
+                                            </div>
                                         </div>
-                                    </div>
-                                )}
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Goalscorers</Label>
-                                        <Textarea
-                                            placeholder="e.g. J.Smith (2), D.Jones"
-                                            value={formData.goalscorers}
-                                            onChange={(e) => setFormData({ ...formData, goalscorers: e.target.value })}
-                                            className="h-20"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Assists</Label>
-                                        <Textarea
-                                            placeholder="e.g. M.Ali, K.West"
-                                            value={formData.assists}
-                                            onChange={(e) => setFormData({ ...formData, assists: e.target.value })}
-                                            className="h-20"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Yellow Cards</Label>
-                                        <Textarea
-                                            placeholder="e.g. J.Smith, P.Maldini"
-                                            value={formData.yellow_cards}
-                                            onChange={(e) => setFormData({ ...formData, yellow_cards: e.target.value })}
-                                            className="h-16"
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Red Cards</Label>
-                                        <Textarea
-                                            placeholder="e.g. S.Ramos"
-                                            value={formData.red_cards}
-                                            onChange={(e) => setFormData({ ...formData, red_cards: e.target.value })}
-                                            className="h-16"
-                                        />
-                                    </div>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label>Competition</Label>
-                                    <Select
-                                        value={formData.competition}
-                                        onValueChange={(v: string) => setFormData({ ...formData, competition: v })}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select Competition" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="League Match">League Match</SelectItem>
-                                            <SelectItem value="Alec Smith Premier Division Cup">Alec Smith Premier Division Cup</SelectItem>
-                                            <SelectItem value="Middlesex Cup">Middlesex Cup</SelectItem>
-                                            <SelectItem value="Friendly">Friendly</SelectItem>
-                                            <SelectItem value="Trial Match">Trial Match</SelectItem>
-                                            {/* Legacy Support for older fixtures like "Premier Division" */}
-                                            {formData.competition && !["League Match", "Alec Smith Premier Division Cup", "Middlesex Cup", "Friendly", "Trial Match"].includes(formData.competition) && (
-                                                <SelectItem value={formData.competition}>{formData.competition}</SelectItem>
-                                            )}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label>Surface</Label>
-                                    <Select
-                                        value={formData.surface || "4G"}
-                                        onValueChange={(v) => setFormData({ ...formData, surface: v as "4G" | "Grass" })}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select Surface" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Grass">Grass</SelectItem>
-                                            <SelectItem value="4G">4G</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div className="space-y-1.5">
-                                    <Label>Scoreline</Label>
-                                    <div className="flex items-center gap-4">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-sm font-bold text-slate-500 w-12 text-right">Home</span>
-                                            <Input
-                                                className="w-16 text-center font-bold text-lg"
-                                                placeholder="0"
-                                                value={(formData.scoreline || "").split('-')[0]?.trim() || ""}
-                                                onChange={e => {
-                                                    const home = e.target.value;
-                                                    const away = (formData.scoreline || "").split('-')[1]?.trim() || "";
-                                                    setFormData({ ...formData, scoreline: `${home}-${away}` });
-                                                }}
-                                            />
-                                        </div>
-                                        <span className="text-slate-400 font-bold">-</span>
-                                        <div className="flex items-center gap-2">
-                                            <Input
-                                                className="w-16 text-center font-bold text-lg"
-                                                placeholder="0"
-                                                value={(formData.scoreline || "").split('-')[1]?.trim() || ""}
-                                                onChange={e => {
-                                                    const home = (formData.scoreline || "").split('-')[0]?.trim() || "";
-                                                    const away = e.target.value;
-                                                    setFormData({ ...formData, scoreline: `${home}-${away}` });
-                                                }}
-                                            />
-                                            <span className="text-sm font-bold text-slate-500 w-12">Away</span>
-                                        </div>
-                                    </div>
-                                </div>
 
-                                <div className="space-y-1.5">
-                                    <Label>Notes</Label>
-                                    <Textarea
-                                        className="min-h-[60px]"
-                                        placeholder="Any special notes (e.g. Points adjustment)"
-                                        value={formData.notes || ""}
-                                        onChange={e => setFormData({ ...formData, notes: e.target.value })}
-                                    />
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500">Competition</Label>
+                                                <Select
+                                                    value={formData.competition}
+                                                    onValueChange={(v: string) => setFormData({ ...formData, competition: v })}
+                                                >
+                                                    <SelectTrigger className="h-9 text-xs">
+                                                        <SelectValue placeholder="Competition" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="League Match" className="text-xs">League Match</SelectItem>
+                                                        <SelectItem value="Alec Smith Premier Division Cup" className="text-xs">Alec Smith Cup</SelectItem>
+                                                        <SelectItem value="Middlesex Cup" className="text-xs">Middlesex Cup</SelectItem>
+                                                        <SelectItem value="Friendly" className="text-xs">Friendly</SelectItem>
+                                                        <SelectItem value="Trial Match" className="text-xs">Trial Match</SelectItem>
+                                                        {formData.competition && !["League Match", "Alec Smith Premier Division Cup", "Middlesex Cup", "Friendly", "Trial Match"].includes(formData.competition) && (
+                                                            <SelectItem value={formData.competition} className="text-xs">{formData.competition}</SelectItem>
+                                                        )}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500">Surface</Label>
+                                                <Select
+                                                    value={formData.surface || "4G"}
+                                                    onValueChange={(v) => setFormData({ ...formData, surface: v as "4G" | "Grass" })}
+                                                >
+                                                    <SelectTrigger className="h-9 text-xs">
+                                                        <SelectValue placeholder="Surface" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="Grass" className="text-xs">Grass</SelectItem>
+                                                        <SelectItem value="4G" className="text-xs">4G</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <Label className="text-xs font-bold text-slate-500">Location / Venue Address</Label>
+                                            <Input
+                                                placeholder="e.g. Market Road Pitches, N7 9PL"
+                                                value={formData.location || ""}
+                                                onChange={e => setFormData({ ...formData, location: e.target.value })}
+                                                className="h-9 text-xs"
+                                            />
+                                        </div>
+
+                                        {formData.opponent && (
+                                            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 space-y-2 mt-1">
+                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Opponent Info</h4>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div className="space-y-0.5">
+                                                        <Label className="text-[10px] font-bold text-slate-505">Instagram</Label>
+                                                        <Input 
+                                                            placeholder="e.g. camden_utd" 
+                                                            value={opponentInstagram}
+                                                            onChange={e => setOpponentInstagram(e.target.value)}
+                                                            className="h-8 text-[11px]"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-0.5">
+                                                        <Label className="text-[10px] font-bold text-slate-505">Badge Image URL</Label>
+                                                        <Input 
+                                                            placeholder="https://..." 
+                                                            value={opponentBadgeUrl}
+                                                            onChange={e => setOpponentBadgeUrl(e.target.value)}
+                                                            className="h-8 text-[11px]"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="space-y-1">
+                                                    <div 
+                                                        onDragOver={e => e.preventDefault()}
+                                                        onDrop={handleBadgeDrop}
+                                                        onPaste={handleBadgePaste}
+                                                        className="border border-dashed border-slate-200 rounded-lg p-2 flex items-center justify-center bg-white cursor-pointer hover:border-indigo-400 transition-colors relative"
+                                                    >
+                                                        <input 
+                                                            type="file" 
+                                                            accept="image/*"
+                                                            onChange={handleBadgeFileChange}
+                                                            className="absolute inset-0 opacity-0 cursor-pointer"
+                                                        />
+                                                        <Upload className="h-4 w-4 text-slate-400 mr-1.5" />
+                                                        <span className="text-[10px] text-slate-500 font-medium">
+                                                            {isUploadingBadge ? "Uploading..." : "Upload or paste opponent badge"}
+                                                        </span>
+                                                    </div>
+                                                    {opponentBadgeUrl && (
+                                                        <div className="flex items-center gap-2 mt-1.5 bg-white p-1.5 rounded border border-slate-105">
+                                                            <img src={opponentBadgeUrl} alt="Badge Preview" className="h-6 w-6 object-contain rounded" />
+                                                            <span className="text-[10px] text-slate-400 truncate flex-1">{opponentBadgeUrl}</span>
+                                                            <Button type="button" variant="ghost" size="sm" className="h-5 text-red-500 hover:text-red-650 p-1 text-[10px]" onClick={() => setOpponentBadgeUrl("")}>Remove</Button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </TabsContent>
+
+                                    <TabsContent value="result" className="space-y-3 mt-0 py-1">
+                                        <div className="space-y-1">
+                                            <Label className="text-xs font-bold text-slate-500">Scoreline</Label>
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs font-bold text-slate-500 w-10 text-right">Home</span>
+                                                    <Input
+                                                        className="w-14 h-8 text-center font-bold text-sm"
+                                                        placeholder="0"
+                                                        value={(formData.scoreline || "").split('-')[0]?.trim() || ""}
+                                                        onChange={e => {
+                                                            const home = e.target.value;
+                                                            const away = (formData.scoreline || "").split('-')[1]?.trim() || "";
+                                                            setFormData({ ...formData, scoreline: `${home}-${away}` });
+                                                        }}
+                                                    />
+                                                </div>
+                                                <span className="text-slate-300 font-bold">-</span>
+                                                <div className="flex items-center gap-2">
+                                                    <Input
+                                                        className="w-14 h-8 text-center font-bold text-sm"
+                                                        placeholder="0"
+                                                        value={(formData.scoreline || "").split('-')[1]?.trim() || ""}
+                                                        onChange={e => {
+                                                            const home = (formData.scoreline || "").split('-')[0]?.trim() || "";
+                                                            const away = e.target.value;
+                                                            setFormData({ ...formData, scoreline: `${home}-${away}` });
+                                                        }}
+                                                    />
+                                                    <span className="text-xs font-bold text-slate-500 w-10">Away</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500">Goalscorers</Label>
+                                                <Textarea
+                                                    placeholder="e.g. J.Smith (2), D.Jones"
+                                                    value={formData.goalscorers}
+                                                    onChange={(e) => setFormData({ ...formData, goalscorers: e.target.value })}
+                                                    className="h-16 text-xs"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500">Assists</Label>
+                                                <Textarea
+                                                    placeholder="e.g. M.Ali, K.West"
+                                                    value={formData.assists}
+                                                    onChange={(e) => setFormData({ ...formData, assists: e.target.value })}
+                                                    className="h-16 text-xs"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500">Yellow Cards</Label>
+                                                <Textarea
+                                                    placeholder="e.g. J.Smith, P.Maldini"
+                                                    value={formData.yellow_cards}
+                                                    onChange={(e) => setFormData({ ...formData, yellow_cards: e.target.value })}
+                                                    className="h-14 text-xs"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500">Red Cards</Label>
+                                                <Textarea
+                                                    placeholder="e.g. S.Ramos"
+                                                    value={formData.red_cards}
+                                                    onChange={(e) => setFormData({ ...formData, red_cards: e.target.value })}
+                                                    className="h-14 text-xs"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <Label className="text-xs font-bold text-slate-500">Notes / Adjustments</Label>
+                                            <Textarea
+                                                className="min-h-[50px] text-xs"
+                                                placeholder="Any special notes (e.g. Points adjustment)"
+                                                value={formData.notes || ""}
+                                                onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                                            />
+                                        </div>
+                                    </TabsContent>
                                 </div>
-                            </div>
-                            <DialogFooter className="gap-2 sm:gap-0">
+                            </Tabs>
+
+                            <DialogFooter className="gap-2 sm:gap-0 p-4 border-t bg-slate-50 shrink-0">
                                 {editingId && formData.scoreline && (
                                     <Button
                                         type="button"
                                         variant="outline"
                                         onClick={() => setFormData({ ...formData, scoreline: "", goalscorers: "", assists: "", yellow_cards: "", red_cards: "", notes: "" })}
-                                        className="h-8 text-xs text-slate-500 bg-amber-50 hover:bg-amber-100 border border-amber-200 mr-auto"
+                                        className="h-9 text-xs text-slate-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 mr-auto"
                                     >
                                         Reset to Upcoming
                                     </Button>
                                 )}
-                                <Button variant="outline" onClick={resetForm}>Cancel</Button>
-                                <Button onClick={handleSaveMatch} className="bg-red-600 hover:bg-red-700">
+                                <Button variant="outline" onClick={resetForm} className="h-9 text-xs">Cancel</Button>
+                                <Button onClick={handleSaveMatch} className="bg-red-600 hover:bg-red-700 h-9 text-xs">
                                     {editingId ? "Update Match" : "Save Match"}
                                 </Button>
                             </DialogFooter>
