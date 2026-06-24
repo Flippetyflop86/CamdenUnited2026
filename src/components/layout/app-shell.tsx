@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Menu, LayoutDashboard, Users, Activity, CreditCard } from "lucide-react";
+import { Menu, LayoutDashboard, Users, Activity, CreditCard, Search } from "lucide-react";
 import Link from "next/link";
 import { useClub } from "@/context/club-context";
 import { cn } from "@/lib/utils";
@@ -54,13 +54,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                     )}
                     <span className="font-bold text-white truncate">{settings.name}</span>
                 </div>
-                <button
-                    onClick={() => setIsMobileMenuOpen(true)}
-                    className="p-2 text-slate-400 hover:text-white"
-                    aria-label="Open menu"
-                >
-                    <Menu className="h-6 w-6" />
-                </button>
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => window.dispatchEvent(new CustomEvent("open-global-search"))}
+                        className="p-2 text-slate-400 hover:text-white"
+                        aria-label="Open search"
+                        title="Search"
+                    >
+                        <Search className="h-5 w-5" />
+                    </button>
+                    <button
+                        onClick={() => setIsMobileMenuOpen(true)}
+                        className="p-2 text-slate-400 hover:text-white"
+                        aria-label="Open menu"
+                    >
+                        <Menu className="h-6 w-6" />
+                    </button>
+                </div>
             </header>
 
             {/* Sidebar Desktop */}

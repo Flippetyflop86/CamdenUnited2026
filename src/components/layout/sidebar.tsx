@@ -30,7 +30,8 @@ import {
     Coins,
     Wallet,
     Lock,
-    CreditCard
+    CreditCard,
+    Search
 } from "lucide-react";
 
 import { useClub } from "@/context/club-context";
@@ -167,6 +168,21 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
 
             <nav className="flex-1 overflow-y-auto py-4 scrollbar-thin scrollbar-thumb-slate-700">
                 <div className="px-3 space-y-6">
+                    {/* Global Search Button */}
+                    <div className="px-3">
+                        <button
+                            onClick={() => window.dispatchEvent(new CustomEvent("open-global-search"))}
+                            className="flex w-full items-center gap-2 rounded-md bg-slate-800/60 border border-slate-700/60 px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-800 hover:border-slate-600 transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-500 shadow-inner group"
+                            title="Search club database (Ctrl+K)"
+                        >
+                            <Search className="h-3.5 w-3.5 shrink-0 text-slate-500 group-hover:text-red-400 transition-colors" />
+                            <span className="flex-1 text-left">Search database...</span>
+                            <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded bg-slate-700 px-1.5 font-mono text-[9px] font-medium text-slate-300">
+                                Ctrl+K
+                            </kbd>
+                        </button>
+                    </div>
+
                     {/* Dashboard — always visible */}
                     <div>
                         <ul className="space-y-1" role="list">
@@ -175,34 +191,35 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                     href="/dashboard"
                                     onClick={(e) => handleItemClick(e, "/dashboard")}
                                     aria-current={pathname === "/dashboard" ? "page" : undefined}
+                                    title="Dashboard Overview"
                                     className={cn(
-                                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-red-500",
+                                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-500 group relative",
                                         pathname === "/dashboard"
-                                            ? "bg-red-600 text-white"
+                                            ? "bg-slate-800 text-white font-semibold border-l-2 border-red-500 rounded-l-none"
                                             : "text-slate-400 hover:bg-slate-800 hover:text-white",
                                         isRouteLocked("/dashboard") && "opacity-60"
                                     )}
                                 >
-                                    <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                    <LayoutDashboard className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110 group-hover:translate-x-0.5" aria-hidden="true" />
                                     <span className="truncate flex-1">Dashboard</span>
                                     {isRouteLocked("/dashboard") && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
                                 </Link>
                             </li>
                         </ul>
                     </div>
-
+ 
                     {navSections.map((section) => {
                         // Filter items the current user can access
                         const visibleItems = section.items.filter(item =>
                             canAccess(item.href, role, pagePermissions)
                         );
-
+ 
                         // Don't render the section header if all items are hidden
                         if (visibleItems.length === 0) return null;
-
+ 
                         return (
                             <div key={section.title}>
-                                <h3 className="px-3 text-[11px] font-black text-slate-200 uppercase tracking-widest mb-2.5 mt-2">
+                                <h3 className="px-3 text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2.5 mt-2">
                                     {section.title}
                                 </h3>
                                 <ul className="space-y-1" role="list">
@@ -212,7 +229,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                         // The billing tab can use a specific link label depending on subscription status
                                         const labelOverride = isBillingItem ? "Billing & Subs (Coming Soon)" : item.label;
                                         const linkHref = isBillingItem ? billingHref : item.href;
-                                        
+                                         
                                         // We map the link to keep user active status
                                         const isActive = pathname === linkHref || pathname?.startsWith(`${linkHref}/`);
                                         return (
@@ -221,15 +238,16 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                                     href={linkHref}
                                                     onClick={(e) => handleItemClick(e, linkHref, !!item.isComingSoon)}
                                                     aria-current={isActive ? "page" : undefined}
+                                                    title={labelOverride}
                                                     className={cn(
-                                                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-red-500",
+                                                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-500 group relative",
                                                         isActive
-                                                            ? "bg-red-600 text-white"
+                                                            ? "bg-slate-800 text-white font-semibold border-l-2 border-red-500 rounded-l-none"
                                                             : "text-slate-400 hover:bg-slate-800 hover:text-white",
                                                         locked && "opacity-60 cursor-not-allowed"
                                                     )}
                                                 >
-                                                    <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                                    <item.icon className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110 group-hover:translate-x-0.5" aria-hidden="true" />
                                                     <span className="truncate flex-1">{labelOverride}</span>
                                                     {locked && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
                                                 </Link>
@@ -274,7 +292,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                 setTimeout(() => setCopiedEmail(false), 2000);
                             }}
                             className="p-1 hover:bg-slate-800 rounded transition-colors text-slate-400 hover:text-white shrink-0"
-                            title="Copy email address"
+                            title={copiedEmail ? "Copied to clipboard!" : "Copy email address"}
                         >
                             {copiedEmail ? (
                                 <Check className="h-3 w-3 text-emerald-400" />
