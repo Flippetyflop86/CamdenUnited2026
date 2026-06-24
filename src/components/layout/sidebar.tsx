@@ -115,13 +115,13 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         if (isComingSoon) {
             e.preventDefault();
             setComingSoonModalOpen(true);
-            if (onClose) onClose();
             return;
         }
         if (isRouteLocked(href)) {
             e.preventDefault();
             if (isTrialExpired) {
                 router.push(billingHref);
+                if (onClose) onClose();
             } else {
                 if (["/opposition"].includes(href)) {
                     setRequiredTier("High");
@@ -130,7 +130,6 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 }
                 setUpgradeModalOpen(true);
             }
-            if (onClose) onClose();
         } else {
             if (onClose) onClose();
         }
