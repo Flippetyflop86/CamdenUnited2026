@@ -12,13 +12,6 @@ import { supabase } from "@/lib/supabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 
-const EXPLOIT_ZONES = [
-    { id: "behind-defense", label: "Space Behind Defense", style: { left: "15%", top: "4%", width: "70%", height: "12%" } },
-    { id: "left-wing", label: "Exploit Behind RB", style: { left: "4%", top: "18%", width: "25%", height: "20%" } },
-    { id: "right-wing", label: "Exploit Behind LB", style: { right: "4%", top: "18%", width: "25%", height: "20%" } },
-    { id: "zone-14", label: "Zone 14 (Pocket)", style: { left: "30%", top: "30%", width: "40%", height: "15%" } },
-];
-
 export default function OppositionReportsPage() {
     const { settings } = useClub();
     const [teams, setTeams] = useState<OppositionTeam[]>([]);
@@ -26,19 +19,6 @@ export default function OppositionReportsPage() {
     const [isEditing, setIsEditing] = useState(true); // Default to editing mode for new report
     const [editedTeam, setEditedTeam] = useState<OppositionTeam | null>(null);
     const [selectedProfileIndex, setSelectedProfileIndex] = useState<number | null>(null);
-
-    const isZoneActive = (zoneId: string) => {
-        return (isEditing ? editedTeam?.exploitZones : displayTeam.exploitZones)?.includes(zoneId);
-    };
-
-    const toggleZone = (zoneId: string) => {
-        if (!isEditing || !editedTeam) return;
-        const current = editedTeam.exploitZones || [];
-        const updated = current.includes(zoneId)
-            ? current.filter(id => id !== zoneId)
-            : [...current, zoneId];
-        setEditedTeam({ ...editedTeam, exploitZones: updated });
-    };
 
     // ... (keep state) ...
 
@@ -82,14 +62,12 @@ export default function OppositionReportsPage() {
         const mapped: OppositionTeam[] = (data || []).map((t: any) => {
             let notesText = "";
             let playerProfiles = [];
-            let exploitZones = [];
             if (t.notes) {
                 if (typeof t.notes === "string") {
                     notesText = t.notes;
                 } else if (t.notes.text !== undefined) {
                     notesText = t.notes.text;
                     playerProfiles = t.notes.playerProfiles || [];
-                    exploitZones = t.notes.exploitZones || [];
                 } else {
                     notesText = parseNotes(t.notes);
                 }
@@ -100,7 +78,6 @@ export default function OppositionReportsPage() {
                 formation: t.formation,
                 notes: notesText,
                 playerProfiles,
-                exploitZones,
                 lineup: t.lineup || [],
                 createdAt: t.created_at,
                 updatedAt: t.updated_at
@@ -178,7 +155,6 @@ export default function OppositionReportsPage() {
             notes: {
                 text: editedTeam.notes,
                 playerProfiles: editedTeam.playerProfiles || [],
-                exploitZones: editedTeam.exploitZones || []
             },
             lineup: editedTeam.lineup || [],
             updated_at: new Date().toISOString()
@@ -525,25 +501,6 @@ export default function OppositionReportsPage() {
                                             )}
                                         </div>
 
-                                        {/* Exploit Zones Overlays */}
-                                        {EXPLOIT_ZONES.map((zone) => {
-                                            const active = isZoneActive(zone.id);
-                                            if (!isEditing && !active) return null;
-                                            return (
-                                                <div
-                                                    key={zone.id}
-                                                    onClick={() => isEditing && toggleZone(zone.id)}
-                                                    style={zone.style}
-                                                    className={`absolute rounded flex items-center justify-center border transition-all select-none z-10 ${
-                                                        active
-                                                            ? "bg-rose-500/35 border-rose-500 shadow-md text-white font-extrabold text-[9px] uppercase tracking-wider cursor-pointer"
-                                                            : "bg-transparent border-dashed border-white/30 text-white/50 hover:bg-white/5 hover:border-white/60 font-semibold text-[8px] cursor-pointer"
-                                                    }`}
-                                                >
-                                                    <span className="px-1 text-center leading-none">{zone.label}</span>
-                                                </div>
-                                            );
-                                        })}
 
                                         {/* Player dots with position label only — no name overflow */}
                                         {formation.map((pos, idx) => {
