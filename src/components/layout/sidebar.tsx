@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { getSubscription } from "@/lib/subscription-utils";
 import {
     Copy,
     Check,
@@ -34,6 +36,7 @@ import {
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { canAccess } from "@/lib/permissions";
+import { Button } from "@/components/ui/button";
 
 const navSections = [
     {
@@ -72,9 +75,74 @@ const navSections = [
 
 export function Sidebar({ onClose }: { onClose?: () => void }) {
     const pathname = usePathname();
+    const router = useRouter();
     const { settings } = useClub();
     const { user, role, pagePermissions, displayName, signOut, isManager } = useAuth();
     const [copiedEmail, setCopiedEmail] = useState(false);
+
+    // Subscription & Gating State
+    const [sub, setSub] = useState(() => getSubscription());
+    const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+    const [requiredTier, setRequiredTier] = useState<"Medium" | "High">("Medium");
+
+    useEffect(() => {
+        const handleSubChange = () => {
+            setSub(getSubscription());
+        };
+        window.addEventListener("subscription-changed", handleSubChange);
+        return () => window.removeEventListener("subscription-changed", handleSubChange);
+    }, []);
+
+    const now = new Date();
+    const trialEnds = new Date(sub.trialEndsAt);
+    const daysLeft = Math.max(0, Math.ceil((trialEnds.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    const isTrialExpired = !sub.isPaymentConfigured && now > trialEnds;
+
+    // Billing route is always dashboard billing
+    const billingHref = "/dashboard/billing";
+
+    const isRouteLocked = (href: string) => {
+        // If payment is configured, lock based on selected tier
+        if (sub.isPaymentConfigured) {
+            if (sub.tier === "Low") {
+                const mediumOrHigh = ["/finance", "/budgets", "/sponsors", "/recruitment", "/opposition"];
+                return mediumOrHigh.includes(href);
+            }
+            if (sub.tier === "Medium") {
+                const highOnly = ["/opposition"];
+                return highOnly.includes(href);
+            }
+            return false;
+        }
+
+        // If trial is expired and payment is not configured, everything is locked except billing
+        if (isTrialExpired) {
+            return href !== billingHref;
+        }
+
+        // During active trial (payment not configured), lock High tier features
+        const highTierRoutes = ["/opposition", "/sponsors", "/recruitment"];
+        return highTierRoutes.includes(href);
+    };
+
+    const handleItemClick = (e: React.MouseEvent, href: string) => {
+        if (isRouteLocked(href)) {
+            e.preventDefault();
+            if (isTrialExpired) {
+                router.push(billingHref);
+            } else {
+                if (["/opposition"].includes(href)) {
+                    setRequiredTier("High");
+                } else {
+                    setRequiredTier("Medium");
+                }
+                setUpgradeModalOpen(true);
+            }
+            if (onClose) onClose();
+        } else {
+            if (onClose) onClose();
+        }
+    };
 
     // The display name shown at the bottom of the sidebar
     const shownName = displayName
@@ -114,17 +182,19 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                             <li>
                                 <Link
                                     href="/dashboard"
-                                    onClick={onClose}
+                                    onClick={(e) => handleItemClick(e, "/dashboard")}
                                     aria-current={pathname === "/dashboard" ? "page" : undefined}
                                     className={cn(
                                         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-red-500",
                                         pathname === "/dashboard"
                                             ? "bg-red-600 text-white"
-                                            : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                                            : "text-slate-400 hover:bg-slate-800 hover:text-white",
+                                        isRouteLocked("/dashboard") && "opacity-60"
                                     )}
                                 >
                                     <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    <span className="truncate">Dashboard</span>
+                                    <span className="truncate flex-1">Dashboard</span>
+                                    {isRouteLocked("/dashboard") && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
                                 </Link>
                             </li>
                         </ul>
@@ -146,23 +216,31 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                 </h3>
                                 <ul className="space-y-1" role="list">
                                     {visibleItems.map((item) => {
-                                        const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
+                                        const locked = isRouteLocked(item.href);
+                                        const isBillingItem = item.href === "/dashboard/billing";
+                                        // The billing tab can use a specific link label depending on subscription status
+                                        const labelOverride = isBillingItem ? "Billing & Subscription" : item.label;
+                                        const linkHref = isBillingItem ? billingHref : item.href;
+                                        
+                                        // We map the link to keep user active status
+                                        const isActive = pathname === linkHref || pathname?.startsWith(`${linkHref}/`);
                                         return (
                                             <li key={item.label}>
                                                 <Link
-                                                    href={item.href}
-                                                    onClick={onClose}
+                                                    href={linkHref}
+                                                    onClick={(e) => handleItemClick(e, linkHref)}
                                                     aria-current={isActive ? "page" : undefined}
                                                     className={cn(
                                                         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-red-500",
                                                         isActive
                                                             ? "bg-red-600 text-white"
-                                                            : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                                                            : "text-slate-400 hover:bg-slate-800 hover:text-white",
+                                                        locked && "opacity-60 cursor-not-allowed"
                                                     )}
                                                 >
                                                     <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-                                                    <span className="truncate flex-1">{item.label}</span>
-                                                    {(item as any).isLocked && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
+                                                    <span className="truncate flex-1">{labelOverride}</span>
+                                                    {locked && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
                                                 </Link>
                                             </li>
                                         );
@@ -215,6 +293,26 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                         </button>
                     </div>
                 </div>
+                {/* Trial/Subscription Status Badge */}
+                <div className="mb-4">
+                    {sub.isPaymentConfigured ? (
+                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-900/60 text-xs">
+                            <span className="text-emerald-400 font-semibold">{sub.tier} Subscription</span>
+                            <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">✓ Active</span>
+                        </div>
+                    ) : isTrialExpired ? (
+                        <Link href={billingHref} className="block flex items-center justify-between p-2.5 rounded-lg bg-rose-950/40 border border-rose-900/60 text-xs hover:bg-rose-900/30 transition-colors">
+                            <span className="text-rose-400 font-bold">Trial Expired</span>
+                            <span className="text-[10px] text-rose-500 font-black uppercase bg-rose-950 px-1.5 py-0.5 rounded animate-pulse">Unlock Now</span>
+                        </Link>
+                    ) : (
+                        <Link href={billingHref} className="block flex items-center justify-between p-2.5 rounded-lg bg-amber-950/40 border border-amber-900/60 text-xs hover:bg-amber-900/30 transition-colors">
+                            <span className="text-amber-400 font-semibold">{sub.tier} Trial: {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left</span>
+                            <span className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">Configure Payment</span>
+                        </Link>
+                    )}
+                </div>
+
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 overflow-hidden">
                         <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
@@ -232,6 +330,50 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                     </button>
                 </div>
             </div>
+
+            {/* Paywall Upgrade Dialog */}
+            <Dialog open={upgradeModalOpen} onOpenChange={setUpgradeModalOpen}>
+                <DialogContent className="max-w-md bg-white rounded-2xl p-6 text-slate-900">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2 text-indigo-900">
+                            <Lock className="h-5 w-5 text-indigo-600 animate-bounce" />
+                            Feature Locked During Trial
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4 mt-2">
+                        <p className="text-sm text-slate-600 leading-relaxed">
+                            To unlock advanced modules like **Opposition Scouting Reports**, **Sponsorships**, or **Recruitment** during your 7-day trial, you need to configure your Stripe auto-billing credentials.
+                        </p>
+                        <div className="bg-indigo-50 border border-indigo-100 p-3.5 rounded-xl text-xs text-indigo-950 space-y-1.5">
+                            <p className="font-bold flex items-center gap-1">Default Subscription Plan:</p>
+                            <ul className="list-disc list-inside space-y-1 text-slate-700">
+                                <li><strong>Medium Tier</strong> Plan selected</li>
+                                <li>£9.99 / month starting after your 7-day trial</li>
+                                <li>No charge will be made before trial finishes</li>
+                                <li>Cancel anytime inside the billing portal</li>
+                            </ul>
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <Button 
+                                onClick={() => {
+                                    setUpgradeModalOpen(false);
+                                    router.push(billingHref);
+                                }}
+                                className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+                            >
+                                Configure Stripe Auto-Billing
+                            </Button>
+                            <Button 
+                                variant="outline" 
+                                onClick={() => setUpgradeModalOpen(false)}
+                                className="flex-1 border-slate-200"
+                            >
+                                Continue Trial
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
