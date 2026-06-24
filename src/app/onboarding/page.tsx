@@ -64,6 +64,8 @@ export default function OnboardingWizard() {
     const [contractsEnabled, setContractsEnabled] = useState(settings.contractsEnabled !== undefined ? settings.contractsEnabled : false);
     const [registrationFee, setRegistrationFee] = useState(settings.registrationFee?.toString() || "0");
     const [trainingFeePerSession, setTrainingFeePerSession] = useState(settings.trainingFeePerSession?.toString() || "5");
+    const [matchdayFee, setMatchdayFee] = useState("10");
+    const [subsStructure, setSubsStructure] = useState<"Monthly" | "Training" | "Matchday" | "Both">("Monthly");
     const [finesEnabled, setFinesEnabled] = useState(settings.finesEnabled || false);
 
     // Step 5: Squads
@@ -110,6 +112,16 @@ export default function OnboardingWizard() {
             setTrainingLocation(settings.trainingLocation || "");
             setMonthlySubs(settings.monthlySubs?.toString() || "35");
             setSubsEnabled(settings.subsEnabled !== undefined ? settings.subsEnabled : (parseFloat(settings.monthlySubs?.toString() || "0") > 0));
+            
+            // Load matchday fee & structure overrides if any
+            if (settings.name) {
+                const savedMatchdayFee = localStorage.getItem(`clubflow_matchday_fee_${settings.name}`);
+                if (savedMatchdayFee) setMatchdayFee(savedMatchdayFee);
+                
+                const savedStructure = localStorage.getItem(`clubflow_subs_structure_${settings.name}`);
+                if (savedStructure) setSubsStructure(savedStructure as any);
+            }
+
             setContractsEnabled(settings.contractsEnabled !== undefined ? settings.contractsEnabled : false);
             setFinesEnabled(settings.finesEnabled || false);
             setSelectedSquads(settings.squads || ["First Team"]);
@@ -320,6 +332,11 @@ export default function OnboardingWizard() {
                 trainingLocation: trainingLocation || null,
                 isOnboarded: true 
             });
+
+            if (subsEnabled) {
+                localStorage.setItem(`clubflow_matchday_fee_${clubName}`, matchdayFee);
+                localStorage.setItem(`clubflow_subs_structure_${clubName}`, subsStructure);
+            }
 
             setStep(8); // Success screen
         } catch (err: any) {
@@ -688,24 +705,41 @@ export default function OnboardingWizard() {
                                                 {subsEnabled && (
                                                     <>
                                                         <div className="space-y-2">
-                                                            <Label className="text-slate-300">Standard Monthly Player Subs (£)</Label>
-                                                            <div className="relative">
-                                                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
-                                                                <Input 
-                                                                    type="number"
-                                                                    value={monthlySubs}
-                                                                    onChange={(e) => setMonthlySubs(e.target.value)}
-                                                                    className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
-                                                                    placeholder="e.g. 35"
-                                                                />
-                                                            </div>
-                                                            <p className="text-slate-400 text-[11px] leading-normal mt-1 bg-slate-900/40 p-2.5 rounded-lg border border-slate-800">
-                                                                <strong>Note:</strong> You can mark specific players as <strong>Exempt</strong> (e.g. coaches, sponsored players) or customize their fees individually later in the Squad and Finance tabs.
-                                                            </p>
-                                                            <p className="text-slate-500 text-xs">Used to calculate target collection goals in the Finance panel.</p>
+                                                            <Label className="text-slate-300">Club Subs Structure</Label>
+                                                            <select
+                                                                value={subsStructure}
+                                                                onChange={(e) => setSubsStructure(e.target.value as any)}
+                                                                className="w-full bg-slate-900/60 border border-slate-800 text-white rounded-xl h-12 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm font-semibold"
+                                                            >
+                                                                <option value="Monthly">Monthly charge in total</option>
+                                                                <option value="Training">Just training fee subs (Pay-As-You-Go)</option>
+                                                                <option value="Matchday">Just matchday subs (Pay-As-You-Go)</option>
+                                                                <option value="Both">Both training & matchday subs (Pay-As-You-Go)</option>
+                                                            </select>
+                                                            <p className="text-slate-500 text-xs">Choose how your club collects subscriptions from players.</p>
                                                         </div>
 
-                                                        <div className="grid grid-cols-2 gap-4">
+                                                        {subsStructure === "Monthly" && (
+                                                            <div className="space-y-2">
+                                                                <Label className="text-slate-300">Standard Monthly Player Subs (£)</Label>
+                                                                <div className="relative">
+                                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
+                                                                    <Input 
+                                                                        type="number"
+                                                                        value={monthlySubs}
+                                                                        onChange={(e) => setMonthlySubs(e.target.value)}
+                                                                        className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
+                                                                        placeholder="e.g. 35"
+                                                                    />
+                                                                </div>
+                                                                <p className="text-slate-400 text-[11px] leading-normal mt-1 bg-slate-900/40 p-2.5 rounded-lg border border-slate-800">
+                                                                    <strong>Note:</strong> You can mark specific players as <strong>Exempt</strong> (e.g. coaches, sponsored players) or customize their fees individually later in the Squad and Finance tabs.
+                                                                </p>
+                                                                <p className="text-slate-500 text-xs">Used to calculate target collection goals in the Finance panel.</p>
+                                                            </div>
+                                                        )}
+
+                                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                                             <div className="space-y-2">
                                                                 <Label className="text-slate-300">Club Registration Fee (£)</Label>
                                                                 <div className="relative">
@@ -721,20 +755,39 @@ export default function OnboardingWizard() {
                                                                 <p className="text-slate-500 text-xs">One-off seasonal registration fee.</p>
                                                             </div>
 
-                                                            <div className="space-y-2">
-                                                                <Label className="text-slate-300">Training Session Fee (£)</Label>
-                                                                <div className="relative">
-                                                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
-                                                                    <Input 
-                                                                        type="number"
-                                                                        value={trainingFeePerSession}
-                                                                        onChange={(e) => setTrainingFeePerSession(e.target.value)}
-                                                                        className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
-                                                                        placeholder="e.g. 5"
-                                                                    />
+                                                            {(subsStructure === "Training" || subsStructure === "Both") && (
+                                                                <div className="space-y-2">
+                                                                    <Label className="text-slate-300">Training Session Fee (£)</Label>
+                                                                    <div className="relative">
+                                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
+                                                                        <Input 
+                                                                            type="number"
+                                                                            value={trainingFeePerSession}
+                                                                            onChange={(e) => setTrainingFeePerSession(e.target.value)}
+                                                                            className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
+                                                                            placeholder="e.g. 5"
+                                                                        />
+                                                                    </div>
+                                                                    <p className="text-slate-500 text-xs">Default fee for pay-as-you-go training.</p>
                                                                 </div>
-                                                                <p className="text-slate-500 text-xs">Default fee for pay-as-you-go training.</p>
-                                                            </div>
+                                                            )}
+
+                                                            {(subsStructure === "Matchday" || subsStructure === "Both") && (
+                                                                <div className="space-y-2">
+                                                                    <Label className="text-slate-300">Matchday Fee (£)</Label>
+                                                                    <div className="relative">
+                                                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold">£</span>
+                                                                        <Input 
+                                                                            type="number"
+                                                                            value={matchdayFee}
+                                                                            onChange={(e) => setMatchdayFee(e.target.value)}
+                                                                            className="bg-slate-900/60 border-slate-800 text-white pl-8 h-12"
+                                                                            placeholder="e.g. 10"
+                                                                        />
+                                                                    </div>
+                                                                    <p className="text-slate-500 text-xs">Default fee for pay-as-you-go matches.</p>
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     </>
                                                 )}
