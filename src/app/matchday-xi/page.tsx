@@ -28,6 +28,8 @@ export default function MatchdayXIPage() {
     const [draggedPlayer, setDraggedPlayer] = useState<string | null>(null);
     const [draggedSource, setDraggedSource] = useState<{type: 'squad' | 'pitch' | 'sub', index?: number} | null>(null);
     const [squadFilter, setSquadFilter] = useState<"All" | "GK" | "DEF" | "MID" | "FWD">("All");
+    const currentSquads = settings.squads || ["First Team"];
+    const [activeSquadTab, setActiveSquadTab] = useState<string>(currentSquads[0] || "First Team");
     const [activeSlot, setActiveSlot] = useState<{type: 'pitch' | 'sub', index: number, label: string} | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
 
@@ -65,7 +67,8 @@ export default function MatchdayXIPage() {
 
     // Load Data
     useEffect(() => {
-        fetchData();
+        fetchPlayers();
+        fetchMatches();
 
         // Subscription for realtime updates (optional but good for multi-user)
         const channel = supabase.channel('public:matchday_xis')
@@ -76,32 +79,64 @@ export default function MatchdayXIPage() {
         return () => { supabase.removeChannel(channel); };
     }, []);
 
+    useEffect(() => {
+        fetchLineupOnly();
+    }, [activeSquadTab]);
+
     const fetchData = async () => {
         await Promise.all([fetchLineupOnly(), fetchPlayers(), fetchMatches()]);
     };
 
     const fetchLineupOnly = async () => {
-        const { data } = await supabase.from('matchday_xis').select('*').order('created_at', { ascending: false }).limit(1);
-        if (data && data.length > 0) {
-            setLineup({
-                id: data[0].id,
-                formation: data[0].formation,
-                starters: data[0].starters,
-                substitutes: data[0].substitutes,
-                createdAt: data[0].created_at,
-                updatedAt: data[0].created_at
-            });
-        } else {
-            // Default
-            setLineup({
-                id: "default-xi", // Will be replaced by UUID on insert check or just handled
-                formation: "4-2-3-1",
-                starters: {},
-                substitutes: ["", "", "", "", ""],
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-            });
+        try {
+            const { data, error } = await supabase
+                .from('matchday_xis')
+                .select('*')
+                .eq('squad', activeSquadTab)
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (error && error.message.includes('column "squad" does not exist')) {
+                // Fallback for database migration pending
+                const fallbackRes = await supabase.from('matchday_xis').select('*').order('created_at', { ascending: false }).limit(1);
+                if (fallbackRes.data && fallbackRes.data.length > 0) {
+                    setLineup({
+                        id: fallbackRes.data[0].id,
+                        formation: fallbackRes.data[0].formation,
+                        starters: fallbackRes.data[0].starters,
+                        substitutes: fallbackRes.data[0].substitutes,
+                        squad: fallbackRes.data[0].squad,
+                        createdAt: fallbackRes.data[0].created_at,
+                        updatedAt: fallbackRes.data[0].created_at
+                    });
+                    return;
+                }
+            } else if (data && data.length > 0) {
+                setLineup({
+                    id: data[0].id,
+                    formation: data[0].formation,
+                    starters: data[0].starters,
+                    substitutes: data[0].substitutes,
+                    squad: data[0].squad,
+                    createdAt: data[0].created_at,
+                    updatedAt: data[0].created_at
+                });
+                return;
+            }
+        } catch (e) {
+            console.error("Error fetching lineup:", e);
         }
+
+        // Default empty lineup if nothing found
+        setLineup({
+            id: "default-xi",
+            formation: "4-2-3-1",
+            starters: {},
+            substitutes: ["", "", "", "", ""],
+            squad: activeSquadTab,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+        });
     };
 
     const fetchPlayers = async () => {
@@ -169,6 +204,7 @@ export default function MatchdayXIPage() {
             formation: newLineup.formation,
             starters: newLineup.starters,
             substitutes: newLineup.substitutes,
+            squad: activeSquadTab,
             created_at: new Date().toISOString()
         };
 
@@ -176,7 +212,11 @@ export default function MatchdayXIPage() {
             const { data, error } = await supabase.from('matchday_xis').insert([payload]).select();
             if (error) {
                 console.error("Save Lineup Error:", error);
-                alert("Database Error: " + error.message + " (Have you run the SQL script for matchday_xis?)");
+                if (error.message.includes('column "squad" does not exist')) {
+                    alert("Database Error: " + error.message + "\n\nPlease run this SQL query in your Supabase SQL Editor to support multiple squads:\n\nALTER TABLE matchday_xis ADD COLUMN IF NOT EXISTS squad text DEFAULT 'First Team';");
+                } else {
+                    alert("Database Error: " + error.message + " (Have you run the SQL script for matchday_xis?)");
+                }
                 return;
             }
             if (data && data.length > 0) {
@@ -186,7 +226,11 @@ export default function MatchdayXIPage() {
             const { error } = await supabase.from('matchday_xis').update(payload).eq('id', newLineup.id);
             if (error) {
                 console.error("Update Lineup Error:", error);
-                alert("Database Error: " + error.message);
+                if (error.message.includes('column "squad" does not exist')) {
+                    alert("Database Error: " + error.message + "\n\nPlease run this SQL query in your Supabase SQL Editor to support multiple squads:\n\nALTER TABLE matchday_xis ADD COLUMN IF NOT EXISTS squad text DEFAULT 'First Team';");
+                } else {
+                    alert("Database Error: " + error.message);
+                }
             }
         }
     };
@@ -593,10 +637,9 @@ export default function MatchdayXIPage() {
         return false;
     };
 
-    const currentSquads = settings.squads || ["First Team"];
     const isPlayerInMatchdayTracker = (p: Player) => {
-        const isFirstTeam = p.squad === "firstTeam" || p.squad === "First Team" || p.squad === currentSquads[0];
-        return isFirstTeam || p.isInMatchdayTracker === true;
+        const matchesSquad = p.squad?.toLowerCase().replace(/\s+/g, '') === activeSquadTab.toLowerCase().replace(/\s+/g, '');
+        return matchesSquad || p.isInMatchdayTracker === true;
     };
 
     const availablePlayers = players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p));
@@ -660,6 +703,18 @@ export default function MatchdayXIPage() {
                         Export PDF
                     </Button>
                 </div>
+            </div>
+
+            <div className="flex space-x-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
+                {currentSquads.map(squad => (
+                    <button 
+                        key={squad} 
+                        onClick={() => setActiveSquadTab(squad)} 
+                        className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${activeSquadTab === squad ? "bg-red-50 text-red-700" : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}
+                    >
+                        {squad}
+                    </button>
+                ))}
             </div>
 
             {nextMatch && (
