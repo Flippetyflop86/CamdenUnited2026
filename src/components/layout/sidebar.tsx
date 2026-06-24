@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import {
+    Copy,
+    Check,
     LayoutDashboard,
     Users,
     CalendarDays,
@@ -61,6 +64,7 @@ const navSections = [
             { href: "/inventory",     label: "Inventory",      icon: Clipboard },
             { href: "/staff",         label: "Staff",          icon: Users },
             { href: "/documents",     label: "Documents",      icon: FileText },
+            { href: "/dashboard/billing", label: "Billing & Subs", icon: CreditCard },
             { href: "/admin",         label: "Admin",          icon: Settings },
         ]
     }
@@ -70,6 +74,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     const pathname = usePathname();
     const { settings } = useClub();
     const { user, role, pagePermissions, displayName, signOut, isManager } = useAuth();
+    const [copiedEmail, setCopiedEmail] = useState(false);
 
     // The display name shown at the bottom of the sidebar
     const shownName = displayName
@@ -120,22 +125,6 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                 >
                                     <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden="true" />
                                     <span className="truncate">Dashboard</span>
-                                </Link>
-                            </li>
-                            <li>
-                                <Link
-                                    href="/dashboard/billing"
-                                    onClick={onClose}
-                                    aria-current={pathname === "/dashboard/billing" ? "page" : undefined}
-                                    className={cn(
-                                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-red-500",
-                                        pathname === "/dashboard/billing"
-                                            ? "bg-red-600 text-white"
-                                            : "text-slate-400 hover:bg-slate-800 hover:text-white"
-                                    )}
-                                >
-                                    <CreditCard className="h-4 w-4 shrink-0" aria-hidden="true" />
-                                    <span className="truncate">Billing & Subs</span>
                                 </Link>
                             </li>
                         </ul>
@@ -202,6 +191,30 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                         )}
                     </div>
                 )}
+
+                <div className="mb-4 p-3 bg-slate-800/40 rounded-lg border border-slate-800/60 text-xs text-slate-400 space-y-1">
+                    <p className="font-bold text-slate-300">Need Support?</p>
+                    <div className="flex items-center justify-between gap-1 mt-0.5">
+                        <span className="text-[11px] truncate">
+                            Email: <a href="mailto:info@clubflow.org.uk" className="text-red-400 hover:text-red-300 hover:underline font-bold">info@clubflow.org.uk</a>
+                        </span>
+                        <button 
+                            onClick={() => {
+                                navigator.clipboard.writeText("info@clubflow.org.uk");
+                                setCopiedEmail(true);
+                                setTimeout(() => setCopiedEmail(false), 2000);
+                            }}
+                            className="p-1 hover:bg-slate-800 rounded transition-colors text-slate-400 hover:text-white shrink-0"
+                            title="Copy email address"
+                        >
+                            {copiedEmail ? (
+                                <Check className="h-3 w-3 text-emerald-400" />
+                            ) : (
+                                <Copy className="h-3 w-3" />
+                            )}
+                        </button>
+                    </div>
+                </div>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3 overflow-hidden">
                         <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0">

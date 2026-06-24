@@ -74,7 +74,7 @@ export default function FinancePage() {
     const [isResetting, setIsResetting] = useState(false);
 
     // Active sub-view or tab
-    const [activeSection, setActiveSection] = useState<"overview" | "subs" | "commitments" | "ledger" | "sponsors" | "fundraising" | "categories">("overview");
+    const [activeSection, setActiveSection] = useState<"overview" | "subs" | "fines" | "commitments" | "ledger" | "sponsors" | "fundraising" | "categories">("overview");
 
     // Modal forms state
     const [isAddTxOpen, setIsAddTxOpen] = useState(false);
@@ -137,6 +137,17 @@ export default function FinancePage() {
     });
     const [viewingHistoryPlayer, setViewingHistoryPlayer] = useState<Player | null>(null);
 
+    // Player Fines state
+    const [fines, setFines] = useState<any[]>([]);
+    const [isAddFineOpen, setIsAddFineOpen] = useState(false);
+    const [customCategoryName, setCustomCategoryName] = useState("");
+    const [fineForm, setFineForm] = useState({
+        playerId: "",
+        category: "",
+        amount: "",
+        date: new Date().toISOString().split("T")[0]
+    });
+
     // Player sub settings edit state
     const [editingSubPlayer, setEditingSubPlayer] = useState<Player | null>(null);
     const [subFormModel, setSubFormModel] = useState<"Monthly" | "Pay-As-You-Go" | "Matchday-PAYG" | "Both-PAYG" | "Exempt">("Monthly");
@@ -157,7 +168,11 @@ export default function FinancePage() {
     const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
     // Setup categories dynamically
-    const incomeCategories = [...DEFAULT_INCOME_CATEGORIES, ...customCategories.income];
+    const incomeCategories = [
+        ...DEFAULT_INCOME_CATEGORIES, 
+        ...(settings.finesEnabled ? ["Player Fines"] : []),
+        ...customCategories.income
+    ];
     const expenseCategories = [...DEFAULT_EXPENSE_CATEGORIES, ...customCategories.expense];
 
     // Load initial data
@@ -196,6 +211,16 @@ export default function FinancePage() {
                 setCustomCategories(JSON.parse(savedCustomCats));
             } catch (e) {
                 console.error("Failed to parse custom categories", e);
+            }
+        }
+
+        // Load player fines from localStorage
+        const savedFines = localStorage.getItem(`clubflow_player_fines_${settings.name}`);
+        if (savedFines) {
+            try {
+                setFines(JSON.parse(savedFines));
+            } catch (e) {
+                console.error("Failed to parse player fines", e);
             }
         }
     }, [settings.name, settings.trainingFeePerSession, settings.monthlySubs]);
@@ -414,6 +439,95 @@ export default function FinancePage() {
             triggerToast(`Registration fee marked paid for ${player.firstName}`);
             fetchFinanceData();
         }
+    };
+
+    const handleFineCategoryChange = (categoryName: string) => {
+        const matchingCategory = (settings.fineCategories || []).find(cat => cat.name === categoryName);
+        setFineForm(prev => ({
+            ...prev,
+            category: categoryName,
+            amount: matchingCategory ? matchingCategory.amount.toString() : prev.amount
+        }));
+    };
+
+    const handleIssueFine = (e: React.FormEvent) => {
+        e.preventDefault();
+        const { playerId, category, amount, date } = fineForm;
+        const finalCategory = category === "Other" ? customCategoryName : category;
+        
+        if (!playerId || !finalCategory || !amount) {
+            alert("Please fill in all fields");
+            return;
+        }
+
+        const playerObj = players.find(p => p.id === playerId);
+        if (!playerObj) {
+            alert("Player not found");
+            return;
+        }
+
+        const newFine = {
+            id: typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15),
+            playerId,
+            playerName: `${playerObj.firstName} ${playerObj.lastName}`,
+            category: finalCategory,
+            amount: parseFloat(amount),
+            date,
+            status: "Unpaid" as "Paid" | "Unpaid"
+        };
+
+        const updatedFines = [newFine, ...fines];
+        setFines(updatedFines);
+        localStorage.setItem(`clubflow_player_fines_${settings.name}`, JSON.stringify(updatedFines));
+        
+        setFineForm({
+            playerId: "",
+            category: "",
+            amount: "",
+            date: new Date().toISOString().split("T")[0]
+        });
+        setCustomCategoryName("");
+        setIsAddFineOpen(false);
+        triggerToast(`Fine of £${amount} issued to ${playerObj.firstName} ${playerObj.lastName}`);
+    };
+
+    const handleMarkFinePaid = async (fineId: string) => {
+        const fineIndex = fines.findIndex(f => f.id === fineId);
+        if (fineIndex === -1) return;
+
+        const fine = fines[fineIndex];
+        
+        const payload = {
+            date: new Date().toISOString().split("T")[0],
+            description: `Fine Paid - ${fine.category} - ${fine.playerName}`,
+            amount: fine.amount,
+            type: "Income",
+            category: "Player Fines",
+            is_recurring: false
+        };
+
+        try {
+            const { error } = await supabase.from("finance_transactions").insert([payload]);
+            if (error) throw error;
+
+            const updatedFines = fines.map(f => f.id === fineId ? { ...f, status: "Paid" as const } : f);
+            setFines(updatedFines);
+            localStorage.setItem(`clubflow_player_fines_${settings.name}`, JSON.stringify(updatedFines));
+            
+            triggerToast(`Fine of £${fine.amount} marked as Paid for ${fine.playerName}`);
+            fetchTransactions();
+        } catch (err: any) {
+            console.error("Failed to mark fine as paid in ledger:", err);
+            alert("Failed to save transaction to ledger: " + (err.message || err));
+        }
+    };
+
+    const handleDeleteFine = (fineId: string) => {
+        if (!confirm("Are you sure you want to delete this fine record?")) return;
+        const updatedFines = fines.filter(f => f.id !== fineId);
+        setFines(updatedFines);
+        localStorage.setItem(`clubflow_player_fines_${settings.name}`, JSON.stringify(updatedFines));
+        triggerToast("Fine record deleted");
     };
 
     // Calculate dynamic values
@@ -1384,6 +1498,7 @@ export default function FinancePage() {
                 {[
                     { id: "overview", label: "Financial Overview", icon: Landmark },
                     { id: "subs", label: "Player Subs Tracker", icon: Users },
+                    ...(settings.finesEnabled ? [{ id: "fines", label: "Fines Tracker", icon: AlertTriangle }] : []),
                     { id: "commitments", label: "Recurring Commitments", icon: Calendar },
                     { id: "ledger", label: "Transactions Ledger", icon: ArrowRightLeft },
                     { id: "sponsors", label: "Sponsors", icon: Sparkles },
@@ -2262,6 +2377,261 @@ export default function FinancePage() {
                 </div>
             )}
 
+            {/* VIEW: FINES TRACKER */}
+            {activeSection === "fines" && (
+                <div className="space-y-6 animate-in fade-in-50 duration-200">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                        <div>
+                            <h3 className="text-xl font-extrabold text-slate-900">Player Fines Tracker</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">Issue, manage, and collect player disciplinary fines.</p>
+                        </div>
+                        <Button 
+                            onClick={() => {
+                                setFineForm({
+                                    playerId: "",
+                                    category: "",
+                                    amount: "",
+                                    date: new Date().toISOString().split("T")[0]
+                                });
+                                setCustomCategoryName("");
+                                setIsAddFineOpen(true);
+                            }}
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold text-sm flex items-center gap-2 rounded-xl px-4 py-2.5 shadow"
+                        >
+                            <Plus className="h-4 w-4" /> Issue Fine
+                        </Button>
+                    </div>
+
+                    {/* Fines Stats Overview */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        <Card className="border-slate-200 shadow-sm relative overflow-hidden bg-white">
+                            <div className="absolute top-0 left-0 w-1.5 h-full bg-slate-400" />
+                            <CardHeader className="pb-2">
+                                <CardDescription className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Total Fines Issued</CardDescription>
+                                <CardTitle className="text-3xl font-black text-slate-950">
+                                    £{fines.reduce((sum, f) => sum + f.amount, 0).toFixed(2)}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-slate-500 font-medium">{fines.length} total incident records</p>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border-slate-200 shadow-sm relative overflow-hidden bg-white">
+                            <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500" />
+                            <CardHeader className="pb-2">
+                                <CardDescription className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Fines Collected</CardDescription>
+                                <CardTitle className="text-3xl font-black text-emerald-600">
+                                    £{fines.filter(f => f.status === "Paid").reduce((sum, f) => sum + f.amount, 0).toFixed(2)}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-slate-500 font-medium">
+                                    {fines.filter(f => f.status === "Paid").length} payments logged in ledger
+                                </p>
+                            </CardContent>
+                        </Card>
+
+                        <Card className="border-slate-200 shadow-sm relative overflow-hidden bg-white">
+                            <div className="absolute top-0 left-0 w-1.5 h-full bg-red-500" />
+                            <CardHeader className="pb-2">
+                                <CardDescription className="text-slate-400 font-bold uppercase text-[10px] tracking-wider">Outstanding Fines</CardDescription>
+                                <CardTitle className="text-3xl font-black text-red-600">
+                                    £{fines.filter(f => f.status === "Unpaid").reduce((sum, f) => sum + f.amount, 0).toFixed(2)}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <p className="text-xs text-slate-500 font-medium">
+                                    {fines.filter(f => f.status === "Unpaid").length} unpaid balances
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Fines Table */}
+                    <Card className="border-slate-200 shadow-sm bg-white overflow-hidden">
+                        <CardHeader className="pb-3 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <CardTitle className="text-base font-bold text-slate-900">Fine History Ledger</CardTitle>
+                                <CardDescription className="text-xs text-slate-500">A log of all disciplinary fees issued to players.</CardDescription>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            {fines.length === 0 ? (
+                                <div className="py-16 text-center text-slate-400 text-xs italic flex flex-col items-center justify-center gap-2">
+                                    <AlertTriangle className="h-8 w-8 text-slate-300" />
+                                    No fines issued yet. Click "Issue Fine" to get started.
+                                </div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="bg-slate-50/75 border-b border-slate-100 text-slate-500 text-[10px] font-extrabold uppercase tracking-wider">
+                                                <th className="py-3 px-4">Date Issued</th>
+                                                <th className="py-3 px-4">Player</th>
+                                                <th className="py-3 px-4">Fine Category</th>
+                                                <th className="py-3 px-4">Amount</th>
+                                                <th className="py-3 px-4">Status</th>
+                                                <th className="py-3 px-4 text-right">Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+                                            {fines.map(fine => (
+                                                <tr key={fine.id} className="hover:bg-slate-50/50 transition-colors">
+                                                    <td className="py-3.5 px-4 font-semibold text-slate-500 whitespace-nowrap">
+                                                        {new Date(fine.date).toLocaleDateString("en-GB", {
+                                                            day: "2-digit",
+                                                            month: "short",
+                                                            year: "numeric"
+                                                        })}
+                                                    </td>
+                                                    <td className="py-3.5 px-4 font-bold text-slate-900">{fine.playerName}</td>
+                                                    <td className="py-3.5 px-4">
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/50">
+                                                            {fine.category}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-3.5 px-4 font-black text-slate-900">£{fine.amount.toFixed(2)}</td>
+                                                    <td className="py-3.5 px-4">
+                                                        {fine.status === "Paid" ? (
+                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                                                <Check className="h-3 w-3" /> Paid
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-extrabold bg-rose-50 text-rose-700 border border-rose-200">
+                                                                <AlertTriangle className="h-3 w-3" /> Unpaid
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td className="py-3.5 px-4 text-right whitespace-nowrap">
+                                                        <div className="flex justify-end gap-1.5">
+                                                            {fine.status === "Unpaid" && (
+                                                                <Button 
+                                                                    onClick={() => handleMarkFinePaid(fine.id)}
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    className="h-7 border-emerald-200 hover:bg-emerald-50 text-emerald-700 text-[10px] font-extrabold px-2.5 rounded-lg flex items-center gap-1"
+                                                                >
+                                                                    <Check className="h-3 w-3" /> Mark Paid
+                                                                </Button>
+                                                            )}
+                                                            <Button
+                                                                onClick={() => handleDeleteFine(fine.id)}
+                                                                size="icon"
+                                                                variant="outline"
+                                                                className="h-7 w-7 border-slate-200 text-slate-500 hover:text-rose-600 hover:border-rose-100 rounded-lg"
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Issue Fine Overlay / Dialog */}
+                    {isAddFineOpen && (
+                        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+                            <Card className="w-full max-w-sm border-slate-200 bg-white text-slate-800 shadow-xl overflow-hidden rounded-2xl">
+                                <CardHeader className="bg-slate-50 border-b border-slate-100 p-4">
+                                    <div className="flex justify-between items-center">
+                                        <CardTitle className="text-sm font-bold">Issue Player Fine</CardTitle>
+                                        <Button size="icon" variant="ghost" onClick={() => setIsAddFineOpen(false)} className="h-7 w-7"><X className="h-4 w-4" /></Button>
+                                    </div>
+                                </CardHeader>
+                                <form onSubmit={handleIssueFine}>
+                                    <CardContent className="p-4 space-y-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold uppercase text-slate-400">Player</label>
+                                            <select
+                                                value={fineForm.playerId}
+                                                onChange={e => setFineForm({ ...fineForm, playerId: e.target.value })}
+                                                className="w-full px-3 py-2 border rounded-xl bg-slate-50 h-10 text-xs focus:ring-indigo-500 focus:outline-none"
+                                                required
+                                            >
+                                                <option value="">Select a player...</option>
+                                                {players.map(p => (
+                                                    <option key={p.id} value={p.id}>{p.firstName} {p.lastName}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold uppercase text-slate-400">Fine Category</label>
+                                            <select
+                                                value={fineForm.category}
+                                                onChange={e => handleFineCategoryChange(e.target.value)}
+                                                className="w-full px-3 py-2 border rounded-xl bg-slate-50 h-10 text-xs focus:ring-indigo-500 focus:outline-none"
+                                                required
+                                            >
+                                                <option value="">Select a category...</option>
+                                                {(settings.fineCategories || []).map((cat, idx) => (
+                                                    <option key={idx} value={cat.name}>{cat.name} (£{cat.amount})</option>
+                                                ))}
+                                                {!(settings.fineCategories || []).some(c => c.name === "Yellow Card") && <option value="Yellow Card">Yellow Card</option>}
+                                                {!(settings.fineCategories || []).some(c => c.name === "Red Card") && <option value="Red Card">Red Card</option>}
+                                                {!(settings.fineCategories || []).some(c => c.name === "Dissent") && <option value="Dissent">Dissent</option>}
+                                                <option value="Other">Other (Custom)</option>
+                                            </select>
+                                        </div>
+
+                                        {fineForm.category === "Other" && (
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold uppercase text-slate-400">Custom Category Name</label>
+                                                <Input
+                                                    placeholder="e.g. Late for Bus"
+                                                    value={customCategoryName}
+                                                    onChange={e => setCustomCategoryName(e.target.value)}
+                                                    className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                                    required
+                                                />
+                                            </div>
+                                        )}
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold uppercase text-slate-400">Fine Amount (£)</label>
+                                                <Input 
+                                                    type="number"
+                                                    value={fineForm.amount}
+                                                    onChange={e => setFineForm({ ...fineForm, amount: e.target.value })}
+                                                    className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                                    required
+                                                    min="0"
+                                                    step="0.01"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold uppercase text-slate-400">Date Issued</label>
+                                                <Input 
+                                                    type="date"
+                                                    value={fineForm.date}
+                                                    onChange={e => setFineForm({ ...fineForm, date: e.target.value })}
+                                                    className="bg-slate-50 border-slate-200 h-10 rounded-xl"
+                                                    required
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <Button 
+                                            type="submit"
+                                            className="w-full bg-red-600 hover:bg-red-500 text-white font-bold h-11 rounded-xl shadow-md mt-2"
+                                        >
+                                            Issue Fine Penalty
+                                        </Button>
+                                    </CardContent>
+                                </form>
+                            </Card>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* VIEW 4: TRANSACTIONS LEDGER */}
             {activeSection === "ledger" && (
                 <div className="space-y-6">
@@ -2799,6 +3169,19 @@ export default function FinancePage() {
                                         <Switch 
                                             checked={settings.contractsEnabled} 
                                             onCheckedChange={(val) => updateSettings({ contractsEnabled: val })}
+                                        />
+                                    </div>
+
+                                    <div className="flex items-start justify-between gap-4 p-3 border border-slate-100 rounded-xl bg-slate-50/50">
+                                        <div className="space-y-0.5">
+                                            <label className="text-xs font-bold text-slate-800">Player Fines (Disciplinary System)</label>
+                                            <p className="text-[10px] text-slate-500 leading-normal">
+                                                Track and manage squad disciplinary fines and payments.
+                                            </p>
+                                        </div>
+                                        <Switch 
+                                            checked={settings.finesEnabled} 
+                                            onCheckedChange={(val) => updateSettings({ finesEnabled: val })}
                                         />
                                     </div>
                                 </div>
