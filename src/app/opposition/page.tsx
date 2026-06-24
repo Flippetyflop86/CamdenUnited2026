@@ -81,6 +81,7 @@ export default function OppositionReportsPage() {
             name: "",
             formation: "4-4-2",
             notes: "",
+            lineup: [],
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
@@ -132,7 +133,7 @@ export default function OppositionReportsPage() {
             name: editedTeam.name,
             formation: editedTeam.formation,
             notes: editedTeam.notes,
-            lineup: editedTeam.lineup,
+            lineup: editedTeam.lineup || [],
             updated_at: new Date().toISOString()
         };
 
