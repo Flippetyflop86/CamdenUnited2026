@@ -67,7 +67,6 @@ const navSections = [
             { href: "/inventory",     label: "Inventory",      icon: Clipboard },
             { href: "/staff",         label: "Staff",          icon: Users },
             { href: "/documents",     label: "Documents",      icon: FileText },
-            { href: "/dashboard/billing", label: "Billing & Subs", icon: CreditCard },
             { href: "/admin",         label: "Admin",          icon: Settings },
         ]
     }
@@ -102,27 +101,8 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     const billingHref = "/dashboard/billing";
 
     const isRouteLocked = (href: string) => {
-        // If payment is configured, lock based on selected tier
-        if (sub.isPaymentConfigured) {
-            if (sub.tier === "Low") {
-                const mediumOrHigh = ["/finance", "/budgets", "/sponsors", "/recruitment", "/opposition"];
-                return mediumOrHigh.includes(href);
-            }
-            if (sub.tier === "Medium") {
-                const highOnly = ["/opposition"];
-                return highOnly.includes(href);
-            }
-            return false;
-        }
-
-        // If trial is expired and payment is not configured, everything is locked except billing
-        if (isTrialExpired) {
-            return href !== billingHref;
-        }
-
-        // During active trial (payment not configured), lock High tier features
-        const highTierRoutes = ["/opposition", "/sponsors", "/recruitment"];
-        return highTierRoutes.includes(href);
+        // Leave everything open for now
+        return false;
     };
 
     const handleItemClick = (e: React.MouseEvent, href: string) => {
@@ -292,25 +272,6 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                             )}
                         </button>
                     </div>
-                </div>
-                {/* Trial/Subscription Status Badge */}
-                <div className="mb-4">
-                    {sub.isPaymentConfigured ? (
-                        <div className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-950/40 border border-emerald-900/60 text-xs">
-                            <span className="text-emerald-400 font-semibold">{sub.tier} Subscription</span>
-                            <span className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">✓ Active</span>
-                        </div>
-                    ) : isTrialExpired ? (
-                        <Link href={billingHref} className="block flex items-center justify-between p-2.5 rounded-lg bg-rose-950/40 border border-rose-900/60 text-xs hover:bg-rose-900/30 transition-colors">
-                            <span className="text-rose-400 font-bold">Trial Expired</span>
-                            <span className="text-[10px] text-rose-500 font-black uppercase bg-rose-950 px-1.5 py-0.5 rounded animate-pulse">Unlock Now</span>
-                        </Link>
-                    ) : (
-                        <Link href={billingHref} className="block flex items-center justify-between p-2.5 rounded-lg bg-amber-950/40 border border-amber-900/60 text-xs hover:bg-amber-900/30 transition-colors">
-                            <span className="text-amber-400 font-semibold">{sub.tier} Trial: {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left</span>
-                            <span className="text-[10px] text-amber-500 font-bold uppercase tracking-wider">Configure Payment</span>
-                        </Link>
-                    )}
                 </div>
 
                 <div className="flex items-center justify-between">
