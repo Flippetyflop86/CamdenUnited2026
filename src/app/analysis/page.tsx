@@ -60,7 +60,6 @@ export default function AnalysisPage() {
     // Shot Dialog State
     const [isShotDialogOpen, setIsShotDialogOpen] = useState(false);
     const [pendingShot, setPendingShot] = useState<{ x: number, y: number } | null>(null);
-    const [mousePos, setMousePos] = useState<{ x: number, y: number } | null>(null);
     const [shotForm, setShotForm] = useState<{
         playerId: string;
         outcome: ShotOutcome;
@@ -71,6 +70,7 @@ export default function AnalysisPage() {
     }>({ playerId: "", outcome: "Goal" as ShotOutcome, minute: "" });
 
     const pitchRef = useRef<HTMLDivElement>(null);
+    const reticleRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         fetchInitialData();
@@ -289,6 +289,16 @@ export default function AnalysisPage() {
             return { ...prev, dominance: newDominance };
         });
     };
+    const handleResetAllMetrics = () => {
+        if (!confirm("Are you sure you want to reset all dominance tracker metrics for both teams?")) return;
+        setAnalysis(prev => ({
+            ...prev,
+            dominance: {
+                us: { deliveries: 0, halfChances: 0, chances: 0, ooohs: 0, goals: 0 },
+                opposition: { deliveries: 0, halfChances: 0, chances: 0, ooohs: 0, goals: 0 }
+            }
+        }));
+    };
 
     return (
         <div className="space-y-6">
@@ -345,10 +355,18 @@ export default function AnalysisPage() {
                     
                     {/* Match Dominance Tracking */}
                     <Card>
-                        <CardHeader className="bg-indigo-50/50 border-b py-4">
+                        <CardHeader className="bg-indigo-50/50 border-b py-4 flex flex-row items-center justify-between">
                             <CardTitle className="text-base flex items-center gap-2 text-indigo-900">
                                 <Activity className="h-4 w-4" /> Match Dominance Tracker
                             </CardTitle>
+                            <Button 
+                                onClick={handleResetAllMetrics}
+                                variant="outline"
+                                size="sm"
+                                className="h-8 border-indigo-200 hover:bg-indigo-100 text-indigo-700 font-bold text-xs flex items-center gap-1 rounded-lg px-3"
+                            >
+                                <RotateCcw className="h-3.5 w-3.5" /> Reset All Metrics
+                            </Button>
                         </CardHeader>
                         <CardContent className="pt-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-center">
@@ -531,29 +549,30 @@ export default function AnalysisPage() {
                                     onClick={handlePitchClick}
                                     onMouseMove={(e) => {
                                         const rect = pitchRef.current?.getBoundingClientRect();
-                                        if (rect) {
+                                        if (rect && reticleRef.current) {
                                             const x = ((e.clientX - rect.left) / rect.width) * 100;
                                             const y = ((e.clientY - rect.top) / rect.height) * 100;
-                                            setMousePos({ x, y });
+                                            reticleRef.current.style.display = "flex";
+                                            reticleRef.current.style.left = `${x}%`;
+                                            reticleRef.current.style.top = `${y}%`;
                                         }
                                     }}
-                                    onMouseLeave={() => setMousePos(null)}
+                                    onMouseLeave={() => {
+                                        if (reticleRef.current) {
+                                            reticleRef.current.style.display = "none";
+                                        }
+                                    }}
                                     className="relative w-full max-w-md aspect-[2/3] bg-emerald-600 rounded cursor-crosshair border-4 border-emerald-700 shadow-inner overflow-hidden"
                                     style={{
                                         backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 10%, rgba(255,255,255,0.05) 10%, rgba(255,255,255,0.05) 20%)"
                                     }}
                                 >
                                     {/* Pinpoint hover indicator */}
-                                    {mousePos && (
-                                        <div 
-                                            className="absolute w-6 h-6 -ml-3 -mt-3 border border-white/85 rounded-full bg-white/25 pointer-events-none flex items-center justify-center animate-pulse z-20"
-                                            style={{ left: `${mousePos.x}%`, top: `${mousePos.y}%` }}
-                                        >
-                                            <div className="absolute w-full h-[1px] bg-white/50"></div>
-                                            <div className="absolute h-full w-[1px] bg-white/50"></div>
-                                            <div className="w-1.5 h-1.5 bg-red-500 rounded-full shadow-sm"></div>
-                                        </div>
-                                    )}
+                                    <div 
+                                        ref={reticleRef}
+                                        className="absolute w-3 h-3 -ml-1.5 -mt-1.5 rounded-full bg-red-500 border border-white shadow pointer-events-none z-20 animate-pulse"
+                                        style={{ display: "none", left: "0%", top: "0%" }}
+                                    />
 
                                     {/* Pitch Markings */}
                                     <div className="absolute inset-0 border-2 border-white/50 m-2"></div>
