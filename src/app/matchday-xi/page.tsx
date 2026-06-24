@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { MatchdayXI, Player, Match } from "@/types";
+import { MatchdayXI, Player, Match, Position } from "@/types";
 import { FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -38,6 +38,27 @@ export default function MatchdayXIPage() {
         if (['CM', 'CDM', 'CAM', 'MID', 'RM', 'LM'].includes(p)) return 'MID';
         if (['ST', 'CF', 'RW', 'LW', 'FWD'].includes(p)) return 'FWD';
         return 'All';
+    };
+
+    const isIdealPosition = (playerPos: string, slotLabel: string) => {
+        const p = playerPos.toUpperCase();
+        const s = slotLabel.toUpperCase();
+        if (p === s) return true;
+        if (s === 'GK') return p === 'GK';
+        if (s === 'CB') return p === 'CB' || p === 'DEF';
+        if (s === 'RB') return p === 'RB' || p === 'RWB' || p === 'DEF';
+        if (s === 'LB') return p === 'LB' || p === 'LWB' || p === 'DEF';
+        if (s === 'RWB') return p === 'RWB' || p === 'RB' || p === 'DEF';
+        if (s === 'LWB') return p === 'LWB' || p === 'LB' || p === 'DEF';
+        if (s === 'CDM') return p === 'CDM' || p === 'CM' || p === 'MID';
+        if (s === 'CM') return p === 'CM' || p === 'CDM' || p === 'CAM' || p === 'MID';
+        if (s === 'CAM') return p === 'CAM' || p === 'CM' || p === 'MID';
+        if (s === 'RM') return p === 'RM' || p === 'RW' || p === 'MID';
+        if (s === 'LM') return p === 'LM' || p === 'LW' || p === 'MID';
+        if (s === 'RW') return p === 'RW' || p === 'RM' || p === 'FWD';
+        if (s === 'LW') return p === 'LW' || p === 'LM' || p === 'FWD';
+        if (s === 'CF' || s === 'ST' || s === 'FWD') return p === 'CF' || p === 'ST' || p === 'FWD';
+        return false;
     };
 
     // ... (keep state) ...
@@ -105,6 +126,8 @@ export default function MatchdayXIPage() {
                 goals: p.goals || 0,
                 assists: p.assists || 0,
                 imageUrl: p.image_url, // Added mapping
+                isInMatchdayTracker: p.is_in_matchday_tracker,
+                secondaryPositions: p.secondary_position ? p.secondary_position.split(",").map((s: string) => s.trim() as Position) : [],
             }));
 
             // Sort logic using global POSITION_ORDER
@@ -570,7 +593,13 @@ export default function MatchdayXIPage() {
         return false;
     };
 
-    const availablePlayers = players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p));
+    const currentSquads = settings.squads || ["First Team"];
+    const isPlayerInMatchdayTracker = (p: Player) => {
+        const isFirstTeam = p.squad === "firstTeam" || p.squad === "First Team" || p.squad === currentSquads[0];
+        return isFirstTeam || p.isInMatchdayTracker === true;
+    };
+
+    const availablePlayers = players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p));
 
     const targetCategory = activeSlot && activeSlot.type === 'pitch' ? getPositionCategory(activeSlot.label) : 'All';
 
@@ -580,13 +609,26 @@ export default function MatchdayXIPage() {
     });
 
     const sortedPlayers = [...filteredAvailable].sort((a, b) => {
-        const catA = getPositionCategory(a.position);
-        const catB = getPositionCategory(b.position);
-        
-        if (targetCategory !== 'All') {
-            const matchA = catA === targetCategory ? 1 : 0;
-            const matchB = catB === targetCategory ? 1 : 0;
-            if (matchA !== matchB) return matchB - matchA;
+        if (activeSlot && activeSlot.type === 'pitch') {
+            const getScore = (player: Player) => {
+                if (isIdealPosition(player.position, activeSlot.label)) return 3;
+                if (player.secondaryPositions && player.secondaryPositions.some(pos => isIdealPosition(pos, activeSlot.label))) return 2;
+                if (getPositionCategory(player.position) === targetCategory) return 1;
+                if (player.secondaryPositions && player.secondaryPositions.some(pos => getPositionCategory(pos) === targetCategory)) return 1;
+                return 0;
+            };
+            const scoreA = getScore(a);
+            const scoreB = getScore(b);
+            if (scoreA !== scoreB) return scoreB - scoreA;
+        } else {
+            const catA = getPositionCategory(a.position);
+            const catB = getPositionCategory(b.position);
+            
+            if (targetCategory !== 'All') {
+                const matchA = catA === targetCategory ? 1 : 0;
+                const matchB = catB === targetCategory ? 1 : 0;
+                if (matchA !== matchB) return matchB - matchA;
+            }
         }
         
         // Group by exact position first using global POSITION_ORDER
@@ -602,7 +644,7 @@ export default function MatchdayXIPage() {
             <div className="flex items-center justify-between">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight text-slate-900">Matchday XI</h2>
-                    <p className="text-slate-500">Select your starting lineup and substitutes ({players.filter(p => isPlayerAvailable(p)).length} players available)</p>
+                    <p className="text-slate-500">Select your starting lineup and substitutes ({players.filter(p => isPlayerAvailable(p) && isPlayerInMatchdayTracker(p)).length} players available)</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <Button onClick={handleClearLineup} variant="outline" className="border-slate-300 hover:bg-slate-100 text-slate-700">
@@ -663,7 +705,7 @@ export default function MatchdayXIPage() {
                 >
                     <div className="p-3 bg-slate-100 font-bold text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 flex items-center justify-between">
                         <span>Available Squad</span>
-                        <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-[10px]">{players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p)).length}</span>
+                        <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-[10px]">{players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p)).length}</span>
                     </div>
                     <div className="p-2 border-b border-slate-200 bg-white flex gap-1 overflow-x-auto no-scrollbar shrink-0 shadow-sm z-10">
                         {(["All", "GK", "DEF", "MID", "FWD"] as const).map(f => (
@@ -977,7 +1019,8 @@ export default function MatchdayXIPage() {
 
                             {sortedPlayers.length > 0 ? (
                                 sortedPlayers.map(player => {
-                                    const matchesTarget = activeSlot.type === 'pitch' && getPositionCategory(player.position) === targetCategory;
+                                    const matchesTarget = activeSlot.type === 'pitch' && isIdealPosition(player.position, activeSlot.label);
+                                    const matchesSecondary = activeSlot.type === 'pitch' && player.secondaryPositions && player.secondaryPositions.some(pos => isIdealPosition(pos, activeSlot.label));
                                     const fullName = `${player.firstName} ${player.lastName}`;
                                     let displayName = player.firstName;
                                     if (fullName === "Mohamed Abdalla") displayName = "Suarez";
@@ -998,7 +1041,9 @@ export default function MatchdayXIPage() {
                                             className={`w-full flex items-center justify-between p-3 border rounded-xl transition-all text-left group
                                                 ${matchesTarget 
                                                     ? 'bg-slate-800/80 border-red-500/20 hover:border-red-500/50 hover:bg-slate-800' 
-                                                    : 'bg-slate-900 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
+                                                    : matchesSecondary
+                                                        ? 'bg-slate-800/50 border-amber-500/20 hover:border-amber-500/50 hover:bg-slate-800'
+                                                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
                                                 }`}
                                         >
                                             <div className="flex flex-col">
@@ -1006,12 +1051,17 @@ export default function MatchdayXIPage() {
                                                     {player.firstName} {player.lastName}
                                                 </span>
                                                 <span className="text-[10px] text-slate-400 font-semibold uppercase">
-                                                    {player.position}
+                                                    {player.position} {player.secondaryPositions && player.secondaryPositions.length > 0 ? `| Sec: ${player.secondaryPositions.join(", ")}` : ''}
                                                 </span>
                                             </div>
                                             {matchesTarget && (
                                                 <span className="bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                                                     Ideal Position
+                                                </span>
+                                            )}
+                                            {!matchesTarget && matchesSecondary && (
+                                                <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                                    Secondary Option
                                                 </span>
                                             )}
                                         </button>

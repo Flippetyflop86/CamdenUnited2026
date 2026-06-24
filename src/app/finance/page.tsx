@@ -1268,7 +1268,7 @@ export default function FinancePage() {
                                 <Sparkles className="h-6 w-6 text-indigo-400" />
                                 <CardTitle className="text-xl font-extrabold">Club Setup Wizard</CardTitle>
                             </div>
-                            <CardDescription className="text-slate-400 mt-1">Configure your club's financial category mapping.</CardDescription>
+                            <CardDescription className="text-slate-400 mt-1">Set up your club's income and expense categories.</CardDescription>
                         </CardHeader>
                         <CardContent className="p-6 space-y-6">
                             

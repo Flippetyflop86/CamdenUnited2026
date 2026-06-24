@@ -1,4 +1,4 @@
-export type Position = "GK" | "DEF" | "MID" | "FWD" | "CB" | "RB" | "LB" | "CM" | "CDM" | "CAM" | "RW" | "LW" | "CF";
+export type Position = "GK" | "DEF" | "MID" | "FWD" | "CB" | "RB" | "LB" | "CM" | "CDM" | "CAM" | "RW" | "LW" | "CF" | "RWB" | "LWB" | "RM" | "LM" | "ST";
 
 export type SquadType = string;
 
@@ -32,6 +32,8 @@ export interface Player {
     imageUrl?: string;
     notes?: string;
     isInTrainingSquad?: boolean;
+    isInMatchdayTracker?: boolean;
+    secondaryPositions?: Position[];
 
     // Contract Info
     isContracted?: boolean;

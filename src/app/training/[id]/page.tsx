@@ -65,7 +65,16 @@ export default function TrainingSessionPage() {
                         const existingAttendance: any[] = sessionRes.data.attendance || [];
 
                         // Pre-populate ALL eligible players as Absent if no record exists
-                        const eligible = mappedPlayers.filter(p => p.squad === "firstTeam" || p.isInTrainingSquad);
+                        const isFirstTeamSession = sessionRes.data.squad === "All" || sessionRes.data.squad === "firstTeam" || sessionRes.data.squad === "First Team";
+                        const isFirstTeam = (squad: string) => squad === "firstTeam" || squad === "First Team";
+                        
+                        const eligible = mappedPlayers.filter(p => {
+                            if (isFirstTeamSession) {
+                                return isFirstTeam(p.squad) || p.isInTrainingSquad;
+                            } else {
+                                return p.squad === sessionRes.data.squad || (sessionRes.data.squad === "Midweek" && p.squad === "midweek") || (sessionRes.data.squad === "Youth" && p.squad === "youth");
+                            }
+                        });
                         const prePopulated = eligible.map(p => {
                             const existing = existingAttendance.find(a => a.playerId === p.id);
                             return existing || { playerId: p.id, status: 'Absent', notes: '' };
@@ -166,8 +175,16 @@ export default function TrainingSessionPage() {
         return dateStr >= p.holidayStart && dateStr <= p.holidayEnd;
     };
 
+    const isFirstTeamSession = session.squad === "All" || session.squad === "firstTeam" || session.squad === "First Team";
+    const isFirstTeam = (squad: string) => squad === "firstTeam" || squad === "First Team";
+
     const eligiblePlayers = players
-        .filter(p => (p.squad === "firstTeam" || p.isInTrainingSquad) && !isPlayerOnHolidayOnDate(p, session.date))
+        .filter(p => {
+            const matchesSquad = isFirstTeamSession 
+                ? (isFirstTeam(p.squad) || p.isInTrainingSquad)
+                : (p.squad === session.squad || (session.squad === "Midweek" && p.squad === "midweek") || (session.squad === "Youth" && p.squad === "youth"));
+            return matchesSquad && !isPlayerOnHolidayOnDate(p, session.date);
+        })
         .sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));
 
     const presentCount = session.attendance.filter(a => a.status === 'Present').length;

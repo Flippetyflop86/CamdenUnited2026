@@ -2,7 +2,7 @@
 // forcing refresh
 
 import { useState, useEffect, useRef } from "react";
-import { Player, SquadType, MedicalStatus } from "@/types";
+import { Player, SquadType, MedicalStatus, Position } from "@/types";
 import { useClub } from "@/context/club-context";
 import { PlayerCard } from "@/components/squad/player-card";
 import { Input } from "@/components/ui/input";
@@ -175,6 +175,8 @@ export default function SquadPage() {
                     holidayEnd: p.holiday_end,
                     notes: p.notes,
                     isInTrainingSquad: p.is_in_training_squad,
+                    isInMatchdayTracker: p.is_in_matchday_tracker,
+                    secondaryPositions: p.secondary_position ? p.secondary_position.split(",").map((s: string) => s.trim() as Position) : [],
                     isContracted: p.is_contracted,
                     contractAmount: p.contract_amount,
                     contractFrequency: p.contract_frequency || "Weekly",
@@ -254,6 +256,8 @@ export default function SquadPage() {
             holiday_start: updatedPlayer.holidayStart || null,
             holiday_end: updatedPlayer.holidayEnd || null,
             is_in_training_squad: updatedPlayer.isInTrainingSquad,
+            is_in_matchday_tracker: updatedPlayer.isInMatchdayTracker,
+            secondary_position: updatedPlayer.secondaryPositions && updatedPlayer.secondaryPositions.length > 0 ? updatedPlayer.secondaryPositions.join(",") : null,
             is_contracted: updatedPlayer.isContracted,
             contract_amount: updatedPlayer.contractAmount,
             contract_frequency: updatedPlayer.contractFrequency,
@@ -276,7 +280,7 @@ export default function SquadPage() {
             setEditingPlayer(null);
         } catch (err: any) {
             console.error("Save Player Error:", err);
-            alert("Database Error: " + err.message + "\n\nIf it says column 'holiday_start' or 'holiday_end' does not exist, please run this SQL query in your Supabase SQL Editor:\n\nALTER TABLE players ADD COLUMN IF NOT EXISTS holiday_start date;\nALTER TABLE players ADD COLUMN IF NOT EXISTS holiday_end date;");
+            alert("Database Error: " + err.message + "\n\nIf it says column 'secondary_position' or 'is_in_matchday_tracker' does not exist, please run this SQL query in your Supabase SQL Editor:\n\nALTER TABLE players ADD COLUMN IF NOT EXISTS secondary_position text;\nALTER TABLE players ADD COLUMN IF NOT EXISTS is_in_matchday_tracker boolean DEFAULT false;\nALTER TABLE players ADD COLUMN IF NOT EXISTS holiday_start date;\nALTER TABLE players ADD COLUMN IF NOT EXISTS holiday_end date;");
         }
     };
 
@@ -327,7 +331,7 @@ export default function SquadPage() {
                     <Button onClick={() => setIsManageSquadsOpen(true)} variant="outline" size="icon">
                         <Settings className="w-4 h-4" />
                     </Button>
-                    <Button className="bg-red-600 hover:bg-red-700" onClick={() => setEditingPlayer({ id: "new", firstName: "", lastName: "", position: "GK", squadNumber: 0, age: 0, nationality: "English", squad: currentSquads[0], medicalStatus: "Available", availability: true, contractExpiry: "", appearances: 0, goals: 0, assists: 0, imageUrl: "", isInTrainingSquad: true, isContracted: false, contractAmount: 0, contractFrequency: "Weekly", contractStartDate: "", contractEndDate: "", subsBillingModel: "Monthly", subsCustomAmount: 0, holidayStart: "", holidayEnd: "" })}>
+                    <Button className="bg-red-600 hover:bg-red-700" onClick={() => setEditingPlayer({ id: "new", firstName: "", lastName: "", position: "GK", squadNumber: 0, age: 0, nationality: "English", squad: currentSquads[0], medicalStatus: "Available", availability: true, contractExpiry: "", appearances: 0, goals: 0, assists: 0, imageUrl: "", isInTrainingSquad: true, isInMatchdayTracker: false, isContracted: false, contractAmount: 0, contractFrequency: "Weekly", contractStartDate: "", contractEndDate: "", subsBillingModel: "Monthly", subsCustomAmount: 0, holidayStart: "", holidayEnd: "" })}>
                         <Plus className="h-4 w-4 mr-2" /> Add Player
                     </Button>
                 </div>
@@ -432,19 +436,33 @@ export default function SquadPage() {
                                 </div>
 
                                 {editingPlayer.squad !== currentSquads[0] && (
-                                    <div className="flex items-center gap-2 p-2 bg-slate-50 rounded border border-slate-200">
-                                        <input
-                                            type="checkbox"
-                                            id="trainingSquad"
-                                            checked={editingPlayer.isInTrainingSquad || false}
-                                            onChange={(e) => setEditingPlayer({ ...editingPlayer, isInTrainingSquad: e.target.checked })}
-                                            className="h-4 w-4 rounded border-gray-300 text-slate-900 focus:ring-slate-900"
-                                        />
-                                        <label htmlFor="trainingSquad" className="text-xs font-medium text-slate-700 cursor-pointer">
-                                            Include in Training Tracker
-                                        </label>
-                                    </div>
-                                )}
+                                     <div className="space-y-2 p-2 bg-slate-50 rounded border border-slate-200">
+                                         <div className="flex items-center gap-2">
+                                             <input
+                                                 type="checkbox"
+                                                 id="trainingSquad"
+                                                 checked={editingPlayer.isInTrainingSquad || false}
+                                                 onChange={(e) => setEditingPlayer({ ...editingPlayer, isInTrainingSquad: e.target.checked })}
+                                                 className="h-4 w-4 rounded border-gray-300 text-slate-900 focus:ring-slate-900"
+                                             />
+                                             <label htmlFor="trainingSquad" className="text-xs font-medium text-slate-700 cursor-pointer">
+                                                 Include in Training Tracker
+                                             </label>
+                                         </div>
+                                         <div className="flex items-center gap-2 border-t pt-2 border-slate-200">
+                                             <input
+                                                 type="checkbox"
+                                                 id="matchdayTracker"
+                                                 checked={editingPlayer.isInMatchdayTracker || false}
+                                                 onChange={(e) => setEditingPlayer({ ...editingPlayer, isInMatchdayTracker: e.target.checked })}
+                                                 className="h-4 w-4 rounded border-gray-300 text-slate-900 focus:ring-slate-900"
+                                             />
+                                             <label htmlFor="matchdayTracker" className="text-xs font-medium text-slate-700 cursor-pointer">
+                                                 Include in Matchday XI Tracker
+                                             </label>
+                                         </div>
+                                     </div>
+                                 )}
                             </div>
 
                             <div className="space-y-1">
@@ -468,7 +486,37 @@ export default function SquadPage() {
                                     <option value="CF">Centre Forward (CF)</option>
                                     <option value="ST">Striker (ST)</option>
                                 </select>
-                            </div>
+                            </div>                             
+                            <div className="space-y-1.5">
+                                 <label className="block text-xs font-medium text-slate-500">Secondary Positions (Select Multiple)</label>
+                                 <div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto p-1 bg-slate-50 rounded border border-slate-200">
+                                     {(["GK", "LB", "LWB", "CB", "RB", "RWB", "CDM", "CM", "CAM", "LM", "RM", "LW", "RW", "CF", "ST"] as const)
+                                         .filter(pos => pos !== editingPlayer.position)
+                                         .map(pos => {
+                                             const isSelected = (editingPlayer.secondaryPositions || []).includes(pos);
+                                             return (
+                                                 <button
+                                                     key={pos}
+                                                     type="button"
+                                                     onClick={() => {
+                                                         const current = editingPlayer.secondaryPositions || [];
+                                                         const next = current.includes(pos)
+                                                             ? current.filter(p => p !== pos)
+                                                             : [...current, pos];
+                                                         setEditingPlayer({ ...editingPlayer, secondaryPositions: next });
+                                                     }}
+                                                     className={`px-2 py-1 text-[10px] font-semibold border rounded-full transition-all whitespace-nowrap ${
+                                                         isSelected 
+                                                             ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                                                             : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                                                     }`}
+                                                 >
+                                                     {pos}
+                                                 </button>
+                                             );
+                                         })}
+                                 </div>
+                             </div>
 
                             <div className="space-y-1">
                                 <label className="block text-xs font-medium text-slate-500">Status</label>

@@ -124,6 +124,7 @@ export default function TrainingPage() {
                 lastName: p.last_name,
                 squad: p.squad,
                 isInTrainingSquad: p.is_in_training_squad,
+                isInMatchdayTracker: p.is_in_matchday_tracker,
                 imageUrl: p.image_url,
                 // ... other fields not strictly needed for this page but good for types
                 position: p.position,
@@ -210,12 +211,16 @@ export default function TrainingPage() {
         setIsDialogOpen(true);
     };
 
+    const isFirstTeamSquad = (squad: string) => {
+        return squad === "firstTeam" || squad === "First Team" || squad === currentSquads[0];
+    };
+
     const getSessionAttendanceStats = (session: TrainingSession) => {
         const attendedCount = session.attendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
         const eligiblePlayers = players.filter(p => 
             session.squad === "All" 
-                ? (p.squad === currentSquads[0] || p.isInTrainingSquad) 
-                : p.squad === session.squad
+                ? (isFirstTeamSquad(p.squad) || p.isInTrainingSquad) 
+                : (p.squad === session.squad || (session.squad === "First Team" && isFirstTeamSquad(p.squad)))
         );
         const totalEligible = eligiblePlayers.length;
         const percentage = totalEligible > 0 ? Math.round((attendedCount / totalEligible) * 100) : 0;
@@ -356,8 +361,8 @@ export default function TrainingPage() {
     const leaderboardSessions = seasonSessions.filter(s => squadFilter === "All" || s.squad === squadFilter);
 
     const leaderboardPlayers = squadFilter === "All"
-        ? players.filter(p => p.squad === currentSquads[0] || p.isInTrainingSquad)
-        : players.filter(p => p.squad === squadFilter);
+        ? players.filter(p => isFirstTeamSquad(p.squad) || p.isInTrainingSquad)
+        : players.filter(p => p.squad === squadFilter || (squadFilter === "First Team" && isFirstTeamSquad(p.squad)));
 
     const playerStats = leaderboardPlayers
         .map(player => {

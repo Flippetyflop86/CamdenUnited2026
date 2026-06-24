@@ -67,6 +67,11 @@ const navSections = [
             { href: "/inventory",     label: "Inventory",      icon: Clipboard },
             { href: "/staff",         label: "Staff",          icon: Users },
             { href: "/documents",     label: "Documents",      icon: FileText },
+        ]
+    },
+    {
+        title: "App",
+        items: [
             { href: "/dashboard/billing", label: "Billing & Subs", icon: CreditCard, isComingSoon: true },
             { href: "/admin",         label: "Admin",          icon: Settings },
         ]
@@ -198,7 +203,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
 
                         return (
                             <div key={section.title}>
-                                <h3 className="px-3 text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">
+                                <h3 className="px-3 text-[11px] font-black text-slate-200 uppercase tracking-widest mb-2.5 mt-2">
                                     {section.title}
                                 </h3>
                                 <ul className="space-y-1" role="list">
