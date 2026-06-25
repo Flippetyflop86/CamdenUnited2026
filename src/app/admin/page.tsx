@@ -63,6 +63,7 @@ export default function AdminPage() {
     const [trainingDeadline, setTrainingDeadline] = useState("thursday evening");
     const [meetupOffset, setMeetupOffset] = useState("90");
     const [copiedPoll, setCopiedPoll] = useState(false);
+    const [pollMessage, setPollMessage] = useState("");
 
     const { user, role: userRole, isManager, pagePermissions, refreshPermissions, clubId } = useAuth();
     const [managerName, setManagerName] = useState("");
@@ -336,12 +337,20 @@ export default function AdminPage() {
         }
     };
 
+    useEffect(() => {
+        setPollMessage(generatePollMessage());
+    }, [pollType, selectedEventId, trainingDeadline, meetupOffset, upcomingSessions, upcomingMatches, settings]);
+
     const handleCopyPoll = async () => {
-        const text = generatePollMessage();
+        const text = pollMessage;
         if (!text || text.startsWith("No upcoming") || text.startsWith("Select")) return;
         await navigator.clipboard.writeText(text);
         setCopiedPoll(true);
         setTimeout(() => setCopiedPoll(false), 2000);
+    };
+
+    const handleResetPoll = () => {
+        setPollMessage(generatePollMessage());
     };
 
     const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -922,36 +931,51 @@ export default function AdminPage() {
 
                                     <div className="space-y-2 pt-4 border-t border-slate-100">
                                         <Label className="text-sm font-semibold flex justify-between items-center">
-                                            <span>Message Preview</span>
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                onClick={handleCopyPoll}
-                                                disabled={
-                                                    (pollType === "training" && upcomingSessions.length === 0) ||
-                                                    (pollType === "match" && upcomingMatches.length === 0)
-                                                }
-                                                className={`h-8 font-semibold text-xs px-3 gap-1.5 transition-all ${
-                                                    copiedPoll 
-                                                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
-                                                        : 'bg-slate-900 hover:bg-slate-800 text-white'
-                                                }`}
-                                            >
-                                                {copiedPoll ? (
-                                                    <>
-                                                        <Check className="h-3.5 w-3.5" /> Copied!
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <Copy className="h-3.5 w-3.5" /> Copy Poll
-                                                    </>
-                                                )}
-                                            </Button>
+                                            <span>Message Preview (Editable)</span>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleResetPoll}
+                                                    disabled={
+                                                        (pollType === "training" && upcomingSessions.length === 0) ||
+                                                        (pollType === "match" && upcomingMatches.length === 0)
+                                                    }
+                                                    className="h-8 font-semibold text-xs px-3 border-slate-200 hover:bg-slate-50"
+                                                >
+                                                    Reset Template
+                                                </Button>
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    onClick={handleCopyPoll}
+                                                    disabled={
+                                                        (pollType === "training" && upcomingSessions.length === 0) ||
+                                                        (pollType === "match" && upcomingMatches.length === 0)
+                                                    }
+                                                    className={`h-8 font-semibold text-xs px-3 gap-1.5 transition-all ${
+                                                        copiedPoll 
+                                                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                                                            : 'bg-slate-900 hover:bg-slate-800 text-white'
+                                                    }`}
+                                                >
+                                                    {copiedPoll ? (
+                                                        <>
+                                                            <Check className="h-3.5 w-3.5" /> Copied!
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Copy className="h-3.5 w-3.5" /> Copy Poll
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            </div>
                                         </Label>
                                         <Textarea
-                                            value={generatePollMessage()}
-                                            readOnly
-                                            className="h-44 font-sans text-xs bg-slate-50/50 text-slate-700 p-3 rounded-lg border border-slate-200 resize-none select-all"
+                                            value={pollMessage}
+                                            onChange={(e) => setPollMessage(e.target.value)}
+                                            className="h-44 font-sans text-xs bg-white text-slate-700 p-3 rounded-lg border border-slate-200 resize-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                                         />
                                     </div>
                                 </div>
