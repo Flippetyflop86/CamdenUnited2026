@@ -5,8 +5,9 @@ import { MatchdayXI, Player, Match, Position } from "@/types";
 import { FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Save, FileDown, Calendar, MapPin, Clock, GripVertical, Trophy, MessageCircle, Search, X } from "lucide-react";
+import { Plus, Trash2, Save, FileDown, Calendar, MapPin, Clock, GripVertical, Trophy, MessageCircle, Search, X, Loader2 } from "lucide-react";
 import { useClub } from "@/context/club-context";
+import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -20,7 +21,8 @@ const POSITION_ORDER: { [key: string]: number } = {
 };
 
 export default function MatchdayXIPage() {
-    const { settings } = useClub();
+    const { settings, isLoaded: isClubLoaded } = useClub();
+    const { isLoading: isAuthLoading } = useAuth();
     const [lineup, setLineup] = useState<MatchdayXI | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
     const [isEditing, setIsEditing] = useState(false);
@@ -692,6 +694,14 @@ export default function MatchdayXIPage() {
         
         return a.lastName.localeCompare(b.lastName);
     });
+
+    if (!isClubLoaded || isAuthLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="w-8 h-8 animate-spin text-red-600" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

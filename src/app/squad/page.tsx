@@ -32,8 +32,8 @@ export default function SquadPage() {
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const hasLoaded = useRef(false);
 
-    const { settings, updateSettings } = useClub();
-    const { clubId } = useAuth();
+    const { settings, updateSettings, isLoaded: isClubLoaded } = useClub();
+    const { clubId, isLoading: isAuthLoading } = useAuth();
     const currentSquads = settings.squads || ["First Team"];
     const [activeTab, setActiveTab] = useState("All");
     const [isManageSquadsOpen, setIsManageSquadsOpen] = useState(false);
@@ -330,6 +330,14 @@ export default function SquadPage() {
             setIsUploadingImage(false);
         }
     };
+
+    if (!isClubLoaded || isAuthLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="w-8 h-8 animate-spin text-red-600" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

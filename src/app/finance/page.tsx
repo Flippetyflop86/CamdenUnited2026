@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { useClub } from "@/context/club-context";
+import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { 
     Plus, 
@@ -34,7 +35,8 @@ import {
     Info,
     UploadCloud,
     RotateCcw,
-    Download
+    Download,
+    Loader2
 } from "lucide-react";
 
 // Default categories
@@ -54,7 +56,8 @@ const DEFAULT_EXPENSE_CATEGORIES = [
 ];
 
 export default function FinancePage() {
-    const { settings, updateSettings } = useClub();
+    const { settings, updateSettings, isLoaded: isClubLoaded } = useClub();
+    const { isLoading: isAuthLoading } = useAuth();
 
     // Data lists
     const [sponsors, setSponsors] = useState<Sponsor[]>([]);
@@ -1289,6 +1292,14 @@ export default function FinancePage() {
             if (rankA !== rankB) return rankA - rankB;
             return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
         });
+
+    if (!isClubLoaded || isAuthLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <Loader2 className="w-8 h-8 animate-spin text-red-600" />
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto pb-24 px-4 sm:px-6">
