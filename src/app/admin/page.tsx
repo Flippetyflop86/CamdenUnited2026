@@ -55,7 +55,14 @@ export default function AdminPage() {
     const [isMigrating, setIsMigrating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-
+    // Poll Generator States
+    const [upcomingSessions, setUpcomingSessions] = useState<any[]>([]);
+    const [upcomingMatches, setUpcomingMatches] = useState<any[]>([]);
+    const [pollType, setPollType] = useState<"training" | "match">("training");
+    const [selectedEventId, setSelectedEventId] = useState<string>("");
+    const [trainingDeadline, setTrainingDeadline] = useState("10:00 PM the evening before training");
+    const [meetupOffset, setMeetupOffset] = useState("1 hour");
+    const [copiedPoll, setCopiedPoll] = useState(false);
 
     const { user, role: userRole, isManager, pagePermissions, refreshPermissions, clubId } = useAuth();
     const [managerName, setManagerName] = useState("");
@@ -74,6 +81,37 @@ export default function AdminPage() {
     const [editingPermissions, setEditingPermissions] = useState<string[]>([]);
     const [isSavingPerms, setIsSavingPerms] = useState(false);
 
+    const fetchEvents = async () => {
+        try {
+            const today = new Date().toISOString().split('T')[0];
+            const { data: sessions } = await supabase
+                .from('training_sessions')
+                .select('*')
+                .gte('date', today)
+                .order('date', { ascending: true })
+                .limit(10);
+            if (sessions) setUpcomingSessions(sessions);
+
+            const { data: matchesData } = await supabase
+                .from('matches')
+                .select('*')
+                .gte('date', today)
+                .order('date', { ascending: true })
+                .limit(10);
+            if (matchesData) setUpcomingMatches(matchesData);
+        } catch (err) {
+            console.error("Error fetching upcoming events for poll generator:", err);
+        }
+    };
+
+    useEffect(() => {
+        if (pollType === "training" && upcomingSessions.length > 0) {
+            setSelectedEventId(upcomingSessions[0].id);
+        } else if (pollType === "match" && upcomingMatches.length > 0) {
+            setSelectedEventId(upcomingMatches[0].id);
+        }
+    }, [pollType, upcomingSessions, upcomingMatches]);
+
     useEffect(() => {
         if (user?.user_metadata?.full_name) {
             setManagerName(user.user_metadata.full_name);
@@ -83,6 +121,7 @@ export default function AdminPage() {
     useEffect(() => {
         if (settings.isOnboarded) {
             fetchTeamAccess();
+            fetchEvents();
         }
     }, [settings]);
 
@@ -228,6 +267,37 @@ export default function AdminPage() {
         } catch (err: any) {
             alert("Failed to delete member: " + err.message);
         }
+    };
+    const generatePollMessage = () => {
+        if (pollType === "training") {
+            const session = upcomingSessions.find(s => s.id === selectedEventId);
+            if (!session) return "No upcoming training sessions scheduled. Go to Training tab to create one.";
+            
+            const formatDate = (dateStr: string) => {
+                const options: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'short', day: 'numeric' };
+                return new Date(dateStr).toLocaleDateString('en-US', options);
+            };
+            
+            return `🏋️‍♂️ ${settings.name || "Club"} Training Availability Poll\n📅 Date: ${formatDate(session.date)}\n⏰ Time: ${session.time}\n📍 Venue: ${session.location}${session.topic ? `\n⚽ Focus: ${session.topic}` : ''}\n\nPlease vote on your availability:\n1️⃣ Available (Ready to train)\n2️⃣ Not Available\n3️⃣ 50/50 (Will let me know by ${trainingDeadline})`;
+        } else {
+            const match = upcomingMatches.find(m => m.id === selectedEventId);
+            if (!match) return "No upcoming matches scheduled. Go to Matches tab to create one.";
+            
+            const formatDate = (dateStr: string) => {
+                const options: Intl.DateTimeFormatOptions = { weekday: 'long', month: 'short', day: 'numeric' };
+                return new Date(dateStr).toLocaleDateString('en-US', options);
+            };
+            
+            return `⚽ ${settings.name || "Club"} Matchday Squad Availability Poll\n🆚 Opponent: ${match.opponent} (${match.is_home ? 'Home' : 'Away'})\n📅 Date: ${formatDate(match.date)}\n⏰ Kick-Off: ${match.time || 'TBC'} (Meeting ${meetupOffset} before kickoff)\n${match.competition ? `🏆 Competition: ${match.competition}\n` : ''}\nPlease vote on your availability:\n1️⃣ Available (Selected & ready to play)\n2️⃣ Not Available\n3️⃣ Injured / Doubtful (Will update manager)`;
+        }
+    };
+
+    const handleCopyPoll = async () => {
+        const text = generatePollMessage();
+        if (!text || text.startsWith("No upcoming") || text.startsWith("Select")) return;
+        await navigator.clipboard.writeText(text);
+        setCopiedPoll(true);
+        setTimeout(() => setCopiedPoll(false), 2000);
     };
 
     const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -434,12 +504,13 @@ export default function AdminPage() {
             </div>
 
             <Tabs key={isManager ? "manager" : "admin"} defaultValue={isManager ? "identity" : "access"} className="w-full">
-                <TabsList className="flex w-full max-w-4xl overflow-x-auto whitespace-nowrap gap-1 md:grid md:grid-cols-7 md:gap-0 bg-slate-100 p-1 rounded-lg scrollbar-none">
+                <TabsList className="flex w-full max-w-5xl overflow-x-auto whitespace-nowrap gap-1 md:grid md:grid-cols-8 md:gap-0 bg-slate-100 p-1 rounded-lg scrollbar-none">
                     {isManager && (
                         <>
                             <TabsTrigger value="identity" className="flex-shrink-0 px-4 py-2">Identity</TabsTrigger>
                             <TabsTrigger value="squads" className="flex-shrink-0 px-4 py-2">Squads</TabsTrigger>
                             <TabsTrigger value="kits" className="flex-shrink-0 px-4 py-2">Kits</TabsTrigger>
+                            <TabsTrigger value="polls" className="flex-shrink-0 px-4 py-2">Poll Generator</TabsTrigger>
                             <TabsTrigger value="finance" className="flex-shrink-0 px-4 py-2">Finance</TabsTrigger>
                             <TabsTrigger value="staff" className="flex-shrink-0 px-4 py-2">Staff</TabsTrigger>
                         </>
@@ -687,6 +758,147 @@ export default function AdminPage() {
                         </CardContent>
                     </Card>
                 </TabsContent>
+
+                {/* POLL GENERATOR TAB */}
+                {isManager && (
+                    <TabsContent value="polls" className="space-y-6 mt-6">
+                        <Card className="max-w-2xl">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Link2 className="h-5 w-5 text-indigo-500" /> WhatsApp Poll Generator
+                                </CardTitle>
+                                <CardDescription>
+                                    Generate copy-pasteable messages for training and matchday availability.
+                                </CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label className="text-sm font-semibold">Select Poll Type</Label>
+                                        <div className="flex gap-2">
+                                            <Button
+                                                type="button"
+                                                variant={pollType === "training" ? "default" : "outline"}
+                                                onClick={() => setPollType("training")}
+                                                className={`flex-1 ${pollType === "training" ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : ''}`}
+                                            >
+                                                Training Poll
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                variant={pollType === "match" ? "default" : "outline"}
+                                                onClick={() => setPollType("match")}
+                                                className={`flex-1 ${pollType === "match" ? 'bg-indigo-600 hover:bg-indigo-700 text-white' : ''}`}
+                                            >
+                                                Matchday Poll
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {pollType === "training" ? (
+                                        <>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="sessionSelect">Select Scheduled Session</Label>
+                                                <select
+                                                    id="sessionSelect"
+                                                    value={selectedEventId}
+                                                    onChange={(e) => setSelectedEventId(e.target.value)}
+                                                    className="w-full bg-white border border-slate-200 rounded-lg h-10 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                >
+                                                    {upcomingSessions.length === 0 ? (
+                                                        <option value="" disabled>No upcoming sessions found</option>
+                                                    ) : (
+                                                        upcomingSessions.map(s => (
+                                                            <option key={s.id} value={s.id}>{s.date} - {s.time} ({s.location})</option>
+                                                        ))
+                                                    )}
+                                                </select>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="deadlineInput">Availability Confirmation Deadline</Label>
+                                                <Input
+                                                    id="deadlineInput"
+                                                    value={trainingDeadline}
+                                                    onChange={(e) => setTrainingDeadline(e.target.value)}
+                                                    placeholder="e.g. 10:00 PM the evening before training"
+                                                    className="h-10 text-sm"
+                                                />
+                                                <p className="text-[11px] text-slate-500">This will be printed inside the generated 50/50 option.</p>
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="matchSelect">Select Scheduled Match</Label>
+                                                <select
+                                                    id="matchSelect"
+                                                    value={selectedEventId}
+                                                    onChange={(e) => setSelectedEventId(e.target.value)}
+                                                    className="w-full bg-white border border-slate-200 rounded-lg h-10 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                >
+                                                    {upcomingMatches.length === 0 ? (
+                                                        <option value="" disabled>No upcoming matches found</option>
+                                                    ) : (
+                                                        upcomingMatches.map(m => (
+                                                            <option key={m.id} value={m.id}>{m.date} vs {m.opponent}</option>
+                                                        ))
+                                                    )}
+                                                </select>
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label htmlFor="meetupInput">Meetup Time Before Kick-Off</Label>
+                                                <Input
+                                                    id="meetupInput"
+                                                    value={meetupOffset}
+                                                    onChange={(e) => setMeetupOffset(e.target.value)}
+                                                    placeholder="e.g. 1 hour, 45 minutes"
+                                                    className="h-10 text-sm"
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+
+                                    <div className="space-y-2 pt-4 border-t border-slate-100">
+                                        <Label className="text-sm font-semibold flex justify-between items-center">
+                                            <span>Message Preview</span>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={handleCopyPoll}
+                                                disabled={
+                                                    (pollType === "training" && upcomingSessions.length === 0) ||
+                                                    (pollType === "match" && upcomingMatches.length === 0)
+                                                }
+                                                className={`h-8 font-semibold text-xs px-3 gap-1.5 transition-all ${
+                                                    copiedPoll 
+                                                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white' 
+                                                        : 'bg-slate-900 hover:bg-slate-800 text-white'
+                                                }`}
+                                            >
+                                                {copiedPoll ? (
+                                                    <>
+                                                        <Check className="h-3.5 w-3.5" /> Copied!
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Copy className="h-3.5 w-3.5" /> Copy Poll
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </Label>
+                                        <Textarea
+                                            value={generatePollMessage()}
+                                            readOnly
+                                            className="h-44 font-sans text-xs bg-slate-50/50 text-slate-700 p-3 rounded-lg border border-slate-200 resize-none select-all"
+                                        />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                )}
 
                 {/* FINANCE TAB */}
                 <TabsContent value="finance" className="space-y-6 mt-6">
