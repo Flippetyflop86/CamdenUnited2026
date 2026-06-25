@@ -161,7 +161,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             return;
         }
 
-        if (!user) {
+        if (!user || !clubId) {
             setSettings(defaultSettings);
             setIsLoaded(true);
             return;
@@ -169,12 +169,11 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
 
         async function fetchSettings() {
             try {
-                // RLS automatically filters this to ONLY the current user's club
                 const { data, error } = await supabase
                     .from("clubs")
                     .select("*")
-                    .limit(1)
-                    .single();
+                    .eq("id", clubId)
+                    .maybeSingle();
 
                 if (data) {
                     setSettings({
@@ -275,12 +274,6 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             if (dbRow) {
                 existingRowExists = true;
             }
-        } else {
-            const { data: existing } = await supabase.from("clubs").select("id").limit(1).maybeSingle();
-            if (existing) {
-                existingId = existing.id;
-                existingRowExists = true;
-            }
         }
 
         let error;
@@ -291,11 +284,33 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                 .eq("id", existingId);
             error = updateErr;
         } else {
-            const insertPayload = existingId ? { id: existingId, ...updates } : updates;
-            const { error: insertErr } = await supabase
+            // No authenticated club membership exists yet. Create a brand new isolated club.
+            const { data: newClub, error: insertErr } = await supabase
                 .from("clubs")
-                .insert([insertPayload]);
-            error = insertErr;
+                .insert([updates])
+                .select("id")
+                .maybeSingle();
+            
+            if (insertErr) {
+                error = insertErr;
+            } else if (newClub && user) {
+                existingId = newClub.id;
+                // Create a membership linking the current user to this new club
+                const { error: memberErr } = await supabase
+                    .from("club_members")
+                    .insert([{
+                        club_id: newClub.id,
+                        user_id: user.id,
+                        role: "manager",
+                        display_name: user.user_metadata?.full_name || "Manager",
+                        page_permissions: ["admin", "dashboard", "squad", "matches", "training", "finance", "sponsors", "staff"]
+                    }]);
+                if (memberErr) {
+                    console.warn("Failed to automatically link new manager to club:", memberErr);
+                }
+            } else {
+                error = new Error("Failed to initialize new club metadata.");
+            }
         }
 
         if (error) {
