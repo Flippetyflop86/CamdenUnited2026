@@ -159,6 +159,7 @@ create table matchday_xis (
   formation text,
   starters jsonb, -- Key-value map of position -> playerId
   substitutes jsonb, -- Array of playerIds
+  squad text default 'First Team',
   created_at timestamp with time zone default timezone('utc'::text, now()),
   updated_at timestamp with time zone default timezone('utc'::text, now())
 );

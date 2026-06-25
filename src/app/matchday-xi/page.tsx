@@ -104,7 +104,11 @@ export default function MatchdayXIPage() {
                 .order('created_at', { ascending: false })
                 .limit(1);
 
-            if (error && error.message.includes('column "squad" does not exist')) {
+            if (error && (
+                error.message.includes('column "squad" does not exist') || 
+                error.message.includes("Could not find the 'squad' column") || 
+                error.message.includes("squad")
+            )) {
                 // Fallback for database migration pending
                 const fallbackRes = await supabase.from('matchday_xis').select('*').order('created_at', { ascending: false }).limit(1);
                 if (fallbackRes.data && fallbackRes.data.length > 0) {
@@ -220,7 +224,11 @@ export default function MatchdayXIPage() {
             const { data, error } = await supabase.from('matchday_xis').insert([payload]).select();
             if (error) {
                 console.error("Save Lineup Error:", error);
-                if (error.message.includes('column "squad" does not exist')) {
+                if (
+                    error.message.includes('column "squad" does not exist') || 
+                    error.message.includes("Could not find the 'squad' column") || 
+                    error.message.includes("squad")
+                ) {
                     alert("Database Error: " + error.message + "\n\nPlease run this SQL query in your Supabase SQL Editor to support multiple squads:\n\nALTER TABLE matchday_xis ADD COLUMN IF NOT EXISTS squad text DEFAULT 'First Team';");
                 } else {
                     alert("Database Error: " + error.message + " (Have you run the SQL script for matchday_xis?)");
@@ -234,7 +242,11 @@ export default function MatchdayXIPage() {
             const { error } = await supabase.from('matchday_xis').update(payload).eq('id', newLineup.id);
             if (error) {
                 console.error("Update Lineup Error:", error);
-                if (error.message.includes('column "squad" does not exist')) {
+                if (
+                    error.message.includes('column "squad" does not exist') || 
+                    error.message.includes("Could not find the 'squad' column") || 
+                    error.message.includes("squad")
+                ) {
                     alert("Database Error: " + error.message + "\n\nPlease run this SQL query in your Supabase SQL Editor to support multiple squads:\n\nALTER TABLE matchday_xis ADD COLUMN IF NOT EXISTS squad text DEFAULT 'First Team';");
                 } else {
                     alert("Database Error: " + error.message);
