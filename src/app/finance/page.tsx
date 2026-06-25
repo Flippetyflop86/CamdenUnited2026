@@ -534,6 +534,30 @@ export default function FinancePage() {
         triggerToast("Fine record deleted");
     };
 
+    const handleRecordSponsorshipPayment = async (sponsor: Sponsor) => {
+        const confirmPayment = confirm(`Record a ledger transaction of £${sponsor.amount} for sponsor "${sponsor.name}"?`);
+        if (!confirmPayment) return;
+
+        const payload = {
+            date: new Date().toISOString().split("T")[0],
+            description: `Sponsorship Payment - ${sponsor.name}`,
+            amount: sponsor.amount,
+            type: "Income",
+            category: "Sponsorship",
+            is_recurring: false
+        };
+
+        try {
+            const { error } = await supabase.from("finance_transactions").insert([payload]);
+            if (error) throw error;
+            triggerToast(`Sponsorship payment of £${sponsor.amount} logged for ${sponsor.name}!`);
+            fetchTransactions();
+        } catch (err: any) {
+            console.error("Failed to log sponsorship payment:", err);
+            alert("Failed to log payment transaction: " + (err.message || err));
+        }
+    };
+
     // Calculate dynamic values
     const currentMonthStr = new Date().toISOString().substring(0, 7); // e.g. "2026-06"
 
@@ -3059,23 +3083,33 @@ export default function FinancePage() {
                                                 </span>
                                             </div>
 
-                                            <div className="flex justify-end gap-2 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <div className="flex justify-between items-center pt-2 border-t border-slate-100/60 mt-1">
                                                 <Button 
                                                     size="sm" 
                                                     variant="ghost" 
-                                                    onClick={() => startEditSponsor(sponsor)}
-                                                    className="h-8 text-indigo-600 hover:text-indigo-800 p-2"
+                                                    onClick={() => handleRecordSponsorshipPayment(sponsor)}
+                                                    className="h-8 text-emerald-600 hover:text-emerald-700 p-1.5 font-bold text-xs"
                                                 >
-                                                    <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                                                    <Wallet className="h-3.5 w-3.5 mr-1" /> Record Payment
                                                 </Button>
-                                                <Button 
-                                                    size="sm" 
-                                                    variant="ghost" 
-                                                    onClick={() => deleteItem(sponsor.id, "sponsor")}
-                                                    className="h-8 text-red-500 hover:text-red-700 p-2"
-                                                >
-                                                    <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete
-                                                </Button>
+                                                <div className="flex gap-1">
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="ghost" 
+                                                        onClick={() => startEditSponsor(sponsor)}
+                                                        className="h-8 text-indigo-600 hover:text-indigo-800 p-1.5"
+                                                    >
+                                                        <Pencil className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="ghost" 
+                                                        onClick={() => deleteItem(sponsor.id, "sponsor")}
+                                                        className="h-8 text-red-500 hover:text-red-700 p-1.5"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </CardContent>
                                     </Card>
