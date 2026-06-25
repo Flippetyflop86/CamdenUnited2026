@@ -93,6 +93,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSession(session);
             setUser(session?.user ?? null);
             if (session?.user) {
+                // Clear any stored browser settings/states when switching user accounts to prevent leaks
+                if (typeof window !== 'undefined') {
+                    sessionStorage.clear();
+                    for (let i = localStorage.length - 1; i >= 0; i--) {
+                        const key = localStorage.key(i);
+                        if (key && key.startsWith('clubflow_')) {
+                            localStorage.removeItem(key);
+                        }
+                    }
+                }
                 fetchClubMembership(session.user.id);
             } else {
                 setClubId(null);
@@ -113,6 +123,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const signOut = async () => {
         await supabase.auth.signOut();
+        if (typeof window !== 'undefined') {
+            sessionStorage.clear();
+            for (let i = localStorage.length - 1; i >= 0; i--) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('clubflow_')) {
+                    localStorage.removeItem(key);
+                }
+            }
+        }
         router.push("/login");
     };
 
