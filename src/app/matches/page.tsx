@@ -344,8 +344,8 @@ export default function MatchesPage() {
         parts.push("⚽ MATCH AVAILABILITY");
 
         if (includeOpponent) {
-            const homeTeam = activeShareMatch.isHome ? "Camden United" : activeShareMatch.opponent;
-            const awayTeam = activeShareMatch.isHome ? activeShareMatch.opponent : "Camden United";
+            const homeTeam = activeShareMatch.isHome ? settings.name : activeShareMatch.opponent;
+            const awayTeam = activeShareMatch.isHome ? activeShareMatch.opponent : settings.name;
             parts.push(`🏆 ${homeTeam} vs ${awayTeam}`);
         }
 
@@ -705,7 +705,7 @@ export default function MatchesPage() {
                                 <img src={teamInfo.badge_url} alt="Badge" className="h-6 w-6 object-contain shrink-0" />
                             )}
                             <span className={`font-bold text-lg ${match.isHome ? 'text-slate-900' : 'text-slate-500'}`}>
-                                {match.isHome ? "Camden United" : match.opponent}
+                                {match.isHome ? settings.name : match.opponent}
                             </span>
                             {match.isHome && <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded shrink-0">H</span>}
                         </div>
@@ -742,7 +742,7 @@ export default function MatchesPage() {
                                 {match.isHome && teamInfo?.badge_url && (
                                     <img src={teamInfo.badge_url} alt="Badge" className="h-6 w-6 object-contain shrink-0" />
                                 )}
-                                {!match.isHome ? "Camden United" : match.opponent}
+                                {!match.isHome ? settings.name : match.opponent}
                             </span>
                             {match.isHome && teamInfo?.instagram_handle && (
                                 <a href={`https://instagram.com/${teamInfo.instagram_handle.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-700 transition-colors shrink-0">

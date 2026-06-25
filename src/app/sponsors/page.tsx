@@ -29,8 +29,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/context/auth-context";
+import { useClub } from "@/context/club-context";
 
 export default function SponsorsPage() {
+    const { settings } = useClub();
     const [sponsors, setSponsors] = useState<Sponsor[]>([]);
 
     const [isAddOpen, setIsAddOpen] = useState(false);
@@ -811,7 +813,7 @@ export default function SponsorsPage() {
                                 <div className="border border-slate-200 rounded-lg p-6 space-y-6 bg-white">
                                     <div className="flex justify-between items-start border-b pb-4">
                                         <div>
-                                            <h1 className="text-2xl font-bold text-slate-900">Camden United FC</h1>
+                                            <h1 className="text-2xl font-bold text-slate-900">{settings.name}</h1>
                                             <p className="text-xs text-slate-500">Sponsorship Performance & ROI Report</p>
                                         </div>
                                         <div className="text-right">
@@ -905,8 +907,8 @@ export default function SponsorsPage() {
                                     })()}
 
                                     <div className="border-t pt-4 text-center text-xs text-slate-400">
-                                        <p>This report has been compiled and verified by the club administration for Camden United FC.</p>
-                                        <p className="mt-1">© {new Date().getFullYear()} Camden United FC. All rights reserved.</p>
+                                        <p>This report has been compiled and verified by the club administration for {settings.name}.</p>
+                                        <p className="mt-1">© {new Date().getFullYear()} {settings.name}. All rights reserved.</p>
                                     </div>
                                 </div>
                             </div>
@@ -939,7 +941,7 @@ export default function SponsorsPage() {
                                     <label className="text-xs font-bold text-slate-400 uppercase">Subject</label>
                                     <Input
                                         readOnly
-                                        value={`Sponsorship Renewal - Camden United FC & ${draftEmailSponsor.name}`}
+                                        value={`Sponsorship Renewal - ${settings.name} & ${draftEmailSponsor.name}`}
                                         className="bg-slate-50 text-xs font-semibold text-slate-900 border-slate-200"
                                     />
                                 </div>
@@ -952,7 +954,7 @@ export default function SponsorsPage() {
 
 I hope you are well.
 
-We want to express our sincere thanks for your partnership as a Secured Sponsor of Camden United FC. Your support has been vital to our success.
+We want to express our sincere thanks for your partnership as a Secured Sponsor of ${settings.name}. Your support has been vital to our success.
 
 We wanted to note that your current sponsorship contract (£${draftEmailSponsor.amount.toLocaleString()} / ${draftEmailSponsor.frequency.toLowerCase()}) is scheduled for renewal on ${draftEmailSponsor.endDate ? new Date(draftEmailSponsor.endDate).toLocaleDateString() : 'N/A'}. 
 
@@ -963,7 +965,7 @@ Please let us know if you're available for a brief call next week to discuss ren
 Best regards,
 
 [Your Name]
-Camden United FC`}
+${settings.name}`}
                                         className="bg-slate-50 text-xs leading-relaxed text-slate-900 border-slate-200"
                                     />
                                 </div>
@@ -976,8 +978,8 @@ Camden United FC`}
                                     </Button>
                                     <Button
                                         onClick={() => {
-                                            const subject = encodeURIComponent(`Sponsorship Renewal - Camden United FC & ${draftEmailSponsor.name}`);
-                                            const body = encodeURIComponent(`Dear ${draftEmailSponsor.name} Team,\n\nI hope you are well.\n\nWe want to express our sincere thanks for your partnership as a Secured Sponsor of Camden United FC. Your support has been vital to our success.\n\nWe wanted to note that your current sponsorship contract (£${draftEmailSponsor.amount.toLocaleString()} / ${draftEmailSponsor.frequency.toLowerCase()}) is scheduled for renewal on ${draftEmailSponsor.endDate ? new Date(draftEmailSponsor.endDate).toLocaleDateString() : 'N/A'}.\n\nWe would love to extend this partnership for the upcoming season and discuss how we can continue to maximize exposure and return on investment for your brand.\n\nPlease let us know if you're available for a brief call next week to discuss renewal packages.\n\nBest regards,\n\n[Your Name]\nCamden United FC`);
+                                            const subject = encodeURIComponent(`Sponsorship Renewal - ${settings.name} & ${draftEmailSponsor.name}`);
+                                            const body = encodeURIComponent(`Dear ${draftEmailSponsor.name} Team,\n\nI hope you are well.\n\nWe want to express our sincere thanks for your partnership as a Secured Sponsor of ${settings.name}.\n\nYour support has been vital to our success.\n\nWe wanted to note that your current sponsorship contract (£${draftEmailSponsor.amount.toLocaleString()} / ${draftEmailSponsor.frequency.toLowerCase()}) is scheduled for renewal on ${draftEmailSponsor.endDate ? new Date(draftEmailSponsor.endDate).toLocaleDateString() : 'N/A'}.\n\nWe would love to extend this partnership for the upcoming season and discuss how we can continue to maximize exposure and return on investment for your brand.\n\nPlease let us know if you're available for a brief call next week to discuss renewal packages.\n\nBest regards,\n\n[Your Name]\n${settings.name}`);
                                             window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
                                         }}
                                         className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
@@ -986,7 +988,7 @@ Camden United FC`}
                                     </Button>
                                     <Button
                                         onClick={() => {
-                                            const text = `Subject: Sponsorship Renewal - Camden United FC & ${draftEmailSponsor.name}\n\nDear ${draftEmailSponsor.name} Team,\n\nI hope you are well.\n\nWe want to express our sincere thanks for your partnership as a Secured Sponsor of Camden United FC. Your support has been vital to our success.\n\nWe wanted to note that your current sponsorship contract (£${draftEmailSponsor.amount.toLocaleString()} / ${draftEmailSponsor.frequency.toLowerCase()}) is scheduled for renewal on ${draftEmailSponsor.endDate ? new Date(draftEmailSponsor.endDate).toLocaleDateString() : 'N/A'}.\n\nWe would love to extend this partnership for the upcoming season and discuss how we can continue to maximize exposure and return on investment for your brand.\n\nPlease let us know if you're available for a brief call next week to discuss renewal packages.\n\nBest regards,\n\n[Your Name]\nCamden United FC`;
+                                            const text = `Subject: Sponsorship Renewal - ${settings.name} & ${draftEmailSponsor.name}\n\nDear ${draftEmailSponsor.name} Team,\n\nI hope you are well.\n\nWe want to express our sincere thanks for your partnership as a Secured Sponsor of ${settings.name}.\n\nYour support has been vital to our success.\n\nWe wanted to note that your current sponsorship contract (£${draftEmailSponsor.amount.toLocaleString()} / ${draftEmailSponsor.frequency.toLowerCase()}) is scheduled for renewal on ${draftEmailSponsor.endDate ? new Date(draftEmailSponsor.endDate).toLocaleDateString() : 'N/A'}.\n\nWe would love to extend this partnership for the upcoming season and discuss how we can continue to maximize exposure and return on investment for your brand.\n\nPlease let us know if you're available for a brief call next week to discuss renewal packages.\n\nBest regards,\n\n[Your Name]\n${settings.name}`;
                                             navigator.clipboard.writeText(text);
                                             alert("Copied to clipboard!");
                                         }}

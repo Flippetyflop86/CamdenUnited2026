@@ -39,8 +39,10 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
+import { useClub } from "@/context/club-context";
 
 export default function RecruitmentPage() {
+    const { settings } = useClub();
     const [recruits, setRecruits] = useState<Recruit[]>([]);
     const hasLoaded = useRef(false);
     const [searchTerm, setSearchTerm] = useState("");
@@ -231,7 +233,7 @@ export default function RecruitmentPage() {
         const content = `
             <html>
             <head>
-                <title>Scouting Report - Camden United</title>
+                <title>Scouting Report - ${settings.name}</title>
                 <style>
                     body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #1e293b; line-height: 1.5; }
                     .header { text-align: center; border-bottom: 3px solid #ef4444; padding-bottom: 20px; margin-bottom: 30px; }
@@ -267,7 +269,7 @@ export default function RecruitmentPage() {
             </head>
             <body>
                 <div class="header">
-                    <div class="logo">Camden United Hub</div>
+                    <div class="logo">${settings.name} Hub</div>
                     <h1>DETAILED SCOUTING REPORT</h1>
                     <div class="date">Generated on ${new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</div>
                 </div>
@@ -316,7 +318,7 @@ export default function RecruitmentPage() {
         }).join('')}
 
                 <div style="margin-top: 50px; text-align: center; color: #94a3b8; font-size: 0.8em; border-top: 1px solid #f1f5f9; padding-top: 20px;">
-                    Confidential Report - Recruitment Department - Camden United FC
+                    Confidential Report - Recruitment Department - ${settings.name} FC
                 </div>
             </body>
             </html>

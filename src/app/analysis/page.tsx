@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label";
 import { Plus, Target, Activity, Trash2, ShieldHalf, LayoutDashboard, RotateCcw } from "lucide-react";
 import Link from "next/link";
+import { useClub } from "@/context/club-context";
 
 type ShotOutcome = "Goal" | "Saved" | "Missed" | "Blocked";
 
@@ -54,6 +55,7 @@ const calculateDominancePoints = (stats: DominanceStats) => {
 };
 
 export default function AnalysisPage() {
+    const { settings } = useClub();
     const [matches, setMatches] = useState<Match[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);
     const [selectedMatchId, setSelectedMatchId] = useState<string>("");
@@ -388,7 +390,7 @@ export default function AnalysisPage() {
                                     <div className="mb-6 bg-slate-50 p-4 rounded-xl border border-slate-100 max-w-2xl mx-auto">
                                         <div className="flex justify-between items-center mb-2">
                                             <div className="text-left">
-                                                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">Camden United</span>
+                                                <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">{settings.name}</span>
                                                 <div className="text-xl font-black text-slate-900">{usPoints} <span className="text-xs font-normal text-slate-500">pts</span></div>
                                             </div>
                                             <div className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-full uppercase tracking-wider">
@@ -420,7 +422,7 @@ export default function AnalysisPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-center">
                                 {/* Camden United */}
                                 <div>
-                                    <h3 className="font-bold text-lg text-slate-800 mb-4">Camden United</h3>
+                                    <h3 className="font-bold text-lg text-slate-800 mb-4">{settings.name}</h3>
                                     <div className="space-y-3">
                                         {["deliveries", "halfChances", "chances", "ooohs", "goals"].map((key) => (
                                             <div key={key} className="flex items-center justify-between bg-slate-50 p-2 rounded">
