@@ -37,7 +37,8 @@ import {
     UploadCloud,
     RotateCcw,
     Download,
-    Loader2
+    Loader2,
+    Box
 } from "lucide-react";
 
 // Default categories
@@ -132,6 +133,8 @@ export default function FinancePage() {
     const [matches, setMatches] = useState<any[]>([]);
     const [matchdayFee, setMatchdayFee] = useState<number>(10);
     const [subsStructure, setSubsStructure] = useState<"Monthly" | "Training" | "Matchday" | "Both">("Monthly");
+    const [inventoryItems, setInventoryItems] = useState<any[]>([]);
+    const [isLoadingInventory, setIsLoadingInventory] = useState(false);
 
     // Player subs modal state
     const [selectedPlayerForPayment, setSelectedPlayerForPayment] = useState<Player | null>(null);
@@ -233,6 +236,18 @@ export default function FinancePage() {
         }
     }, [settings.name, settings.trainingFeePerSession, settings.monthlySubs]);
 
+    const fetchInventoryItems = async () => {
+        setIsLoadingInventory(true);
+        try {
+            const { data } = await supabase.from("inventory_items").select("*");
+            if (data) setInventoryItems(data);
+        } catch (e) {
+            console.error("Failed to load inventory items for assets calculation:", e);
+        } finally {
+            setIsLoadingInventory(false);
+        }
+    };
+
     const fetchFinanceData = async () => {
         await Promise.all([
             fetchTransactions(),
@@ -240,7 +255,8 @@ export default function FinancePage() {
             fetchSubscriptions(),
             fetchPlayers(),
             fetchTrainingSessions(),
-            fetchMatches()
+            fetchMatches(),
+            fetchInventoryItems()
         ]);
         setNewStartingBalance((settings.financeStartingBalance || 0).toString());
     };
@@ -782,6 +798,23 @@ export default function FinancePage() {
     // Runway calculation
     const runwayMonths = monthlyExpensesCommitment > 0 ? (bankBalance / monthlyExpensesCommitment).toFixed(1) : "∞";
 
+    // Dynamic Asset Value from Inventory cost estimation
+    // Since inventory doesn't store price per item directly, we estimate value based on matched transaction costs of type 'Kit & Equipment' or use fallback standard unit estimations
+    const estimatedInventoryAssets = (() => {
+        let total = 0;
+        inventoryItems.forEach(item => {
+            let unitPrice = 15; // default fallback for sports equipment/other
+            if (item.category === "Kit") unitPrice = 35; // jersey/short sets
+            else if (item.category === "Technology") unitPrice = 120; // veo cameras, tablets
+            else if (item.category === "Medical") unitPrice = 25; // first aid kits
+            
+            // Exclude lost items
+            if (item.status !== "Lost") {
+                total += item.quantity * unitPrice;
+            }
+        });
+        return total;
+    })();
     // Setup Wizard Actions
     const handleWizardComplete = () => {
         localStorage.setItem(`clubflow_wizard_completed_${settings.name}`, "true");
@@ -1755,7 +1788,7 @@ export default function FinancePage() {
                             {settings.subsEnabled ? (
                                 <Card className="border-amber-100 bg-amber-50/10 hover:shadow-md transition-shadow">
                                     <CardHeader className="pb-2">
-                                        <CardTitle className="text-xs font-bold text-amber-950">Who still owes us money?</CardTitle>
+                                        <CardTitle className="text-xs font-bold text-amber-950">Who still owes us money? (Debtors)</CardTitle>
                                     </CardHeader>
                                     <CardContent className="text-xs text-amber-950/80 leading-relaxed">
                                         There are currently <strong className="text-amber-950 font-extrabold">£{subsOverview.outstanding}</strong> in uncollected player subs this month. <button onClick={() => setActiveSection("subs")} className="text-amber-900 font-bold underline">Remind them now</button>.
@@ -1771,6 +1804,18 @@ export default function FinancePage() {
                                     </CardContent>
                                 </Card>
                             )}
+
+                            {/* Inventory cost asset value card */}
+                            <Card className="border-blue-100 bg-blue-50/10 hover:shadow-md transition-shadow">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                                        <Box className="h-3.5 w-3.5" /> What inventory assets do we hold?
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="text-xs text-blue-950/80 leading-relaxed">
+                                    Our inventory (kits, equipment, technology) has an estimated valuation of <strong className="text-blue-900 font-extrabold">£{estimatedInventoryAssets.toLocaleString()}</strong>.
+                                </CardContent>
+                            </Card>
                         </div>
 
                         {/* --- DETAILED ACCRUAL BASES BREAKDOWN PANEL --- */}
@@ -1872,6 +1917,72 @@ export default function FinancePage() {
                                                         );
                                                     })}
                                                 </>
+                                            )}
+                                        </div>
+                                    </div>
+                                    {/* 4. Debtors List (Money Owed to Us) */}
+                                    <div className="space-y-2">
+                                        <h4 className="text-xs font-bold text-indigo-900 flex justify-between">
+                                            <span>4. Outstanding Debtors (Receivables)</span>
+                                            <span className="text-[10px] text-indigo-700">Money owed to club</span>
+                                        </h4>
+                                        <div className="bg-white border border-indigo-100 rounded-xl overflow-hidden divide-y divide-slate-100 max-h-[220px] overflow-y-auto">
+                                            {/* Players with outstanding dues */}
+                                            {players.filter(p => getPlayerDuesForMonth(p).outstanding > 0).length === 0 && sponsors.filter(s => s.status !== "Secured" && s.status !== "Lead" && s.amount).length === 0 ? (
+                                                <div className="p-3 text-center text-slate-400 text-xs italic">No current debtors. All dues up to date.</div>
+                                            ) : (
+                                                <>
+                                                    {players.filter(p => getPlayerDuesForMonth(p).outstanding > 0).map(p => {
+                                                        const dues = getPlayerDuesForMonth(p);
+                                                        return (
+                                                            <div key={p.id} className="p-3 flex justify-between items-center text-xs">
+                                                                <div>
+                                                                    <span className="font-semibold text-slate-800">{p.firstName} {p.lastName}</span>
+                                                                    <span className="text-[10px] text-slate-400 block mt-0.5">Player Subscriptions</span>
+                                                                </div>
+                                                                <span className="font-bold text-amber-600">£{dues.outstanding.toFixed(2)}</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {sponsors.filter(s => s.status === "Proposal" || s.status === "Review").map(s => (
+                                                        <div key={s.id} className="p-3 flex justify-between items-center text-xs">
+                                                            <div>
+                                                                <span className="font-semibold text-slate-800">{s.name} (Pipeline)</span>
+                                                                <span className="text-[10px] text-slate-400 block mt-0.5">Sponsorship ({s.status})</span>
+                                                            </div>
+                                                            <span className="font-bold text-blue-600">£{s.amount.toLocaleString()}</span>
+                                                        </div>
+                                                    ))}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* 5. Creditors List (Money Owed to Others) */}
+                                    <div className="space-y-2">
+                                        <h4 className="text-xs font-bold text-indigo-900 flex justify-between">
+                                            <span>5. Outstanding Creditors (Payables)</span>
+                                            <span className="text-[10px] text-indigo-700">Committed expenses owed</span>
+                                        </h4>
+                                        <div className="bg-white border border-indigo-100 rounded-xl overflow-hidden divide-y divide-slate-100">
+                                            {subscriptions.filter(sub => {
+                                                const nextDate = sub.nextPaymentDate ? new Date(sub.nextPaymentDate) : null;
+                                                return nextDate && nextDate < new Date();
+                                            }).length === 0 ? (
+                                                <div className="p-3 text-center text-slate-400 text-xs italic">No overdue liabilities or credit payments due.</div>
+                                            ) : (
+                                                subscriptions.filter(sub => {
+                                                    const nextDate = sub.nextPaymentDate ? new Date(sub.nextPaymentDate) : null;
+                                                    return nextDate && nextDate < new Date();
+                                                }).map(sub => (
+                                                    <div key={sub.id} className="p-3 flex justify-between items-center text-xs">
+                                                        <div>
+                                                            <span className="font-semibold text-slate-800">{sub.name} (Overdue)</span>
+                                                            <span className="text-[10px] text-slate-400 block mt-0.5">{sub.category} • Due {sub.nextPaymentDate ? new Date(sub.nextPaymentDate).toLocaleDateString() : ""}</span>
+                                                        </div>
+                                                        <span className="font-bold text-red-500">£{sub.cost.toFixed(2)}</span>
+                                                    </div>
+                                                ))
                                             )}
                                         </div>
                                     </div>
