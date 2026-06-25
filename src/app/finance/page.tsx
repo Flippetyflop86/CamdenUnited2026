@@ -168,6 +168,9 @@ export default function FinancePage() {
     // Copy confirmation alerts
     const [alertMessage, setAlertMessage] = useState<string | null>(null);
 
+    // Accounting method state (Accrual vs Cash basis)
+    const [accountingMethod, setAccountingMethod] = useState<"accrual" | "cash">("accrual");
+
     // Setup categories dynamically
     const incomeCategories = [
         ...DEFAULT_INCOME_CATEGORIES, 
@@ -731,6 +734,21 @@ export default function FinancePage() {
         });
 
         return income;
+    })();
+
+    // Cash-basis actuals for the current month
+    const cashIncomeActual = (() => {
+        const currentMonth = new Date().toISOString().substring(0, 7); // e.g., "2026-06"
+        return transactions
+            .filter(t => t.type === "Income" && t.date && t.date.startsWith(currentMonth))
+            .reduce((sum, t) => sum + t.amount, 0);
+    })();
+
+    const cashExpenseActual = (() => {
+        const currentMonth = new Date().toISOString().substring(0, 7); // e.g., "2026-06"
+        return transactions
+            .filter(t => t.type === "Expense" && t.date && t.date.startsWith(currentMonth))
+            .reduce((sum, t) => sum + t.amount, 0);
     })();
 
     // Runway calculation
@@ -1414,15 +1432,58 @@ export default function FinancePage() {
                 </div>
             )}
 
-            {/* --- SECTION 1: FINANCIAL OVERVIEW METRICS --- */}
+            {/* --- ACCOUNTING METHOD TOGGLE & TOOLTIP --- */}
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-slate-50 border border-slate-200/80 p-4 rounded-2xl shadow-xs">
+                <div>
+                    <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-indigo-500" />
+                        Club Accounting Engine
+                    </h3>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                        {accountingMethod === "accrual" 
+                            ? "Accrual Basis matches monthly forecasted/amortized revenues and commitments to show true operational run-rate." 
+                            : "Cash Basis tracks actual money received and spent inside this current month's transactions."}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2 p-1 bg-slate-200/60 rounded-xl border border-slate-300/40">
+                    <button
+                        onClick={() => setAccountingMethod("accrual")}
+                        className={`py-1.5 px-3.5 text-xs font-bold rounded-lg transition-all ${
+                            accountingMethod === "accrual" 
+                                ? "bg-slate-900 text-white shadow-xs" 
+                                : "text-slate-600 hover:text-slate-900"
+                        }`}
+                    >
+                        Accrual Basis
+                    </button>
+                    <button
+                        onClick={() => setAccountingMethod("cash")}
+                        className={`py-1.5 px-3.5 text-xs font-bold rounded-lg transition-all ${
+                            accountingMethod === "cash" 
+                                ? "bg-slate-900 text-white shadow-xs" 
+                                : "text-slate-600 hover:text-slate-900"
+                        }`}
+                    >
+                        Cash Basis
+                    </button>
+                </div>
+            </div>
+
+            {/* --- SECTION 1: FINANCIAL OVERVIEW METRICS (REDESIGNED) --- */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 
-                {/* 1. BANK BALANCE */}
-                <Card className="border-slate-200/80 shadow-md bg-gradient-to-br from-slate-900 to-slate-950 text-white overflow-hidden relative">
+                {/* 1. BANK BALANCE / CASH RESERVES */}
+                <Card className="border-slate-800 bg-gradient-to-br from-slate-900 via-indigo-950/20 to-slate-950 text-white shadow-xl overflow-hidden relative group hover:border-slate-700 transition-all">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all" />
                     <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
-                            <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-400">Current Bank Balance</CardTitle>
-                            <Wallet className="h-5 w-5 text-indigo-400" />
+                            <div>
+                                <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Bank Balance & Reserves</CardTitle>
+                                <CardDescription className="text-[9px] text-slate-400">Total cleared funds</CardDescription>
+                            </div>
+                            <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400">
+                                <Wallet className="h-5 w-5" />
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
@@ -1434,72 +1495,103 @@ export default function FinancePage() {
                                         type="number"
                                         value={newStartingBalance}
                                         onChange={e => setNewStartingBalance(e.target.value)}
-                                        className="bg-slate-800 border-slate-700 text-white max-w-[150px] text-lg font-bold h-10 px-2 rounded-lg focus-visible:ring-indigo-500"
+                                        className="bg-slate-800 border-slate-700 text-white max-w-[140px] text-lg font-bold h-10 px-2 rounded-lg focus-visible:ring-indigo-500"
                                     />
                                     <Button size="sm" onClick={saveStartingBalance} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-10 rounded-lg px-3">Save</Button>
                                     <Button size="icon" variant="ghost" onClick={() => setIsEditingBalance(false)} className="text-slate-400 hover:text-white h-10 w-10"><X className="h-4 w-4" /></Button>
                                 </div>
                             ) : (
                                 <div className="flex items-baseline gap-2">
-                                    <span className="text-4xl font-extrabold tracking-tight">£{bankBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    <span className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent">
+                                        £{bankBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </span>
                                     <button 
                                         onClick={() => setIsEditingBalance(true)}
                                         className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold underline flex items-center gap-1 cursor-pointer"
                                     >
-                                        <Pencil className="h-3 w-3" /> Edit Start
+                                        <Pencil className="h-3 w-3" /> Edit
                                     </button>
                                 </div>
                             )}
-                            <p className="text-[10px] text-slate-400 mt-1.5 font-medium">Starting balance: £{(settings.financeStartingBalance || 0).toFixed(2)}</p>
+                            <p className="text-[9px] text-slate-400 mt-1.5 font-medium">Starting: £{(settings.financeStartingBalance || 0).toFixed(2)}</p>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* 2. RECURRING FORECASTS (INCOME vs EXPENSE) */}
-                <Card className="border-slate-200/80 shadow-md">
+                {/* 2. RECURRING FORECASTS OR MONTHLY CASH FLOW */}
+                <Card className="border-slate-200 shadow-md bg-white hover:shadow-lg transition-all relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-20 h-20 bg-slate-500/5 rounded-full blur-xl" />
                     <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
-                            <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-500">Monthly Runway & Runway Net</CardTitle>
-                            <ArrowRightLeft className="h-5 w-5 text-indigo-500" />
+                            <div>
+                                <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
+                                    {accountingMethod === "accrual" ? "Monthly Forecast (Accrual)" : "Cash Flow Actuals"}
+                                </CardTitle>
+                                <CardDescription className="text-[9px] text-slate-400">
+                                    {accountingMethod === "accrual" ? "Monthly run-rate equivalent" : "Cleared this month"}
+                                </CardDescription>
+                            </div>
+                            <div className="p-2 bg-slate-100 rounded-xl text-slate-600">
+                                <ArrowRightLeft className="h-5 w-5" />
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex justify-between items-baseline">
                             <div>
-                                <p className="text-[10px] uppercase font-bold text-slate-400">Forecast In/Out</p>
+                                <p className="text-[9px] uppercase font-bold text-slate-400">In / Out</p>
                                 <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-md font-bold text-green-600">+£{Math.round(monthlyIncomeForecast)}</span>
+                                    <span className="text-md font-bold text-green-600">
+                                        +£{Math.round(accountingMethod === "accrual" ? monthlyIncomeForecast : cashIncomeActual)}
+                                    </span>
                                     <span className="text-slate-300">/</span>
-                                    <span className="text-md font-bold text-red-500">-£{Math.round(monthlyExpensesCommitment)}</span>
+                                    <span className="text-md font-bold text-red-500">
+                                        -£{Math.round(accountingMethod === "accrual" ? monthlyExpensesCommitment : cashExpenseActual)}
+                                    </span>
                                 </div>
                             </div>
                             <div className="text-right">
-                                <p className="text-[10px] uppercase font-bold text-slate-400">Net Position</p>
-                                <span className={`text-xl font-black ${monthlyIncomeForecast - monthlyExpensesCommitment >= 0 ? "text-green-600" : "text-red-500"}`}>
-                                    {monthlyIncomeForecast - monthlyExpensesCommitment >= 0 ? "+" : ""}
-                                    £{Math.round(monthlyIncomeForecast - monthlyExpensesCommitment)}
+                                <p className="text-[9px] uppercase font-bold text-slate-400">Net Profit</p>
+                                <span className={`text-xl font-black ${
+                                    (accountingMethod === "accrual" ? monthlyIncomeForecast - monthlyExpensesCommitment : cashIncomeActual - cashExpenseActual) >= 0 
+                                        ? "text-green-600" 
+                                        : "text-red-500"
+                                }`}>
+                                    {(accountingMethod === "accrual" ? monthlyIncomeForecast - monthlyExpensesCommitment : cashIncomeActual - cashExpenseActual) >= 0 ? "+" : ""}
+                                    £{Math.round(accountingMethod === "accrual" ? monthlyIncomeForecast - monthlyExpensesCommitment : cashIncomeActual - cashExpenseActual)}
                                 </span>
                             </div>
                         </div>
                         <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
                             <div 
-                                className="h-full bg-green-500" 
+                                className="h-full bg-green-500 transition-all duration-500" 
                                 style={{ 
-                                    width: `${monthlyIncomeForecast + monthlyExpensesCommitment > 0 
-                                        ? (monthlyIncomeForecast / (monthlyIncomeForecast + monthlyExpensesCommitment)) * 100 
-                                        : 50}%` 
+                                    width: `${
+                                        (accountingMethod === "accrual" 
+                                            ? monthlyIncomeForecast + monthlyExpensesCommitment 
+                                            : cashIncomeActual + cashExpenseActual) > 0 
+                                            ? ((accountingMethod === "accrual" ? monthlyIncomeForecast : cashIncomeActual) / 
+                                               ((accountingMethod === "accrual" ? monthlyIncomeForecast : cashIncomeActual) + 
+                                                (accountingMethod === "accrual" ? monthlyExpensesCommitment : cashExpenseActual))) * 100 
+                                            : 50
+                                    }%` 
                                 }} 
                             />
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* 3. HEALTH / CASH RUNWAY */}
-                <Card className="border-slate-200/80 shadow-md">
+                {/* 3. CASH RUNWAY / HEALTH */}
+                <Card className="border-slate-200 shadow-md bg-white hover:shadow-lg transition-all relative overflow-hidden group">
                     <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
-                            <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-500">Cash Runway & Subs Health</CardTitle>
-                            <Calendar className="h-5 w-5 text-indigo-500" />
+                            <div>
+                                <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Cash Runway & Subs Health</CardTitle>
+                                <CardDescription className="text-[9px] text-slate-400">Safety net metrics</CardDescription>
+                            </div>
+                            <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
+                                <Calendar className="h-5 w-5" />
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
@@ -1508,13 +1600,13 @@ export default function FinancePage() {
                                 <span className="text-2xl font-black text-slate-800">{runwayMonths} Months</span>
                                 <span className="text-xs text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded-full">Runway</span>
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-1">Based on monthly fixed commitments of £{Math.round(monthlyExpensesCommitment)}</p>
+                            <p className="text-[9px] text-slate-500 mt-1">Based on monthly fixed commitments of £{Math.round(monthlyExpensesCommitment)}</p>
                         </div>
                         
                         {settings.subsEnabled && (
                             <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                                <span className="text-xs text-slate-400 font-bold uppercase">Uncollected Subs:</span>
-                                <span className="text-sm font-extrabold text-red-500">£{subsOverview.outstanding} Outstanding</span>
+                                <span className="text-[10px] text-slate-400 font-bold uppercase">Uncollected Subs:</span>
+                                <span className="text-xs font-extrabold text-red-500 bg-red-50 px-2 py-0.5 rounded-lg">£{subsOverview.outstanding} Overdue</span>
                             </div>
                         )}
                     </CardContent>
@@ -1561,7 +1653,7 @@ export default function FinancePage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <Card className="border-indigo-100/50 bg-indigo-50/10 hover:shadow-md transition-shadow">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-bold text-indigo-900">How much money do we have?</CardTitle>
+                                    <CardTitle className="text-xs font-bold text-indigo-900">How much money do we have?</CardTitle>
                                 </CardHeader>
                                 <CardContent className="text-xs text-indigo-950/80 leading-relaxed">
                                     We currently have <strong className="text-indigo-900 font-extrabold">£{bankBalance.toLocaleString()}</strong> in the club bank. This covers approximately <strong className="text-indigo-900 font-extrabold">{runwayMonths} months</strong> of normal operations.
@@ -1570,26 +1662,42 @@ export default function FinancePage() {
 
                             <Card className="border-emerald-100 bg-emerald-50/10 hover:shadow-md transition-shadow">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-bold text-emerald-950">What money is coming in?</CardTitle>
+                                    <CardTitle className="text-xs font-bold text-emerald-950">What money is coming in?</CardTitle>
                                 </CardHeader>
                                 <CardContent className="text-xs text-emerald-950/80 leading-relaxed">
-                                    We project <strong className="text-emerald-950 font-extrabold">£{Math.round(monthlyIncomeForecast)}</strong> this month from player subscriptions, sponsorship payouts, and recurring programs.
+                                    {accountingMethod === "accrual" ? (
+                                        <>
+                                            We project <strong className="text-emerald-950 font-extrabold">£{Math.round(monthlyIncomeForecast)}</strong> this month from player subscriptions, amortized sponsorship payouts, and recurring programs.
+                                        </>
+                                    ) : (
+                                        <>
+                                            We cleared <strong className="text-emerald-950 font-extrabold">£{Math.round(cashIncomeActual)}</strong> in real cash income this month.
+                                        </>
+                                    )}
                                 </CardContent>
                             </Card>
 
                             <Card className="border-rose-100 bg-rose-50/10 hover:shadow-md transition-shadow">
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-bold text-rose-950">What money is going out?</CardTitle>
+                                    <CardTitle className="text-xs font-bold text-rose-950">What money is going out?</CardTitle>
                                 </CardHeader>
                                 <CardContent className="text-xs text-rose-950/80 leading-relaxed">
-                                    Our regular recurring expenses and wage commitments total <strong className="text-rose-950 font-extrabold">£{Math.round(monthlyExpensesCommitment)}</strong> per month.
+                                    {accountingMethod === "accrual" ? (
+                                        <>
+                                            Our regular recurring expenses and wage commitments total <strong className="text-rose-950 font-extrabold">£{Math.round(monthlyExpensesCommitment)}</strong> per month.
+                                        </>
+                                    ) : (
+                                        <>
+                                            We paid out <strong className="text-rose-950 font-extrabold">£{Math.round(cashExpenseActual)}</strong> in real cash expenses this month.
+                                        </>
+                                    )}
                                 </CardContent>
                             </Card>
 
                             {settings.subsEnabled ? (
                                 <Card className="border-amber-100 bg-amber-50/10 hover:shadow-md transition-shadow">
                                     <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm font-bold text-amber-950">Who still owes us money?</CardTitle>
+                                        <CardTitle className="text-xs font-bold text-amber-950">Who still owes us money?</CardTitle>
                                     </CardHeader>
                                     <CardContent className="text-xs text-amber-950/80 leading-relaxed">
                                         There are currently <strong className="text-amber-950 font-extrabold">£{subsOverview.outstanding}</strong> in uncollected player subs this month. <button onClick={() => setActiveSection("subs")} className="text-amber-900 font-bold underline">Remind them now</button>.
@@ -1598,7 +1706,7 @@ export default function FinancePage() {
                             ) : (
                                 <Card className="border-indigo-100 bg-indigo-50/10 hover:shadow-md transition-shadow">
                                     <CardHeader className="pb-2">
-                                        <CardTitle className="text-sm font-bold text-indigo-950">Need sponsorships?</CardTitle>
+                                        <CardTitle className="text-xs font-bold text-indigo-950">Need sponsorships?</CardTitle>
                                     </CardHeader>
                                     <CardContent className="text-xs text-indigo-950/80 leading-relaxed">
                                         Check out the <button onClick={() => setActiveSection("sponsors")} className="text-indigo-950 font-bold underline">Sponsors tab</button> to track your club's sponsorship pipelines and deals.
@@ -1607,11 +1715,117 @@ export default function FinancePage() {
                             )}
                         </div>
 
+                        {/* --- DETAILED ACCRUAL BASES BREAKDOWN PANEL --- */}
+                        {accountingMethod === "accrual" && (
+                            <Card className="border-indigo-100 shadow-md bg-indigo-50/5 overflow-hidden">
+                                <CardHeader className="border-b bg-indigo-50/20 p-4">
+                                    <div className="flex items-center gap-2">
+                                        <Sparkles className="h-4 w-4 text-indigo-600" />
+                                        <CardTitle className="text-sm font-bold text-indigo-950">Accrual Revenue & Expense Breakdowns</CardTitle>
+                                    </div>
+                                    <CardDescription className="text-[11px] text-indigo-900/60 mt-0.5">
+                                        Amortization schedules and monthly-equivalent accounting logic
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-4 space-y-4">
+                                    {/* Secured Sponsors Amortization Details */}
+                                    <div className="space-y-2">
+                                        <h4 className="text-xs font-bold text-indigo-900 flex justify-between">
+                                            <span>1. Sponsor Contracts (Amortized Monthly)</span>
+                                            <span className="text-[10px] text-indigo-700">Monthly recognized income</span>
+                                        </h4>
+                                        <div className="bg-white border border-indigo-100 rounded-xl overflow-hidden divide-y divide-slate-100">
+                                            {sponsors.filter(s => s.status === "Secured").length === 0 ? (
+                                                <div className="p-3 text-center text-slate-400 text-xs italic">No active secured sponsors.</div>
+                                            ) : (
+                                                sponsors.filter(s => s.status === "Secured").map(s => {
+                                                    const monthlyRate = s.frequency === "Monthly" ? s.amount : s.frequency === "Yearly" ? s.amount / 12 : 0;
+                                                    return (
+                                                        <div key={s.id} className="p-3 flex justify-between items-center text-xs">
+                                                            <div>
+                                                                <span className="font-semibold text-slate-800">{s.name}</span>
+                                                                <span className="text-[10px] text-slate-400 block mt-0.5">Contract: £{s.amount.toLocaleString()} ({s.frequency})</span>
+                                                            </div>
+                                                            <span className="font-bold text-emerald-600">+£{monthlyRate.toFixed(2)}/mo</span>
+                                                        </div>
+                                                    );
+                                                })
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* Player Subs Dues */}
+                                    {settings.subsEnabled && (
+                                        <div className="space-y-2">
+                                            <h4 className="text-xs font-bold text-indigo-900 flex justify-between">
+                                                <span>2. Accrued Player Subscriptions</span>
+                                                <span className="text-[10px] text-indigo-700">Dues expected this month</span>
+                                            </h4>
+                                            <div className="bg-white border border-indigo-100 rounded-xl p-3 text-xs space-y-2">
+                                                <div className="flex justify-between">
+                                                    <span className="text-slate-600">Expected Month Total:</span>
+                                                    <span className="font-semibold text-slate-800">£{subsOverview.expected.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-[10px]">
+                                                    <span className="text-slate-400">- Collected Cash:</span>
+                                                    <span className="font-medium text-emerald-600">£{subsOverview.received.toFixed(2)}</span>
+                                                </div>
+                                                <div className="flex justify-between text-[10px]">
+                                                    <span className="text-slate-400">- Accrued Outstanding:</span>
+                                                    <span className="font-medium text-red-500">£{subsOverview.outstanding.toFixed(2)}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Recurring commitments and bills */}
+                                    <div className="space-y-2">
+                                        <h4 className="text-xs font-bold text-indigo-900 flex justify-between">
+                                            <span>3. Recurring Outgoing Commitments</span>
+                                            <span className="text-[10px] text-indigo-700">Monthly amortized costs</span>
+                                        </h4>
+                                        <div className="bg-white border border-indigo-100 rounded-xl overflow-hidden divide-y divide-slate-100">
+                                            {subscriptions.length === 0 && (!settings.contractsEnabled || players.filter(p => p.isContracted).length === 0) ? (
+                                                <div className="p-3 text-center text-slate-400 text-xs italic">No recurring commitments.</div>
+                                            ) : (
+                                                <>
+                                                    {subscriptions.map(sub => {
+                                                        const monthlyRate = sub.frequency === "Monthly" ? sub.cost : sub.frequency === "Yearly" ? sub.cost / 12 : 0;
+                                                        return (
+                                                            <div key={sub.id} className="p-3 flex justify-between items-center text-xs">
+                                                                <div>
+                                                                    <span className="font-semibold text-slate-800">{sub.name}</span>
+                                                                    <span className="text-[10px] text-slate-400 block mt-0.5">{sub.category} ({sub.frequency})</span>
+                                                                </div>
+                                                                <span className="font-bold text-red-500">-£{monthlyRate.toFixed(2)}/mo</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                    {settings.contractsEnabled && players.filter(p => p.isContracted && p.contractAmount).map(p => {
+                                                        const monthlyRate = p.contractFrequency === "Weekly" ? (p.contractAmount || 0) * 4.33 : (p.contractAmount || 0);
+                                                        return (
+                                                            <div key={p.id} className="p-3 flex justify-between items-center text-xs">
+                                                                <div>
+                                                                    <span className="font-semibold text-slate-800">Player wage: {p.firstName} {p.lastName}</span>
+                                                                    <span className="text-[10px] text-slate-400 block mt-0.5">Contract: £{p.contractAmount} ({p.contractFrequency})</span>
+                                                                </div>
+                                                                <span className="font-bold text-red-500">-£{monthlyRate.toFixed(2)}/mo</span>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
                         {/* Recent Transactions list */}
                         <Card className="border-slate-200/80 shadow-md">
                             <CardHeader className="border-b bg-slate-50/50 p-4">
                                 <div className="flex justify-between items-center">
-                                    <CardTitle className="text-sm font-bold">Recent Ledger Entries</CardTitle>
+                                    <CardTitle className="text-xs font-bold">Recent Ledger Entries</CardTitle>
                                     <Button onClick={() => setActiveSection("ledger")} variant="link" className="text-xs font-bold text-indigo-600 h-auto p-0">View Ledger</Button>
                                 </div>
                             </CardHeader>
@@ -1650,7 +1864,7 @@ export default function FinancePage() {
                     <div className="lg:col-span-1 space-y-6">
                         <Card className="border-slate-200/80 shadow-md">
                             <CardHeader className="border-b bg-slate-50/50 p-4">
-                                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                                <CardTitle className="text-xs font-bold flex items-center gap-2">
                                     <Calendar className="h-4 w-4 text-indigo-500" />
                                     Upcoming Commitments
                                 </CardTitle>
