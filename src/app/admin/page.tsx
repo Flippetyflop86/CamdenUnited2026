@@ -19,39 +19,70 @@ export default function AdminPage() {
     const { settings, updateSettings } = useClub();
     const hasInitialized = useRef(false);
     
+    const getCached = (key: string) => {
+        if (typeof window !== 'undefined') {
+            return sessionStorage.getItem(`clubflow_admin_${key}`);
+        }
+        return null;
+    };
+
     // Identity
-    const [name, setName] = useState(settings.name);
-    const [logo, setLogo] = useState<string | null>(settings.logo);
-    const [squads, setSquads] = useState<string[]>(settings.squads || []);
-    const [homeGround, setHomeGround] = useState(settings.homeGround || "");
-    const [foundingYear, setFoundingYear] = useState(settings.foundingYear?.toString() || "");
-    const [twitterUrl, setTwitterUrl] = useState(settings.twitterUrl || "");
-    const [instagramUrl, setInstagramUrl] = useState(settings.instagramUrl || "");
+    const [name, setName] = useState(() => getCached("name") ?? settings.name);
+    const [logo, setLogo] = useState<string | null>(() => settings.logo);
+    const [squads, setSquads] = useState<string[]>(() => {
+        const cached = getCached("squads");
+        if (cached) return JSON.parse(cached);
+        return settings.squads || [];
+    });
+    const [homeGround, setHomeGround] = useState(() => getCached("homeGround") ?? settings.homeGround ?? "");
+    const [foundingYear, setFoundingYear] = useState(() => getCached("foundingYear") ?? settings.foundingYear?.toString() ?? "");
+    const [twitterUrl, setTwitterUrl] = useState(() => getCached("twitterUrl") ?? settings.twitterUrl ?? "");
+    const [instagramUrl, setInstagramUrl] = useState(() => getCached("instagramUrl") ?? settings.instagramUrl ?? "");
 
     // Colors & Kits
-    const [primaryColor, setPrimaryColor] = useState(settings.primaryColor);
-    const [homeKitShirt, setHomeKitShirt] = useState(settings.homeKitShirt);
-    const [homeKitShorts, setHomeKitShorts] = useState(settings.homeKitShorts);
-    const [homeKitSocks, setHomeKitSocks] = useState(settings.homeKitSocks);
-    const [awayKitShirt, setAwayKitShirt] = useState(settings.awayKitShirt);
-    const [awayKitShorts, setAwayKitShorts] = useState(settings.awayKitShorts);
-    const [awayKitSocks, setAwayKitSocks] = useState(settings.awayKitSocks);
+    const [primaryColor, setPrimaryColor] = useState(() => getCached("primaryColor") ?? settings.primaryColor);
+    const [homeKitShirt, setHomeKitShirt] = useState(() => getCached("homeKitShirt") ?? settings.homeKitShirt);
+    const [homeKitShorts, setHomeKitShorts] = useState(() => getCached("homeKitShorts") ?? settings.homeKitShorts);
+    const [homeKitSocks, setHomeKitSocks] = useState(() => getCached("homeKitSocks") ?? settings.homeKitSocks);
+    const [awayKitShirt, setAwayKitShirt] = useState(() => getCached("awayKitShirt") ?? settings.awayKitShirt);
+    const [awayKitShorts, setAwayKitShorts] = useState(() => getCached("awayKitShorts") ?? settings.awayKitShorts);
+    const [awayKitSocks, setAwayKitSocks] = useState(() => getCached("awayKitSocks") ?? settings.awayKitSocks);
 
     // League
-    const [leagueUrl, setLeagueUrl] = useState(settings.leagueUrl || "");
-    const [leaguePosition, setLeaguePosition] = useState(settings.leaguePosition?.toString() || "");
+    const [leagueUrl, setLeagueUrl] = useState(() => getCached("leagueUrl") ?? settings.leagueUrl ?? "");
+    const [leaguePosition, setLeaguePosition] = useState(() => getCached("leaguePosition") ?? settings.leaguePosition?.toString() ?? "");
 
     // Finance & Sponsors
-    const [monthlySubs, setMonthlySubs] = useState(settings.monthlySubs?.toString() || "0");
-    const [subsEnabled, setSubsEnabled] = useState(settings.subsEnabled !== undefined ? settings.subsEnabled : true);
-    const [contractsEnabled, setContractsEnabled] = useState(settings.contractsEnabled !== undefined ? settings.contractsEnabled : false);
-    const [finesEnabled, setFinesEnabled] = useState(settings.finesEnabled);
-    const [fineCategories, setFineCategories] = useState<{name: string, amount: number}[]>(settings.fineCategories || []);
+    const [monthlySubs, setMonthlySubs] = useState(() => getCached("monthlySubs") ?? settings.monthlySubs?.toString() ?? "0");
+    const [subsEnabled, setSubsEnabled] = useState(() => {
+        const cached = getCached("subsEnabled");
+        if (cached !== null) return cached === "true";
+        return settings.subsEnabled !== undefined ? settings.subsEnabled : true;
+    });
+    const [contractsEnabled, setContractsEnabled] = useState(() => {
+        const cached = getCached("contractsEnabled");
+        if (cached !== null) return cached === "true";
+        return settings.contractsEnabled !== undefined ? settings.contractsEnabled : false;
+    });
+    const [finesEnabled, setFinesEnabled] = useState(() => {
+        const cached = getCached("finesEnabled");
+        if (cached !== null) return cached === "true";
+        return settings.finesEnabled;
+    });
+    const [fineCategories, setFineCategories] = useState<{name: string, amount: number}[]>(() => {
+        const cached = getCached("fineCategories");
+        if (cached) return JSON.parse(cached);
+        return settings.fineCategories || [];
+    });
     const [sponsorLogo, setSponsorLogo] = useState<string | null>(settings.sponsorLogo);
 
     // Notifications
-    const [notificationsEnabled, setNotificationsEnabled] = useState(settings.notificationsEnabled || false);
-    const [notificationEmail, setNotificationEmail] = useState(settings.notificationEmail || "");
+    const [notificationsEnabled, setNotificationsEnabled] = useState(() => {
+        const cached = getCached("notificationsEnabled");
+        if (cached !== null) return cached === "true";
+        return settings.notificationsEnabled || false;
+    });
+    const [notificationEmail, setNotificationEmail] = useState(() => getCached("notificationEmail") ?? settings.notificationEmail ?? "");
 
     const [isMigrating, setIsMigrating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -69,7 +100,7 @@ export default function AdminPage() {
     const [isPollMessageEdited, setIsPollMessageEdited] = useState(false);
 
     const { user, role: userRole, isManager, pagePermissions, refreshPermissions, clubId } = useAuth();
-    const [managerName, setManagerName] = useState("");
+    const [managerName, setManagerName] = useState(() => getCached("managerName") ?? "");
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [invitations, setInvitations] = useState<any[]>([]);
     // Invite form state

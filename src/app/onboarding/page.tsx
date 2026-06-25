@@ -32,47 +32,68 @@ export default function OnboardingWizard() {
     const router = useRouter();
 
     const [step, setStep] = useState(0);
+
+    const getCached = (key: string) => {
+        if (typeof window !== 'undefined') {
+            return sessionStorage.getItem(`clubflow_onboarding_${key}`);
+        }
+        return null;
+    };
     
     // Step 1: Branding
-    const [clubName, setClubName] = useState(settings.name || "");
-    const [managerName, setManagerName] = useState(user?.user_metadata?.full_name || "");
+    const [clubName, setClubName] = useState(() => getCached("clubName") ?? settings.name ?? "");
+    const [managerName, setManagerName] = useState(() => getCached("managerName") ?? user?.user_metadata?.full_name ?? "");
     const [logoFile, setLogoFile] = useState<File | null>(null);
-    const [logoPreview, setLogoPreview] = useState<string | null>(settings.logo);
+    const [logoPreview, setLogoPreview] = useState<string | null>(() => settings.logo ?? null);
     const [sponsorLogoFile, setSponsorLogoFile] = useState<File | null>(null);
-    const [sponsorLogoPreview, setSponsorLogoPreview] = useState<string | null>(settings.sponsorLogo);
-    const [primaryColor, setPrimaryColor] = useState(settings.primaryColor || "#ef4444");
+    const [sponsorLogoPreview, setSponsorLogoPreview] = useState<string | null>(() => settings.sponsorLogo ?? null);
+    const [primaryColor, setPrimaryColor] = useState(() => getCached("primaryColor") ?? settings.primaryColor ?? "#ef4444");
 
     // Step 2: Kits
-    const [homeKitShirt, setHomeKitShirt] = useState(settings.homeKitShirt || "#ffffff");
-    const [homeKitShorts, setHomeKitShorts] = useState(settings.homeKitShorts || "#ffffff");
-    const [homeKitSocks, setHomeKitSocks] = useState(settings.homeKitSocks || "#ffffff");
-    const [awayKitShirt, setAwayKitShirt] = useState(settings.awayKitShirt || "#1e293b");
-    const [awayKitShorts, setAwayKitShorts] = useState(settings.awayKitShorts || "#1e293b");
-    const [awayKitSocks, setAwayKitSocks] = useState(settings.awayKitSocks || "#1e293b");
+    const [homeKitShirt, setHomeKitShirt] = useState(() => getCached("homeKitShirt") ?? settings.homeKitShirt ?? "#ffffff");
+    const [homeKitShorts, setHomeKitShorts] = useState(() => getCached("homeKitShorts") ?? settings.homeKitShorts ?? "#ffffff");
+    const [homeKitSocks, setHomeKitSocks] = useState(() => getCached("homeKitSocks") ?? settings.homeKitSocks ?? "#ffffff");
+    const [awayKitShirt, setAwayKitShirt] = useState(() => getCached("awayKitShirt") ?? settings.awayKitShirt ?? "#1e293b");
+    const [awayKitShorts, setAwayKitShorts] = useState(() => getCached("awayKitShorts") ?? settings.awayKitShorts ?? "#1e293b");
+    const [awayKitSocks, setAwayKitSocks] = useState(() => getCached("awayKitSocks") ?? settings.awayKitSocks ?? "#1e293b");
 
     // Step 3: Details & History
-    const [homeGroundName, setHomeGroundName] = useState(settings.homeGround || "");
+    const [homeGroundName, setHomeGroundName] = useState(() => getCached("homeGroundName") ?? settings.homeGround ?? "");
     const [postcode, setPostcode] = useState("");
-    const [twitterHandle, setTwitterHandle] = useState(settings.twitterUrl || "");
-    const [instagramHandle, setInstagramHandle] = useState(settings.instagramUrl || "");
-    const [whatsappPollMessage, setWhatsAppPollMessage] = useState(settings.whatsappPollMessage || "");
-    const [trainingLocation, setTrainingLocation] = useState(settings.trainingLocation || "");
+    const [twitterHandle, setTwitterHandle] = useState(() => getCached("twitterHandle") ?? settings.twitterUrl ?? "");
+    const [instagramHandle, setInstagramHandle] = useState(() => getCached("instagramHandle") ?? settings.instagramUrl ?? "");
+    const [whatsappPollMessage, setWhatsAppPollMessage] = useState(() => getCached("whatsappPollMessage") ?? settings.whatsappPollMessage ?? "");
+    const [trainingLocation, setTrainingLocation] = useState(() => getCached("trainingLocation") ?? settings.trainingLocation ?? "");
 
     // Step 4: Finance & Operations
-    const [monthlySubs, setMonthlySubs] = useState(settings.monthlySubs?.toString() || "35");
-    const [subsEnabled, setSubsEnabled] = useState(settings.subsEnabled !== undefined ? settings.subsEnabled : parseFloat(settings.monthlySubs?.toString() || "0") > 0);
-    const [contractsEnabled, setContractsEnabled] = useState(settings.contractsEnabled !== undefined ? settings.contractsEnabled : false);
-    const [registrationFee, setRegistrationFee] = useState(settings.registrationFee?.toString() || "0");
-    const [trainingFeePerSession, setTrainingFeePerSession] = useState(settings.trainingFeePerSession?.toString() || "5");
-    const [matchdayFee, setMatchdayFee] = useState("10");
-    const [subsStructure, setSubsStructure] = useState<"Monthly" | "Training" | "Matchday" | "Both">("Monthly");
-    const [finesEnabled, setFinesEnabled] = useState(settings.finesEnabled || false);
+    const [monthlySubs, setMonthlySubs] = useState(() => getCached("monthlySubs") ?? settings.monthlySubs?.toString() ?? "35");
+    const [subsEnabled, setSubsEnabled] = useState(() => {
+        const cached = getCached("subsEnabled");
+        if (cached !== null) return cached === "true";
+        return settings.subsEnabled !== undefined ? settings.subsEnabled : (parseFloat(settings.monthlySubs?.toString() || "0") > 0);
+    });
+    const [contractsEnabled, setContractsEnabled] = useState(() => {
+        const cached = getCached("contractsEnabled");
+        if (cached !== null) return cached === "true";
+        return settings.contractsEnabled !== undefined ? settings.contractsEnabled : false;
+    });
+    const [registrationFee, setRegistrationFee] = useState(() => getCached("registrationFee") ?? settings.registrationFee?.toString() ?? "0");
+    const [trainingFeePerSession, setTrainingFeePerSession] = useState(() => getCached("trainingFeePerSession") ?? settings.trainingFeePerSession?.toString() ?? "5");
+    const [matchdayFee, setMatchdayFee] = useState(() => getCached("matchdayFee") ?? "10");
+    const [subsStructure, setSubsStructure] = useState<"Monthly" | "Training" | "Matchday" | "Both">((getCached("subsStructure") as any) ?? "Monthly");
+    const [finesEnabled, setFinesEnabled] = useState(() => {
+        const cached = getCached("finesEnabled");
+        if (cached !== null) return cached === "true";
+        return settings.finesEnabled || false;
+    });
 
     // Step 5: Squads
     const availableSquads = ["First Team", "Reserves", "Under-18s", "Under-16s", "Women's Team", "Academy", "Pan-Disability", "Midweek", "Youth"];
-    const [selectedSquads, setSelectedSquads] = useState<string[]>(
-        settings.isOnboarded ? (settings.squads || ["First Team"]) : ["First Team"]
-    );
+    const [selectedSquads, setSelectedSquads] = useState<string[]>(() => {
+        const cached = getCached("selectedSquads");
+        if (cached) return JSON.parse(cached);
+        return settings.isOnboarded ? (settings.squads || ["First Team"]) : ["First Team"];
+    });
     const [customSquadInput, setCustomSquadInput] = useState("");
 
     // Step 6: Committee & Staff
@@ -83,7 +104,7 @@ export default function OnboardingWizard() {
     ]);
 
     // Step 7: League
-    const [leagueUrl, setLeagueUrl] = useState(settings.leagueUrl || "");
+    const [leagueUrl, setLeagueUrl] = useState(() => getCached("leagueUrl") ?? settings.leagueUrl ?? "");
 
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
