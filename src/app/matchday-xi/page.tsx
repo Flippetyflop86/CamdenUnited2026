@@ -728,7 +728,7 @@ export default function MatchdayXIPage() {
                         <div className="space-y-1">
                             <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">Upcoming Match</p>
                             <h3 className="text-2xl font-bold flex items-center gap-2">
-                                <span className={nextMatch.isHome ? "text-white" : "text-slate-400"}>Camden United</span>
+                                <span className={nextMatch.isHome ? "text-white" : "text-slate-400"}>{settings.name}</span>
                                 <span className="text-slate-500 text-lg">vs</span>
                                 <span className={!nextMatch.isHome ? "text-white" : "text-slate-400"}>{nextMatch.opponent}</span>
                             </h3>
