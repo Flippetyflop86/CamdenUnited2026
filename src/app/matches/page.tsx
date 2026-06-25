@@ -366,7 +366,7 @@ export default function MatchesPage() {
 
         if (includeVenue && activeShareMatch.location) {
             const venueType = activeShareMatch.isHome ? "Home" : "Away";
-            details.push(`📍 Venue (${venueType}): ${activeShareMatch.location}`);
+            details.push(`🏟️ Venue (${venueType}): ${activeShareMatch.location}`);
         }
 
         if (includeCompetition && activeShareMatch.competition) {
