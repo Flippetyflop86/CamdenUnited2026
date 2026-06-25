@@ -113,7 +113,7 @@ export default function MatchdayXIPage() {
                         formation: fallbackRes.data[0].formation,
                         starters: fallbackRes.data[0].starters,
                         substitutes: fallbackRes.data[0].substitutes,
-                        squad: fallbackRes.data[0].squad,
+                        squad: activeSquadTab,
                         createdAt: fallbackRes.data[0].created_at,
                         updatedAt: fallbackRes.data[0].created_at
                     });
