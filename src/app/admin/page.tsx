@@ -64,6 +64,8 @@ export default function AdminPage() {
     const [meetupOffset, setMeetupOffset] = useState("90");
     const [copiedPoll, setCopiedPoll] = useState(false);
     const [pollMessage, setPollMessage] = useState("");
+    const [lastGeneratedMessage, setLastGeneratedMessage] = useState("");
+    const [isPollMessageEdited, setIsPollMessageEdited] = useState(false);
 
     const { user, role: userRole, isManager, pagePermissions, refreshPermissions, clubId } = useAuth();
     const [managerName, setManagerName] = useState("");
@@ -338,7 +340,12 @@ export default function AdminPage() {
     };
 
     useEffect(() => {
-        setPollMessage(generatePollMessage());
+        const newGen = generatePollMessage();
+        if (!isPollMessageEdited || newGen !== lastGeneratedMessage) {
+            setPollMessage(newGen);
+            setLastGeneratedMessage(newGen);
+            setIsPollMessageEdited(false);
+        }
     }, [pollType, selectedEventId, trainingDeadline, meetupOffset, upcomingSessions, upcomingMatches, settings]);
 
     const handleCopyPoll = async () => {
@@ -350,7 +357,10 @@ export default function AdminPage() {
     };
 
     const handleResetPoll = () => {
-        setPollMessage(generatePollMessage());
+        const newGen = generatePollMessage();
+        setPollMessage(newGen);
+        setLastGeneratedMessage(newGen);
+        setIsPollMessageEdited(false);
     };
 
     const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -974,7 +984,10 @@ export default function AdminPage() {
                                         </Label>
                                         <Textarea
                                             value={pollMessage}
-                                            onChange={(e) => setPollMessage(e.target.value)}
+                                            onChange={(e) => {
+                                                setPollMessage(e.target.value);
+                                                setIsPollMessageEdited(true);
+                                            }}
                                             className="h-44 font-sans text-xs bg-white text-slate-700 p-3 rounded-lg border border-slate-200 resize-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
                                         />
                                     </div>
