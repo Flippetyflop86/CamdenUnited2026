@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Recruit } from "@/types";
 import Link from "next/link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -47,6 +47,15 @@ export default function RecruitmentPage() {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingRecruit, setEditingRecruit] = useState<Recruit | null>(null);
     const [expandedPositions, setExpandedPositions] = useState<string[]>(["GK", "DEF", "MID", "FWD"]);
+    const [enlargedRecruit, setEnlargedRecruit] = useState<Recruit | null>(null);
+
+    const getPositionBorder = (pos: string) => {
+        const p = pos.toUpperCase();
+        if (p === "GK") return "border-amber-500";
+        if (["DEF", "CB", "RB", "LB"].includes(p)) return "border-sky-500";
+        if (["MID", "CM", "CDM", "CAM", "RM", "LM"].includes(p)) return "border-emerald-500";
+        return "border-rose-500"; // FWD, RW, LW, CF, ST
+    };
 
     const roles = ["Star Player", "1st Team Player", "Rotation Player", "Back-up", "Prospect"];
 
@@ -559,86 +568,110 @@ export default function RecruitmentPage() {
                                                     No {section.title.toLowerCase()} tracked yet.
                                                 </div>
                                             ) : (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
                                                     {sectionRecruits.map((recruit) => (
-                                                        <Card key={recruit.id} className="relative group overflow-hidden bg-white border-slate-200 hover:border-red-200 hover:shadow-md transition-all">
-                                                            <CardHeader className="pb-2">
-                                                                <div className="flex justify-between items-start">
-                                                                    <div>
-                                                                        <div className="flex items-center gap-2">
-                                                                            <CardTitle className="inline-flex items-center gap-1.5 text-lg font-bold hover:text-blue-600 transition-colors cursor-pointer">
-                                                                                {recruit.scoutedRole === "Star Player" && <Star className="h-4 w-4 fill-amber-400 text-amber-400" />}
-                                                                                <Link href={`/recruitment/${recruit.id}`}>{recruit.name}</Link>
-                                                                            </CardTitle>
-                                                                            {recruit.onTrial && (
-                                                                                <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100 flex gap-1 items-center scale-90">
-                                                                                    <UserCheck className="h-3 w-3" />
-                                                                                    Trialist
-                                                                                </Badge>
-                                                                            )}
-                                                                        </div>
-                                                                        <div className="flex items-center gap-2 mt-1">
-                                                                            <span className="text-red-600 font-bold text-sm">{recruit.primaryPosition}</span>
-                                                                            <Badge variant="outline" className="text-[10px] py-0 px-1.5 bg-slate-50 flex items-center gap-1">
-                                                                                <Trophy className="h-2.5 w-2.5" />
-                                                                                {recruit.scoutedRole}
-                                                                            </Badge>
-                                                                        </div>
+                                                        <Card key={recruit.id} className={`overflow-hidden hover:shadow-lg transition-all duration-200 group relative border-2 bg-slate-950 ${getPositionBorder(recruit.primaryPosition)} flex flex-col h-full`}>
+                                                            <CardHeader className="p-0 flex-1 flex flex-col">
+                                                                <div className="bg-slate-900 p-3 sm:p-4 flex flex-col items-center justify-center flex-1 relative border-b border-slate-800">
+                                                                    {/* Action Buttons overlay */}
+                                                                    <div className="absolute top-2 left-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleEdit(recruit);
+                                                                            }}
+                                                                            className="p-1.5 bg-slate-800 hover:bg-blue-900/50 rounded-full text-slate-400 hover:text-blue-500"
+                                                                            title="Edit Recruit"
+                                                                        >
+                                                                            <Edit2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                                                        </button>
+                                                                        <button
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                handleDelete(recruit.id);
+                                                                            }}
+                                                                            className="p-1.5 bg-slate-800 hover:bg-red-900/50 rounded-full text-slate-400 hover:text-red-500"
+                                                                            title="Delete Recruit"
+                                                                        >
+                                                                            <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+                                                                        </button>
                                                                     </div>
-                                                                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleEdit(recruit)}>
-                                                                            <Edit2 className="h-4 w-4" />
-                                                                        </Button>
-                                                                        <Button size="icon" variant="ghost" className="h-8 w-8 text-slate-400 hover:text-red-600" onClick={() => handleDelete(recruit.id)}>
-                                                                            <Trash2 className="h-4 w-4" />
-                                                                        </Button>
+                                                                    
+                                                                    {/* Badges in Top Right */}
+                                                                    <div className="absolute top-2 right-2 flex flex-col items-end gap-1 z-20">
+                                                                        {recruit.onTrial && (
+                                                                            <Badge variant="secondary" className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[9px] sm:text-[10px] px-1.5 py-0.5">
+                                                                                Trialist
+                                                                            </Badge>
+                                                                        )}
+                                                                        <Badge className={`text-[9px] sm:text-[10px] px-1.5 py-0.5 border ${
+                                                                            recruit.status === 'Unattached' 
+                                                                                ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' 
+                                                                                : 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30'
+                                                                        }`}>
+                                                                            {recruit.status === 'Unattached' ? 'Free Agent' : 'Contracted'}
+                                                                        </Badge>
+                                                                    </div>
+
+                                                                    {/* Avatar Fallback Circle */}
+                                                                    <div 
+                                                                        onClick={() => setEnlargedRecruit(recruit)}
+                                                                        className="cursor-pointer h-14 w-14 sm:h-20 sm:w-20 rounded-full bg-slate-800 flex items-center justify-center border-2 border-slate-700 shadow-xl mt-6 sm:mt-2 hover:border-red-500 transition-colors"
+                                                                    >
+                                                                        <span className="text-base sm:text-2xl font-bold bg-gradient-to-br from-red-400 to-red-650 bg-clip-text text-transparent">
+                                                                            {recruit.name.split(/\s+/).map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                                                                        </span>
+                                                                    </div>
+
+                                                                    {/* Title / Subtitle */}
+                                                                    <div className="mt-3 text-center w-full px-1">
+                                                                        <CardTitle 
+                                                                            onClick={() => setEnlargedRecruit(recruit)}
+                                                                            className="text-white text-xs sm:text-base font-bold truncate hover:text-red-400 cursor-pointer transition-colors"
+                                                                        >
+                                                                            {recruit.name}
+                                                                        </CardTitle>
+                                                                        <p className="text-slate-400 text-[9px] sm:text-xs font-medium mt-0.5">
+                                                                            {recruit.primaryPosition} {recruit.secondaryPosition ? `(${recruit.secondaryPosition})` : ''} • {recruit.age} yo
+                                                                        </p>
                                                                     </div>
                                                                 </div>
                                                             </CardHeader>
-                                                            <CardContent className="space-y-4">
-                                                                <div className="grid grid-cols-2 gap-y-2 text-sm">
-                                                                    <div className="flex items-center text-slate-500">
-                                                                        <Calendar className="h-4 w-4 mr-2" />
-                                                                        <span>{recruit.age}y</span>
+                                                            
+                                                            <CardContent className="p-2 sm:p-3 space-y-2 text-center text-xs flex-none">
+                                                                <div className="grid grid-cols-2 gap-1.5 text-[9px] sm:text-xs">
+                                                                    <div className="bg-slate-900/60 p-1 sm:p-1.5 rounded border border-slate-800/40">
+                                                                        <div className="text-slate-500 text-[8px] sm:text-[9px] uppercase tracking-wider">Role</div>
+                                                                        <div className="font-bold text-white truncate">{recruit.scoutedRole}</div>
                                                                     </div>
-                                                                    <div className="flex items-center text-slate-500">
-                                                                        <MapPin className="h-4 w-4 mr-2" />
-                                                                        <span className="truncate">{recruit.location}</span>
-                                                                    </div>
-                                                                    <div className="flex items-center text-slate-500 col-span-2 overflow-hidden">
-                                                                        <Building2 className="h-4 w-4 mr-2 shrink-0" />
-                                                                        {recruit.status === "Unattached" ? (
-                                                                            <span className="text-emerald-600 font-medium flex items-center">
-                                                                                Free Agent
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span className="truncate">At: <span className="text-slate-900 font-medium">{recruit.currentClub}</span></span>
-                                                                        )}
+                                                                    <div className="bg-slate-900/60 p-1 sm:p-1.5 rounded border border-slate-800/40">
+                                                                        <div className="text-slate-500 text-[8px] sm:text-[9px] uppercase tracking-wider">Club</div>
+                                                                        <div className="font-bold text-white truncate">{recruit.status === 'Unattached' ? 'None' : (recruit.currentClub || 'Unknown')}</div>
                                                                     </div>
                                                                 </div>
-
-                                                                {recruit.notes && (
-                                                                    <div className="bg-slate-50 p-3 rounded-lg text-[11px] text-slate-600 border border-slate-100">
-                                                                        <p className="whitespace-pre-wrap line-clamp-2">{recruit.notes}</p>
-                                                                    </div>
-                                                                )}
-
+                                                                
                                                                 {recruit.clubConnection && (
-                                                                    <div className="mt-2 text-[10px] text-red-600 font-medium flex items-center bg-red-50 p-1.5 rounded border border-red-100 italic">
-                                                                        <UserPlus className="h-3 w-3 mr-1.5" />
-                                                                        Connection: {recruit.clubConnection}
+                                                                    <div className="text-[8px] sm:text-[9px] text-red-400 bg-red-950/20 border border-red-900/30 p-1 rounded text-left truncate flex items-center justify-center gap-1 italic">
+                                                                        <span>🔗 {recruit.clubConnection}</span>
                                                                     </div>
                                                                 )}
+                                                            </CardContent>
 
+                                                            <CardFooter className="p-1.5 sm:p-3 pt-0 sm:pt-0 mt-auto flex flex-col gap-1 sm:gap-1.5 shrink-0">
+                                                                <Button 
+                                                                    variant="outline" 
+                                                                    onClick={() => setEnlargedRecruit(recruit)}
+                                                                    className="w-full h-7 sm:h-8 text-[9px] sm:text-xs bg-slate-900 hover:bg-slate-800 text-white border-slate-800 hover:border-slate-700"
+                                                                >
+                                                                    Enlarge Card
+                                                                </Button>
                                                                 <Button
                                                                     onClick={() => handleSignPlayer(recruit)}
-                                                                    className="w-full mt-2 bg-slate-900 hover:bg-red-600 text-[11px] h-8 group-hover:shadow-lg transition-all"
+                                                                    className="w-full bg-red-600 hover:bg-red-700 text-[9px] sm:text-xs h-7 sm:h-8 font-bold"
                                                                 >
-                                                                    <ArrowUpRight className="h-3.5 w-3.5 mr-1.5" />
-                                                                    Sign to First Team
+                                                                    Sign Player
                                                                 </Button>
-                                                            </CardContent>
-                                                            <div className={`h-1 w-full absolute bottom-0 ${recruit.scoutedRole === 'Star Player' ? 'bg-amber-400' : 'bg-slate-200'}`} />
+                                                            </CardFooter>
                                                         </Card>
                                                     ))}
                                                 </div>
@@ -651,6 +684,122 @@ export default function RecruitmentPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Enlarged Card Dialog */}
+            <Dialog open={enlargedRecruit !== null} onOpenChange={(open) => !open && setEnlargedRecruit(null)}>
+                {enlargedRecruit && (
+                    <DialogContent className="sm:max-w-[440px] bg-slate-950 text-white border-2 border-red-600 p-0 overflow-hidden shadow-2xl">
+                        <DialogHeader className="p-4 bg-slate-900 border-b border-slate-800 flex flex-row items-center justify-between">
+                            <DialogTitle className="text-white font-bold flex items-center gap-2 text-lg">
+                                {enlargedRecruit.scoutedRole === "Star Player" && <Star className="h-5 w-5 fill-amber-400 text-amber-400" />}
+                                Scouting Card: {enlargedRecruit.name}
+                            </DialogTitle>
+                        </DialogHeader>
+                        
+                        <div className="p-5 space-y-5">
+                            {/* Card Display Container */}
+                            <div className={`relative p-5 rounded-xl bg-slate-900 border-2 ${getPositionBorder(enlargedRecruit.primaryPosition)} shadow-lg flex flex-col items-center text-center space-y-4`}>
+                                {/* Badges */}
+                                <div className="absolute top-4 right-4 flex flex-col items-end gap-1.5">
+                                    {enlargedRecruit.onTrial && (
+                                        <Badge className="bg-amber-500/20 text-amber-400 border border-amber-500/40 text-xs py-0.5 px-2">
+                                            Trialist
+                                        </Badge>
+                                    )}
+                                    <Badge className={`text-xs py-0.5 px-2 border ${
+                                        enlargedRecruit.status === 'Unattached'
+                                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                            : 'bg-indigo-500/20 text-indigo-400 border-indigo-500/40'
+                                    }`}>
+                                        {enlargedRecruit.status === 'Unattached' ? 'Free Agent' : 'Contracted'}
+                                    </Badge>
+                                </div>
+                                
+                                {/* Big Initials Avatar */}
+                                <div className="h-20 w-20 rounded-full bg-slate-800 border-4 border-slate-700 shadow-2xl flex items-center justify-center">
+                                    <span className="text-2xl font-extrabold bg-gradient-to-br from-red-400 to-red-650 bg-clip-text text-transparent">
+                                        {enlargedRecruit.name.split(/\s+/).map(n => n[0]).join("").toUpperCase().slice(0, 2)}
+                                    </span>
+                                </div>
+                                
+                                {/* Name and Squad details */}
+                                <div>
+                                    <h3 className="text-xl font-extrabold tracking-tight text-white">{enlargedRecruit.name}</h3>
+                                    <p className="text-red-400 font-bold text-sm mt-1">
+                                        {enlargedRecruit.primaryPosition} {enlargedRecruit.secondaryPosition ? `(Secondary: ${enlargedRecruit.secondaryPosition})` : ''}
+                                    </p>
+                                    <p className="text-slate-400 text-xs mt-0.5">{enlargedRecruit.age} years old • Located in {enlargedRecruit.location || 'Unknown'}</p>
+                                </div>
+
+                                {/* Divider */}
+                                <div className="w-full border-t border-slate-800 my-1" />
+
+                                {/* Detailed Grid */}
+                                <div className="w-full grid grid-cols-2 gap-3 text-left text-xs">
+                                    <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                                        <span className="text-slate-500 text-[10px] block">Scouted Role</span>
+                                        <span className="text-white font-bold text-sm block mt-0.5">{enlargedRecruit.scoutedRole}</span>
+                                    </div>
+                                    <div className="bg-slate-950/80 p-2.5 rounded-lg border border-slate-800">
+                                        <span className="text-slate-500 text-[10px] block">Current Club</span>
+                                        <span className="text-white font-bold text-sm block mt-0.5 truncate">
+                                            {enlargedRecruit.status === 'Unattached' ? 'Free Agent' : (enlargedRecruit.currentClub || 'Unknown')}
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                {/* Club Connection */}
+                                {enlargedRecruit.clubConnection && (
+                                    <div className="w-full bg-red-950/20 border border-red-900/40 p-2.5 rounded-lg text-left text-xs italic text-red-300 flex items-start gap-2">
+                                        <span className="text-sm shrink-0">🔗</span>
+                                        <div>
+                                            <span className="font-bold text-[9px] uppercase block tracking-wider not-italic text-red-400">Club Connection</span>
+                                            {enlargedRecruit.clubConnection}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Scouting Notes Block */}
+                            {enlargedRecruit.notes && (
+                                <div className="space-y-1.5">
+                                    <span className="text-slate-400 font-semibold text-[10px] uppercase tracking-wider block">Scouting Report & Notes</span>
+                                    <div className="bg-slate-900 p-3 rounded-lg border border-slate-800 text-slate-300 text-xs whitespace-pre-wrap max-h-[120px] overflow-y-auto">
+                                        {enlargedRecruit.notes}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Footer Controls */}
+                        <DialogFooter className="p-3 bg-slate-900 border-t border-slate-800 flex gap-2">
+                            <Button 
+                                variant="outline" 
+                                onClick={() => {
+                                    const r = enlargedRecruit;
+                                    setEnlargedRecruit(null);
+                                    handleEdit(r);
+                                }}
+                                className="bg-slate-800 hover:bg-slate-700 border-slate-700 text-white h-9 text-xs"
+                            >
+                                <Edit2 className="h-3.5 w-3.5 mr-2" />
+                                Edit Details
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    const r = enlargedRecruit;
+                                    setEnlargedRecruit(null);
+                                    handleSignPlayer(r);
+                                }}
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold h-9 text-xs"
+                            >
+                                <ArrowUpRight className="h-3.5 w-3.5 mr-2" />
+                                Sign Player
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                )}
+            </Dialog>
         </div>
     );
 }
