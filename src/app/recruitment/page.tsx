@@ -568,7 +568,7 @@ export default function RecruitmentPage() {
                                                     No {section.title.toLowerCase()} tracked yet.
                                                 </div>
                                             ) : (
-                                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
+                                                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8">
                                                     {sectionRecruits.map((recruit) => (
                                                         <Card key={recruit.id} className={`overflow-hidden hover:shadow-lg transition-all duration-200 group relative border-2 bg-slate-950 ${getPositionBorder(recruit.primaryPosition)} flex flex-col h-full`}>
                                                             <CardHeader className="p-0 flex-1 flex flex-col">
@@ -688,15 +688,15 @@ export default function RecruitmentPage() {
             {/* Enlarged Card Dialog */}
             <Dialog open={enlargedRecruit !== null} onOpenChange={(open) => !open && setEnlargedRecruit(null)}>
                 {enlargedRecruit && (
-                    <DialogContent className="sm:max-w-[440px] bg-slate-950 text-white border-2 border-red-600 p-0 overflow-hidden shadow-2xl">
-                        <DialogHeader className="p-4 bg-slate-900 border-b border-slate-800 flex flex-row items-center justify-between">
+                    <DialogContent className="sm:max-w-[440px] max-h-[90vh] flex flex-col bg-slate-950 text-white border-2 border-red-600 p-0 overflow-hidden shadow-2xl">
+                        <DialogHeader className="p-4 bg-slate-900 border-b border-slate-800 flex flex-row items-center justify-between shrink-0">
                             <DialogTitle className="text-white font-bold flex items-center gap-2 text-lg">
                                 {enlargedRecruit.scoutedRole === "Star Player" && <Star className="h-5 w-5 fill-amber-400 text-amber-400" />}
                                 Scouting Card: {enlargedRecruit.name}
                             </DialogTitle>
                         </DialogHeader>
                         
-                        <div className="p-5 space-y-5">
+                        <div className="p-5 space-y-5 flex-1 overflow-y-auto">
                             {/* Card Display Container */}
                             <div className={`relative p-5 rounded-xl bg-slate-900 border-2 ${getPositionBorder(enlargedRecruit.primaryPosition)} shadow-lg flex flex-col items-center text-center space-y-4`}>
                                 {/* Badges */}
@@ -772,7 +772,7 @@ export default function RecruitmentPage() {
                         </div>
 
                         {/* Footer Controls */}
-                        <DialogFooter className="p-3 bg-slate-900 border-t border-slate-800 flex gap-2">
+                        <DialogFooter className="p-3 bg-slate-900 border-t border-slate-800 flex gap-2 shrink-0">
                             <Button 
                                 variant="outline" 
                                 onClick={() => {
