@@ -638,7 +638,11 @@ export default function MatchdayXIPage() {
     };
 
     const isPlayerInMatchdayTracker = (p: Player) => {
-        const matchesSquad = p.squad?.toLowerCase().replace(/\s+/g, '') === activeSquadTab.toLowerCase().replace(/\s+/g, '');
+        const playerSquads = p.squad
+            ? p.squad.split(',').map((s: string) => s.trim().toLowerCase().replace(/\s+/g, ''))
+            : [];
+        const activeTabClean = activeSquadTab.toLowerCase().replace(/\s+/g, '');
+        const matchesSquad = playerSquads.includes(activeTabClean);
         return matchesSquad || p.isInMatchdayTracker === true;
     };
 

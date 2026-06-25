@@ -31,7 +31,7 @@ export default function OnboardingWizard() {
     const { user, signOut, clubId } = useAuth();
     const router = useRouter();
 
-    const [step, setStep] = useState(1);
+    const [step, setStep] = useState(0);
     
     // Step 1: Branding
     const [clubName, setClubName] = useState(settings.name || "");
@@ -404,7 +404,7 @@ export default function OnboardingWizard() {
                     <div className="w-full space-y-4">
                             
                             {/* Progress Dots */}
-                            {step <= totalSteps && (
+                            {step > 0 && step <= totalSteps && (
                                 <div className="flex justify-between items-center px-4 mb-4 relative max-w-md mx-auto">
                                     <div className="absolute left-6 right-6 top-1/2 h-0.5 bg-slate-800 -z-10" />
                                     {[1, 2, 3, 4, 5, 6, 7].map((num) => (
@@ -432,6 +432,67 @@ export default function OnboardingWizard() {
 
                                 <AnimatePresence mode="wait">
                                     
+                                    {/* STEP 0: Welcome Intro */}
+                                    {step === 0 && (
+                                        <motion.div key="step0" {...animations}>
+                                            <CardHeader className="space-y-4 pb-6 border-b border-slate-900 text-center">
+                                                <div className="mx-auto w-16 h-16 bg-teal-500/10 rounded-2xl flex items-center justify-center border border-teal-500/30">
+                                                    <Trophy className="h-8 w-8 text-teal-400" />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <CardTitle className="text-3xl font-extrabold text-white bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Welcome to ClubFlow</CardTitle>
+                                                    <CardDescription className="text-slate-400 text-sm max-w-md mx-auto">
+                                                        Let's set up your club's digital workspace. In a few quick steps, you'll customize branding, kits, ground details, financial modules, and invite staff.
+                                                    </CardDescription>
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent className="space-y-6 pt-6">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    <div className="p-4 bg-slate-900/30 border border-slate-800 rounded-xl space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Palette className="w-4 h-4 text-pink-400" />
+                                                            <h4 className="text-sm font-semibold text-white">Brand & Kits</h4>
+                                                        </div>
+                                                        <p className="text-xs text-slate-400 leading-relaxed">
+                                                            Define your club name, colors, sponsor logo, and home/away kit details to theme your entire dashboard.
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="p-4 bg-slate-900/30 border border-slate-800 rounded-xl space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Banknote className="w-4 h-4 text-emerald-400" />
+                                                            <h4 className="text-sm font-semibold text-white">Club Finance</h4>
+                                                        </div>
+                                                        <p className="text-xs text-slate-400 leading-relaxed">
+                                                            Track player subs, match fees, player contracts, and squad fines to manage your budget efficiently.
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="p-4 bg-slate-900/30 border border-slate-800 rounded-xl space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Users className="w-4 h-4 text-indigo-400" />
+                                                            <h4 className="text-sm font-semibold text-white">Squads & Staff</h4>
+                                                        </div>
+                                                        <p className="text-xs text-slate-400 leading-relaxed">
+                                                            Configure multiple matchday squads (e.g. First Team, Midweek) and invite coaches, treasurers, or secretaries.
+                                                        </p>
+                                                    </div>
+
+                                                    <div className="p-4 bg-slate-900/30 border border-slate-800 rounded-xl space-y-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <Trophy className="w-4 h-4 text-yellow-400" />
+                                                            <h4 className="text-sm font-semibold text-white">League Sync</h4>
+                                                            <span className="text-[9px] bg-teal-500/25 text-teal-300 font-bold px-1.5 py-0.5 rounded-full uppercase">Live</span>
+                                                        </div>
+                                                        <p className="text-xs text-slate-400 leading-relaxed">
+                                                            Paste your FA Full-Time standings page to automatically feed live table data straight to your dashboard.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </motion.div>
+                                    )}
+
                                     {/* STEP 1: Club Branding */}
                                     {step === 1 && (
                                         <motion.div key="step1" {...animations}>
@@ -442,6 +503,12 @@ export default function OnboardingWizard() {
                                                 </CardDescription>
                                             </CardHeader>
                                             <CardContent className="space-y-6 pt-6">
+                                                <div className="p-3.5 bg-slate-900/30 border border-slate-800 rounded-xl flex items-start gap-2.5">
+                                                    <Palette className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+                                                    <p className="text-xs text-slate-400 leading-relaxed">
+                                                        Your club logo and primary color will automatically style the main layout, team statistics cards, and the mini tactics board.
+                                                    </p>
+                                                </div>
                                                 <div className="space-y-2">
                                                     <Label htmlFor="clubName" className="text-slate-300 font-semibold">Club Name <span className="text-teal-400">*</span></Label>
                                                     <Input
@@ -688,6 +755,12 @@ export default function OnboardingWizard() {
                                                 </CardDescription>
                                             </CardHeader>
                                             <CardContent className="space-y-6 pt-6">
+                                                <div className="p-3.5 bg-slate-900/30 border border-slate-800 rounded-xl flex items-start gap-2.5">
+                                                    <Banknote className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+                                                    <p className="text-xs text-slate-400 leading-relaxed">
+                                                        These options enable finance tracking tools in your workspace (such as player billing, contracts, and player fine sheets). You can toggle these modules on or off anytime.
+                                                    </p>
+                                                </div>
                                                 <div className="bg-slate-900/30 border border-slate-800 rounded-xl p-5 flex items-start justify-between gap-4">
                                                     <div className="space-y-1">
                                                         <Label className="text-white font-semibold flex items-center gap-1.5">
@@ -841,6 +914,12 @@ export default function OnboardingWizard() {
                                                 </CardDescription>
                                             </CardHeader>
                                             <CardContent className="space-y-4 pt-6 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+                                                <div className="p-3.5 bg-slate-900/30 border border-slate-800 rounded-xl flex items-start gap-2.5 mb-2">
+                                                    <Shield className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
+                                                    <p className="text-xs text-slate-400 leading-relaxed">
+                                                        <strong>Multi-Squad Selection:</strong> Players can belong to multiple squads (e.g. Saturday First Team & Midweek League) and will automatically filter across your matchday tactics sheets and squad lists.
+                                                    </p>
+                                                </div>
                                                 <div className="grid grid-cols-2 gap-3">
                                                     {Array.from(new Set([...availableSquads, ...selectedSquads])).map(squad => {
                                                         const isSelected = selectedSquads.includes(squad);
@@ -1009,7 +1088,7 @@ export default function OnboardingWizard() {
                                 {/* Footer navigation for steps 1-7 */}
                                 {step < 8 && (
                                     <CardFooter className="bg-slate-950/40 p-4 border-t border-slate-900 flex justify-between gap-4">
-                                        {step > 1 ? (
+                                        {step > 0 ? (
                                             <Button 
                                                 type="button" 
                                                 variant="ghost" 
@@ -1036,11 +1115,11 @@ export default function OnboardingWizard() {
                                             )}
                                             <Button 
                                                 type="button" 
-                                                onClick={handleSaveAndNext}
+                                                onClick={step === 0 ? handleNext : handleSaveAndNext}
                                                 className="bg-white hover:bg-slate-100 text-slate-950 font-bold px-6 h-10 text-xs"
                                                 disabled={isLoading}
                                             >
-                                                {isLoading ? "Saving..." : step === totalSteps ? "Finish Setup" : "Next"}
+                                                {isLoading ? "Saving..." : step === 0 ? "Get Started" : step === totalSteps ? "Finish Setup" : "Next"}
                                             </Button>
                                         </div>
                                     </CardFooter>

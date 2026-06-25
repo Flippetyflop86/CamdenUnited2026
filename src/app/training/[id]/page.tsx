@@ -66,13 +66,32 @@ export default function TrainingSessionPage() {
 
                         // Pre-populate ALL eligible players as Absent if no record exists
                         const isFirstTeamSession = sessionRes.data.squad === "All" || sessionRes.data.squad === "firstTeam" || sessionRes.data.squad === "First Team";
-                        const isFirstTeam = (squad: string) => squad === "firstTeam" || squad === "First Team";
+                        const checkSquadMatch = (playerSquadsStr: string | undefined | null, targetSquad: string) => {
+                            if (!playerSquadsStr) return false;
+                            const squads = playerSquadsStr.split(',').map(s => s.trim().toLowerCase());
+                            const cleanTarget = targetSquad.toLowerCase();
+                            if (cleanTarget === 'firstteam' || cleanTarget === 'first team') {
+                                return squads.includes('first team') || squads.includes('firstteam');
+                            }
+                            if (cleanTarget === 'midweek') {
+                                return squads.includes('midweek');
+                            }
+                            if (cleanTarget === 'youth') {
+                                return squads.includes('youth');
+                            }
+                            return squads.includes(cleanTarget);
+                        };
+                        const isFirstTeam = (squad: string | undefined | null) => {
+                            if (!squad) return false;
+                            const squads = squad.split(',').map(s => s.trim().toLowerCase());
+                            return squads.includes('first team') || squads.includes('firstteam');
+                        };
                         
                         const eligible = mappedPlayers.filter(p => {
                             if (isFirstTeamSession) {
                                 return isFirstTeam(p.squad) || p.isInTrainingSquad;
                             } else {
-                                return p.squad === sessionRes.data.squad || (sessionRes.data.squad === "Midweek" && p.squad === "midweek") || (sessionRes.data.squad === "Youth" && p.squad === "youth");
+                                return checkSquadMatch(p.squad, sessionRes.data.squad);
                             }
                         });
                         const prePopulated = eligible.map(p => {
@@ -176,13 +195,32 @@ export default function TrainingSessionPage() {
     };
 
     const isFirstTeamSession = session.squad === "All" || session.squad === "firstTeam" || session.squad === "First Team";
-    const isFirstTeam = (squad: string) => squad === "firstTeam" || squad === "First Team";
+    const checkSquadMatch = (playerSquadsStr: string | undefined | null, targetSquad: string) => {
+        if (!playerSquadsStr) return false;
+        const squads = playerSquadsStr.split(',').map(s => s.trim().toLowerCase());
+        const cleanTarget = targetSquad.toLowerCase();
+        if (cleanTarget === 'firstteam' || cleanTarget === 'first team') {
+            return squads.includes('first team') || squads.includes('firstteam');
+        }
+        if (cleanTarget === 'midweek') {
+            return squads.includes('midweek');
+        }
+        if (cleanTarget === 'youth') {
+            return squads.includes('youth');
+        }
+        return squads.includes(cleanTarget);
+    };
+    const isFirstTeam = (squad: string | undefined | null) => {
+        if (!squad) return false;
+        const squads = squad.split(',').map(s => s.trim().toLowerCase());
+        return squads.includes('first team') || squads.includes('firstteam');
+    };
 
     const eligiblePlayers = players
         .filter(p => {
             const matchesSquad = isFirstTeamSession 
                 ? (isFirstTeam(p.squad) || p.isInTrainingSquad)
-                : (p.squad === session.squad || (session.squad === "Midweek" && p.squad === "midweek") || (session.squad === "Youth" && p.squad === "youth"));
+                : checkSquadMatch(p.squad, session.squad);
             return matchesSquad && !isPlayerOnHolidayOnDate(p, session.date);
         })
         .sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));

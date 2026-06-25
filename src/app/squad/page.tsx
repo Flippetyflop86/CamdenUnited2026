@@ -227,11 +227,16 @@ export default function SquadPage() {
     };
 
     const filteredPlayers = players.filter((player) => {
-        const SQUAD_LABELS: Record<string, string> = { firstTeam: "First Team", midweek: "Midweek", youth: "Youth" };
-        const mappedSquad = SQUAD_LABELS[player.squad] || player.squad;
+        const playerSquads = player.squad
+            ? player.squad.split(',').map((s: string) => {
+                const clean = s.trim();
+                const SQUAD_LABELS: Record<string, string> = { firstTeam: "First Team", midweek: "Midweek", youth: "Youth" };
+                return SQUAD_LABELS[clean] || clean;
+            })
+            : [];
         
         const matchesSearch = player.firstName.toLowerCase().includes(searchTerm.toLowerCase()) || player.lastName.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesSquad = activeTab === "All" || mappedSquad === activeTab;
+        const matchesSquad = activeTab === "All" || playerSquads.some((s: string) => s.toLowerCase() === activeTab.toLowerCase());
         const matchesPosition = positionFilter === "All" || (positionFilter === "GK" && player.position === "GK") || (positionFilter === "DEF" && ["DEF", "LB", "CB", "RB", "LWB", "RWB"].includes(player.position)) || (positionFilter === "MID" && ["MID", "CDM", "CM", "CAM", "LM", "RM"].includes(player.position)) || (positionFilter === "FWD" && ["FWD", "CF", "ST", "LW", "RW"].includes(player.position));
         const matchesAvailability = !showAvailableOnly || player.medicalStatus === "Available";
         return matchesSearch && matchesSquad && matchesPosition && matchesAvailability;
@@ -421,24 +426,40 @@ export default function SquadPage() {
 
                             <div className="space-y-4">
                                 <div className="space-y-1">
-                                    <label className="block text-xs font-medium text-slate-500">Squad</label>
+                                    <label className="block text-xs font-medium text-slate-500">Squads (Select all that apply)</label>
                                     <div className="flex flex-wrap gap-2">
-                                        {currentSquads.map(squad => (
-                                            <button
-                                                key={squad}
-                                                onClick={() => setEditingPlayer({ ...editingPlayer, squad })}
-                                                className={`px-3 py-1.5 text-xs border rounded transition-colors ${editingPlayer.squad === squad
-                                                    ? "bg-slate-900 text-white border-slate-900"
-                                                    : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                                                    }`}
-                                            >
-                                                {squad}
-                                            </button>
-                                        ))}
+                                        {currentSquads.map(squad => {
+                                            const currentSquadList = editingPlayer.squad
+                                                ? editingPlayer.squad.split(',').map((s: string) => s.trim())
+                                                : [];
+                                            const isSelected = currentSquadList.includes(squad);
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    key={squad}
+                                                    onClick={() => {
+                                                        let newSquadList;
+                                                        if (isSelected) {
+                                                            newSquadList = currentSquadList.filter((s: string) => s !== squad);
+                                                        } else {
+                                                            newSquadList = [...currentSquadList, squad];
+                                                        }
+                                                        if (newSquadList.length === 0) newSquadList = [currentSquads[0]];
+                                                        setEditingPlayer({ ...editingPlayer, squad: newSquadList.join(', ') });
+                                                    }}
+                                                    className={`px-3 py-1.5 text-xs border rounded transition-colors ${isSelected
+                                                        ? "bg-slate-900 text-white border-slate-900 font-bold"
+                                                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                                                        }`}
+                                                >
+                                                    {squad}
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 </div>
 
-                                {editingPlayer.squad !== currentSquads[0] && (
+                                {!editingPlayer.squad?.split(',').map((s: string) => s.trim()).includes(currentSquads[0]) && (
                                      <div className="space-y-2 p-2 bg-slate-50 rounded border border-slate-200">
                                          <div className="flex items-center gap-2">
                                              <input
