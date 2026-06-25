@@ -61,13 +61,13 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
         load();
     }, [player.imageUrl]);
 
-    const SQUAD_LABELS: Record<string, string> = {
-        firstTeam: "First Team",
-        midweek: "Midweek",
-        youth: "Youth"
-    };
-
-    const squadLabel = SQUAD_LABELS[player.squad] || player.squad;
+    const squadLabel = player.squad
+        ? player.squad.split(',').map((s: string) => {
+            const clean = s.trim();
+            const SQUAD_LABELS: Record<string, string> = { firstTeam: "First Team", midweek: "Midweek", youth: "Youth" };
+            return SQUAD_LABELS[clean] || clean;
+        }).join(', ')
+        : '';
 
     let displayAge = player.age;
     if (player.dateOfBirth) {

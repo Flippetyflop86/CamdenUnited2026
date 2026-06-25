@@ -228,15 +228,18 @@ export default function SquadPage() {
 
     const filteredPlayers = players.filter((player) => {
         const playerSquads = player.squad
-            ? player.squad.split(',').map((s: string) => {
-                const clean = s.trim();
-                const SQUAD_LABELS: Record<string, string> = { firstTeam: "First Team", midweek: "Midweek", youth: "Youth" };
-                return SQUAD_LABELS[clean] || clean;
-            })
+            ? player.squad.split(',').map((s: string) => s.trim())
             : [];
         
         const matchesSearch = player.firstName.toLowerCase().includes(searchTerm.toLowerCase()) || player.lastName.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesSquad = activeTab === "All" || playerSquads.some((s: string) => s.toLowerCase() === activeTab.toLowerCase());
+        const matchesSquad = activeTab === "All" || playerSquads.some((s: string) => {
+            const sClean = s.toLowerCase().replace(/[\s-_]+/g, '');
+            const tabClean = activeTab.toLowerCase().replace(/[\s-_]+/g, '');
+            // Handle common seed/db variants
+            if ((sClean === 'firstteam' || sClean === 'first team') && (tabClean === 'firstteam' || tabClean === 'first team')) return true;
+            if ((sClean === 'midweek' || sClean === 'midweek team') && (tabClean === 'midweek' || tabClean === 'midweek team')) return true;
+            return sClean === tabClean;
+        });
         const matchesPosition = positionFilter === "All" || (positionFilter === "GK" && player.position === "GK") || (positionFilter === "DEF" && ["DEF", "LB", "CB", "RB", "LWB", "RWB"].includes(player.position)) || (positionFilter === "MID" && ["MID", "CDM", "CM", "CAM", "LM", "RM"].includes(player.position)) || (positionFilter === "FWD" && ["FWD", "CF", "ST", "LW", "RW"].includes(player.position));
         const matchesAvailability = !showAvailableOnly || player.medicalStatus === "Available";
         return matchesSearch && matchesSquad && matchesPosition && matchesAvailability;

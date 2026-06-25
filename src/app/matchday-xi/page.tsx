@@ -80,6 +80,12 @@ export default function MatchdayXIPage() {
     }, []);
 
     useEffect(() => {
+        if (currentSquads.length > 0 && !currentSquads.includes(activeSquadTab)) {
+            setActiveSquadTab(currentSquads[0]);
+        }
+    }, [currentSquads, activeSquadTab]);
+
+    useEffect(() => {
         fetchLineupOnly();
     }, [activeSquadTab]);
 

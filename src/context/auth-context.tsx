@@ -37,6 +37,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const AUTH_PAGES = ["/login", "/signup", "/reset-password", "/update-password", "/join"];
 
     const fetchClubMembership = async (userId: string) => {
+        setGlobalClubId(null);
         try {
             const { data, error } = await supabase
                 .from("club_members")
