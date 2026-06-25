@@ -33,7 +33,8 @@ import {
     HelpCircle,
     Info,
     UploadCloud,
-    RotateCcw
+    RotateCcw,
+    Download
 } from "lucide-react";
 
 // Default categories
@@ -1123,6 +1124,33 @@ export default function FinancePage() {
     const triggerToast = (msg: string) => {
         setAlertMessage(msg);
         setTimeout(() => setAlertMessage(null), 3500);
+    };
+
+    const handleExportCSV = () => {
+        if (filteredLedger.length === 0) {
+            triggerToast("No transactions to export");
+            return;
+        }
+
+        const headers = ["Date", "Description", "Category", "Type", "Amount (GBP)"];
+        const rows = filteredLedger.map(t => [
+            new Date(t.date).toLocaleDateString(),
+            `"${t.description.replace(/"/g, '""')}"`,
+            `"${t.category}"`,
+            t.type,
+            t.amount.toFixed(2)
+        ]);
+
+        const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `${settings.name.replace(/\s+/g, "_")}_transactions.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        triggerToast("Ledger data exported to CSV");
     };
 
     // Helpers to populate edit states
@@ -2703,6 +2731,12 @@ export default function FinancePage() {
                                 ))}
                             </select>
                         </div>
+                        <Button 
+                            onClick={handleExportCSV}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs flex items-center gap-2 rounded-xl h-10 px-4 transition-colors"
+                        >
+                            <Download className="h-4 w-4" /> Export to Excel
+                        </Button>
                     </Card>
 
                     {/* Transactions Table */}
