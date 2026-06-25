@@ -97,42 +97,97 @@ export default function OnboardingWizard() {
 
     useEffect(() => {
         if (isLoaded && settings && !hasInitialized.current) {
-            setClubName(settings.name || "");
-            setManagerName(user?.user_metadata?.full_name || "");
+            const getCached = (key: string) => sessionStorage.getItem(`clubflow_onboarding_${key}`);
+            
+            setClubName(getCached("clubName") ?? settings.name ?? "");
+            setManagerName(getCached("managerName") ?? user?.user_metadata?.full_name ?? "");
             setLogoPreview(settings.logo);
             setSponsorLogoPreview(settings.sponsorLogo);
-            setPrimaryColor(settings.primaryColor || "#ef4444");
-            setHomeKitShirt(settings.homeKitShirt || "#ffffff");
-            setHomeKitShorts(settings.homeKitShorts || "#ffffff");
-            setHomeKitSocks(settings.homeKitSocks || "#ffffff");
-            setAwayKitShirt(settings.awayKitShirt || "#1e293b");
-            setAwayKitShorts(settings.awayKitShorts || "#1e293b");
-            setAwayKitSocks(settings.awayKitSocks || "#1e293b");
-            setHomeGroundName(settings.homeGround || "");
-            setTwitterHandle(settings.twitterUrl || "");
-            setInstagramHandle(settings.instagramUrl || "");
-            setWhatsAppPollMessage(settings.whatsappPollMessage || "");
-            setTrainingLocation(settings.trainingLocation || "");
-            setMonthlySubs(settings.monthlySubs?.toString() || "35");
-            setSubsEnabled(settings.subsEnabled !== undefined ? settings.subsEnabled : (parseFloat(settings.monthlySubs?.toString() || "0") > 0));
+            setPrimaryColor(getCached("primaryColor") ?? settings.primaryColor ?? "#ef4444");
+            setHomeKitShirt(getCached("homeKitShirt") ?? settings.homeKitShirt ?? "#ffffff");
+            setHomeKitShorts(getCached("homeKitShorts") ?? settings.homeKitShorts ?? "#ffffff");
+            setHomeKitSocks(getCached("homeKitSocks") ?? settings.homeKitSocks ?? "#ffffff");
+            setAwayKitShirt(getCached("awayKitShirt") ?? settings.awayKitShirt ?? "#1e293b");
+            setAwayKitShorts(getCached("awayKitShorts") ?? settings.awayKitShorts ?? "#1e293b");
+            setAwayKitSocks(getCached("awayKitSocks") ?? settings.awayKitSocks ?? "#1e293b");
+            setHomeGroundName(getCached("homeGroundName") ?? settings.homeGround ?? "");
+            setTwitterHandle(getCached("twitterHandle") ?? settings.twitterUrl ?? "");
+            setInstagramHandle(getCached("instagramHandle") ?? settings.instagramUrl ?? "");
+            setWhatsAppPollMessage(getCached("whatsappPollMessage") ?? settings.whatsappPollMessage ?? "");
+            setTrainingLocation(getCached("trainingLocation") ?? settings.trainingLocation ?? "");
+            setMonthlySubs(getCached("monthlySubs") ?? settings.monthlySubs?.toString() ?? "35");
+            
+            const cachedSubsEnabled = getCached("subsEnabled");
+            setSubsEnabled(cachedSubsEnabled !== null ? cachedSubsEnabled === "true" : (settings.subsEnabled !== undefined ? settings.subsEnabled : (parseFloat(settings.monthlySubs?.toString() || "0") > 0)));
             
             // Load matchday fee & structure overrides if any
             if (settings.name) {
-                const savedMatchdayFee = localStorage.getItem(`clubflow_matchday_fee_${settings.name}`);
+                const savedMatchdayFee = getCached("matchdayFee") ?? localStorage.getItem(`clubflow_matchday_fee_${settings.name}`);
                 if (savedMatchdayFee) setMatchdayFee(savedMatchdayFee);
                 
-                const savedStructure = localStorage.getItem(`clubflow_subs_structure_${settings.name}`);
+                const savedStructure = getCached("subsStructure") ?? localStorage.getItem(`clubflow_subs_structure_${settings.name}`);
                 if (savedStructure) setSubsStructure(savedStructure as any);
             }
 
-            setContractsEnabled(settings.contractsEnabled !== undefined ? settings.contractsEnabled : false);
-            setFinesEnabled(settings.finesEnabled || false);
-            setSelectedSquads(settings.isOnboarded ? (settings.squads || ["First Team"]) : ["First Team"]);
-            setLeagueUrl(settings.leagueUrl || "");
+            const cachedContracts = getCached("contractsEnabled");
+            setContractsEnabled(cachedContracts !== null ? cachedContracts === "true" : (settings.contractsEnabled !== undefined ? settings.contractsEnabled : false));
+            
+            const cachedFines = getCached("finesEnabled");
+            setFinesEnabled(cachedFines !== null ? cachedFines === "true" : (settings.finesEnabled || false));
+            
+            setRegistrationFee(getCached("registrationFee") ?? settings.registrationFee?.toString() ?? "0");
+            setTrainingFeePerSession(getCached("trainingFeePerSession") ?? settings.trainingFeePerSession?.toString() ?? "5");
+
+            const cachedSquads = getCached("selectedSquads");
+            setSelectedSquads(cachedSquads ? JSON.parse(cachedSquads) : (settings.isOnboarded ? (settings.squads || ["First Team"]) : ["First Team"]));
+            
+            setLeagueUrl(getCached("leagueUrl") ?? settings.leagueUrl ?? "");
             
             hasInitialized.current = true;
         }
     }, [isLoaded, settings, user]);
+
+    // Save onboarding fields to sessionStorage whenever they change
+    useEffect(() => {
+        if (!hasInitialized.current) return;
+        
+        const cache = {
+            clubName,
+            managerName,
+            primaryColor,
+            homeKitShirt,
+            homeKitShorts,
+            homeKitSocks,
+            awayKitShirt,
+            awayKitShorts,
+            awayKitSocks,
+            homeGroundName,
+            twitterHandle,
+            instagramHandle,
+            whatsappPollMessage,
+            trainingLocation,
+            monthlySubs,
+            subsEnabled: String(subsEnabled),
+            contractsEnabled: String(contractsEnabled),
+            registrationFee,
+            trainingFeePerSession,
+            matchdayFee,
+            subsStructure,
+            finesEnabled: String(finesEnabled),
+            selectedSquads: JSON.stringify(selectedSquads),
+            leagueUrl,
+        };
+
+        Object.entries(cache).forEach(([key, val]) => {
+            sessionStorage.setItem(`clubflow_onboarding_${key}`, String(val));
+        });
+    }, [
+        clubName, managerName, primaryColor, homeKitShirt, homeKitShorts, homeKitSocks,
+        awayKitShirt, awayKitShorts, awayKitSocks, homeGroundName, twitterHandle,
+        instagramHandle, whatsappPollMessage, trainingLocation, monthlySubs, subsEnabled,
+        contractsEnabled, registrationFee, trainingFeePerSession, matchdayFee, subsStructure,
+        finesEnabled, selectedSquads, leagueUrl
+    ]);
 
     useEffect(() => {
         if (isLoaded && settings?.isOnboarded && step !== 8) {
@@ -342,6 +397,16 @@ export default function OnboardingWizard() {
                 localStorage.setItem(`clubflow_matchday_fee_${clubName}`, matchdayFee);
                 localStorage.setItem(`clubflow_subs_structure_${clubName}`, subsStructure);
             }
+
+            // Clear onboarding cache keys from sessionStorage
+            const ONBOARDING_CACHE_KEYS = [
+                "clubName", "managerName", "primaryColor", "homeKitShirt", "homeKitShorts", "homeKitSocks",
+                "awayKitShirt", "awayKitShorts", "awayKitSocks", "homeGroundName", "twitterHandle",
+                "instagramHandle", "whatsappPollMessage", "trainingLocation", "monthlySubs", "subsEnabled",
+                "contractsEnabled", "registrationFee", "trainingFeePerSession", "matchdayFee", "subsStructure",
+                "finesEnabled", "selectedSquads", "leagueUrl"
+            ];
+            ONBOARDING_CACHE_KEYS.forEach(key => sessionStorage.removeItem(`clubflow_onboarding_${key}`));
 
             setStep(8); // Success screen
         } catch (err: any) {

@@ -117,7 +117,10 @@ export default function AdminPage() {
     }, [pollType, upcomingSessions, upcomingMatches]);
 
     useEffect(() => {
-        if (user?.user_metadata?.full_name) {
+        const cachedManager = sessionStorage.getItem("clubflow_admin_managerName");
+        if (cachedManager) {
+            setManagerName(cachedManager);
+        } else if (user?.user_metadata?.full_name) {
             setManagerName(user.user_metadata.full_name);
         }
     }, [user]);
@@ -131,34 +134,91 @@ export default function AdminPage() {
 
     useEffect(() => {
         if (settings && !hasInitialized.current) {
-            setName(settings.name);
+            const getCached = (key: string) => sessionStorage.getItem(`clubflow_admin_${key}`);
+
+            setName(getCached("name") ?? settings.name);
             setLogo(settings.logo);
-            setSquads(settings.squads || []);
-            setHomeGround(settings.homeGround || "");
-            setFoundingYear(settings.foundingYear?.toString() || "");
-            setTwitterUrl(settings.twitterUrl || "");
-            setInstagramUrl(settings.instagramUrl || "");
-            setPrimaryColor(settings.primaryColor);
-            setHomeKitShirt(settings.homeKitShirt);
-            setHomeKitShorts(settings.homeKitShorts);
-            setHomeKitSocks(settings.homeKitSocks);
-            setAwayKitShirt(settings.awayKitShirt);
-            setAwayKitShorts(settings.awayKitShorts);
-            setAwayKitSocks(settings.awayKitSocks);
-            setLeagueUrl(settings.leagueUrl || "");
-            setLeaguePosition(settings.leaguePosition?.toString() || "");
-            setMonthlySubs(settings.monthlySubs?.toString() || "0");
-            setSubsEnabled(settings.subsEnabled !== undefined ? settings.subsEnabled : true);
-            setContractsEnabled(settings.contractsEnabled !== undefined ? settings.contractsEnabled : false);
-            setFinesEnabled(settings.finesEnabled);
-            setFineCategories(settings.fineCategories || []);
+            
+            const cachedSquads = getCached("squads");
+            setSquads(cachedSquads ? JSON.parse(cachedSquads) : (settings.squads || []));
+            
+            setHomeGround(getCached("homeGround") ?? settings.homeGround ?? "");
+            setFoundingYear(getCached("foundingYear") ?? settings.foundingYear?.toString() ?? "");
+            setTwitterUrl(getCached("twitterUrl") ?? settings.twitterUrl ?? "");
+            setInstagramUrl(getCached("instagramUrl") ?? settings.instagramUrl ?? "");
+            setPrimaryColor(getCached("primaryColor") ?? settings.primaryColor);
+            setHomeKitShirt(getCached("homeKitShirt") ?? settings.homeKitShirt);
+            setHomeKitShorts(getCached("homeKitShorts") ?? settings.homeKitShorts);
+            setHomeKitSocks(getCached("homeKitSocks") ?? settings.homeKitSocks);
+            setAwayKitShirt(getCached("awayKitShirt") ?? settings.awayKitShirt);
+            setAwayKitShorts(getCached("awayKitShorts") ?? settings.awayKitShorts);
+            setAwayKitSocks(getCached("awayKitSocks") ?? settings.awayKitSocks);
+            setLeagueUrl(getCached("leagueUrl") ?? settings.leagueUrl ?? "");
+            setLeaguePosition(getCached("leaguePosition") ?? settings.leaguePosition?.toString() ?? "");
+            setMonthlySubs(getCached("monthlySubs") ?? settings.monthlySubs?.toString() ?? "0");
+            
+            const cachedSubsEnabled = getCached("subsEnabled");
+            setSubsEnabled(cachedSubsEnabled !== null ? cachedSubsEnabled === "true" : (settings.subsEnabled !== undefined ? settings.subsEnabled : true));
+            
+            const cachedContracts = getCached("contractsEnabled");
+            setContractsEnabled(cachedContracts !== null ? cachedContracts === "true" : (settings.contractsEnabled !== undefined ? settings.contractsEnabled : false));
+            
+            const cachedFines = getCached("finesEnabled");
+            setFinesEnabled(cachedFines !== null ? cachedFines === "true" : settings.finesEnabled);
+            
+            const cachedFineCategories = getCached("fineCategories");
+            setFineCategories(cachedFineCategories ? JSON.parse(cachedFineCategories) : (settings.fineCategories || []));
+            
             setSponsorLogo(settings.sponsorLogo);
-            setNotificationsEnabled(settings.notificationsEnabled || false);
-            setNotificationEmail(settings.notificationEmail || "");
+            
+            const cachedNotifications = getCached("notificationsEnabled");
+            setNotificationsEnabled(cachedNotifications !== null ? cachedNotifications === "true" : (settings.notificationsEnabled || false));
+            
+            setNotificationEmail(getCached("notificationEmail") ?? settings.notificationEmail ?? "");
             
             hasInitialized.current = true;
         }
     }, [settings]);
+
+    // Save admin settings fields to sessionStorage whenever they change
+    useEffect(() => {
+        if (!hasInitialized.current) return;
+
+        const cache = {
+            name,
+            squads: JSON.stringify(squads),
+            homeGround,
+            foundingYear,
+            twitterUrl,
+            instagramUrl,
+            primaryColor,
+            homeKitShirt,
+            homeKitShorts,
+            homeKitSocks,
+            awayKitShirt,
+            awayKitShorts,
+            awayKitSocks,
+            leagueUrl,
+            leaguePosition,
+            monthlySubs,
+            subsEnabled: String(subsEnabled),
+            contractsEnabled: String(contractsEnabled),
+            finesEnabled: String(finesEnabled),
+            fineCategories: JSON.stringify(fineCategories),
+            notificationsEnabled: String(notificationsEnabled),
+            notificationEmail,
+            managerName
+        };
+
+        Object.entries(cache).forEach(([key, val]) => {
+            sessionStorage.setItem(`clubflow_admin_${key}`, String(val));
+        });
+    }, [
+        name, squads, homeGround, foundingYear, twitterUrl, instagramUrl, primaryColor,
+        homeKitShirt, homeKitShorts, homeKitSocks, awayKitShirt, awayKitShorts, awayKitSocks,
+        leagueUrl, leaguePosition, monthlySubs, subsEnabled, contractsEnabled, finesEnabled,
+        fineCategories, notificationsEnabled, notificationEmail, managerName
+    ]);
 
     const fetchTeamAccess = async () => {
         try {
@@ -458,6 +518,15 @@ export default function AdminPage() {
                 sponsorLogo: finalSponsor
             });
             alert("Settings saved successfully!");
+
+            // Clear admin settings cache keys from sessionStorage
+            const ADMIN_CACHE_KEYS = [
+                "name", "squads", "homeGround", "foundingYear", "twitterUrl", "instagramUrl", "primaryColor",
+                "homeKitShirt", "homeKitShorts", "homeKitSocks", "awayKitShirt", "awayKitShorts", "awayKitSocks",
+                "leagueUrl", "leaguePosition", "monthlySubs", "subsEnabled", "contractsEnabled", "finesEnabled",
+                "fineCategories", "notificationsEnabled", "notificationEmail", "managerName"
+            ];
+            ADMIN_CACHE_KEYS.forEach(key => sessionStorage.removeItem(`clubflow_admin_${key}`));
         } catch (error) {
             console.error(error);
             alert("Failed to save settings.");
