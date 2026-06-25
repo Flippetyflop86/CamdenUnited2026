@@ -779,8 +779,7 @@ export default function MatchdayXIPage() {
                         ))}
                     </div>
                     <div className="p-3 space-y-2 overflow-y-auto flex-1 bg-slate-50/30">
-                        {players
-                            .filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p))
+                        {sortedPlayers
                             .filter(p => squadFilter === "All" || getPositionCategory(p.position) === squadFilter)
                             .map(player => {
                                 const fullName = `${player.firstName} ${player.lastName}`;
@@ -803,7 +802,7 @@ export default function MatchdayXIPage() {
                                     </div>
                                 );
                         })}
-                        {players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p)).length === 0 && (
+                        {availablePlayers.length === 0 && (
                             <div className="text-center py-6 text-slate-400 text-sm border-2 border-dashed rounded-lg border-slate-200 m-2">
                                 <span className="text-xl mb-1 block">✅</span>
                                 Squad deployed!
