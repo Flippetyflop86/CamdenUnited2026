@@ -436,8 +436,8 @@ export default function OnboardingWizard() {
                                     {step === 0 && (
                                         <motion.div key="step0" {...animations}>
                                             <CardHeader className="space-y-4 pb-6 border-b border-slate-900 text-center">
-                                                <div className="mx-auto w-16 h-16 bg-teal-500/10 rounded-2xl flex items-center justify-center border border-teal-500/30">
-                                                    <Trophy className="h-8 w-8 text-teal-400" />
+                                                <div className="mx-auto w-16 h-16 bg-slate-900/30 rounded-2xl flex items-center justify-center border border-slate-800">
+                                                    <img src="/clubflow-logo.png" alt="ClubFlow Logo" className="h-10 w-auto object-contain" />
                                                 </div>
                                                 <div className="space-y-2">
                                                     <CardTitle className="text-3xl font-extrabold text-white bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">Welcome to ClubFlow</CardTitle>
