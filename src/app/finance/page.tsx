@@ -9,6 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
+import { logActivity } from "@/lib/activity";
 import { 
     Plus, 
     Trash2, 
@@ -966,6 +967,10 @@ export default function FinancePage() {
             console.error(res.error);
             alert("Error saving transaction");
         } else {
+            logActivity(
+                editingId ? "Updated Transaction" : "Recorded Transaction",
+                `${payload.type}: '${payload.description}' of £${payload.amount} (Category: ${payload.category || 'None'}) on ${payload.date}.`
+            );
             triggerToast(editingId ? "Transaction updated" : "One-off transaction added");
             fetchTransactions();
             setIsAddTxOpen(false);
@@ -1105,9 +1110,27 @@ export default function FinancePage() {
         if (!confirm(`Are you sure you want to delete this ${type === "tx" ? "transaction" : type === "sponsor" ? "sponsor" : "commitment"}?`)) return;
 
         let error;
-        if (type === "tx") error = (await supabase.from("finance_transactions").delete().eq("id", id)).error;
-        if (type === "sponsor") error = (await supabase.from("sponsors").delete().eq("id", id)).error;
-        if (type === "sub") error = (await supabase.from("subscriptions").delete().eq("id", id)).error;
+        if (type === "tx") {
+            const tx = transactions.find(t => t.id === id);
+            error = (await supabase.from("finance_transactions").delete().eq("id", id)).error;
+            if (!error && tx) {
+                logActivity("Deleted Transaction", `Removed transaction: '${tx.description}' of £${tx.amount} (${tx.type}).`);
+            }
+        }
+        if (type === "sponsor") {
+            const sp = sponsors.find(s => s.id === id);
+            error = (await supabase.from("sponsors").delete().eq("id", id)).error;
+            if (!error && sp) {
+                logActivity("Deleted Sponsor", `Removed sponsor: '${sp.name}'.`);
+            }
+        }
+        if (type === "sub") {
+            const sub = subscriptions.find(s => s.id === id);
+            error = (await supabase.from("subscriptions").delete().eq("id", id)).error;
+            if (!error && sub) {
+                logActivity("Deleted Commitment", `Removed recurring commitment: '${sub.name}' of £${sub.cost}.`);
+            }
+        }
 
         if (error) {
             console.error(error);

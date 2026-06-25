@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/lib/supabase";
 import { Textarea } from "@/components/ui/textarea";
+import { logActivity } from "@/lib/activity";
 
 export default function AdminPage() {
     const { settings, updateSettings } = useClub();
@@ -115,6 +116,8 @@ export default function AdminPage() {
     const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
     const [editingPermissions, setEditingPermissions] = useState<string[]>([]);
     const [isSavingPerms, setIsSavingPerms] = useState(false);
+    const [activities, setActivities] = useState<any[]>([]);
+    const [isLoadingActivities, setIsLoadingActivities] = useState(false);
 
     const fetchEvents = async () => {
         try {
@@ -160,6 +163,7 @@ export default function AdminPage() {
         if (settings.isOnboarded) {
             fetchTeamAccess();
             fetchEvents();
+            fetchActivities();
         }
     }, [settings]);
 
@@ -259,6 +263,23 @@ export default function AdminPage() {
             if (invites) setInvitations(invites);
         } catch (err) {
             console.error("Error fetching team access:", err);
+        }
+    };
+
+    const fetchActivities = async () => {
+        setIsLoadingActivities(true);
+        try {
+            const { data, error } = await supabase
+                .from('activity_logs')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(100);
+            if (error) throw error;
+            if (data) setActivities(data);
+        } catch (err) {
+            console.error("Error fetching activities:", err);
+        } finally {
+            setIsLoadingActivities(false);
         }
     };
 
@@ -548,6 +569,7 @@ export default function AdminPage() {
                 notificationEmail,
                 sponsorLogo: finalSponsor
             });
+            logActivity("Updated Club Settings", `Saved changes to club details, primary color, or squads.`);
             alert("Settings saved successfully!");
 
             // Clear admin settings cache keys from sessionStorage
@@ -670,7 +692,7 @@ export default function AdminPage() {
             </div>
 
             <Tabs key={isManager ? "manager" : "admin"} defaultValue={isManager ? "identity" : "access"} className="w-full">
-                <TabsList className="flex w-full max-w-5xl overflow-x-auto whitespace-nowrap gap-1 md:grid md:grid-cols-8 md:gap-0 bg-slate-100 p-1 rounded-lg scrollbar-none">
+                <TabsList className="flex w-full max-w-5xl overflow-x-auto whitespace-nowrap gap-1 md:grid md:grid-cols-9 md:gap-0 bg-slate-100 p-1 rounded-lg scrollbar-none">
                     {isManager && (
                         <>
                             <TabsTrigger value="identity" className="flex-shrink-0 px-4 py-2">Identity</TabsTrigger>
@@ -682,7 +704,12 @@ export default function AdminPage() {
                         </>
                     )}
                     <TabsTrigger value="access" className="flex-shrink-0 px-4 py-2">Access</TabsTrigger>
-                    {isManager && <TabsTrigger value="advanced" className="flex-shrink-0 px-4 py-2">Advanced</TabsTrigger>}
+                    {isManager && (
+                        <>
+                            <TabsTrigger value="advanced" className="flex-shrink-0 px-4 py-2">Advanced</TabsTrigger>
+                            <TabsTrigger value="activity" className="flex-shrink-0 px-4 py-2">Activity Log</TabsTrigger>
+                        </>
+                    )}
                 </TabsList>
 
                 {/* IDENTITY TAB */}
@@ -1629,6 +1656,98 @@ export default function AdminPage() {
 
                     <DataExport />
                 </TabsContent>
+                )}
+
+                {isManager && (
+                    <TabsContent value="activity" className="space-y-6 mt-6">
+                        <Card className="max-w-4xl border border-slate-200 shadow-md">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b border-slate-100">
+                                <div>
+                                    <CardTitle className="text-xl font-bold text-slate-900">Audit Trail & Activity Log</CardTitle>
+                                    <CardDescription className="text-slate-500">
+                                        Monitor real-time updates and settings changes made by all managers and staff in your club.
+                                    </CardDescription>
+                                </div>
+                                <Button
+                                    onClick={fetchActivities}
+                                    disabled={isLoadingActivities}
+                                    variant="outline"
+                                    size="sm"
+                                    className="flex items-center gap-2"
+                                >
+                                    <svg
+                                        className={`h-4 w-4 text-slate-600 ${isLoadingActivities ? 'animate-spin' : ''}`}
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        fill="none"
+                                        viewBox="0 0 24 24"
+                                        stroke="currentColor"
+                                        strokeWidth={2}
+                                    >
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 7.89M21 3v5h-5" />
+                                    </svg>
+                                    Refresh
+                                </Button>
+                            </CardHeader>
+                            <CardContent className="pt-6">
+                                {isLoadingActivities ? (
+                                    <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                                        <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-slate-800" />
+                                        <p className="text-sm text-slate-500">Loading recent activities...</p>
+                                    </div>
+                                ) : activities.length === 0 ? (
+                                    <div className="text-center py-12 border-2 border-dashed border-slate-200 rounded-xl bg-slate-50">
+                                        <p className="text-slate-500 font-medium">No recent activities found.</p>
+                                        <p className="text-xs text-slate-400 mt-1">Changes made to settings, squad members, or finances will appear here.</p>
+                                    </div>
+                                ) : (
+                                    <div className="relative border-l-2 border-slate-200 ml-4 pl-6 space-y-8 py-2">
+                                        {activities.map((act) => {
+                                            const isDelete = act.action.toLowerCase().includes('delete') || act.action.toLowerCase().includes('remove');
+                                            const isCreate = act.action.toLowerCase().includes('create') || act.action.toLowerCase().includes('add');
+                                            
+                                            let iconBg = 'bg-blue-100 text-blue-800 border-blue-200';
+                                            if (isDelete) {
+                                                iconBg = 'bg-rose-100 text-rose-800 border-rose-200';
+                                            } else if (isCreate) {
+                                                iconBg = 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                                            }
+
+                                            return (
+                                                <div key={act.id} className="relative group">
+                                                    {/* Timeline Bullet */}
+                                                    <span className={`absolute -left-[35px] top-1.5 flex h-6 w-6 items-center justify-center rounded-full border-2 bg-white text-xs font-semibold ${iconBg} shadow-sm transition-transform group-hover:scale-110`}>
+                                                        {isDelete ? '❌' : isCreate ? '➕' : '📝'}
+                                                    </span>
+
+                                                    {/* Log Content Card */}
+                                                    <div className="bg-slate-50/70 hover:bg-slate-50 border border-slate-100 hover:border-slate-200 p-4 rounded-xl transition-all shadow-sm">
+                                                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 mb-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-semibold text-slate-900 text-sm">{act.user_name}</span>
+                                                                <span className="text-xs text-slate-400 bg-slate-200/60 px-2 py-0.5 rounded-full font-mono">
+                                                                    {act.user_email}
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-xs text-slate-400" title={new Date(act.created_at).toLocaleString()}>
+                                                                {new Date(act.created_at).toLocaleDateString()} {new Date(act.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                            </span>
+                                                        </div>
+
+                                                        <h4 className="text-sm font-bold text-slate-800 mb-1">{act.action}</h4>
+                                                        {act.details && (
+                                                            <p className="text-xs text-slate-600 bg-white/80 border border-slate-100 p-2.5 rounded-lg font-mono whitespace-pre-wrap mt-2 shadow-inner">
+                                                                {act.details}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
                 )}
             </Tabs>
         </div>

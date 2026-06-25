@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { supabase } from "@/lib/supabase";
 import imageCompression from "browser-image-compression";
 import { UploadCloud, Loader2 } from "lucide-react";
+import { logActivity } from "@/lib/activity";
 
 const getCurrentSeasonStr = () => {
     const d = new Date();
@@ -198,8 +199,12 @@ export default function SquadPage() {
 
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure?")) return;
+        const player = players.find(p => p.id === id);
         setPlayers((prev) => prev.filter((p) => p.id !== id));
-        await supabase.from("players").delete().eq("id", id);
+        const { error } = await supabase.from("players").delete().eq("id", id);
+        if (!error && player) {
+            logActivity("Deleted Player", `Removed ${player.firstName} ${player.lastName} from the squad.`);
+        }
     };
 
     const handleStatusToggle = async (player: Player) => {
@@ -278,7 +283,8 @@ export default function SquadPage() {
         };
         try {
             let error;
-            if (updatedPlayer.id === "new") {
+            const isNew = updatedPlayer.id === "new";
+            if (isNew) {
                 const res = await supabase.from("players").insert([payload]);
                 error = res.error;
             } else {
@@ -286,6 +292,10 @@ export default function SquadPage() {
                 error = res.error;
             }
             if (error) throw error;
+            logActivity(
+                isNew ? "Added Player" : "Updated Player Details",
+                `${isNew ? "Created profile for" : "Updated profile of"} ${updatedPlayer.firstName} ${updatedPlayer.lastName} (Position: ${updatedPlayer.position}, Squad: ${updatedPlayer.squad || 'None'}).`
+            );
             await fetchData();
             setEditingPlayer(null);
         } catch (err: any) {
