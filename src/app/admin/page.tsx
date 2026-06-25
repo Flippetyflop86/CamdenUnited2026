@@ -60,8 +60,8 @@ export default function AdminPage() {
     const [upcomingMatches, setUpcomingMatches] = useState<any[]>([]);
     const [pollType, setPollType] = useState<"training" | "match">("training");
     const [selectedEventId, setSelectedEventId] = useState<string>("");
-    const [trainingDeadline, setTrainingDeadline] = useState("10:00 PM the evening before training");
-    const [meetupOffset, setMeetupOffset] = useState("1 hour");
+    const [trainingDeadline, setTrainingDeadline] = useState("thursday evening");
+    const [meetupOffset, setMeetupOffset] = useState("90");
     const [copiedPoll, setCopiedPoll] = useState(false);
 
     const { user, role: userRole, isManager, pagePermissions, refreshPermissions, clubId } = useAuth();
@@ -268,6 +268,47 @@ export default function AdminPage() {
             alert("Failed to delete member: " + err.message);
         }
     };
+    const calculateMeetTime = (kickoffTime: string, offsetMin: number = 90) => {
+        if (!kickoffTime) return "TBC";
+        try {
+            const timeClean = kickoffTime.trim().toLowerCase();
+            let hours = 0;
+            let minutes = 0;
+            
+            const match24 = timeClean.match(/^(\d{1,2})[.:](\d{2})$/);
+            const match12 = timeClean.match(/^(\d{1,2})[.:](\d{2})\s*(am|pm)$/);
+            
+            if (match12) {
+                hours = parseInt(match12[1], 10);
+                minutes = parseInt(match12[2], 10);
+                const ampm = match12[3];
+                if (ampm === 'pm' && hours < 12) hours += 12;
+                if (ampm === 'am' && hours === 12) hours = 0;
+            } else if (match24) {
+                hours = parseInt(match24[1], 10);
+                minutes = parseInt(match24[2], 10);
+            } else {
+                const matchSingle = timeClean.match(/^(\d{1,2})$/);
+                if (matchSingle) {
+                    hours = parseInt(matchSingle[1], 10);
+                } else {
+                    return `TBC (Meet ${offsetMin}m before)`;
+                }
+            }
+            
+            let meetMinutes = hours * 60 + minutes - offsetMin;
+            if (meetMinutes < 0) meetMinutes += 24 * 60;
+            
+            const meetHours = Math.floor(meetMinutes / 60);
+            const meetMins = meetMinutes % 60;
+            
+            const pad = (n: number) => String(n).padStart(2, '0');
+            return `${pad(meetHours)}:${pad(meetMins)}`;
+        } catch (e) {
+            return `TBC (Meet ${offsetMin}m before)`;
+        }
+    };
+
     const generatePollMessage = () => {
         if (pollType === "training") {
             const session = upcomingSessions.find(s => s.id === selectedEventId);
@@ -278,7 +319,7 @@ export default function AdminPage() {
                 return new Date(dateStr).toLocaleDateString('en-US', options);
             };
             
-            return `🏋️‍♂️ ${settings.name || "Club"} Training Availability Poll\n📅 Date: ${formatDate(session.date)}\n⏰ Time: ${session.time}\n📍 Venue: ${session.location}${session.topic ? `\n⚽ Focus: ${session.topic}` : ''}\n\nPlease vote on your availability:\n1️⃣ Available (Ready to train)\n2️⃣ Not Available\n3️⃣ 50/50 (Will let me know by ${trainingDeadline})`;
+            return `⚽ ${settings.name || "Club"} Training Availability Poll\n📅 Date: ${formatDate(session.date)}\n⏰ Time: ${session.time}\n📍 Venue: ${session.location}\n\nAvailable (Ready to train)\nNot Available\n50/50 (will let you know by ${trainingDeadline})`;
         } else {
             const match = upcomingMatches.find(m => m.id === selectedEventId);
             if (!match) return "No upcoming matches scheduled. Go to Matches tab to create one.";
@@ -288,7 +329,10 @@ export default function AdminPage() {
                 return new Date(dateStr).toLocaleDateString('en-US', options);
             };
             
-            return `⚽ ${settings.name || "Club"} Matchday Squad Availability Poll\n🆚 Opponent: ${match.opponent} (${match.is_home ? 'Home' : 'Away'})\n📅 Date: ${formatDate(match.date)}\n⏰ Kick-Off: ${match.time || 'TBC'} (Meeting ${meetupOffset} before kickoff)\n${match.competition ? `🏆 Competition: ${match.competition}\n` : ''}\nPlease vote on your availability:\n1️⃣ Available (Selected & ready to play)\n2️⃣ Not Available\n3️⃣ Injured / Doubtful (Will update manager)`;
+            const offsetNum = parseInt(meetupOffset, 10) || 90;
+            const meetTime = calculateMeetTime(match.time || "", offsetNum);
+            
+            return `⚽ ${settings.name || "Club"} Matchday Squad Availability Poll\n🆚 Opponent: ${match.opponent} (${match.is_home ? 'Home' : 'Away'})\n📅 Date: ${formatDate(match.date)}\n⏰ Kick-Off: ${match.time || 'TBC'} (Meet at ${meetTime})\n${match.competition ? `🏆 Competition: ${match.competition}\n` : ''}\nAvailable (Selected & ready to play)\nNot Available\nInjured / Doubtful (Will update manager)`;
         }
     };
 
@@ -849,13 +893,29 @@ export default function AdminPage() {
 
                                             <div className="space-y-2">
                                                 <Label htmlFor="meetupInput">Meetup Time Before Kick-Off</Label>
-                                                <Input
+                                                <select
                                                     id="meetupInput"
                                                     value={meetupOffset}
                                                     onChange={(e) => setMeetupOffset(e.target.value)}
-                                                    placeholder="e.g. 1 hour, 45 minutes"
-                                                    className="h-10 text-sm"
-                                                />
+                                                    className="w-full bg-white border border-slate-200 rounded-lg h-10 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                                >
+                                                    <option value="30">30 minutes before</option>
+                                                    <option value="60">1 hour before</option>
+                                                    <option value="90">1 hour 30 minutes before (Preset)</option>
+                                                    <option value="120">2 hours before</option>
+                                                </select>
+                                                {(() => {
+                                                    const match = upcomingMatches.find(m => m.id === selectedEventId);
+                                                    if (match && match.time) {
+                                                        const calculated = calculateMeetTime(match.time, parseInt(meetupOffset, 10));
+                                                        return (
+                                                            <p className="text-xs font-semibold text-indigo-600 mt-1">
+                                                                Calculated Meet Time: {calculated} (Kick-Off: {match.time})
+                                                            </p>
+                                                        );
+                                                    }
+                                                    return null;
+                                                })()}
                                             </div>
                                         </>
                                     )}
