@@ -103,7 +103,14 @@ export default function SponsorsPage() {
     // Removed saveSponsors helper
 
     const handleSave = async () => {
-        if (!formData.name || !formData.amount) return;
+        if (!formData.name) {
+            alert("Sponsor name is required.");
+            return;
+        }
+        if (formData.amount === undefined || formData.amount === null || isNaN(formData.amount)) {
+            alert("Agreement value is required and must be a valid number.");
+            return;
+        }
 
         let finalResponsibilities = formData.responsibilities || '';
         if (finalResponsibilities) {
@@ -143,11 +150,19 @@ export default function SponsorsPage() {
             exposure_stats: formData.exposureStats || { impressions: 0, matches: 0, clicks: 0 }
         };
 
+        let result;
         if (editingId) {
-            await supabase.from('sponsors').update(payload).eq('id', editingId);
+            result = await supabase.from('sponsors').update(payload).eq('id', editingId);
         } else {
-            await supabase.from('sponsors').insert([payload]);
+            result = await supabase.from('sponsors').insert([payload]);
         }
+
+        if (result.error) {
+            alert(`Failed to save sponsor: ${result.error.message || JSON.stringify(result.error)}`);
+            console.error("Database save error:", result.error);
+            return;
+        }
+
         await fetchSponsors();
         closeModal();
     };
