@@ -103,68 +103,73 @@ export default function SponsorsPage() {
     // Removed saveSponsors helper
 
     const handleSave = async () => {
-        if (!formData.name) {
-            alert("Sponsor name is required.");
-            return;
-        }
-        if (formData.amount === undefined || formData.amount === null || isNaN(formData.amount)) {
-            alert("Agreement value is required and must be a valid number.");
-            return;
-        }
-
-        let finalResponsibilities = formData.responsibilities || '';
-        if (finalResponsibilities) {
-            const lines = finalResponsibilities.split('\n').filter(Boolean);
-            let existingDeliverables: any[] = [];
-            if (editingId) {
-                const oldSponsor = sponsors.find(s => s.id === editingId);
-                if (oldSponsor && oldSponsor.responsibilities) {
-                    try {
-                        existingDeliverables = JSON.parse(oldSponsor.responsibilities);
-                    } catch (e) {}
-                }
+        try {
+            if (!formData.name) {
+                alert("Sponsor name is required.");
+                return;
             }
-            const newDeliverables = lines.map(line => {
-                const cleanText = line.replace(/^•\s*/, '').trim();
-                const matched = existingDeliverables.find(item => item.text === cleanText);
-                return {
-                    text: cleanText,
-                    completed: matched ? matched.completed : false
-                };
-            });
-            finalResponsibilities = JSON.stringify(newDeliverables);
+            if (formData.amount === undefined || formData.amount === null || isNaN(formData.amount)) {
+                alert("Agreement value is required and must be a valid number.");
+                return;
+            }
+
+            let finalResponsibilities = formData.responsibilities || '';
+            if (finalResponsibilities) {
+                const lines = finalResponsibilities.split('\n').filter(Boolean);
+                let existingDeliverables: any[] = [];
+                if (editingId) {
+                    const oldSponsor = sponsors.find(s => s.id === editingId);
+                    if (oldSponsor && oldSponsor.responsibilities) {
+                        try {
+                            existingDeliverables = JSON.parse(oldSponsor.responsibilities);
+                        } catch (e) {}
+                    }
+                }
+                const newDeliverables = lines.map(line => {
+                    const cleanText = line.replace(/^•\s*/, '').trim();
+                    const matched = existingDeliverables.find(item => item.text === cleanText);
+                    return {
+                        text: cleanText,
+                        completed: matched ? matched.completed : false
+                    };
+                });
+                finalResponsibilities = JSON.stringify(newDeliverables);
+            }
+
+            const payload = {
+                name: formData.name,
+                amount: formData.amount,
+                frequency: formData.frequency,
+                description: formData.description || null,
+                website: formData.website || null,
+                start_date: formData.startDate ? formData.startDate : null,
+                end_date: formData.endDate ? formData.endDate : null,
+                responsibilities: finalResponsibilities || null,
+                status: formData.status || 'Secured',
+                contract_url: formData.contractUrl || null,
+                contract_name: formData.contractName || null,
+                exposure_stats: formData.exposureStats || { impressions: 0, matches: 0, clicks: 0 }
+            };
+
+            let result;
+            if (editingId) {
+                result = await supabase.from('sponsors').update(payload).eq('id', editingId);
+            } else {
+                result = await supabase.from('sponsors').insert([payload]);
+            }
+
+            if (result.error) {
+                alert(`Failed to save sponsor: ${result.error.message || JSON.stringify(result.error)}`);
+                console.error("Database save error:", result.error);
+                return;
+            }
+
+            await fetchSponsors();
+            closeModal();
+        } catch (error: any) {
+            alert(`An unexpected error occurred: ${error.message || error}`);
+            console.error("Unexpected error inside handleSave:", error);
         }
-
-        const payload = {
-            name: formData.name,
-            amount: formData.amount,
-            frequency: formData.frequency,
-            description: formData.description || null,
-            website: formData.website || null,
-            start_date: formData.startDate ? formData.startDate : null,
-            end_date: formData.endDate ? formData.endDate : null,
-            responsibilities: finalResponsibilities || null,
-            status: formData.status || 'Secured',
-            contract_url: formData.contractUrl || null,
-            contract_name: formData.contractName || null,
-            exposure_stats: formData.exposureStats || { impressions: 0, matches: 0, clicks: 0 }
-        };
-
-        let result;
-        if (editingId) {
-            result = await supabase.from('sponsors').update(payload).eq('id', editingId);
-        } else {
-            result = await supabase.from('sponsors').insert([payload]);
-        }
-
-        if (result.error) {
-            alert(`Failed to save sponsor: ${result.error.message || JSON.stringify(result.error)}`);
-            console.error("Database save error:", result.error);
-            return;
-        }
-
-        await fetchSponsors();
-        closeModal();
     };
 
     const handleDelete = async (id: string) => {
