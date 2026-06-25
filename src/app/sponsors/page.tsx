@@ -36,6 +36,17 @@ export default function SponsorsPage() {
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [selectedReportSponsor, setSelectedReportSponsor] = useState<Sponsor | null>(null);
+    const [draftEmailSponsor, setDraftEmailSponsor] = useState<Sponsor | null>(null);
+    const [isEmailOpen, setIsEmailOpen] = useState(false);
+
+    const getDaysLeft = (endDateStr?: string) => {
+        if (!endDateStr) return null;
+        const end = new Date(endDateStr);
+        const now = new Date();
+        end.setHours(0,0,0,0);
+        now.setHours(0,0,0,0);
+        return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    };
 
     // Form State
     const [formData, setFormData] = useState<Partial<Sponsor>>({
@@ -471,6 +482,53 @@ export default function SponsorsPage() {
                     </Button>
                 </div>
 
+                {/* Expiring Sponsors Alert Box */}
+                {(() => {
+                    const expiringSponsors = securedSponsors.filter(s => {
+                        const days = getDaysLeft(s.endDate);
+                        return days !== null && days <= 30;
+                    });
+                    if (expiringSponsors.length === 0) return null;
+                    return (
+                        <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl space-y-3">
+                            <div className="flex items-center gap-2 text-amber-800 font-bold text-sm">
+                                <AlertCircle className="h-5 w-5 text-amber-600 animate-pulse" />
+                                <span>Sponsorship Contracts Requiring Attention ({expiringSponsors.length})</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                                {expiringSponsors.map(sponsor => {
+                                    const days = getDaysLeft(sponsor.endDate);
+                                    let notice = "";
+                                    if (days !== null) {
+                                        if (days < 0) notice = `Expired ${Math.abs(days)} days ago`;
+                                        else if (days === 0) notice = "Expires Today!";
+                                        else notice = `Expires in ${days} days`;
+                                    }
+                                    return (
+                                        <div key={sponsor.id} className="flex justify-between items-center bg-white p-3 rounded-lg border border-amber-200/60 shadow-sm gap-2">
+                                            <div className="overflow-hidden">
+                                                <p className="font-bold text-slate-900 truncate">{sponsor.name}</p>
+                                                <p className="text-slate-500 font-medium">{notice} ({sponsor.endDate ? new Date(sponsor.endDate).toLocaleDateString() : ''})</p>
+                                            </div>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setDraftEmailSponsor(sponsor);
+                                                    setIsEmailOpen(true);
+                                                }}
+                                                className="bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-300 font-semibold h-8 shrink-0 text-[11px]"
+                                            >
+                                                Draft Renewal
+                                            </Button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })()}
+
                 <Tabs defaultValue="secured" className="w-full">
                     <TabsList className="flex gap-1 bg-slate-100 p-1 rounded-lg w-fit mb-6">
                         <TabsTrigger value="secured" className="px-4 py-1.5 text-sm font-medium">Secured ({securedSponsors.length})</TabsTrigger>
@@ -860,6 +918,85 @@ export default function SponsorsPage() {
                                 <Printer className="h-4 w-4 mr-2" /> Print / Save PDF
                             </Button>
                         </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Contract Renewal Draft Email Dialog */}
+                <Dialog open={isEmailOpen} onOpenChange={setIsEmailOpen}>
+                    <DialogContent className="sm:max-w-[550px] bg-white text-slate-900">
+                        <DialogHeader>
+                            <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                                <FileText className="h-5 w-5 text-indigo-600" />
+                                Sponsor Contract Renewal Draft
+                            </DialogTitle>
+                            <DialogDescription>
+                                Copy this draft to email {draftEmailSponsor?.name} regarding their renewal.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {draftEmailSponsor && (
+                            <div className="space-y-4 py-3">
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Subject</label>
+                                    <Input
+                                        readOnly
+                                        value={`Sponsorship Renewal - Camden United FC & ${draftEmailSponsor.name}`}
+                                        className="bg-slate-50 text-xs font-semibold text-slate-900 border-slate-200"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-xs font-bold text-slate-400 uppercase">Message Body</label>
+                                    <Textarea
+                                        readOnly
+                                        rows={12}
+                                        value={`Dear ${draftEmailSponsor.name} Team,
+
+I hope you are well.
+
+We want to express our sincere thanks for your partnership as a Secured Sponsor of Camden United FC. Your support has been vital to our success.
+
+We wanted to note that your current sponsorship contract (£${draftEmailSponsor.amount.toLocaleString()} / ${draftEmailSponsor.frequency.toLowerCase()}) is scheduled for renewal on ${draftEmailSponsor.endDate ? new Date(draftEmailSponsor.endDate).toLocaleDateString() : 'N/A'}. 
+
+We would love to extend this partnership for the upcoming season and discuss how we can continue to maximize exposure and return on investment for your brand.
+
+Please let us know if you're available for a brief call next week to discuss renewal packages.
+
+Best regards,
+
+[Your Name]
+Camden United FC`}
+                                        className="bg-slate-50 text-xs leading-relaxed text-slate-900 border-slate-200"
+                                    />
+                                </div>
+                                <div className="flex gap-2 justify-end pt-2">
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setIsEmailOpen(false)}
+                                    >
+                                        Close
+                                    </Button>
+                                    <Button
+                                        onClick={() => {
+                                            const subject = encodeURIComponent(`Sponsorship Renewal - Camden United FC & ${draftEmailSponsor.name}`);
+                                            const body = encodeURIComponent(`Dear ${draftEmailSponsor.name} Team,\n\nI hope you are well.\n\nWe want to express our sincere thanks for your partnership as a Secured Sponsor of Camden United FC. Your support has been vital to our success.\n\nWe wanted to note that your current sponsorship contract (£${draftEmailSponsor.amount.toLocaleString()} / ${draftEmailSponsor.frequency.toLowerCase()}) is scheduled for renewal on ${draftEmailSponsor.endDate ? new Date(draftEmailSponsor.endDate).toLocaleDateString() : 'N/A'}.\n\nWe would love to extend this partnership for the upcoming season and discuss how we can continue to maximize exposure and return on investment for your brand.\n\nPlease let us know if you're available for a brief call next week to discuss renewal packages.\n\nBest regards,\n\n[Your Name]\nCamden United FC`);
+                                            window.open(`mailto:?subject=${subject}&body=${body}`, '_blank');
+                                        }}
+                                        className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold"
+                                    >
+                                        Open in Mail App
+                                    </Button>
+                                    <Button
+                                        onClick={() => {
+                                            const text = `Subject: Sponsorship Renewal - Camden United FC & ${draftEmailSponsor.name}\n\nDear ${draftEmailSponsor.name} Team,\n\nI hope you are well.\n\nWe want to express our sincere thanks for your partnership as a Secured Sponsor of Camden United FC. Your support has been vital to our success.\n\nWe wanted to note that your current sponsorship contract (£${draftEmailSponsor.amount.toLocaleString()} / ${draftEmailSponsor.frequency.toLowerCase()}) is scheduled for renewal on ${draftEmailSponsor.endDate ? new Date(draftEmailSponsor.endDate).toLocaleDateString() : 'N/A'}.\n\nWe would love to extend this partnership for the upcoming season and discuss how we can continue to maximize exposure and return on investment for your brand.\n\nPlease let us know if you're available for a brief call next week to discuss renewal packages.\n\nBest regards,\n\n[Your Name]\nCamden United FC`;
+                                            navigator.clipboard.writeText(text);
+                                            alert("Copied to clipboard!");
+                                        }}
+                                        className="bg-slate-900 hover:bg-slate-800 text-white font-semibold"
+                                    >
+                                        Copy Draft
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
                     </DialogContent>
                 </Dialog>
             </div>

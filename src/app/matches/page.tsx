@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink } from "lucide-react";
+import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink, CloudRain, Snowflake, Thermometer, CloudLightning, Sun, AlertCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,6 +22,7 @@ import { calculateMeetTime, generateWhatsAppMessage } from "@/lib/whatsapp-utils
 
 export default function MatchesPage() {
     const [matches, setMatches] = useState<Match[]>([]);
+    const [weatherForecast, setWeatherForecast] = useState<Record<string, { tempMax: number, tempMin: number, rain: number, snow: number, code: number }>>({});
     const [leagueTeams, setLeagueTeams] = useState<any[]>([]);
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -89,10 +90,43 @@ export default function MatchesPage() {
 
     // ... (keep state) ...
 
+    const getLocalDateString = (dateStr: string) => {
+        const d = new Date(dateStr);
+        if (isNaN(d.getTime())) return "";
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
     // Load Matches and League Teams from Supabase
     useEffect(() => {
         fetchMatches();
         fetchLeagueTeams();
+
+        const fetchWeather = async () => {
+            try {
+                // Free keyless forecast for London (Camden area)
+                const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=51.5074&longitude=-0.1278&daily=weathercode,temperature_2m_max,temperature_2m_min,rain_sum,snowfall_sum&timezone=Europe/London");
+                const data = await res.json();
+                if (data && data.daily) {
+                    const forecast: Record<string, { tempMax: number, tempMin: number, rain: number, snow: number, code: number }> = {};
+                    data.daily.time.forEach((dateStr: string, idx: number) => {
+                        forecast[dateStr] = {
+                            tempMax: data.daily.temperature_2m_max[idx],
+                            tempMin: data.daily.temperature_2m_min[idx],
+                            rain: data.daily.rain_sum[idx],
+                            snow: data.daily.snowfall_sum[idx],
+                            code: data.daily.weathercode[idx]
+                        };
+                    });
+                    setWeatherForecast(forecast);
+                }
+            } catch (e) {
+                console.error("Failed to load weather forecast:", e);
+            }
+        };
+        fetchWeather();
 
         const channel = supabase
             .channel("public:matches")
@@ -583,10 +617,53 @@ export default function MatchesPage() {
 
     const MatchCard = ({ match, isPast }: { match: Match, isPast?: boolean }) => {
         const teamInfo = leagueTeams.find(t => t.name.toLowerCase() === match.opponent.toLowerCase());
+        
+        const localDate = getLocalDateString(match.date);
+        const dayWeather = weatherForecast[localDate];
+
+        let weatherIcon = <Sun className="h-4 w-4 text-amber-500" />;
+        let weatherLabel = "Sunny / Clear";
+        let isWarning = false;
+        let warningText = "";
+
+        if (dayWeather) {
+            const { code, tempMax, tempMin, rain, snow } = dayWeather;
+            if (code >= 95) {
+                weatherIcon = <CloudLightning className="h-4 w-4 text-purple-500 animate-pulse" />;
+                weatherLabel = "Thunderstorms";
+                isWarning = true;
+                warningText = "Thunderstorms forecasted. Risk of pitch cancellation.";
+            } else if (snow > 0 || (code >= 71 && code <= 77) || (code >= 85 && code <= 86)) {
+                weatherIcon = <Snowflake className="h-4 w-4 text-sky-400 animate-spin" style={{ animationDuration: '3s' }} />;
+                weatherLabel = "Snowfall";
+                isWarning = true;
+                warningText = "Snow forecasted. Risk of frozen pitch.";
+            } else if (tempMin <= 1) {
+                weatherIcon = <Thermometer className="h-4 w-4 text-blue-500" />;
+                weatherLabel = `Freezing (${tempMin}°C)`;
+                isWarning = true;
+                warningText = `Sub-zero temperatures (${tempMin}°C) expected. Risk of frozen pitch.`;
+            } else if (rain > 8 || code === 63 || code === 65 || code === 82) {
+                weatherIcon = <CloudRain className="h-4 w-4 text-blue-600" />;
+                weatherLabel = "Heavy Rain";
+                isWarning = true;
+                warningText = "Heavy rain expected. Risk of waterlogged pitch.";
+            } else if (rain > 1 || (code >= 51 && code <= 55) || code === 61 || code === 80 || code === 81) {
+                weatherIcon = <CloudRain className="h-4 w-4 text-blue-400" />;
+                weatherLabel = "Light Rain";
+            } else if (code >= 1 && code <= 3) {
+                weatherLabel = "Partly Cloudy";
+                weatherIcon = <Sun className="h-4 w-4 text-slate-400" />;
+            } else if (code >= 45 && code <= 48) {
+                weatherLabel = "Foggy";
+                weatherIcon = <Sun className="h-4 w-4 text-slate-350" />;
+            }
+        }
+
         return (
             <Card className="overflow-hidden hover:shadow-md transition-shadow">
                 <CardHeader className="py-4 bg-slate-50/50 border-b flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 flex-wrap">
                         <Badge variant="outline" className={`bg-white ${match.competition.toLowerCase().includes("cup") ? "border-amber-200 text-amber-700" : "border-slate-200"
                             }`}>
                             {match.competition}
@@ -594,6 +671,11 @@ export default function MatchesPage() {
                         <span className="text-sm text-slate-500 flex items-center gap-1">
                             <CalendarDays className="h-3 w-3" /> {new Date(match.date).toLocaleDateString()}
                         </span>
+                        {dayWeather && !isPast && (
+                            <span className="text-xs text-slate-500 flex items-center gap-1 bg-slate-100/80 border border-slate-200/60 px-2 py-0.5 rounded-full" title={`Temp: ${dayWeather.tempMin}°C to ${dayWeather.tempMax}°C, Rain: ${dayWeather.rain}mm`}>
+                                {weatherIcon} <span>{weatherLabel} ({dayWeather.tempMin}° - {dayWeather.tempMax}°)</span>
+                            </span>
+                        )}
                     </div>
                     <div className="flex items-center gap-1">
                         {!isPast && (
@@ -694,6 +776,13 @@ export default function MatchesPage() {
                                 Note: {match.notes}
                             </div>
                         )}
+                    </div>
+                )}
+                {/* Weather Warning Banner */}
+                {isWarning && warningText && (
+                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 font-semibold flex items-center gap-2">
+                        <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 animate-pulse" />
+                        <span>{warningText}</span>
                     </div>
                 )}
             </CardContent>
