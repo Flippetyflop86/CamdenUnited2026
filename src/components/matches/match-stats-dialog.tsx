@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, Plus, Minus, Search, Trash2, Filter, RefreshCw, Link as LinkIcon } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
@@ -18,7 +19,7 @@ interface MatchPlayerStat {
     minutes_played: number;
 }
 
-export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon' }: { matchId: string, matchDate: string, opponent: string, variant?: 'icon' | 'full' }) {
+export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon' }: { matchId: string, matchDate: string, opponent: string, variant?: 'icon' | 'full' | 'inline' }) {
     const [isOpen, setIsOpen] = useState(false);
     const [players, setPlayers] = useState<any[]>([]);
     const [stats, setStats] = useState<MatchPlayerStat[]>([]);
@@ -35,10 +36,10 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
     const currentSquads = settings.squads || ["First Team"];
 
     useEffect(() => {
-        if (isOpen) {
+        if (isOpen || variant === 'inline') {
             fetchData();
         }
-    }, [isOpen]);
+    }, [isOpen, matchId, variant]);
 
     const fetchData = async () => {
         setIsLoading(true);
@@ -152,6 +153,135 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
             if (orderA !== orderB) return orderA - orderB;
             return a.last_name.localeCompare(b.last_name);
         });
+
+    if (variant === 'inline') {
+        return (
+            <Card className="border-slate-200 shadow-sm overflow-hidden flex flex-col bg-slate-50">
+                <CardHeader className="shrink-0 pb-4 border-b bg-white">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <CardTitle className="text-xl font-bold">Squad Player Stats</CardTitle>
+                            <p className="text-sm text-slate-500">
+                                {new Date(matchDate).toLocaleDateString()} vs {opponent}
+                            </p>
+                        </div>
+                        <div className="flex flex-col items-end gap-2">
+                            {showSyncInput ? (
+                                <div className="flex items-center gap-2">
+                                    <Input 
+                                        placeholder="Paste Match URL..." 
+                                        value={syncUrl}
+                                        onChange={(e) => setSyncUrl(e.target.value)}
+                                        className="h-8 text-xs w-64 bg-white"
+                                    />
+                                    <Button size="sm" onClick={handleAutoSync} disabled={isSyncing} className="h-8 bg-indigo-600 hover:bg-indigo-700">
+                                        {isSyncing ? <RefreshCw className="h-3 w-3 animate-spin mr-1" /> : <RefreshCw className="h-3 w-3 mr-1" />}
+                                        Fetch
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => setShowSyncInput(false)} className="h-8 px-2 text-slate-400">Cancel</Button>
+                                </div>
+                            ) : (
+                                <Button size="sm" variant="outline" onClick={() => setShowSyncInput(true)} className="h-8 text-xs bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100">
+                                    <LinkIcon className="h-3 w-3 mr-1.5" /> Auto-Fetch from URL
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </CardHeader>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 min-h-[450px]">
+                    {/* Left: Players in Match */}
+                    <div className="flex flex-col h-[400px] overflow-hidden bg-white border rounded-lg shadow-sm">
+                        <div className="p-3 bg-slate-900 text-white font-bold text-sm sticky top-0 z-10 flex justify-between items-center">
+                            <span>Players Logged ({stats.length})</span>
+                            <span className="text-xs font-normal text-slate-400">All get +1 App</span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                            {stats.length === 0 ? (
+                                <div className="text-center p-6 text-slate-400 text-sm">
+                                    No players logged yet.<br/>Select from the right panel.
+                                </div>
+                            ) : (
+                                stats.map(stat => {
+                                    const p = players.find(x => x.id === stat.player_id);
+                                    if (!p) return null;
+                                    return (
+                                        <div key={stat.id} className="bg-slate-50 border rounded-lg p-2 text-sm flex flex-col gap-2">
+                                            <div className="flex justify-between items-center border-b pb-2">
+                                                <span className="font-bold">{p.first_name} {p.last_name}</span>
+                                                <button onClick={() => removePlayerFromMatch(stat.id)} className="text-slate-400 hover:text-red-500 transition-colors">
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-12 text-xs text-slate-500 font-medium">Goals</span>
+                                                    <div className="flex items-center bg-white border rounded-full overflow-hidden">
+                                                        <button onClick={() => updateStat(stat.id, 'goals', -1)} className="px-2 py-1 hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
+                                                        <span className="w-6 text-center font-bold text-emerald-600">{stat.goals}</span>
+                                                        <button onClick={() => updateStat(stat.id, 'goals', 1)} className="px-2 py-1 hover:bg-slate-100"><Plus className="h-3 w-3" /></button>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="w-12 text-xs text-slate-500 font-medium">Assists</span>
+                                                    <div className="flex items-center bg-white border rounded-full overflow-hidden">
+                                                        <button onClick={() => updateStat(stat.id, 'assists', -1)} className="px-2 py-1 hover:bg-slate-100"><Minus className="h-3 w-3" /></button>
+                                                        <span className="w-6 text-center font-bold text-blue-600">{stat.assists}</span>
+                                                        <button onClick={() => updateStat(stat.id, 'assists', 1)} className="px-2 py-1 hover:bg-slate-100"><Plus className="h-3 w-3" /></button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Right: Available Players */}
+                    <div className="flex flex-col h-[400px] overflow-hidden bg-white border rounded-lg shadow-sm">
+                        <div className="p-3 bg-slate-100 border-b sticky top-0 z-10 space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="font-bold text-sm text-slate-700">Available Squad</span>
+                                <select 
+                                    className="text-xs bg-white border border-slate-200 rounded px-2 py-1 outline-none"
+                                    value={squadFilter}
+                                    onChange={(e) => setSquadFilter(e.target.value)}
+                                >
+                                    <option value="All">All Squads</option>
+                                    {currentSquads.map((s: string) => (
+                                        <option key={s} value={s}>{s}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="relative">
+                                <Search className="absolute left-2 top-2 h-4 w-4 text-slate-400" />
+                                <Input 
+                                    placeholder="Search player..." 
+                                    className="pl-8 h-8 text-sm"
+                                    value={search}
+                                    onChange={e => setSearch(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                            {availablePlayers.map(p => (
+                                <div key={p.id} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded-lg group transition-colors border border-transparent hover:border-slate-100">
+                                    <div>
+                                        <span className="font-semibold text-sm">{p.first_name} {p.last_name}</span>
+                                        <span className="ml-2 text-xs text-slate-400">{p.position}</span>
+                                    </div>
+                                    <Button size="sm" variant="outline" className="h-7 bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => addPlayerToMatch(p.id)}>
+                                        <Plus className="h-3 w-3 mr-1" /> Add
+                                    </Button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </Card>
+        );
+    }
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>

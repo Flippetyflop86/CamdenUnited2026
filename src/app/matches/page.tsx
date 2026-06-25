@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Match } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink, CloudRain, Snowflake, Thermometer, CloudLightning, Sun, AlertCircle } from "lucide-react";
+import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink, CloudRain, Snowflake, Thermometer, CloudLightning, Sun, AlertCircle, BarChart3 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -21,6 +22,7 @@ import { FORMATIONS } from "@/lib/formations";
 import { calculateMeetTime, generateWhatsAppMessage } from "@/lib/whatsapp-utils";
 
 export default function MatchesPage() {
+    const router = useRouter();
     const [matches, setMatches] = useState<Match[]>([]);
     const [weatherForecast, setWeatherForecast] = useState<Record<string, { tempMax: number, tempMin: number, rain: number, snow: number, code: number }>>({});
     const [leagueTeams, setLeagueTeams] = useState<any[]>([]);
@@ -683,7 +685,17 @@ export default function MatchesPage() {
                                 <MessageCircle className="h-4 w-4" />
                             </Button>
                         )}
-                        {!isPast && <MatchStatsDialog matchId={match.id} matchDate={match.date} opponent={match.opponent} />}
+                        {!isPast && (
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-slate-400 hover:text-emerald-600" 
+                                onClick={() => router.push(`/analysis?matchId=${match.id}`)}
+                                title="Log Match Stats"
+                            >
+                                <BarChart3 className="h-4 w-4" />
+                            </Button>
+                        )}
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleEditMatch(match)}>
                             <Edit2 className="h-4 w-4" />
                         </Button>
@@ -788,7 +800,14 @@ export default function MatchesPage() {
             </CardContent>
             {isPast && (
                 <div className="p-4 bg-slate-50 border-t">
-                    <MatchStatsDialog matchId={match.id} matchDate={match.date} opponent={match.opponent} variant="full" />
+                    <Button 
+                        variant="outline" 
+                        onClick={() => router.push(`/analysis?matchId=${match.id}`)}
+                        className="w-full font-bold border-red-200 text-red-700 bg-red-50 hover:bg-red-100 flex items-center justify-center gap-2"
+                    >
+                        <BarChart3 className="h-4 w-4" /> 
+                        Log Match Stats & Analysis
+                    </Button>
                 </div>
             )}
         </Card>
