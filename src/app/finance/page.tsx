@@ -2636,6 +2636,41 @@ export default function FinancePage() {
             {activeSection === "ledger" && (
                 <div className="space-y-6">
                     
+                    {/* Ledger Summaries */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <Card className="border-slate-200/80 shadow-sm bg-white">
+                            <CardContent className="p-4">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Income (Ledger)</div>
+                                <div className="text-xl font-black text-green-600 mt-1">
+                                    +£{transactions.filter(t => t.type === "Income").reduce((sum, t) => sum + t.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-slate-200/80 shadow-sm bg-white">
+                            <CardContent className="p-4">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Total Expenses (Ledger)</div>
+                                <div className="text-xl font-black text-red-500 mt-1">
+                                    -£{transactions.filter(t => t.type === "Expense").reduce((sum, t) => sum + t.amount, 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-slate-200/80 shadow-sm bg-white">
+                            <CardContent className="p-4">
+                                <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Net Ledger Cashflow</div>
+                                {(() => {
+                                    const inc = transactions.filter(t => t.type === "Income").reduce((sum, t) => sum + t.amount, 0);
+                                    const exp = transactions.filter(t => t.type === "Expense").reduce((sum, t) => sum + t.amount, 0);
+                                    const net = inc - exp;
+                                    return (
+                                        <div className={`text-xl font-black mt-1 ${net >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                            {net >= 0 ? '+' : '-'}£{Math.abs(net).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </div>
+                                    );
+                                })()}
+                            </CardContent>
+                        </Card>
+                    </div>
+                    
                     {/* Ledger Filters */}
                     <Card className="p-4 border-slate-200 shadow-md flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex flex-1 flex-wrap items-center gap-3">
