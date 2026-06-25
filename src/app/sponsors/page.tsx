@@ -22,7 +22,8 @@ import {
     Paperclip,
     Download,
     Square,
-    CheckSquare
+    CheckSquare,
+    Wallet
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -176,6 +177,29 @@ export default function SponsorsPage() {
         if (confirm("Are you sure you want to remove this sponsor? This will also remove them from the Finance dashboard.")) {
             await supabase.from('sponsors').delete().eq('id', id);
             await fetchSponsors();
+        }
+    };
+
+    const handleRecordPayment = async (sponsor: Sponsor) => {
+        const confirmPayment = confirm(`Record a ledger transaction of £${sponsor.amount} for sponsor "${sponsor.name}"?`);
+        if (!confirmPayment) return;
+
+        const payload = {
+            date: new Date().toISOString().split("T")[0],
+            description: `Sponsorship Payment - ${sponsor.name}`,
+            amount: sponsor.amount,
+            type: "Income",
+            category: "Sponsorship",
+            is_recurring: false
+        };
+
+        try {
+            const { error } = await supabase.from("finance_transactions").insert([payload]);
+            if (error) throw error;
+            alert(`Sponsorship payment of £${sponsor.amount} logged successfully in the ledger for ${sponsor.name}!`);
+        } catch (err: any) {
+            console.error("Failed to log sponsorship payment:", err);
+            alert("Failed to log payment transaction: " + (err.message || err));
         }
     };
 
@@ -469,9 +493,14 @@ export default function SponsorsPage() {
                             <CardContent className="pt-0 pb-4">
                                 <div className="flex flex-wrap justify-between items-center gap-2 pt-2 border-t mt-2">
                                     {sponsor.status === 'Secured' ? (
-                                        <Button variant="outline" size="sm" className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200 h-8 px-2 shrink-0" onClick={() => setSelectedReportSponsor(sponsor)}>
-                                            <FileText className="h-3.5 w-3.5 mr-1" /> ROI Report
-                                        </Button>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Button variant="outline" size="sm" className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200 h-8 px-2 shrink-0" onClick={() => setSelectedReportSponsor(sponsor)}>
+                                                <FileText className="h-3.5 w-3.5 mr-1" /> ROI Report
+                                            </Button>
+                                            <Button variant="outline" size="sm" className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 border-emerald-200 h-8 px-2 shrink-0" onClick={() => handleRecordPayment(sponsor)}>
+                                                <Wallet className="h-3.5 w-3.5 mr-1" /> Record Payment
+                                            </Button>
+                                        </div>
                                     ) : (
                                         <div />
                                     )}
