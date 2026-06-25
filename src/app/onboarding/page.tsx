@@ -93,9 +93,10 @@ export default function OnboardingWizard() {
     const sponsorInputRef = useRef<HTMLInputElement>(null);
 
     const totalSteps = 7;
+    const hasInitialized = useRef(false);
 
     useEffect(() => {
-        if (isLoaded && settings) {
+        if (isLoaded && settings && !hasInitialized.current) {
             setClubName(settings.name || "");
             setManagerName(user?.user_metadata?.full_name || "");
             setLogoPreview(settings.logo);
@@ -128,6 +129,8 @@ export default function OnboardingWizard() {
             setFinesEnabled(settings.finesEnabled || false);
             setSelectedSquads(settings.isOnboarded ? (settings.squads || ["First Team"]) : ["First Team"]);
             setLeagueUrl(settings.leagueUrl || "");
+            
+            hasInitialized.current = true;
         }
     }, [isLoaded, settings, user]);
 

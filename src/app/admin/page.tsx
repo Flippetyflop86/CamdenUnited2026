@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 export default function AdminPage() {
     const { settings, updateSettings } = useClub();
+    const hasInitialized = useRef(false);
     
     // Identity
     const [name, setName] = useState(settings.name);
@@ -129,7 +130,7 @@ export default function AdminPage() {
     }, [settings]);
 
     useEffect(() => {
-        if (settings) {
+        if (settings && !hasInitialized.current) {
             setName(settings.name);
             setLogo(settings.logo);
             setSquads(settings.squads || []);
@@ -154,6 +155,8 @@ export default function AdminPage() {
             setSponsorLogo(settings.sponsorLogo);
             setNotificationsEnabled(settings.notificationsEnabled || false);
             setNotificationEmail(settings.notificationEmail || "");
+            
+            hasInitialized.current = true;
         }
     }, [settings]);
 
