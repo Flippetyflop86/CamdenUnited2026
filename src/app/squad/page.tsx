@@ -35,7 +35,7 @@ export default function SquadPage() {
     const { settings, updateSettings } = useClub();
     const { clubId } = useAuth();
     const currentSquads = settings.squads || ["First Team"];
-    const [activeTab, setActiveTab] = useState(currentSquads[0] || "All");
+    const [activeTab, setActiveTab] = useState("All");
     const [isManageSquadsOpen, setIsManageSquadsOpen] = useState(false);
     const [editingSquads, setEditingSquads] = useState<string[]>(currentSquads);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
