@@ -643,7 +643,8 @@ export default function MatchdayXIPage() {
             : [];
         const activeTabClean = activeSquadTab.toLowerCase().replace(/\s+/g, '');
         const matchesSquad = playerSquads.includes(activeTabClean);
-        return matchesSquad || p.isInMatchdayTracker === true;
+        const isFirstTeamTab = activeTabClean === 'firstteam';
+        return matchesSquad || (isFirstTeamTab && p.isInMatchdayTracker === true);
     };
 
     const availablePlayers = players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p));
