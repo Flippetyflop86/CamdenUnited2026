@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
+import { useAuth } from "@/context/auth-context";
 import { RefreshCw } from "lucide-react";
 import { MatchStatsDialog } from "@/components/matches/match-stats-dialog";
 import { FORMATIONS } from "@/lib/formations";
@@ -25,6 +26,7 @@ export default function MatchesPage() {
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const { settings, updateSettings } = useClub();
+    const { clubId } = useAuth();
     const [isSyncing, setIsSyncing] = useState(false);
     const [isEditingUrl, setIsEditingUrl] = useState(false);
     const [tempUrl, setTempUrl] = useState("");
@@ -464,7 +466,8 @@ export default function MatchesPage() {
         if (!file) return;
         setIsUploadingBadge(true);
         try {
-            const fileName = `${Date.now()}_${file.name}`;
+            const nameBase = `${Date.now()}_${file.name}`;
+            const fileName = clubId ? `${clubId}/${nameBase}` : nameBase;
             const { data, error } = await supabase.storage
                 .from('player-avatars')
                 .upload(fileName, file, { cacheControl: '3600', upsert: false });

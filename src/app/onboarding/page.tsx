@@ -28,7 +28,7 @@ const presetColors = [
 
 export default function OnboardingWizard() {
     const { settings, updateSettings, isLoaded } = useClub();
-    const { user, signOut } = useAuth();
+    const { user, signOut, clubId } = useAuth();
     const router = useRouter();
 
     const [step, setStep] = useState(1);
@@ -225,7 +225,7 @@ export default function OnboardingWizard() {
         if (file && user) {
             const fileExt = file.name.split('.').pop() || 'png';
             const fileName = `${user.id}-${Math.random()}.${fileExt}`;
-            const filePath = `${fileName}`;
+            const filePath = clubId ? `${clubId}/${fileName}` : fileName;
 
             const { error: uploadError } = await supabase.storage
                 .from(bucket)

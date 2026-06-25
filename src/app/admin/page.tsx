@@ -57,7 +57,7 @@ export default function AdminPage() {
 
 
 
-    const { user, role: userRole, isManager, pagePermissions, refreshPermissions } = useAuth();
+    const { user, role: userRole, isManager, pagePermissions, refreshPermissions, clubId } = useAuth();
     const [managerName, setManagerName] = useState("");
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
     const [invitations, setInvitations] = useState<any[]>([]);
@@ -263,7 +263,7 @@ export default function AdminPage() {
         try {
             const fileExt = file.name.split('.').pop();
             const fileName = `${Math.random()}.${fileExt}`;
-            const filePath = fileName;
+            const filePath = clubId ? `${clubId}/${fileName}` : fileName;
 
             const { error: uploadError } = await supabase.storage
                 .from(bucket)

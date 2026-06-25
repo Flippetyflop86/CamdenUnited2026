@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Player, SquadType, MedicalStatus, Position } from "@/types";
 import { useClub } from "@/context/club-context";
+import { useAuth } from "@/context/auth-context";
 import { PlayerCard } from "@/components/squad/player-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ export default function SquadPage() {
     const hasLoaded = useRef(false);
 
     const { settings, updateSettings } = useClub();
+    const { clubId } = useAuth();
     const currentSquads = settings.squads || ["First Team"];
     const [activeTab, setActiveTab] = useState(currentSquads[0] || "All");
     const [isManageSquadsOpen, setIsManageSquadsOpen] = useState(false);
@@ -299,7 +301,8 @@ export default function SquadPage() {
             const compressedFile = await imageCompression(file, options);
 
             // Upload to Supabase Storage
-            const fileName = `${Date.now()}_${compressedFile.name}`;
+            const nameBase = `${Date.now()}_${compressedFile.name}`;
+            const fileName = clubId ? `${clubId}/${nameBase}` : nameBase;
             const { data, error } = await supabase.storage
                 .from('player-avatars')
                 .upload(fileName, compressedFile, { cacheControl: '3600', upsert: false });
