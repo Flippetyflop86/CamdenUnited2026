@@ -467,19 +467,19 @@ export default function SponsorsPage() {
                                 </CardContent>
                             </div>
                             <CardContent className="pt-0 pb-4">
-                                <div className="flex justify-between items-center pt-2 border-t mt-2">
+                                <div className="flex flex-wrap justify-between items-center gap-2 pt-2 border-t mt-2">
                                     {sponsor.status === 'Secured' ? (
-                                        <Button variant="outline" size="sm" className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200 h-8" onClick={() => setSelectedReportSponsor(sponsor)}>
+                                        <Button variant="outline" size="sm" className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 border-indigo-200 h-8 px-2 shrink-0" onClick={() => setSelectedReportSponsor(sponsor)}>
                                             <FileText className="h-3.5 w-3.5 mr-1" /> ROI Report
                                         </Button>
                                     ) : (
                                         <div />
                                     )}
-                                    <div className="flex gap-2">
-                                        <Button variant="ghost" size="sm" className="h-8" onClick={() => openEdit(sponsor)}>
+                                    <div className="flex gap-1.5 shrink-0">
+                                        <Button variant="ghost" size="sm" className="h-8 px-2" onClick={() => openEdit(sponsor)}>
                                             <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
                                         </Button>
-                                        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8" onClick={() => handleDelete(sponsor.id)}>
+                                        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-600 hover:bg-red-50 h-8 px-2" onClick={() => handleDelete(sponsor.id)}>
                                             <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
                                         </Button>
                                     </div>
