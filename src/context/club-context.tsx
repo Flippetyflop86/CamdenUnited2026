@@ -40,7 +40,7 @@ interface ClubSettings {
 interface ClubContextType {
     settings: ClubSettings;
     isLoaded: boolean;
-    updateSettings: (newSettings: Partial<ClubSettings>) => void;
+    updateSettings: (newSettings: Partial<ClubSettings>, pagePermissions?: string[]) => Promise<void>;
 }
 
 const defaultSettings: ClubSettings = {
@@ -220,7 +220,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         fetchSettings();
     }, [user, clubId, authLoading]);
 
-    const updateSettings = async (newSettings: Partial<ClubSettings>) => {
+    const updateSettings = async (newSettings: Partial<ClubSettings>, pagePermissions?: string[]) => {
         let finalSecondaryColor = newSettings.secondaryColor ?? settings.secondaryColor;
         if (newSettings.primaryColor && !newSettings.secondaryColor) {
             finalSecondaryColor = generateSecondaryColor(newSettings.primaryColor);
@@ -283,6 +283,17 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                 .update(updates)
                 .eq("id", existingId);
             error = updateErr;
+
+            if (!error && pagePermissions && user) {
+                const { error: memberUpdateErr } = await supabase
+                    .from("club_members")
+                    .update({ page_permissions: pagePermissions })
+                    .eq("club_id", existingId)
+                    .eq("user_id", user.id);
+                if (memberUpdateErr) {
+                    console.warn("Failed to update page permissions on club_members:", memberUpdateErr);
+                }
+            }
         } else {
             // No authenticated club membership exists yet. Create a brand new isolated club.
             const { data: newClub, error: insertErr } = await supabase
@@ -303,7 +314,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         user_id: user.id,
                         role: "manager",
                         display_name: user.user_metadata?.full_name || "Manager",
-                        page_permissions: ["admin", "dashboard", "squad", "matches", "training", "finance", "sponsors", "staff"]
+                        page_permissions: pagePermissions || ["admin", "dashboard", "squad", "matches", "training", "finance", "sponsors", "staff"]
                     }]);
                 if (memberErr) {
                     console.warn("Failed to automatically link new manager to club:", memberErr);

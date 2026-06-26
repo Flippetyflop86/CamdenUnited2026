@@ -7,11 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Upload, CheckCircle2, ChevronRight, Image as ImageIcon, Users, Palette, Trophy, ShieldCheck, MapPin, Twitter, Instagram, Banknote, ShieldAlert, Award, Plus, Trash2, Shield } from "lucide-react";
+import { AlertCircle, Upload, CheckCircle2, ChevronRight, Image as ImageIcon, Users, Palette, Trophy, ShieldCheck, MapPin, Twitter, Instagram, Banknote, ShieldAlert, Award, Plus, Trash2, Shield, FileText, Target } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { motion, AnimatePresence } from "framer-motion";
+import { ALL_PAGE_PERMISSIONS } from "@/lib/permissions";
+
+
+const ROLE_TABS: Record<string, string[]> = {
+    "manager/coach": ["squad", "training", "matches", "matchday-xi", "analysis", "opposition", "league", "staff", "documents"],
+    "secretary": ["squad", "matches", "league", "sponsors", "finance", "staff", "documents", "inventory"],
+    "analyst": ["squad", "matches", "matchday-xi", "analysis", "opposition", "league"],
+    "chairperson": ["squad", "matches", "league", "sponsors", "finance", "budgets", "staff", "documents"]
+};
 
 const presetColors = [
     { name: "White", value: "#ffffff" },
@@ -48,6 +57,13 @@ export default function OnboardingWizard() {
     const [sponsorLogoFile, setSponsorLogoFile] = useState<File | null>(null);
     const [sponsorLogoPreview, setSponsorLogoPreview] = useState<string | null>(() => settings.sponsorLogo ?? null);
     const [primaryColor, setPrimaryColor] = useState(() => getCached("primaryColor") ?? settings.primaryColor ?? "#ef4444");
+
+    // Step 2 & 3: Role and Tabs
+    const [selectedRole, setSelectedRole] = useState(() => getCached("selectedRole") ?? "");
+    const [selectedTabs, setSelectedTabs] = useState<string[]>(() => {
+        const cached = getCached("selectedTabs");
+        return cached ? JSON.parse(cached) : [];
+    });
 
     // Step 2: Kits
     const [homeKitShirt, setHomeKitShirt] = useState(() => getCached("homeKitShirt") ?? settings.homeKitShirt ?? "#ffffff");
@@ -113,7 +129,7 @@ export default function OnboardingWizard() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const sponsorInputRef = useRef<HTMLInputElement>(null);
 
-    const totalSteps = 7;
+    const totalSteps = 9;
     const hasInitialized = useRef(false);
 
     useEffect(() => {
@@ -162,6 +178,12 @@ export default function OnboardingWizard() {
             const cachedSquads = getCached("selectedSquads");
             setSelectedSquads(cachedSquads ? JSON.parse(cachedSquads) : (settings.isOnboarded ? (settings.squads || ["First Team"]) : ["First Team"]));
             
+            const cachedRole = getCached("selectedRole");
+            if (cachedRole) setSelectedRole(cachedRole);
+
+            const cachedTabs = getCached("selectedTabs");
+            if (cachedTabs) setSelectedTabs(JSON.parse(cachedTabs));
+
             setLeagueUrl(getCached("leagueUrl") ?? settings.leagueUrl ?? "");
             
             hasInitialized.current = true;
@@ -197,6 +219,8 @@ export default function OnboardingWizard() {
             finesEnabled: String(finesEnabled),
             selectedSquads: JSON.stringify(selectedSquads),
             leagueUrl,
+            selectedRole,
+            selectedTabs: JSON.stringify(selectedTabs),
         };
 
         Object.entries(cache).forEach(([key, val]) => {
@@ -207,7 +231,7 @@ export default function OnboardingWizard() {
         awayKitShirt, awayKitShorts, awayKitSocks, homeGroundName, twitterHandle,
         instagramHandle, whatsappPollMessage, trainingLocation, monthlySubs, subsEnabled,
         contractsEnabled, registrationFee, trainingFeePerSession, matchdayFee, subsStructure,
-        finesEnabled, selectedSquads, leagueUrl
+        finesEnabled, selectedSquads, leagueUrl, selectedRole, selectedTabs
     ]);
 
     useEffect(() => {
@@ -336,7 +360,14 @@ export default function OnboardingWizard() {
             }
         }
 
-        if (step === 5 && selectedSquads.length === 0) {
+        if (step === 2) {
+            if (!selectedRole) {
+                setError("Please select a role to continue.");
+                return;
+            }
+        }
+
+        if (step === 7 && selectedSquads.length === 0) {
             setError("Please select at least one squad.");
             return;
         }
@@ -388,6 +419,9 @@ export default function OnboardingWizard() {
                 if (userUpdateErr) console.warn("Failed to update manager name metadata:", userUpdateErr);
             }
 
+            // Always make sure 'admin' and 'dashboard' are in page permissions for manager/owner
+            const permissionsToSave = Array.from(new Set(["admin", "dashboard", ...selectedTabs]));
+
             await updateSettings({ 
                 name: clubName,
                 logo: finalLogoUrl,
@@ -412,7 +446,7 @@ export default function OnboardingWizard() {
                 whatsappPollMessage: whatsappPollMessage || null,
                 trainingLocation: trainingLocation || null,
                 isOnboarded: true 
-            });
+            }, permissionsToSave);
 
             if (subsEnabled) {
                 localStorage.setItem(`clubflow_matchday_fee_${clubName}`, matchdayFee);
@@ -425,11 +459,11 @@ export default function OnboardingWizard() {
                 "awayKitShirt", "awayKitShorts", "awayKitSocks", "homeGroundName", "twitterHandle",
                 "instagramHandle", "whatsappPollMessage", "trainingLocation", "monthlySubs", "subsEnabled",
                 "contractsEnabled", "registrationFee", "trainingFeePerSession", "matchdayFee", "subsStructure",
-                "finesEnabled", "selectedSquads", "leagueUrl"
+                "finesEnabled", "selectedSquads", "leagueUrl", "selectedRole", "selectedTabs"
             ];
             ONBOARDING_CACHE_KEYS.forEach(key => sessionStorage.removeItem(`clubflow_onboarding_${key}`));
 
-            setStep(8); // Success screen
+            setStep(10); // Success screen (step 10 now)
         } catch (err: any) {
             console.error(err);
             setError(err.message || "Failed to save settings.");
@@ -496,7 +530,7 @@ export default function OnboardingWizard() {
                             {step > 0 && step <= totalSteps && (
                                 <div className="flex justify-between items-center px-4 mb-4 relative max-w-md mx-auto">
                                     <div className="absolute left-6 right-6 top-1/2 h-0.5 bg-slate-800 -z-10" />
-                                    {[1, 2, 3, 4, 5, 6, 7].map((num) => (
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                                         <div 
                                             key={num} 
                                             className={`h-7 w-7 rounded-full flex items-center justify-center font-bold text-xs transition-colors duration-300 ${
@@ -733,8 +767,148 @@ export default function OnboardingWizard() {
                                         </motion.div>
                                     )}
 
-                                    {/* STEP 2: Kit Colors */}
+                                    {/* STEP 2: Role Selection */}
                                     {step === 2 && (
+                                        <motion.div key="step2" {...animations}>
+                                            <CardHeader className="space-y-2 pb-6 border-b border-slate-900 text-center">
+                                                <CardTitle className="text-2xl font-extrabold text-white">Select Your Role</CardTitle>
+                                                <CardDescription className="text-slate-400 text-sm">
+                                                    Choose your primary role to tailormake your workspace tabs.
+                                                </CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-6 pt-6">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {[
+                                                        { role: "manager/coach", label: "Manager / Coach", desc: "For running team squads, training sessions, matchday lineups, and tactics.", icon: Users },
+                                                        { role: "secretary", label: "Secretary", desc: "For coordinating fixtures, sponsorships, player databases, documents, and overall admin.", icon: FileText },
+                                                        { role: "analyst", label: "Analyst", desc: "For post-match analytics, opposition scouting reports, and fixtures performance.", icon: Target },
+                                                        { role: "chairperson", label: "Chairperson", desc: "For high-level oversight, sponsorships, financials, player budgets, and staff contracts.", icon: Award }
+                                                    ].map((item) => {
+                                                        const IconComponent = item.icon;
+                                                        const isSelected = selectedRole === item.role;
+                                                        return (
+                                                            <button
+                                                                key={item.role}
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setSelectedRole(item.role);
+                                                                    setSelectedTabs(ROLE_TABS[item.role] || []);
+                                                                }}
+                                                                className={`p-5 rounded-2xl cursor-pointer border-2 text-left transition-all duration-300 flex flex-col justify-between h-44 hover:scale-[1.02] ${
+                                                                    isSelected
+                                                                        ? 'border-teal-500 bg-teal-500/10 shadow-lg shadow-teal-500/10'
+                                                                        : 'border-slate-800 bg-slate-900/20 hover:border-slate-700 hover:bg-slate-900/30'
+                                                                }`}
+                                                            >
+                                                                <div className="flex items-center justify-between w-full">
+                                                                    <div className={`p-2.5 rounded-xl ${isSelected ? 'bg-teal-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
+                                                                        <IconComponent className="w-5 h-5" />
+                                                                    </div>
+                                                                    {isSelected && (
+                                                                        <CheckCircle2 className="w-5 h-5 text-teal-400 fill-teal-400/20" />
+                                                                    )}
+                                                                </div>
+                                                                <div className="mt-4">
+                                                                    <h4 className="font-bold text-base text-white">{item.label}</h4>
+                                                                    <p className="text-slate-400 text-xs mt-1 leading-relaxed">{item.desc}</p>
+                                                                </div>
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </CardContent>
+                                        </motion.div>
+                                    )}
+
+                                    {/* STEP 3: Workspace Tab Selection */}
+                                    {step === 3 && (
+                                        <motion.div key="step3" {...animations}>
+                                            <CardHeader className="space-y-2 pb-6 border-b border-slate-900">
+                                                <CardTitle className="text-2xl font-extrabold text-white flex items-center gap-2">
+                                                    <Palette className="text-slate-400 w-5 h-5" /> Tailor Your Workspace
+                                                </CardTitle>
+                                                <CardDescription className="text-slate-400 text-sm">
+                                                    Choose which tabs should show up in your main dashboard sidebar. You can easily add or remove them later via the Admin page.
+                                                </CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="space-y-6 pt-6">
+                                                {/* Select All Checkbox */}
+                                                <div 
+                                                    onClick={() => {
+                                                        const selectablePermissions = ALL_PAGE_PERMISSIONS.filter(p => p.key !== "admin" && p.key !== "dashboard");
+                                                        const allSelected = selectablePermissions.every(p => selectedTabs.includes(p.key));
+                                                        if (allSelected) {
+                                                            setSelectedTabs([]);
+                                                        } else {
+                                                            setSelectedTabs(selectablePermissions.map(p => p.key));
+                                                        }
+                                                    }}
+                                                    className="p-4 rounded-xl border border-slate-800 bg-slate-900/30 hover:border-slate-700 cursor-pointer flex items-center justify-between transition-all"
+                                                >
+                                                    <div className="space-y-0.5">
+                                                        <span className="text-sm font-bold text-white">Select all tabs</span>
+                                                        <p className="text-xs text-slate-400">Enable every tab in the workspace regardless of your role</p>
+                                                    </div>
+                                                    {(() => {
+                                                        const selectablePermissions = ALL_PAGE_PERMISSIONS.filter(p => p.key !== "admin" && p.key !== "dashboard");
+                                                        const allSelected = selectablePermissions.length > 0 && selectablePermissions.every(p => selectedTabs.includes(p.key));
+                                                        return (
+                                                            <div className={`w-6 h-6 rounded-md border flex items-center justify-center transition-all ${
+                                                                allSelected ? 'bg-teal-500 border-teal-500 text-slate-950' : 'border-slate-700 bg-slate-900/50'
+                                                            }`}>
+                                                                {allSelected && <CheckCircle2 className="w-4 h-4 text-slate-950" />}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </div>
+
+                                                <div className="max-h-[350px] overflow-y-auto pr-2 custom-scrollbar space-y-4">
+                                                    {["On the Pitch", "Analysis", "Off the Pitch"].map(group => {
+                                                        const groupPermissions = ALL_PAGE_PERMISSIONS.filter(p => p.group === group && p.key !== "admin" && p.key !== "dashboard");
+                                                        if (groupPermissions.length === 0) return null;
+                                                        return (
+                                                            <div key={group} className="space-y-2">
+                                                                <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider">{group}</h4>
+                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                                    {groupPermissions.map(perm => {
+                                                                        const isSelected = selectedTabs.includes(perm.key);
+                                                                        return (
+                                                                            <div
+                                                                                key={perm.key}
+                                                                                onClick={() => {
+                                                                                    setSelectedTabs(prev =>
+                                                                                        prev.includes(perm.key)
+                                                                                            ? prev.filter(t => t !== perm.key)
+                                                                                            : [...prev, perm.key]
+                                                                                    );
+                                                                                }}
+                                                                                className={`p-3.5 rounded-xl cursor-pointer border-2 transition-all flex items-start gap-3 text-left ${
+                                                                                    isSelected ? 'border-teal-500 bg-teal-500/5' : 'border-slate-800 bg-slate-900/10 hover:border-slate-700'
+                                                                                }`}
+                                                                            >
+                                                                                <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
+                                                                                    isSelected ? 'bg-teal-500 border-teal-500 text-slate-950' : 'border-slate-700 bg-slate-900/30'
+                                                                                }`}>
+                                                                                    {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-slate-950" />}
+                                                                                </div>
+                                                                                <div>
+                                                                                    <span className="text-sm font-semibold text-white block">{perm.label}</span>
+                                                                                    <span className="text-slate-400 text-[11px] leading-relaxed mt-0.5 block">{perm.description}</span>
+                                                                                </div>
+                                                                            </div>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </CardContent>
+                                        </motion.div>
+                                    )}
+
+                                    {/* STEP 4: Kit Colors */}
+                                    {step === 4 && (
                                         <motion.div key="step2" {...animations}>
                                             <CardHeader className="space-y-2 pb-6 border-b border-slate-900">
                                                 <CardTitle className="text-2xl font-extrabold text-white flex items-center gap-2">
@@ -792,8 +966,8 @@ export default function OnboardingWizard() {
                                         </motion.div>
                                     )}
 
-                                    {/* STEP 3: Details & History */}
-                                    {step === 3 && (
+                                    {/* STEP 5: Details & History */}
+                                    {step === 5 && (
                                         <motion.div key="step3" {...animations}>
                                             <CardHeader className="space-y-2 pb-6 border-b border-slate-900">
                                                 <CardTitle className="text-2xl font-extrabold text-white flex items-center gap-2">
@@ -832,8 +1006,8 @@ export default function OnboardingWizard() {
                                         </motion.div>
                                     )}
 
-                                    {/* STEP 4: Finance & Operations */}
-                                    {step === 4 && (
+                                    {/* STEP 6: Finance & Operations */}
+                                    {step === 6 && (
                                         <motion.div key="step4" {...animations}>
                                             <CardHeader className="space-y-2 pb-6 border-b border-slate-900">
                                                 <CardTitle className="text-2xl font-extrabold text-white flex items-center gap-2">
@@ -991,8 +1165,8 @@ export default function OnboardingWizard() {
                                         </motion.div>
                                     )}
 
-                                    {/* STEP 5: Squads */}
-                                    {step === 5 && (
+                                    {/* STEP 7: Squads */}
+                                    {step === 7 && (
                                         <motion.div key="step5" {...animations}>
                                             <CardHeader className="space-y-2 pb-6 border-b border-slate-900">
                                                 <CardTitle className="text-2xl font-extrabold text-white flex items-center gap-2">
@@ -1049,8 +1223,8 @@ export default function OnboardingWizard() {
                                         </motion.div>
                                     )}
 
-                                    {/* STEP 6: Staff & Committee */}
-                                    {step === 6 && (
+                                    {/* STEP 8: Staff & Committee */}
+                                    {step === 8 && (
                                         <motion.div key="step6" {...animations}>
                                             <CardHeader className="space-y-2 pb-6 border-b border-slate-900">
                                                 <CardTitle className="text-2xl font-extrabold text-white flex items-center gap-2">
@@ -1114,8 +1288,8 @@ export default function OnboardingWizard() {
                                         </motion.div>
                                     )}
 
-                                    {/* STEP 7: League Integration */}
-                                    {step === 7 && (
+                                    {/* STEP 9: League Integration */}
+                                    {step === 9 && (
                                         <motion.div key="step7" {...animations}>
                                             <CardHeader className="space-y-2 pb-6 border-b border-slate-900">
                                                 <CardTitle className="text-2xl font-extrabold text-white flex items-center gap-2">
@@ -1143,8 +1317,8 @@ export default function OnboardingWizard() {
                                         </motion.div>
                                     )}
 
-                                    {/* STEP 8: Onboarding Success */}
-                                    {step === 8 && (
+                                    {/* STEP 10: Onboarding Success */}
+                                    {step === 10 && (
                                         <motion.div
                                             key="step8"
                                             initial={{ opacity: 0, scale: 0.95 }}
@@ -1174,8 +1348,8 @@ export default function OnboardingWizard() {
 
                                 </AnimatePresence>
 
-                                {/* Footer navigation for steps 1-7 */}
-                                {step < 8 && (
+                                {/* Footer navigation for steps 1-9 */}
+                                {step < 10 && (
                                     <CardFooter className="bg-slate-950/40 p-4 border-t border-slate-900 flex justify-between gap-4">
                                         {step > 0 ? (
                                             <Button 
