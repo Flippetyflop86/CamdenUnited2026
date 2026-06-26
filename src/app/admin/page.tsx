@@ -100,6 +100,41 @@ export default function AdminPage() {
     const [lastGeneratedMessage, setLastGeneratedMessage] = useState("");
     const [isPollMessageEdited, setIsPollMessageEdited] = useState(false);
 
+    const DEFAULT_TRAINING_TEMPLATE = `⚽ Training Availability Poll\n📅 Date: {date}\n⏰ Time: {time}\n📍 Venue: {location}\n\nAvailable (Ready to train)\nNot Available\n50/50 (will let you know by {deadline})`;
+    const DEFAULT_MATCH_TEMPLATE = `⚽ Matchday Squad Availability Poll 🏟️\n🆚 Opponent: {opponent} ({home_away})\n📅 Date: {date}\n⏰ Kick-Off: {time} (Meet at {meet_time})\n🏆 Competition: {competition}\n\nAvailable (Selected & ready to play)\nNot Available\nInjured / Doubtful (Will update manager)`;
+
+    const [trainingTemplate, setTrainingTemplate] = useState(() => {
+        const cached = getCached("trainingTemplate");
+        if (cached) return cached;
+        if (settings.whatsappPollMessage) {
+            try {
+                const parsed = JSON.parse(settings.whatsappPollMessage);
+                return parsed.training || DEFAULT_TRAINING_TEMPLATE;
+            } catch (e) {
+                if (settings.whatsappPollMessage.includes("Training")) {
+                    return settings.whatsappPollMessage;
+                }
+            }
+        }
+        return DEFAULT_TRAINING_TEMPLATE;
+    });
+
+    const [matchTemplate, setMatchTemplate] = useState(() => {
+        const cached = getCached("matchTemplate");
+        if (cached) return cached;
+        if (settings.whatsappPollMessage) {
+            try {
+                const parsed = JSON.parse(settings.whatsappPollMessage);
+                return parsed.match || DEFAULT_MATCH_TEMPLATE;
+            } catch (e) {
+                if (settings.whatsappPollMessage.includes("Matchday")) {
+                    return settings.whatsappPollMessage;
+                }
+            }
+        }
+        return DEFAULT_MATCH_TEMPLATE;
+    });
+
     const { user, role: userRole, isManager, pagePermissions, refreshPermissions, clubId } = useAuth();
     const [managerName, setManagerName] = useState(() => getCached("managerName") ?? "");
     const [teamMembers, setTeamMembers] = useState<any[]>([]);
@@ -210,6 +245,27 @@ export default function AdminPage() {
             setNotificationsEnabled(cachedNotifications !== null ? cachedNotifications === "true" : (settings.notificationsEnabled || false));
             
             setNotificationEmail(getCached("notificationEmail") ?? settings.notificationEmail ?? "");
+
+            const cachedTraining = getCached("trainingTemplate");
+            const cachedMatch = getCached("matchTemplate");
+            
+            let parsedTraining = DEFAULT_TRAINING_TEMPLATE;
+            let parsedMatch = DEFAULT_MATCH_TEMPLATE;
+            if (settings.whatsappPollMessage) {
+                try {
+                    const parsed = JSON.parse(settings.whatsappPollMessage);
+                    if (parsed.training) parsedTraining = parsed.training;
+                    if (parsed.match) parsedMatch = parsed.match;
+                } catch (e) {
+                    if (settings.whatsappPollMessage.includes("Training")) {
+                        parsedTraining = settings.whatsappPollMessage;
+                    } else if (settings.whatsappPollMessage.includes("Matchday")) {
+                        parsedMatch = settings.whatsappPollMessage;
+                    }
+                }
+            }
+            setTrainingTemplate(cachedTraining ?? parsedTraining);
+            setMatchTemplate(cachedMatch ?? parsedMatch);
             
             hasInitialized.current = true;
         }
@@ -242,7 +298,9 @@ export default function AdminPage() {
             fineCategories: JSON.stringify(fineCategories),
             notificationsEnabled: String(notificationsEnabled),
             notificationEmail,
-            managerName
+            managerName,
+            trainingTemplate,
+            matchTemplate
         };
 
         Object.entries(cache).forEach(([key, val]) => {
@@ -252,7 +310,7 @@ export default function AdminPage() {
         name, squads, homeGround, foundingYear, twitterUrl, instagramUrl, primaryColor,
         homeKitShirt, homeKitShorts, homeKitSocks, awayKitShirt, awayKitShorts, awayKitSocks,
         leagueUrl, leaguePosition, monthlySubs, subsEnabled, contractsEnabled, finesEnabled,
-        fineCategories, notificationsEnabled, notificationEmail, managerName
+        fineCategories, notificationsEnabled, notificationEmail, managerName, trainingTemplate, matchTemplate
     ]);
 
     const fetchTeamAccess = async () => {
@@ -437,7 +495,13 @@ export default function AdminPage() {
                 return new Date(dateStr).toLocaleDateString('en-US', options);
             };
             
-            return `⚽ ${settings.name || "Club"} Training Availability Poll\n📅 Date: ${formatDate(session.date)}\n⏰ Time: ${session.time}\n📍 Venue: ${session.location}\n\nAvailable (Ready to train)\nNot Available\n50/50 (will let you know by ${trainingDeadline})`;
+            const template = trainingTemplate || DEFAULT_TRAINING_TEMPLATE;
+            return template
+                .replace(/{club_name}/g, name || settings.name || "Club")
+                .replace(/{date}/g, formatDate(session.date))
+                .replace(/{time}/g, session.time || "")
+                .replace(/{location}/g, session.location || "")
+                .replace(/{deadline}/g, trainingDeadline || "");
         } else {
             const match = upcomingMatches.find(m => m.id === selectedEventId);
             if (!match) return "No upcoming matches scheduled. Go to Matches tab to create one.";
@@ -450,7 +514,15 @@ export default function AdminPage() {
             const offsetNum = parseInt(meetupOffset, 10) || 90;
             const meetTime = calculateMeetTime(match.time || "", offsetNum);
             
-            return `⚽ ${settings.name || "Club"} Matchday Squad Availability Poll\n🆚 Opponent: ${match.opponent} (${match.is_home ? 'Home' : 'Away'})\n📅 Date: ${formatDate(match.date)}\n⏰ Kick-Off: ${match.time || 'TBC'} (Meet at ${meetTime})\n${match.competition ? `🏆 Competition: ${match.competition}\n` : ''}\nAvailable (Selected & ready to play)\nNot Available\nInjured / Doubtful (Will update manager)`;
+            const template = matchTemplate || DEFAULT_MATCH_TEMPLATE;
+            return template
+                .replace(/{club_name}/g, name || settings.name || "Club")
+                .replace(/{opponent}/g, match.opponent || "")
+                .replace(/{home_away}/g, match.is_home ? 'Home' : 'Away')
+                .replace(/{date}/g, formatDate(match.date))
+                .replace(/{time}/g, match.time || 'TBC')
+                .replace(/{meet_time}/g, meetTime || 'TBC')
+                .replace(/{competition}/g, match.competition || "");
         }
     };
 
@@ -461,7 +533,7 @@ export default function AdminPage() {
             setLastGeneratedMessage(newGen);
             setIsPollMessageEdited(false);
         }
-    }, [pollType, selectedEventId, trainingDeadline, meetupOffset, upcomingSessions, upcomingMatches, settings]);
+    }, [pollType, selectedEventId, trainingDeadline, meetupOffset, upcomingSessions, upcomingMatches, settings, name, trainingTemplate, matchTemplate]);
 
     const handleCopyPoll = async () => {
         const text = pollMessage;
@@ -472,10 +544,36 @@ export default function AdminPage() {
     };
 
     const handleResetPoll = () => {
-        const newGen = generatePollMessage();
-        setPollMessage(newGen);
-        setLastGeneratedMessage(newGen);
+        if (pollType === "training") {
+            setTrainingTemplate(DEFAULT_TRAINING_TEMPLATE);
+        } else {
+            setMatchTemplate(DEFAULT_MATCH_TEMPLATE);
+        }
         setIsPollMessageEdited(false);
+    };
+
+    const insertEmoji = (emoji: string) => {
+        const textarea = document.getElementById("templateInput") as HTMLTextAreaElement;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const before = text.substring(0, start);
+        const after = text.substring(end, text.length);
+        const newText = before + emoji + after;
+
+        if (pollType === "training") {
+            setTrainingTemplate(newText);
+        } else {
+            setMatchTemplate(newText);
+        }
+
+        // Refocus textarea and restore selection
+        setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(start + emoji.length, start + emoji.length);
+        }, 0);
     };
 
     const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -567,7 +665,11 @@ export default function AdminPage() {
                 fineCategories,
                 notificationsEnabled,
                 notificationEmail,
-                sponsorLogo: finalSponsor
+                sponsorLogo: finalSponsor,
+                whatsappPollMessage: JSON.stringify({
+                    training: trainingTemplate,
+                    match: matchTemplate
+                })
             });
             logActivity("Updated Club Settings", `Saved changes to club details, primary color, or squads.`);
             alert("Settings saved successfully!");
@@ -577,7 +679,7 @@ export default function AdminPage() {
                 "name", "squads", "homeGround", "foundingYear", "twitterUrl", "instagramUrl", "primaryColor",
                 "homeKitShirt", "homeKitShorts", "homeKitSocks", "awayKitShirt", "awayKitShorts", "awayKitSocks",
                 "leagueUrl", "leaguePosition", "monthlySubs", "subsEnabled", "contractsEnabled", "finesEnabled",
-                "fineCategories", "notificationsEnabled", "notificationEmail", "managerName"
+                "fineCategories", "notificationsEnabled", "notificationEmail", "managerName", "trainingTemplate", "matchTemplate"
             ];
             ADMIN_CACHE_KEYS.forEach(key => sessionStorage.removeItem(`clubflow_admin_${key}`));
         } catch (error) {
@@ -1070,8 +1172,48 @@ export default function AdminPage() {
                                     )}
 
                                     <div className="space-y-2 pt-4 border-t border-slate-100">
+                                        <Label htmlFor="templateInput" className="text-sm font-semibold">
+                                            {pollType === "training" ? "Training Poll Template" : "Matchday Poll Template"}
+                                        </Label>
+                                        <Textarea
+                                            id="templateInput"
+                                            value={pollType === "training" ? trainingTemplate : matchTemplate}
+                                            onChange={(e) => {
+                                                if (pollType === "training") {
+                                                    setTrainingTemplate(e.target.value);
+                                                } else {
+                                                    setMatchTemplate(e.target.value);
+                                                }
+                                            }}
+                                            className="h-36 font-sans text-xs bg-white text-slate-700 p-3 rounded-lg border border-slate-200 resize-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                            placeholder="Enter template content..."
+                                        />
+                                        <div className="flex flex-wrap gap-1.5 p-2 bg-slate-50 border border-slate-100 rounded-lg">
+                                            {["⚽", "🏟️", "🆚", "🏆", "📅", "⏰", "📍", "📋", "🔥", "🚨", "💪", "👊", "💯", "✅", "❌", "🤕", "🙋‍♂️", "⏳"].map(emoji => (
+                                                <button
+                                                    key={emoji}
+                                                    type="button"
+                                                    onClick={() => insertEmoji(emoji)}
+                                                    className="w-7 h-7 flex items-center justify-center bg-white hover:bg-slate-100 active:bg-slate-200 border border-slate-200 rounded-md text-sm transition-colors cursor-pointer shadow-sm"
+                                                    title={`Insert ${emoji}`}
+                                                >
+                                                    {emoji}
+                                                </button>
+                                            ))}
+                                        </div>
+                                        <p className="text-[10px] text-slate-500 leading-normal">
+                                            Available Placeholders:<br />
+                                            {pollType === "training" ? (
+                                                <code className="text-indigo-600 font-semibold">{`{club_name}, {date}, {time}, {location}, {deadline}`}</code>
+                                            ) : (
+                                                <code className="text-indigo-600 font-semibold">{`{club_name}, {opponent}, {home_away}, {date}, {time}, {meet_time}, {competition}`}</code>
+                                            )}
+                                        </p>
+                                    </div>
+
+                                    <div className="space-y-2 pt-4 border-t border-slate-100">
                                         <Label className="text-sm font-semibold flex justify-between items-center">
-                                            <span>Message Preview (Editable)</span>
+                                            <span>Generated Message Preview (Ready to copy)</span>
                                             <div className="flex gap-2">
                                                 <Button
                                                     type="button"
@@ -1114,11 +1256,8 @@ export default function AdminPage() {
                                         </Label>
                                         <Textarea
                                             value={pollMessage}
-                                            onChange={(e) => {
-                                                setPollMessage(e.target.value);
-                                                setIsPollMessageEdited(true);
-                                            }}
-                                            className="h-44 font-sans text-xs bg-white text-slate-700 p-3 rounded-lg border border-slate-200 resize-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                                            readOnly
+                                            className="h-44 font-sans text-xs bg-slate-50 text-slate-600 p-3 rounded-lg border border-slate-200 resize-none cursor-default focus-visible:ring-0"
                                         />
                                     </div>
                                 </div>
