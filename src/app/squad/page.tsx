@@ -36,13 +36,27 @@ export default function SquadPage() {
     const { settings, updateSettings, isLoaded: isClubLoaded } = useClub();
     const { clubId, isLoading: isAuthLoading } = useAuth();
     const currentSquads = settings.squads || ["First Team"];
-    const [activeTab, setActiveTab] = useState("All");
+    const [activeTab, setActiveTab] = useState("First Team");
     const [isManageSquadsOpen, setIsManageSquadsOpen] = useState(false);
     const [editingSquads, setEditingSquads] = useState<string[]>(currentSquads);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
 
     const [seasonFilter, setSeasonFilter] = useState<string>(getCurrentSeasonStr());
     const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
+
+    const hasInitializedTab = useRef(false);
+    useEffect(() => {
+        if (isClubLoaded && settings.squads && !hasInitializedTab.current) {
+            const hasFirstTeam = settings.squads.some(s => s.toLowerCase().replace(/[\s-_]+/g, '') === 'firstteam');
+            if (hasFirstTeam) {
+                const ft = settings.squads.find(s => s.toLowerCase().replace(/[\s-_]+/g, '') === 'firstteam') || "First Team";
+                setActiveTab(ft);
+            } else if (settings.squads.length > 0) {
+                setActiveTab(settings.squads[0]);
+            }
+            hasInitializedTab.current = true;
+        }
+    }, [isClubLoaded, settings.squads]);
 
     // 1. Initial load: Supabase
     useEffect(() => {
