@@ -71,13 +71,6 @@ export default function PublicCheckinPage() {
 
     // Selected player for update/verification
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
-    const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
-    
-    // PIN states
-    const [pinMode, setPinMode] = useState<"set" | "enter">("enter");
-    const [enteredPin, setEnteredPin] = useState("");
-    const [pinError, setPinError] = useState("");
-    const [isPinSubmitting, setIsPinSubmitting] = useState(false);
 
     // Status update states
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -181,35 +174,10 @@ export default function PublicCheckinPage() {
         return localStorage.getItem(`cf_verified_player_${playerId}`) === "true";
     };
 
-    const [otpCode, setOtpCode] = useState("");
-    const [enteredOtp, setEnteredOtp] = useState("");
-
     const handlePlayerClick = (player: Player) => {
-        setSelectedPlayer(player);
         setSuccessMessage(null);
-        setEnteredPin("");
-        setEnteredOtp("");
-        const code = Math.floor(1000 + Math.random() * 9000).toString();
-        setOtpCode(code);
-        setPinError("");
-
-        const existingPin = extractPin(player.notes);
-
-        if (existingPin) {
-            // Player has a PIN set in the DB
-            if (isVerified(player.id)) {
-                // Device is already verified, toggle status directly
-                toggleAttendanceStatus(player);
-            } else {
-                // Device not verified, prompt to enter PIN
-                setPinMode("enter");
-                setIsVerificationModalOpen(true);
-            }
-        } else {
-            // Player has no PIN, prompt to set one
-            setPinMode("set");
-            setIsVerificationModalOpen(true);
-        }
+        setSelectedPlayer(player);
+        toggleAttendanceStatus(player);
     };
 
     const toggleAttendanceStatus = async (player: Player, pinToSave?: string) => {
@@ -289,60 +257,7 @@ export default function PublicCheckinPage() {
         }
     };
 
-    const handlePinSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedPlayer) return;
 
-        if (enteredPin.length !== 4 || !/^\d+$/.test(enteredPin)) {
-            setPinError("PIN must be exactly 4 digits.");
-            return;
-        }
-
-        setIsPinSubmitting(true);
-        setPinError("");
-
-        try {
-            if (pinMode === "set") {
-                if (!enteredOtp) {
-                    setPinError("Please enter the activation code sent to your coach.");
-                    setIsPinSubmitting(false);
-                    return;
-                }
-
-                if (enteredOtp !== otpCode) {
-                    setPinError("Incorrect activation code. Please try again.");
-                    setIsPinSubmitting(false);
-                    return;
-                }
-
-                // Save verification state locally
-                localStorage.setItem(`cf_verified_player_${selectedPlayer.id}`, "true");
-                setIsVerificationModalOpen(false);
-                
-                // Toggle status and save PIN
-                await toggleAttendanceStatus(selectedPlayer, enteredPin);
-            } else {
-                // Verify existing PIN
-                const actualPin = extractPin(selectedPlayer.notes);
-
-                if (enteredPin === actualPin) {
-                    // PIN is correct! Save verification state locally
-                    localStorage.setItem(`cf_verified_player_${selectedPlayer.id}`, "true");
-                    setIsVerificationModalOpen(false);
-                    
-                    // Toggle status immediately
-                    await toggleAttendanceStatus(selectedPlayer);
-                } else {
-                    setPinError("Incorrect PIN. Please try again or ask your coach to reset it.");
-                }
-            }
-        } catch (err) {
-            console.error(err);
-            setPinError("An error occurred. Please try again.");
-        } finally {
-            setIsPinSubmitting(false);
-        }
-    };
 
     if (loading) {
         return (
@@ -513,17 +428,6 @@ export default function PublicCheckinPage() {
                                             }
                                         `}
                                     >
-                                        {/* Security / Verification badge */}
-                                        {isUserVerified ? (
-                                            <div className="absolute top-2 right-2 flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-400 text-[8px] font-bold">
-                                                ✓
-                                            </div>
-                                        ) : hasPin ? (
-                                            <div className="absolute top-2 right-2 text-slate-500" title="Secured with PIN">
-                                                <Lock className="h-3 w-3" />
-                                            </div>
-                                        ) : null}
-
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                                             {player.position}
                                         </span>
@@ -554,128 +458,6 @@ export default function PublicCheckinPage() {
                     </CardContent>
                 </Card>
             </div>
-
-            {/* PIN Verification Modal */}
-            {isVerificationModalOpen && selectedPlayer && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
-                        {/* Modal Header */}
-                        <div className="p-5 border-b border-slate-800 bg-slate-900/80 flex justify-between items-start">
-                            <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-xl bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500">
-                                    {pinMode === "set" ? <KeyRound className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-lg text-white">
-                                        {pinMode === "set" ? "Secure Your Slot" : "Enter Check-in PIN"}
-                                    </h3>
-                                    <p className="text-xs text-slate-400 font-semibold">For {selectedPlayer.firstName} {selectedPlayer.lastName}</p>
-                                </div>
-                            </div>
-                            <button 
-                                onClick={() => setIsVerificationModalOpen(false)} 
-                                className="text-slate-500 hover:text-slate-200 text-lg transition-colors p-1"
-                            >
-                                ✕
-                            </button>
-                        </div>
-
-                        {/* Modal Content */}
-                        <form onSubmit={handlePinSubmit} className="p-5 space-y-4">
-                            {pinError && (
-                                <div className="bg-red-950/40 border border-red-500/30 rounded-xl p-3 flex items-center gap-2.5 text-red-400 text-xs animate-in shake duration-200">
-                                    <AlertCircle className="h-4.5 w-4.5 shrink-0" />
-                                    <span>{pinError}</span>
-                                </div>
-                            )}
-
-                            {pinMode === "set" ? (
-                                <div className="space-y-3">
-                                    <p className="text-xs text-slate-355 leading-relaxed font-semibold">
-                                        To prevent anyone else from locking your slot, you need a verification code. Click below to send a request to your coach on WhatsApp. They will reply with your activation code.
-                                    </p>
-                                    <Button 
-                                        type="button"
-                                        onClick={() => {
-                                            const text = `Hi Coach, please approve my ClubFlow check-in registration. Player: ${selectedPlayer.firstName} ${selectedPlayer.lastName}. Verification Code: ${otpCode}`;
-                                            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
-                                        }}
-                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 flex items-center justify-center gap-2 rounded-xl text-xs"
-                                    >
-                                        💬 Request Code via WhatsApp
-                                    </Button>
-                                    <div className="space-y-1.5 pt-1">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enter Approval Code from Coach</label>
-                                        <Input
-                                            type="text"
-                                            maxLength={4}
-                                            required
-                                            value={enteredOtp}
-                                            onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, "").substring(0, 4))}
-                                            placeholder="e.g. 1234"
-                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choose 4-Digit PIN</label>
-                                        <Input
-                                            type="password"
-                                            pattern="\d*"
-                                            inputMode="numeric"
-                                            maxLength={4}
-                                            required
-                                            value={enteredPin}
-                                            onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 4))}
-                                            placeholder="••••"
-                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
-                                        />
-                                    </div>
-                                    <Button 
-                                        type="submit"
-                                        disabled={isPinSubmitting || enteredPin.length !== 4 || !enteredOtp}
-                                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
-                                    >
-                                        {isPinSubmitting ? "Securing Name..." : "Lock Name & Check-in"}
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    <p className="text-xs text-slate-300 leading-relaxed">
-                                        Your name slot is locked. Please enter your 4-digit PIN to check in.
-                                    </p>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enter PIN</label>
-                                        <Input
-                                            type="password"
-                                            pattern="\d*"
-                                            inputMode="numeric"
-                                            maxLength={4}
-                                            required
-                                            value={enteredPin}
-                                            onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 4))}
-                                            placeholder="••••"
-                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
-                                        />
-                                    </div>
-                                    <Button 
-                                        type="submit"
-                                        disabled={isPinSubmitting || enteredPin.length !== 4}
-                                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
-                                    >
-                                        {isPinSubmitting ? "Verifying..." : "Unlock Device"}
-                                    </Button>
-                                    <div className="text-center pt-1.5">
-                                        <p className="text-[10px] text-slate-500 flex items-center justify-center gap-1">
-                                            <HelpCircle className="h-3 w-3" />
-                                            <span>Forgot PIN? Ask your coach to reset it from their end.</span>
-                                        </p>
-                                    </div>
-                                </div>
-                            )}
-                        </form>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
