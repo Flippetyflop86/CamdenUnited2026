@@ -530,8 +530,8 @@ export default function TrainingSessionPage() {
                                         relative flex flex-col items-center justify-center p-3 rounded-xl border-2 cursor-pointer
                                         transition-all duration-150 select-none text-center gap-1 min-h-[100px]
                                         ${isPresent
-                                            ? 'bg-emerald-600 border-emerald-450 shadow-md scale-[1.02]'
-                                            : 'bg-white border-slate-200 hover:border-slate-400 hover:bg-slate-50'
+                                            ? 'bg-gradient-to-br from-amber-500 to-yellow-600 border-amber-400 text-white shadow-md scale-[1.02]'
+                                            : 'bg-amber-50/30 border-amber-200/50 hover:bg-amber-50/60 hover:border-amber-300 text-slate-800'
                                         }
                                     `}
                                 >
@@ -549,14 +549,19 @@ export default function TrainingSessionPage() {
                                     >
                                         ✕
                                     </button>
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                        Guest
+                                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border
+                                        ${isPresent 
+                                            ? 'bg-amber-400/30 text-white border-amber-300/40' 
+                                            : 'bg-amber-100 text-amber-800 border-amber-200'
+                                        }`}
+                                    >
+                                        Trialist
                                     </span>
-                                    <span className={`text-sm font-bold leading-tight ${isPresent ? 'text-white' : 'text-slate-800'}`}>
+                                    <span className={`text-sm font-bold leading-tight mt-1 ${isPresent ? 'text-white' : 'text-slate-800'}`}>
                                         {guestNameClean}
                                     </span>
                                     <div className={`mt-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full
-                                        ${isPresent ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                        ${isPresent ? 'bg-amber-400/40 text-white border border-amber-300/30' : 'bg-slate-100 text-slate-400'}`}>
                                         {isPresent ? '✓ Here' : 'Absent'}
                                     </div>
                                 </div>
