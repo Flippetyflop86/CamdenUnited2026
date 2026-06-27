@@ -6,7 +6,7 @@ import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, CalendarDays, MapPin, Clock, Download } from "lucide-react";
+import { ArrowLeft, CalendarDays, MapPin, Clock, Download, Share2, Link2, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 
@@ -287,6 +287,46 @@ export default function TrainingSessionPage() {
                             <MapPin className="h-5 w-5 text-red-600" />
                             <span className="font-medium">{session.location}</span>
                         </div>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Public Check-in Link Card */}
+            <Card className="w-full border-slate-200 bg-slate-50 shadow-sm border-l-4 border-l-emerald-500">
+                <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700">
+                            <Share2 className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h3 className="font-semibold text-slate-900 text-sm">Public Attendance Check-in Link</h3>
+                            <p className="text-slate-500 text-xs">Share this bespoke link in WhatsApp. Players verify their browser once, then check in with one tap.</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                        <Button 
+                            variant="outline" 
+                            size="sm"
+                            className="bg-white border-slate-200 flex-1 md:flex-initial"
+                            onClick={() => {
+                                const link = `${window.location.origin}/checkin/${session.id}`;
+                                navigator.clipboard.writeText(link);
+                                alert("Check-in link copied to clipboard!");
+                            }}
+                        >
+                            <Link2 className="h-4 w-4 mr-2" /> Copy Link
+                        </Button>
+                        <Button
+                            size="sm"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 md:flex-initial"
+                            onClick={() => {
+                                const link = `${window.location.origin}/checkin/${session.id}`;
+                                const text = `Camden United check-in: Players, please log your training attendance for tonight's session here: ${link}`;
+                                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+                            }}
+                        >
+                            <MessageCircle className="h-4 w-4 mr-2" /> Share to WhatsApp
+                        </Button>
                     </div>
                 </CardContent>
             </Card>

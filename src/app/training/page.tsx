@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CalendarDays, MapPin, Users, Trash2, Pencil, BarChart3, List, Download, ClipboardList, MessageCircle, Copy, ExternalLink } from "lucide-react";
+import { Plus, CalendarDays, MapPin, Users, Trash2, Pencil, BarChart3, List, Download, ClipboardList, MessageCircle, Copy, ExternalLink, Link2 } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase";
@@ -497,9 +497,25 @@ export default function TrainingPage() {
                                         );
                                     })()}
                                 </div>
-                                <Button variant="secondary" className="w-full mt-4" asChild>
-                                    <Link href={`/training/${session.id}`}>Manage Session</Link>
-                                </Button>
+                                <div className="flex gap-2 mt-4">
+                                    <Button variant="secondary" className="flex-1" asChild>
+                                        <Link href={`/training/${session.id}`}>Manage Session</Link>
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="icon"
+                                        className="text-slate-600 hover:text-slate-900 border-slate-200"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const link = `${window.location.origin}/checkin/${session.id}`;
+                                            navigator.clipboard.writeText(link);
+                                            alert("Check-in link copied to clipboard!");
+                                        }}
+                                        title="Copy Public Check-in Link"
+                                    >
+                                        <Link2 className="h-4 w-4" />
+                                    </Button>
+                                </div>
                             </CardContent>
                         </Card>
                     ))}
