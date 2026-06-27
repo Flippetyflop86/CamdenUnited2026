@@ -190,13 +190,16 @@ export default function MatchCheckinPage() {
         return localStorage.getItem(`cf_verified_player_${playerId}`) === "true";
     };
 
-    const [enteredDob, setEnteredDob] = useState("");
+    const [otpCode, setOtpCode] = useState("");
+    const [enteredOtp, setEnteredOtp] = useState("");
 
     const handlePlayerClick = (player: Player) => {
         setSelectedPlayer(player);
         setSuccessMessage(null);
         setEnteredPin("");
-        setEnteredDob("");
+        setEnteredOtp("");
+        const code = Math.floor(1000 + Math.random() * 9000).toString();
+        setOtpCode(code);
         setPinError("");
 
         const existingPin = extractPin(player.notes);
@@ -304,23 +307,14 @@ export default function MatchCheckinPage() {
 
         try {
             if (pinMode === "set") {
-                if (!enteredDob) {
-                    setPinError("Please enter your Date of Birth for verification.");
+                if (!enteredOtp) {
+                    setPinError("Please enter the activation code sent to your coach.");
                     setIsPinSubmitting(false);
                     return;
                 }
 
-                const cleanInputDob = new Date(enteredDob).toISOString().split('T')[0];
-                const cleanPlayerDob = selectedPlayer.dateOfBirth ? new Date(selectedPlayer.dateOfBirth).toISOString().split('T')[0] : "";
-
-                if (!cleanPlayerDob) {
-                    setPinError("Your Date of Birth is not registered in the system. Please ask your coach to check you in.");
-                    setIsPinSubmitting(false);
-                    return;
-                }
-
-                if (cleanInputDob !== cleanPlayerDob) {
-                    setPinError("Incorrect Date of Birth. Verification failed.");
+                if (enteredOtp !== otpCode) {
+                    setPinError("Incorrect activation code. Please try again.");
                     setIsPinSubmitting(false);
                     return;
                 }
@@ -595,17 +589,29 @@ export default function MatchCheckinPage() {
 
                             {pinMode === "set" ? (
                                 <div className="space-y-3">
-                                    <p className="text-xs text-slate-300 leading-relaxed font-medium">
-                                        To prevent anyone else from locking your slot, please verify your identity by entering your Date of Birth, then choose a secure 4-digit PIN.
+                                    <p className="text-xs text-slate-355 leading-relaxed font-semibold">
+                                        To secure your name slot, request an activation code from your coach on WhatsApp. They will reply with your code.
                                     </p>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Verify Date of Birth</label>
+                                    <Button 
+                                        type="button"
+                                        onClick={() => {
+                                            const text = `Hi Coach, please verify me for match check-in on ClubFlow. My name is ${selectedPlayer.firstName} ${selectedPlayer.lastName}. My activation code is: ${otpCode}`;
+                                            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+                                        }}
+                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 flex items-center justify-center gap-2 rounded-xl text-xs"
+                                    >
+                                        💬 Request Code via WhatsApp
+                                    </Button>
+                                    <div className="space-y-1.5 pt-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enter Activation Code</label>
                                         <Input
-                                            type="date"
+                                            type="text"
+                                            maxLength={4}
                                             required
-                                            value={enteredDob}
-                                            onChange={(e) => setEnteredDob(e.target.value)}
-                                            className="bg-slate-950 border-slate-800 text-white text-center text-sm h-11 focus-visible:ring-red-500"
+                                            value={enteredOtp}
+                                            onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, "").substring(0, 4))}
+                                            placeholder="e.g. 1234"
+                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
                                         />
                                     </div>
                                     <div className="space-y-1.5">
@@ -618,13 +624,13 @@ export default function MatchCheckinPage() {
                                             required
                                             value={enteredPin}
                                             onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 4))}
-                                            placeholder="e.g. 2580"
+                                            placeholder="••••"
                                             className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
                                         />
                                     </div>
                                     <Button 
                                         type="submit"
-                                        disabled={isPinSubmitting || enteredPin.length !== 4 || !enteredDob}
+                                        disabled={isPinSubmitting || enteredPin.length !== 4 || !enteredOtp}
                                         className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
                                     >
                                         {isPinSubmitting ? "Securing Name..." : "Lock Name & Check-in"}
