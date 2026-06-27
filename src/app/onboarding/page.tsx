@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Upload, CheckCircle2, ChevronRight, Image as ImageIcon, Users, Palette, Trophy, ShieldCheck, MapPin, Twitter, Instagram, Banknote, ShieldAlert, Award, Plus, Trash2, Shield, FileText, Target } from "lucide-react";
+import { AlertCircle, Upload, CheckCircle2, ChevronRight, Image as ImageIcon, Users, Palette, Trophy, ShieldCheck, MapPin, Twitter, Instagram, Banknote, ShieldAlert, Award, Plus, Trash2, Shield, FileText, Target, TrendingUp } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
@@ -779,10 +779,42 @@ export default function OnboardingWizard() {
                                             <CardContent className="space-y-6 pt-6">
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     {[
-                                                        { role: "manager/coach", label: "Manager / Coach", desc: "For running team squads, training sessions, matchday lineups, and tactics.", icon: Users },
-                                                        { role: "secretary", label: "Secretary", desc: "For coordinating fixtures, sponsorships, player databases, documents, and overall admin.", icon: FileText },
-                                                        { role: "analyst", label: "Analyst", desc: "For post-match analytics, opposition scouting reports, and fixtures performance.", icon: Target },
-                                                        { role: "chairperson", label: "Chairperson", desc: "For high-level oversight, sponsorships, financials, player budgets, and staff contracts.", icon: Award }
+                                                        { 
+                                                            role: "manager/coach", 
+                                                            label: "Manager / Coach", 
+                                                            desc: "The tactician running team squads, training sessions, matchday lineups, and masterminding matchday tactics.", 
+                                                            icon: Users,
+                                                            colorClass: "border-emerald-500 bg-gradient-to-br from-emerald-950/40 to-emerald-900/10 shadow-emerald-500/10 text-emerald-400",
+                                                            iconClass: "bg-emerald-500 text-slate-950",
+                                                            borderClass: "hover:border-emerald-700/60"
+                                                        },
+                                                        { 
+                                                            role: "secretary", 
+                                                            label: "Secretary", 
+                                                            desc: "The administrator coordinating fixtures, sponsorships, player databases, documents, and keeping the club running smoothly.", 
+                                                            icon: FileText,
+                                                            colorClass: "border-blue-500 bg-gradient-to-br from-blue-950/40 to-blue-900/10 shadow-blue-500/10 text-blue-400",
+                                                            iconClass: "bg-blue-500 text-slate-950",
+                                                            borderClass: "hover:border-blue-700/60"
+                                                        },
+                                                        { 
+                                                            role: "analyst", 
+                                                            label: "Analyst", 
+                                                            desc: "The data guru dissecting post-match statistics, compiling opposition reports, and mapping zones to exploit.", 
+                                                            icon: TrendingUp,
+                                                            colorClass: "border-rose-500 bg-gradient-to-br from-rose-950/40 to-rose-900/10 shadow-rose-500/10 text-rose-400",
+                                                            iconClass: "bg-rose-500 text-slate-950",
+                                                            borderClass: "hover:border-rose-700/60"
+                                                        },
+                                                        { 
+                                                            role: "chairperson", 
+                                                            label: "Chairperson", 
+                                                            desc: "The club lead overseeing budgets, sponsorships, financial audits, and signing off staff contracts.", 
+                                                            icon: Award,
+                                                            colorClass: "border-amber-500 bg-gradient-to-br from-amber-950/40 to-amber-900/10 shadow-amber-500/10 text-amber-400",
+                                                            iconClass: "bg-amber-500 text-slate-950",
+                                                            borderClass: "hover:border-amber-700/60"
+                                                        }
                                                     ].map((item) => {
                                                         const IconComponent = item.icon;
                                                         const isSelected = selectedRole === item.role;
@@ -796,16 +828,16 @@ export default function OnboardingWizard() {
                                                                 }}
                                                                 className={`p-5 rounded-2xl cursor-pointer border-2 text-left transition-all duration-300 flex flex-col justify-between h-44 hover:scale-[1.02] ${
                                                                     isSelected
-                                                                        ? 'border-teal-500 bg-teal-500/10 shadow-lg shadow-teal-500/10'
-                                                                        : 'border-slate-800 bg-slate-900/20 hover:border-slate-700 hover:bg-slate-900/30'
+                                                                        ? item.colorClass
+                                                                        : `border-slate-800 bg-slate-900/20 hover:bg-slate-900/30 ${item.borderClass}`
                                                                 }`}
                                                             >
                                                                 <div className="flex items-center justify-between w-full">
-                                                                    <div className={`p-2.5 rounded-xl ${isSelected ? 'bg-teal-500 text-slate-950' : 'bg-slate-800 text-slate-400'}`}>
+                                                                    <div className={`p-2.5 rounded-xl transition-all ${isSelected ? item.iconClass : 'bg-slate-800 text-slate-400'}`}>
                                                                         <IconComponent className="w-5 h-5" />
                                                                     </div>
                                                                     {isSelected && (
-                                                                        <CheckCircle2 className="w-5 h-5 text-teal-400 fill-teal-400/20" />
+                                                                        <CheckCircle2 className="w-5 h-5" />
                                                                     )}
                                                                 </div>
                                                                 <div className="mt-4">
@@ -854,7 +886,7 @@ export default function OnboardingWizard() {
                                                         const allSelected = selectablePermissions.length > 0 && selectablePermissions.every(p => selectedTabs.includes(p.key));
                                                         return (
                                                             <div className={`w-6 h-6 rounded-md border flex items-center justify-center transition-all ${
-                                                                allSelected ? 'bg-teal-500 border-teal-500 text-slate-950' : 'border-slate-700 bg-slate-900/50'
+                                                                allSelected ? 'bg-teal-500 border-teal-500 text-slate-950 font-bold' : 'border-slate-700 bg-slate-900/50'
                                                             }`}>
                                                                 {allSelected && <CheckCircle2 className="w-4 h-4 text-slate-950" />}
                                                             </div>
@@ -863,12 +895,34 @@ export default function OnboardingWizard() {
                                                 </div>
 
                                                 <div className="max-h-[350px] overflow-y-auto pr-2 custom-scrollbar space-y-4">
-                                                    {["On the Pitch", "Analysis", "Off the Pitch"].map(group => {
-                                                        const groupPermissions = ALL_PAGE_PERMISSIONS.filter(p => p.group === group && p.key !== "admin" && p.key !== "dashboard");
+                                                    {[
+                                                        { 
+                                                            name: "On the Pitch", 
+                                                            colorTheme: "emerald",
+                                                            borderClass: "border-emerald-500/40 bg-emerald-950/20 text-emerald-300",
+                                                            checkboxClass: "bg-emerald-500 border-emerald-500 text-slate-950",
+                                                            labelClass: "text-emerald-400"
+                                                        },
+                                                        { 
+                                                            name: "Analysis", 
+                                                            colorTheme: "rose",
+                                                            borderClass: "border-rose-500/40 bg-rose-950/20 text-rose-300",
+                                                            checkboxClass: "bg-rose-500 border-rose-500 text-slate-950",
+                                                            labelClass: "text-rose-400"
+                                                        },
+                                                        { 
+                                                            name: "Off the Pitch", 
+                                                            colorTheme: "blue",
+                                                            borderClass: "border-blue-500/40 bg-blue-950/20 text-blue-300",
+                                                            checkboxClass: "bg-blue-500 border-blue-500 text-slate-950",
+                                                            labelClass: "text-blue-400"
+                                                        }
+                                                    ].map(group => {
+                                                        const groupPermissions = ALL_PAGE_PERMISSIONS.filter(p => p.group === group.name && p.key !== "admin" && p.key !== "dashboard");
                                                         if (groupPermissions.length === 0) return null;
                                                         return (
-                                                            <div key={group} className="space-y-2">
-                                                                <h4 className="text-xs font-black text-slate-500 uppercase tracking-wider">{group}</h4>
+                                                            <div key={group.name} className="space-y-2">
+                                                                <h4 className={`text-xs font-black uppercase tracking-wider ${group.labelClass}`}>{group.name}</h4>
                                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                                     {groupPermissions.map(perm => {
                                                                         const isSelected = selectedTabs.includes(perm.key);
@@ -883,11 +937,11 @@ export default function OnboardingWizard() {
                                                                                     );
                                                                                 }}
                                                                                 className={`p-3.5 rounded-xl cursor-pointer border-2 transition-all flex items-start gap-3 text-left ${
-                                                                                    isSelected ? 'border-teal-500 bg-teal-500/5' : 'border-slate-800 bg-slate-900/10 hover:border-slate-700'
+                                                                                    isSelected ? group.borderClass : 'border-slate-800 bg-slate-900/10 hover:border-slate-700'
                                                                                 }`}
                                                                             >
                                                                                 <div className={`mt-0.5 w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                                                                                    isSelected ? 'bg-teal-500 border-teal-500 text-slate-950' : 'border-slate-700 bg-slate-900/30'
+                                                                                    isSelected ? group.checkboxClass : 'border-slate-700 bg-slate-900/30'
                                                                                 }`}>
                                                                                     {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-slate-950" />}
                                                                                 </div>
@@ -1018,6 +1072,17 @@ export default function OnboardingWizard() {
                                                 </CardDescription>
                                             </CardHeader>
                                             <CardContent className="space-y-6 pt-6">
+                                                {!selectedTabs.includes("finance") && (
+                                                    <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+                                                        <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                                                        <div className="space-y-1">
+                                                            <h5 className="text-sm font-bold text-amber-300">Suggestion: Skip Finance Setup</h5>
+                                                            <p className="text-xs text-slate-300 leading-relaxed">
+                                                                You did not select <strong>Finance</strong> or <strong>Player Budgets</strong> when tailoring your workspace. If you don't need financial tracking, feel free to click <strong className="text-white">"Skip for now"</strong> below to proceed!
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                )}
                                                 <div className="p-3.5 bg-slate-900/30 border border-slate-800 rounded-xl flex items-start gap-2.5">
                                                     <Banknote className="w-4 h-4 text-teal-400 shrink-0 mt-0.5" />
                                                     <p className="text-xs text-slate-400 leading-relaxed">
