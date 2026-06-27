@@ -531,7 +531,7 @@ export default function OppositionReportsPage() {
                                         })}
                                     </div>
 
-                                    {/* Mobile-friendly player name roster below the pitch */}
+                                    {/* Mobile-friendly player name squad below the pitch */}
                                     <div className="border-t border-slate-200 bg-white">
                                         <div className="px-3 py-2 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
                                             <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1">

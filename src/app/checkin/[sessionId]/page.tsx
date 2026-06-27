@@ -191,7 +191,8 @@ export default function PublicCheckinPage() {
         if (existingPin) {
             // Player has a PIN set in the DB
             if (isVerified(player.id)) {
-                // Device is already verified, show status selector directly
+                // Device is already verified, toggle status directly
+                toggleAttendanceStatus(player);
             } else {
                 // Device not verified, prompt to enter PIN
                 setPinMode("enter");
@@ -201,6 +202,83 @@ export default function PublicCheckinPage() {
             // Player has no PIN, prompt to set one
             setPinMode("set");
             setIsVerificationModalOpen(true);
+        }
+    };
+
+    const toggleAttendanceStatus = async (player: Player, pinToSave?: string) => {
+        setIsSubmitting(true);
+        try {
+            // Fetch latest session attendance list first to prevent overwrite
+            const { data: latestSession } = await supabase
+                .from("training_sessions")
+                .select("attendance")
+                .eq("id", sessionId)
+                .single();
+
+            const existingAttendance = latestSession?.attendance || [];
+            
+            // Toggle logic: If Present or Late -> Absent. Otherwise -> Present.
+            const record = existingAttendance.find((a: any) => a.playerId === player.id);
+            const currentStatus = record?.status ?? "Absent";
+            const newStatus: AttendanceStatus = (currentStatus === "Present" || currentStatus === "Late") ? "Absent" : "Present";
+
+            const updatedAttendance = [...existingAttendance];
+            const playerIndex = updatedAttendance.findIndex((a: any) => a.playerId === player.id);
+
+            if (playerIndex >= 0) {
+                updatedAttendance[playerIndex] = { 
+                    ...updatedAttendance[playerIndex], 
+                    status: newStatus 
+                };
+            } else {
+                updatedAttendance.push({ 
+                    playerId: player.id, 
+                    status: newStatus,
+                    notes: "Checked in via public link" 
+                });
+            }
+
+            // If we are setting a new PIN, write it to player notes in the database
+            if (pinToSave) {
+                const currentNotes = player.notes || "";
+                const stripped = cleanNotes(currentNotes);
+                const newNotes = `${stripped} [PIN:${pinToSave}]`.trim();
+
+                const { error: playerErr } = await supabase
+                    .from("players")
+                    .update({ notes: newNotes })
+                    .eq("id", player.id);
+
+                if (playerErr) throw playerErr;
+                
+                // Sync notes locally
+                player.notes = newNotes;
+                setPlayers(players.map(p => p.id === player.id ? { ...p, notes: newNotes } : p));
+            }
+
+            // Update training session in Supabase
+            const { error: updateErr } = await supabase
+                .from("training_sessions")
+                .update({ attendance: updatedAttendance })
+                .eq("id", sessionId);
+
+            if (updateErr) throw updateErr;
+
+            // Success state update
+            setSession({ ...session!, attendance: updatedAttendance });
+            setSuccessMessage(`${player.firstName} marked as ${newStatus}!`);
+            
+            // Clean selected player after a short delay
+            setTimeout(() => {
+                setSelectedPlayer(null);
+                setSuccessMessage(null);
+            }, 2500);
+
+        } catch (err) {
+            console.error(err);
+            alert("Failed to update status. Please try again.");
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -218,31 +296,12 @@ export default function PublicCheckinPage() {
 
         try {
             if (pinMode === "set") {
-                // Save new PIN to database (embedded in notes)
-                const currentNotes = selectedPlayer.notes || "";
-                const stripped = cleanNotes(currentNotes);
-                const newNotes = `${stripped} [PIN:${enteredPin}]`.trim();
-
-                const { error: updateErr } = await supabase
-                    .from("players")
-                    .update({ notes: newNotes })
-                    .eq("id", selectedPlayer.id);
-
-                if (updateErr) throw updateErr;
-
-                // Update local list state
-                setPlayers(players.map(p => p.id === selectedPlayer.id ? { ...p, notes: newNotes } : p));
-                selectedPlayer.notes = newNotes;
-
                 // Save verification state locally
                 localStorage.setItem(`cf_verified_player_${selectedPlayer.id}`, "true");
-                
                 setIsVerificationModalOpen(false);
-                setSuccessMessage("PIN set successfully!");
                 
-                // Immediately trigger status card opening
-                setTimeout(() => setSuccessMessage(null), 1500);
-
+                // Toggle status and save PIN
+                await toggleAttendanceStatus(selectedPlayer, enteredPin);
             } else {
                 // Verify existing PIN
                 const actualPin = extractPin(selectedPlayer.notes);
@@ -251,6 +310,9 @@ export default function PublicCheckinPage() {
                     // PIN is correct! Save verification state locally
                     localStorage.setItem(`cf_verified_player_${selectedPlayer.id}`, "true");
                     setIsVerificationModalOpen(false);
+                    
+                    // Toggle status immediately
+                    await toggleAttendanceStatus(selectedPlayer);
                 } else {
                     setPinError("Incorrect PIN. Please try again or ask your coach to reset it.");
                 }
@@ -260,63 +322,6 @@ export default function PublicCheckinPage() {
             setPinError("An error occurred. Please try again.");
         } finally {
             setIsPinSubmitting(false);
-        }
-    };
-
-    const handleUpdateStatus = async (status: AttendanceStatus) => {
-        if (!selectedPlayer || !session || !sessionId) return;
-        setIsSubmitting(true);
-
-        try {
-            // Fetch latest session attendance list first to prevent overwrite
-            const { data: latestSession } = await supabase
-                .from("training_sessions")
-                .select("attendance")
-                .eq("id", sessionId)
-                .single();
-
-            const existingAttendance = latestSession?.attendance || [];
-            
-            // Map or update player status
-            const updatedAttendance = [...existingAttendance];
-            const playerIndex = updatedAttendance.findIndex(a => a.playerId === selectedPlayer.id);
-
-            if (playerIndex >= 0) {
-                updatedAttendance[playerIndex] = { 
-                    ...updatedAttendance[playerIndex], 
-                    status 
-                };
-            } else {
-                updatedAttendance.push({ 
-                    playerId: selectedPlayer.id, 
-                    status,
-                    notes: "Checked in via public Attendance Link" 
-                });
-            }
-
-            // Update training session in Supabase
-            const { error: updateErr } = await supabase
-                .from("training_sessions")
-                .update({ attendance: updatedAttendance })
-                .eq("id", sessionId);
-
-            if (updateErr) throw updateErr;
-
-            // Success state update
-            setSession({ ...session, attendance: updatedAttendance });
-            setSuccessMessage(`${selectedPlayer.firstName} marked as ${status}!`);
-            
-            // Clean selected player after a short delay
-            setTimeout(() => {
-                setSelectedPlayer(null);
-                setSuccessMessage(null);
-            }, 3000);
-
-        } catch (err) {
-            console.error(err);
-            alert("Failed to submit attendance. Please try again.");
-        } finally {
-            setIsSubmitting(false);
         }
     };
 
@@ -388,7 +393,7 @@ export default function PublicCheckinPage() {
                         </div>
                         <CardTitle className="text-xl text-white mt-1.5">{session.topic || "General Session"}</CardTitle>
                         <CardDescription className="text-slate-400">
-                            Please select your name below to confirm whether you are attending tonight's session.
+                            Select your name below to instantly toggle your attendance status.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-0 border-t border-slate-800/50 mt-2 text-sm text-slate-300">
@@ -409,10 +414,10 @@ export default function PublicCheckinPage() {
                     </CardContent>
                 </Card>
 
-                {/* Selected Player Update Card (Displays once name is clicked & verified) */}
-                {selectedPlayer && isVerified(selectedPlayer.id) && (
+                {/* Instant Success Toast (Displays once name is clicked & verified) */}
+                {selectedPlayer && successMessage && (
                     <Card className="bg-slate-900 border-red-500/50 shadow-xl border-t-2 animate-in fade-in slide-in-from-top-4 duration-300">
-                        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+                        <CardContent className="p-4 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                                 <Avatar className="h-10 w-10 border border-slate-700">
                                     <AvatarImage src={selectedPlayer.imageUrl} />
@@ -431,59 +436,17 @@ export default function PublicCheckinPage() {
                                                 setSelectedPlayer(null);
                                                 setPlayers([...players]);
                                             }}
-                                            className="text-[10px] text-red-400 hover:text-red-305 underline hover:no-underline font-medium"
+                                            className="text-[10px] text-red-400 hover:text-red-355 underline hover:no-underline font-medium"
                                         >
                                             Reset Verification
                                         </button>
                                     </div>
                                 </div>
                             </div>
-                            <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                className="text-slate-400 hover:text-white"
-                                onClick={() => setSelectedPlayer(null)}
-                            >
-                                Cancel
-                            </Button>
-                        </CardHeader>
-                        <CardContent className="pt-2">
-                            {successMessage ? (
-                                <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-4 flex items-center gap-3 text-emerald-400 animate-in zoom-in-95 duration-200">
-                                    <UserCheck className="h-5 w-5" />
-                                    <span className="font-semibold text-sm">{successMessage}</span>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <p className="text-xs text-slate-400 font-medium">Select your attendance status for this session:</p>
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <button
-                                            disabled={isSubmitting}
-                                            onClick={() => handleUpdateStatus("Present")}
-                                            className="flex flex-col items-center justify-center p-3 rounded-xl border border-emerald-500/30 bg-emerald-950/20 text-emerald-400 hover:bg-emerald-900/40 transition-colors font-bold text-sm gap-1 disabled:opacity-50"
-                                        >
-                                            <ThumbsUp className="h-5 w-5" />
-                                            <span>Present</span>
-                                        </button>
-                                        <button
-                                            disabled={isSubmitting}
-                                            onClick={() => handleUpdateStatus("Late")}
-                                            className="flex flex-col items-center justify-center p-3 rounded-xl border border-amber-500/30 bg-amber-950/20 text-amber-400 hover:bg-amber-900/40 transition-colors font-bold text-sm gap-1 disabled:opacity-50"
-                                        >
-                                            <Clock className="h-5 w-5" />
-                                            <span>Late</span>
-                                        </button>
-                                        <button
-                                            disabled={isSubmitting}
-                                            onClick={() => handleUpdateStatus("Absent")}
-                                            className="flex flex-col items-center justify-center p-3 rounded-xl border border-red-500/30 bg-red-950/20 text-red-400 hover:bg-red-900/40 transition-colors font-bold text-sm gap-1 disabled:opacity-50"
-                                        >
-                                            <ThumbsDown className="h-5 w-5" />
-                                            <span>Absent</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                            <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl px-4 py-2 flex items-center gap-2 text-emerald-400 font-semibold text-sm">
+                                <UserCheck className="h-4.5 w-4.5 animate-pulse" />
+                                <span>{successMessage}</span>
+                            </div>
                         </CardContent>
                     </Card>
                 )}
@@ -491,7 +454,7 @@ export default function PublicCheckinPage() {
                 {/* Player Selection Grid */}
                 <Card className="bg-slate-900 border-slate-800 shadow-xl">
                     <CardHeader className="pb-4">
-                        <CardTitle className="text-lg text-white">Squad Roster</CardTitle>
+                        <CardTitle className="text-lg text-white">Squad List</CardTitle>
                         <CardDescription className="text-slate-400">
                             Find your name and click it. Secured slots require your 4-digit PIN.
                         </CardDescription>
@@ -503,15 +466,16 @@ export default function PublicCheckinPage() {
                                 const status = record?.status ?? "Absent";
                                 const isUserVerified = isVerified(player.id);
                                 const hasPin = extractPin(player.notes) !== null;
+                                const isPresent = status === 'Present' || status === 'Late';
                                 
                                 return (
                                     <div
                                         key={player.id}
-                                        onClick={() => handlePlayerClick(player)}
+                                        onClick={() => !isSubmitting && handlePlayerClick(player)}
                                         className={`
                                             relative flex flex-col items-center p-4 rounded-xl border cursor-pointer select-none text-center gap-1.5 transition-all duration-150 min-h-[110px]
-                                            ${selectedPlayer?.id === player.id
-                                                ? 'bg-red-950/30 border-red-500 shadow-md shadow-red-500/10 scale-[1.02]'
+                                            ${isPresent
+                                                ? 'bg-emerald-950/30 border-emerald-500 shadow-md shadow-emerald-500/10 scale-[1.02]'
                                                 : 'bg-slate-800/50 border-slate-800 hover:border-slate-700 hover:bg-slate-800'
                                             }
                                         `}
@@ -572,7 +536,7 @@ export default function PublicCheckinPage() {
                                     <h3 className="font-bold text-lg text-white">
                                         {pinMode === "set" ? "Secure Your Slot" : "Enter Check-in PIN"}
                                     </h3>
-                                    <p className="text-xs text-slate-400">For {selectedPlayer.firstName} {selectedPlayer.lastName}</p>
+                                    <p className="text-xs text-slate-400 font-semibold">For {selectedPlayer.firstName} {selectedPlayer.lastName}</p>
                                 </div>
                             </div>
                             <button 
@@ -595,7 +559,7 @@ export default function PublicCheckinPage() {
                             {pinMode === "set" ? (
                                 <div className="space-y-3">
                                     <p className="text-xs text-slate-300 leading-relaxed">
-                                        Choose a personal **4-digit PIN** to lock your name slot on this roster. Teammates won't be able to edit your status, and your phone will remember it automatically.
+                                        Choose a personal **4-digit PIN** to lock your name slot on this squad. Teammates won't be able to edit your status, and your phone will remember it automatically.
                                     </p>
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choose 4-Digit PIN</label>

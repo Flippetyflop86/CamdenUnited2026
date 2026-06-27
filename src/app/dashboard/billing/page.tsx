@@ -92,7 +92,7 @@ export default function BillingPage() {
             price: "4.99",
             description: "Core administration tools for starting clubs.",
             features: [
-                "Squad & Roster Management",
+                "Squad Management",
                 "Training Attendance Log",
                 "Basic Fixtures & Score logging",
                 "Matchday XI Team Builder",
