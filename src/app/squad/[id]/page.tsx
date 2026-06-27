@@ -13,6 +13,7 @@ import Link from "next/link";
 import { Player } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
+import { Input } from "@/components/ui/input";
 
 export default function PlayerProfilePage() {
     const params = useParams();
@@ -32,6 +33,70 @@ export default function PlayerProfilePage() {
     const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
     const [calculatedStats, setCalculatedStats] = useState({ apps: 0, goals: 0, assists: 0 });
 
+    // Invite player portal states
+    const [inviteEmail, setInviteEmail] = useState("");
+    const [inviteMobile, setInviteMobile] = useState("");
+    const [inviteLoading, setInviteLoading] = useState(false);
+    const [inviteSuccess, setInviteSuccess] = useState(false);
+    const [inviteError, setInviteError] = useState("");
+
+    const handleInvitePlayer = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setInviteLoading(true);
+        setInviteError("");
+        setInviteSuccess(false);
+
+        try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData?.session?.access_token;
+            if (!token) throw new Error("Authentication failed");
+
+            const res = await fetch("/api/player/invite", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    playerId: id,
+                    email: inviteEmail,
+                    mobileNumber: inviteMobile
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || "Failed to send invitation");
+            }
+
+            setInviteSuccess(true);
+            setPlayer(prev => prev ? { ...prev, email: inviteEmail, mobileNumber: inviteMobile, status: "Pending Activation" } as any : null);
+        } catch (err: any) {
+            setInviteError(err.message || "Failed to invite player.");
+        } finally {
+            setInviteLoading(false);
+        }
+    };
+
+    const handleRevokeDevice = async (deviceToken: string) => {
+        if (!player) return;
+        if (!confirm("Revoke access for this device? The player will need to verify via email OTP next time they respond.")) return;
+
+        const updatedDevices = (player as any).trustedDevices.filter((d: any) => d.token !== deviceToken);
+
+        try {
+            const { error } = await supabase
+                .from("players")
+                .update({ trusted_devices: updatedDevices })
+                .eq("id", player.id);
+
+            if (error) throw error;
+            setPlayer(prev => prev ? { ...prev, trustedDevices: updatedDevices } as any : null);
+        } catch (err: any) {
+            alert("Failed to revoke device access: " + err.message);
+        }
+    };
+
     const { settings } = useClub();
     const currentSquads = settings.squads || ["First Team"];
 
@@ -40,7 +105,7 @@ export default function PlayerProfilePage() {
             if (!id) return;
             
             const [playerRes, matchesRes, statsRes] = await Promise.all([
-                supabase.from('players').select('*').eq('id', id).single(),
+                supabase.from('players').select('*, email, mobile_number, status, trusted_devices').eq('id', id).single(),
                 supabase.from('matches').select('id, date'),
                 supabase.from('match_player_stats').select('*').eq('player_id', id)
             ]);
@@ -66,7 +131,11 @@ export default function PlayerProfilePage() {
                     dateOfBirth: data.date_of_birth,
                     notes: data.notes,
                     isInTrainingSquad: data.is_in_training_squad,
-                    medicalNotes: data.medical_notes
+                    medicalNotes: data.medical_notes,
+                    email: data.email,
+                    mobileNumber: data.mobile_number,
+                    status: data.status || "Pending Activation",
+                    trustedDevices: data.trusted_devices || []
                 } as any);
             }
 
@@ -189,10 +258,11 @@ export default function PlayerProfilePage() {
 
             {/* Tabs Section */}
             <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="grid w-full grid-cols-3 lg:w-[400px]">
+                <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     <TabsTrigger value="stats">Stats</TabsTrigger>
                     <TabsTrigger value="medical">Medical</TabsTrigger>
+                    <TabsTrigger value="portal">Player Portal</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="overview" className="mt-6 space-y-6">
@@ -278,6 +348,102 @@ export default function PlayerProfilePage() {
                         <CardHeader><CardTitle>Detailed Statistics</CardTitle></CardHeader>
                         <CardContent>
                             <p className="text-slate-500">Advanced analytics and charts will appear here.</p>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="portal" className="mt-6">
+                    <Card className="border-slate-200">
+                        <CardHeader>
+                            <CardTitle className="text-slate-900 text-base">Player Portal Integration</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-6">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50 p-4 border rounded-xl">
+                                <div>
+                                    <p className="text-xs text-slate-500 font-bold uppercase">Portal Status</p>
+                                    <p className="text-sm font-semibold text-slate-800 mt-0.5">
+                                        {player && (player as any).status || "Pending Activation"}
+                                    </p>
+                                </div>
+                                {player && ((player as any).email || (player as any).mobileNumber) && (
+                                    <div className="text-slate-600 text-xs">
+                                        <p><strong>Email:</strong> {(player as any).email || "Not Set"}</p>
+                                        <p><strong>Mobile:</strong> {(player as any).mobileNumber || "Not Set"}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Invitation Form if no email is set */}
+                            {player && !(player as any).email && (
+                                <form onSubmit={handleInvitePlayer} className="space-y-4 border-t pt-4">
+                                    <h4 className="text-xs font-bold text-slate-700 uppercase">Send Player Portal Invite</h4>
+                                    {inviteError && (
+                                        <div className="text-red-600 bg-red-50 p-2.5 border border-red-100 rounded-lg text-xs">
+                                            {inviteError}
+                                        </div>
+                                    )}
+                                    {inviteSuccess && (
+                                        <div className="text-green-700 bg-green-50 p-2.5 border border-green-100 rounded-lg text-xs font-semibold">
+                                            Invitation email sent successfully!
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Player Email Address</label>
+                                            <Input 
+                                                type="email" 
+                                                required 
+                                                value={inviteEmail} 
+                                                onChange={e => setInviteEmail(e.target.value)} 
+                                                placeholder="e.g. player@example.com"
+                                                className="text-xs border-slate-200"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Mobile Number (Optional)</label>
+                                            <Input 
+                                                type="tel" 
+                                                value={inviteMobile} 
+                                                onChange={e => setInviteMobile(e.target.value)} 
+                                                placeholder="e.g. 07123456789"
+                                                className="text-xs border-slate-200"
+                                            />
+                                        </div>
+                                    </div>
+                                    <Button type="submit" disabled={inviteLoading} className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs h-9">
+                                        {inviteLoading ? "Sending invite..." : "Invite Player"}
+                                    </Button>
+                                </form>
+                            )}
+
+                            {/* Trusted Devices list */}
+                            {player && (player as any).status === "Active" && (
+                                <div className="space-y-3 border-t pt-4">
+                                    <h4 className="text-xs font-bold text-slate-700 uppercase">Registered Trusted Devices</h4>
+                                    {!(player as any).trustedDevices || (player as any).trustedDevices.length === 0 ? (
+                                        <p className="text-xs text-slate-500 italic">No devices registered yet.</p>
+                                    ) : (
+                                        <div className="divide-y divide-slate-100 border rounded-lg">
+                                            {((player as any).trustedDevices || []).map((device: any, index: number) => (
+                                                <div key={index} className="p-3 flex items-center justify-between gap-4 text-xs">
+                                                    <div>
+                                                        <p className="font-bold text-slate-800">{device.name || `Device ${index + 1}`}</p>
+                                                        <p className="text-[10px] text-slate-500">Trusted: {device.trustedAt ? new Date(device.trustedAt).toLocaleString() : "Unknown"}</p>
+                                                    </div>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm" 
+                                                        onClick={() => handleRevokeDevice(device.token)}
+                                                        className="text-red-600 hover:bg-red-50 text-[10px] font-bold h-7"
+                                                    >
+                                                        Revoke Access
+                                                    </Button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </TabsContent>
