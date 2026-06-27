@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Menu, LayoutDashboard, Users, Activity, CreditCard, Search, Plus, Moon, Sun, UserPlus, Calendar } from "lucide-react";
+import { Menu, LayoutDashboard, Users, Activity, CreditCard, Search, Plus, UserPlus, Calendar } from "lucide-react";
 import Link from "next/link";
 import { useClub } from "@/context/club-context";
 import { cn } from "@/lib/utils";
@@ -13,37 +13,12 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { settings, isLoaded } = useClub();
     const pathname = usePathname();
-    const [isDarkMode, setIsDarkMode] = useState(false);
     const [isFabOpen, setIsFabOpen] = useState(false);
 
     const isPublicCheckin = pathname?.startsWith("/checkin/");
     const isAuthPage = ["/login", "/signup", "/reset-password", "/update-password", "/join"].includes(pathname);
     const isOnboardingPage = pathname === "/onboarding";
     const isNoShellPage = isAuthPage || isOnboardingPage || isPublicCheckin;
-
-    useEffect(() => {
-        // Initialize Theme from localStorage
-        const theme = localStorage.getItem("cf_theme");
-        if (theme === "dark" || (!theme && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
-            setIsDarkMode(true);
-            document.documentElement.classList.add("dark");
-        } else {
-            setIsDarkMode(false);
-            document.documentElement.classList.remove("dark");
-        }
-    }, []);
-
-    const toggleTheme = () => {
-        const next = !isDarkMode;
-        setIsDarkMode(next);
-        if (next) {
-            document.documentElement.classList.add("dark");
-            localStorage.setItem("cf_theme", "dark");
-        } else {
-            document.documentElement.classList.remove("dark");
-            localStorage.setItem("cf_theme", "light");
-        }
-    };
 
     useEffect(() => {
         if (isLoaded && !settings.isOnboarded && !isNoShellPage) {
@@ -54,7 +29,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }, [isLoaded, settings.isOnboarded, isNoShellPage]);
 
     if (isNoShellPage) {
-        return <main className="min-h-screen bg-slate-50 dark:bg-slate-950">{children}</main>;
+        return <main className="min-h-screen bg-slate-50">{children}</main>;
     }
 
     if (isLoaded && !settings.isOnboarded && !isAuthPage && !isOnboardingPage) {
@@ -69,7 +44,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="flex h-screen w-full bg-slate-50 dark:bg-slate-950 overflow-hidden text-slate-900 dark:text-slate-100">
+        <div className="flex h-screen w-full bg-slate-50 overflow-hidden text-slate-900">
             {/* Mobile Header */}
             <header className="fixed top-0 left-0 right-0 h-16 bg-slate-900 flex items-center px-4 justify-between z-40 md:hidden">
                 <div className="flex items-center gap-3 overflow-hidden">
@@ -90,14 +65,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         title="Search"
                     >
                         <Search className="h-5 w-5" />
-                    </button>
-                    <button
-                        onClick={toggleTheme}
-                        className="p-2 text-slate-400 hover:text-white"
-                        aria-label="Toggle theme"
-                        title="Toggle dark mode"
-                    >
-                        {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                     </button>
                     <button
                         onClick={() => setIsMobileMenuOpen(true)}
@@ -147,7 +114,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         <Link 
                             href="/matches?add=true" 
                             onClick={() => setIsFabOpen(false)}
-                            className="flex items-center gap-2 bg-slate-900 text-white dark:bg-slate-800 dark:text-slate-100 hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
+                            className="flex items-center gap-2 bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
                         >
                             <Calendar className="h-4 w-4 text-red-500" />
                             <span>Schedule Match</span>
@@ -156,7 +123,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         <Link 
                             href="/training?add=true" 
                             onClick={() => setIsFabOpen(false)}
-                            className="flex items-center gap-2 bg-slate-900 text-white dark:bg-slate-800 dark:text-slate-100 hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
+                            className="flex items-center gap-2 bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
                         >
                             <Activity className="h-4 w-4 text-red-500" />
                             <span>Schedule Training</span>
@@ -165,19 +132,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                         <Link 
                             href="/squad?add=true" 
                             onClick={() => setIsFabOpen(false)}
-                            className="flex items-center gap-2 bg-slate-900 text-white dark:bg-slate-800 dark:text-slate-100 hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
+                            className="flex items-center gap-2 bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
                         >
                             <UserPlus className="h-4 w-4 text-red-500" />
                             <span>Add Player</span>
                         </Link>
-                        {/* Desktop Dark Mode Toggle */}
-                        <button 
-                            onClick={() => { toggleTheme(); setIsFabOpen(false); }}
-                            className="hidden md:flex items-center gap-2 bg-slate-900 text-white dark:bg-slate-800 dark:text-slate-100 hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
-                        >
-                            {isDarkMode ? <Sun className="h-4 w-4 text-yellow-500" /> : <Moon className="h-4 w-4 text-indigo-400" />}
-                            <span>{isDarkMode ? "Light Mode" : "Dark Mode"}</span>
-                        </button>
                     </div>
                 )}
                 <button

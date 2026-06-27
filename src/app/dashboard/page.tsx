@@ -503,20 +503,6 @@ export default function DashboardPage() {
                                 </p>
                             </div>
                         </div>
-                        <div className="flex gap-2">
-                            {birthdays.map(b => {
-                                const message = `Happy Birthday ${b.player.firstName}! hope you have a great day! 🎂⚽`;
-                                return (
-                                    <Badge
-                                        key={b.player.id}
-                                        onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank")}
-                                        className="bg-pink-650 hover:bg-pink-700 text-white font-bold cursor-pointer text-[10px] py-1.5 px-3 rounded-full select-none shrink-0"
-                                    >
-                                        Wish {b.player.firstName}
-                                    </Badge>
-                                );
-                            })}
-                        </div>
                     </CardContent>
                 </Card>
             )}
