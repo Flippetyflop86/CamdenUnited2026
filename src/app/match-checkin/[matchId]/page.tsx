@@ -170,6 +170,7 @@ export default function MatchCheckinPage() {
                     isInTrainingSquad: p.is_in_training_squad,
                     imageUrl: p.image_url,
                     notes: p.notes,
+                    dateOfBirth: p.date_of_birth,
                 } as Player)).sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));
 
                 setPlayers(eligible);
@@ -189,10 +190,13 @@ export default function MatchCheckinPage() {
         return localStorage.getItem(`cf_verified_player_${playerId}`) === "true";
     };
 
+    const [enteredDob, setEnteredDob] = useState("");
+
     const handlePlayerClick = (player: Player) => {
         setSelectedPlayer(player);
         setSuccessMessage(null);
         setEnteredPin("");
+        setEnteredDob("");
         setPinError("");
 
         const existingPin = extractPin(player.notes);
@@ -300,6 +304,27 @@ export default function MatchCheckinPage() {
 
         try {
             if (pinMode === "set") {
+                if (!enteredDob) {
+                    setPinError("Please enter your Date of Birth for verification.");
+                    setIsPinSubmitting(false);
+                    return;
+                }
+
+                const cleanInputDob = new Date(enteredDob).toISOString().split('T')[0];
+                const cleanPlayerDob = selectedPlayer.dateOfBirth ? new Date(selectedPlayer.dateOfBirth).toISOString().split('T')[0] : "";
+
+                if (!cleanPlayerDob) {
+                    setPinError("Your Date of Birth is not registered in the system. Please ask your coach to check you in.");
+                    setIsPinSubmitting(false);
+                    return;
+                }
+
+                if (cleanInputDob !== cleanPlayerDob) {
+                    setPinError("Incorrect Date of Birth. Verification failed.");
+                    setIsPinSubmitting(false);
+                    return;
+                }
+
                 localStorage.setItem(`cf_verified_player_${selectedPlayer.id}`, "true");
                 setIsVerificationModalOpen(false);
                 await toggleMatchAvailability(selectedPlayer, enteredPin);
@@ -570,9 +595,19 @@ export default function MatchCheckinPage() {
 
                             {pinMode === "set" ? (
                                 <div className="space-y-3">
-                                    <p className="text-xs text-slate-300 leading-relaxed">
-                                        Choose a personal **4-digit PIN** to lock your name slot on this squad. Teammates won't be able to edit your status, and your phone will remember it automatically.
+                                    <p className="text-xs text-slate-300 leading-relaxed font-medium">
+                                        To prevent anyone else from locking your slot, please verify your identity by entering your Date of Birth, then choose a secure 4-digit PIN.
                                     </p>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Verify Date of Birth</label>
+                                        <Input
+                                            type="date"
+                                            required
+                                            value={enteredDob}
+                                            onChange={(e) => setEnteredDob(e.target.value)}
+                                            className="bg-slate-950 border-slate-800 text-white text-center text-sm h-11 focus-visible:ring-red-500"
+                                        />
+                                    </div>
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choose 4-Digit PIN</label>
                                         <Input
@@ -589,7 +624,7 @@ export default function MatchCheckinPage() {
                                     </div>
                                     <Button 
                                         type="submit"
-                                        disabled={isPinSubmitting || enteredPin.length !== 4}
+                                        disabled={isPinSubmitting || enteredPin.length !== 4 || !enteredDob}
                                         className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
                                     >
                                         {isPinSubmitting ? "Securing Name..." : "Lock Name & Check-in"}
