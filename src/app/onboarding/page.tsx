@@ -788,7 +788,7 @@ export default function OnboardingWizard() {
                                                             role: "manager/coach", 
                                                             label: "Manager / Coach", 
                                                             desc: "The tactician running team squads, training sessions, matchday lineups, and masterminding tactics.", 
-                                                            icon: ClipboardList,
+                                                            icon: Users,
                                                             colorClass: "border-emerald-500 bg-gradient-to-br from-emerald-950/40 via-emerald-900/10 to-slate-900/10 shadow-lg shadow-emerald-500/10 text-emerald-400",
                                                             defaultClass: "border-emerald-950/40 bg-gradient-to-br from-emerald-950/10 to-slate-950/50 hover:border-emerald-800/60 hover:shadow-[0_0_20px_rgba(16,185,129,0.08)]",
                                                             iconClass: "bg-emerald-500 text-slate-950",
