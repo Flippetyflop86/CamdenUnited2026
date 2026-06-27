@@ -358,7 +358,20 @@ export default function PublicCheckinPage() {
                                 </Avatar>
                                 <div>
                                     <h3 className="text-base font-bold text-white">{selectedPlayer.firstName} {selectedPlayer.lastName}</h3>
-                                    <p className="text-xs text-slate-400 font-semibold uppercase">{selectedPlayer.position} • Verified Device ✓</p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-xs text-slate-400 font-semibold uppercase">{selectedPlayer.position} • Verified Device ✓</span>
+                                        <button
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                localStorage.removeItem(`cf_verified_player_${selectedPlayer.id}`);
+                                                setSelectedPlayer(null);
+                                                setPlayers([...players]);
+                                            }}
+                                            className="text-[10px] text-red-400 hover:text-red-350 underline hover:no-underline font-medium"
+                                        >
+                                            Reset Verification
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                             <Button 
