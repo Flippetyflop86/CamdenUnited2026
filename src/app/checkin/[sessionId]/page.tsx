@@ -391,9 +391,23 @@ export default function PublicCheckinPage() {
                                 <Clock className="h-3 w-3" /> {session.time}
                             </span>
                         </div>
-                        <CardTitle className="text-xl text-white mt-1.5">{session.topic || "General Session"}</CardTitle>
-                        <CardDescription className="text-slate-400">
-                            Select your name below to instantly toggle your attendance status.
+                        <h2 className="text-xl font-bold text-white mt-2.5 mb-1">{session.topic || "General Session"}</h2>
+                        <CardDescription className="text-slate-400 leading-relaxed">
+                            {(() => {
+                                const sessionDate = new Date(session.date);
+                                const today = new Date();
+                                const isToday = sessionDate.getDate() === today.getDate() &&
+                                                sessionDate.getMonth() === today.getMonth() &&
+                                                sessionDate.getFullYear() === today.getFullYear();
+                                return isToday ? (
+                                    `Please confirm whether you are attending tonight's session on ${formatFriendlyDate(session.date)} at ${session.time} at ${session.location}.`
+                                ) : (
+                                    `Please confirm whether you are attending the session on ${formatFriendlyDate(session.date)} at ${session.time} at ${session.location}.`
+                                );
+                            })()}
+                            <span className="block mt-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                💡 Select your name below to instantly toggle your attendance status.
+                            </span>
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-0 border-t border-slate-800/50 mt-2 text-sm text-slate-300">
