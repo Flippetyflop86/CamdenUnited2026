@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CalendarDays, MapPin, Users, Trash2, Pencil, BarChart3, List, Download, ClipboardList, MessageCircle, Copy, ExternalLink, Link2 } from "lucide-react";
+import { Plus, CalendarDays, MapPin, Users, Trash2, Pencil, BarChart3, List, Download, ClipboardList, MessageCircle, Copy, ExternalLink, Link2, Repeat } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase";
@@ -172,6 +172,35 @@ export default function TrainingPage() {
             setEditingSessionId(null);
         } catch (e: any) {
             alert("Error saving session: " + e.message);
+        }
+    };
+
+    const handleRepeatNextWeek = async (session: TrainingSession, e: React.MouseEvent) => {
+        e.stopPropagation();
+        
+        // Calculate date of next week (add 7 days)
+        const d = new Date(session.date);
+        d.setDate(d.getDate() + 7);
+        const nextWeekDate = d.toISOString().split('T')[0];
+
+        const payload = {
+            date: nextWeekDate,
+            time: session.time,
+            location: session.location,
+            squad: session.squad,
+            topic: session.topic || "General Session"
+        };
+
+        try {
+            const { error } = await supabase
+                .from("training_sessions")
+                .insert([{ ...payload, attendance: [], notes: "" }]);
+
+            if (error) throw error;
+            alert(`Session repeated successfully for next week (${nextWeekDate})!`);
+            fetchSessionsOnly();
+        } catch (err: any) {
+            alert("Failed to repeat session: " + err.message);
         }
     };
 
@@ -462,13 +491,16 @@ export default function TrainingPage() {
                     {upcomingSessions.map((session) => (
                         <Card key={session.id} className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-red-600 group relative">
                             <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-650" onClick={(e) => handleRepeatNextWeek(session, e)} title="Repeat Next Week">
+                                    <Repeat className="h-4 w-4" />
+                                </Button>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" onClick={(e) => { e.stopPropagation(); handleOpenShare(session); }}>
                                     <MessageCircle className="h-4 w-4" />
                                 </Button>
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={(e) => { e.stopPropagation(); handleEdit(session); }}>
                                     <Pencil className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600" onClick={(e) => { e.stopPropagation(); handleDelete(session.id); }}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-650" onClick={(e) => { e.stopPropagation(); handleDelete(session.id); }}>
                                     <Trash2 className="h-4 w-4" />
                                 </Button>
                             </div>

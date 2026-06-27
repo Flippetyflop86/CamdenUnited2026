@@ -74,9 +74,10 @@ export default function MatchesPage() {
     const [resultSort, setResultSort] = useState<"desc" | "asc">("desc"); // desc = Newest First
 
     // Form State
-    const [formData, setFormData] = useState<Omit<Match, "id" | "result">>({
+    const [formData, setFormData] = useState<any>({
         date: "",
         time: "15:00",
+        meetTime: "14:00",
         opponent: "",
         isHome: true,
         competition: "League Match",
@@ -161,14 +162,19 @@ export default function MatchesPage() {
             const surfaceMatch = m.notes ? m.notes.match(/\[Surface: (.*?)\]/) : null;
             const surface = surfaceMatch ? surfaceMatch[1] : "4G";
 
+            const meetTimeMatch = m.notes ? m.notes.match(/\[MeetTime: (.*?)\]/) : null;
+            const meetTime = meetTimeMatch ? meetTimeMatch[1] : "";
+
             let cleanNotes = m.notes || "";
             cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/, "");
-            cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "").trim();
+            cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "");
+            cleanNotes = cleanNotes.replace(/\[MeetTime: .*?\]\n?/, "").trim();
             
             return {
                 id: m.id,
                 date: m.date,
                 time: m.time,
+                meetTime: meetTime,
                 opponent: m.opponent,
                 isHome: m.is_home,
                 competition: m.competition,
@@ -181,11 +187,34 @@ export default function MatchesPage() {
                 notes: cleanNotes,
                 surface: surface,
                 location: location
-            };
+            } as any;
         });
 
         setMatches(mapped);
     }
+
+    const autoCalculateMeetTime = (kickoffTime: string, isHome: boolean): string => {
+        const offset = isHome ? -60 : -75;
+        return calculateMeetTime(kickoffTime, offset);
+    };
+
+    const handleKickoffChange = (newTime: string) => {
+        const computed = autoCalculateMeetTime(newTime, formData.isHome);
+        setFormData((prev: any) => ({
+            ...prev,
+            time: newTime,
+            meetTime: computed
+        }));
+    };
+
+    const handleVenueChange = (isHome: boolean) => {
+        const computed = autoCalculateMeetTime(formData.time, isHome);
+        setFormData((prev: any) => ({
+            ...prev,
+            isHome,
+            meetTime: computed
+        }));
+    };
 
     const handleSaveMatch = async () => {
         if (!formData.opponent || !formData.date) return;
@@ -208,7 +237,8 @@ export default function MatchesPage() {
         // Build combined metadata in the notes column
         const locationPrefix = `[Location: ${formData.location || ""}]`;
         const surfacePrefix = `[Surface: ${formData.surface || "4G"}]`;
-        const combinedNotes = `${locationPrefix}${surfacePrefix}\n${formData.notes || ""}`.trim();
+        const meetTimePrefix = `[MeetTime: ${formData.meetTime || ""}]`;
+        const combinedNotes = `${locationPrefix}${surfacePrefix}${meetTimePrefix}\n${formData.notes || ""}`.trim();
 
         const payload = {
             date: formData.date,
@@ -271,6 +301,7 @@ export default function MatchesPage() {
         setFormData({
             date: match.date,
             time: match.time,
+            meetTime: (match as any).meetTime || autoCalculateMeetTime(match.time, match.isHome),
             opponent: match.opponent,
             isHome: match.isHome,
             competition: match.competition,
@@ -483,6 +514,7 @@ export default function MatchesPage() {
         setFormData({
             date: "",
             time: "15:00",
+            meetTime: "14:00",
             opponent: "",
             isHome: true,
             competition: "League Match",
@@ -847,14 +879,21 @@ export default function MatchesPage() {
 
                                 <div className="flex-1 overflow-y-auto px-6 py-2 space-y-4">
                                     <TabsContent value="fixture" className="space-y-3 mt-0 py-1">
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1">
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <div className="col-span-1 space-y-1">
                                                 <Label className="text-xs font-bold text-slate-500">Date</Label>
                                                 <Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="h-9 text-xs" />
                                             </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Time</Label>
-                                                <Input type="time" value={formData.time} onChange={e => setFormData({ ...formData, time: e.target.value })} className="h-9 text-xs" />
+                                            <div className="col-span-1 space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500">Time (Kick Off)</Label>
+                                                <Input type="time" value={formData.time} onChange={e => handleKickoffChange(e.target.value)} className="h-9 text-xs" />
+                                            </div>
+                                            <div className="col-span-1 space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500 flex items-center justify-between">
+                                                    <span>Meet Time</span>
+                                                    <span className="text-[9px] text-slate-400 font-normal lowercase">(auto)</span>
+                                                </Label>
+                                                <Input type="time" value={formData.meetTime} onChange={e => setFormData({ ...formData, meetTime: e.target.value })} className="h-9 text-xs" />
                                             </div>
                                         </div>
                                         
@@ -863,7 +902,7 @@ export default function MatchesPage() {
                                                 <Label className="text-xs font-bold text-slate-500">Venue</Label>
                                                 <Select
                                                     value={formData.isHome ? "Home" : "Away"}
-                                                    onValueChange={(v: string) => setFormData({ ...formData, isHome: v === "Home" })}
+                                                    onValueChange={(v: string) => handleVenueChange(v === "Home")}
                                                 >
                                                     <SelectTrigger className="h-9 text-xs">
                                                         <SelectValue />

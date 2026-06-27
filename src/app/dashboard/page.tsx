@@ -139,7 +139,7 @@ export default function DashboardPage() {
     };
 
     const fetchSquad = async () => {
-        const { data } = await supabase.from('players').select('id, first_name, last_name, position, squad, image_url');
+        const { data } = await supabase.from('players').select('id, first_name, last_name, position, squad, image_url, date_of_birth');
         if (data) {
             const mapped: Player[] = data.map((p: any) => ({
                 id: p.id,
@@ -150,6 +150,7 @@ export default function DashboardPage() {
                 squadNumber: 0,
                 age: 0,
                 nationality: "",
+                dateOfBirth: p.date_of_birth,
                 medicalStatus: "Available",
                 contractExpiry: "",
                 availability: true,
@@ -415,6 +416,34 @@ export default function DashboardPage() {
     const completedStepsCount = checklistSteps.filter(s => s.completed).length;
     const showSetupChecklist = completedStepsCount < 4;
 
+    const getUpcomingBirthdays = (squadPlayers: Player[]) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const upcoming = [];
+        
+        for (const player of squadPlayers) {
+            if (!player.dateOfBirth) continue;
+            const dob = new Date(player.dateOfBirth);
+            if (isNaN(dob.getTime())) continue;
+            
+            const nextBirthday = new Date(today.getFullYear(), dob.getMonth(), dob.getDate());
+            if (nextBirthday.getTime() < today.getTime()) {
+                nextBirthday.setFullYear(today.getFullYear() + 1);
+            }
+            
+            const diffTime = nextBirthday.getTime() - today.getTime();
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            
+            if (diffDays >= 0 && diffDays <= 7) {
+                upcoming.push({ player, daysLeft: diffDays, nextBirthday });
+            }
+        }
+        
+        return upcoming.sort((a, b) => a.daysLeft - b.daysLeft);
+    };
+
+    const birthdays = getUpcomingBirthdays(players);
+
     return (
         <div className="space-y-6 relative">
             <style>{`
@@ -457,6 +486,40 @@ export default function DashboardPage() {
                     <p className="text-slate-500 text-sm font-medium">Welcome back, Coach. Here's what's happening at {settings.name}.</p>
                 </div>
             </div>
+
+            {/* Birthday Alerts Banner */}
+            {birthdays.length > 0 && (
+                <Card className="bg-gradient-to-r from-pink-500/5 via-purple-500/5 to-indigo-500/5 border-pink-500/20 shadow-sm relative overflow-hidden z-10 border mb-6 animate-in slide-in-from-top-4 duration-300">
+                    <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <span className="text-2xl animate-bounce">🎉</span>
+                            <div>
+                                <h4 className="text-sm font-bold text-slate-900">Upcoming Squad Birthdays</h4>
+                                <p className="text-xs text-slate-550">
+                                    {birthdays.map(b => {
+                                        const daysText = b.daysLeft === 0 ? "today!" : `in ${b.daysLeft} days (${b.nextBirthday.getDate()} ${b.nextBirthday.toLocaleString('en-GB', { month: 'short' })})`;
+                                        return `${b.player.firstName} ${b.player.lastName} turns ${new Date().getFullYear() - new Date(b.player.dateOfBirth!).getFullYear()} ${daysText}`;
+                                    }).join(", ")}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            {birthdays.map(b => {
+                                const message = `Happy Birthday ${b.player.firstName}! hope you have a great day! 🎂⚽`;
+                                return (
+                                    <Badge
+                                        key={b.player.id}
+                                        onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank")}
+                                        className="bg-pink-650 hover:bg-pink-700 text-white font-bold cursor-pointer text-[10px] py-1.5 px-3 rounded-full select-none shrink-0"
+                                    >
+                                        Wish {b.player.firstName}
+                                    </Badge>
+                                );
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Quick Start Checklist Banner */}
             {showSetupChecklist && (
