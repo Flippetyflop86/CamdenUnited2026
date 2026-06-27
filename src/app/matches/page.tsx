@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink, CloudRain, Snowflake, Thermometer, CloudLightning, Sun, AlertCircle, BarChart3 } from "lucide-react";
+import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink, CloudRain, Snowflake, Thermometer, CloudLightning, Sun, AlertCircle, BarChart3, Share2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -56,6 +56,18 @@ export default function MatchesPage() {
     const [meetLocation, setMeetLocation] = useState("");
     const [additionalNotes, setAdditionalNotes] = useState("");
     const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
+
+    // Opposition & Referee Confirmation Modal States
+    const [selectedConfirmMatch, setSelectedConfirmMatch] = useState<Match | null>(null);
+    const [confirmStadiumAddress, setConfirmStadiumAddress] = useState("");
+    const [confirmSurfaceType, setConfirmSurfaceType] = useState("3G Pitch");
+    const [confirmRefFee, setConfirmRefFee] = useState("45");
+    const [confirmPaymentMethod, setConfirmPaymentMethod] = useState("Bank Transfer");
+    const [confirmDietaryDetails, setConfirmDietaryDetails] = useState("Plates of chips/pizza at the clubhouse");
+    const [confirmKitColors, setConfirmKitColors] = useState("Red Shirts, Black Shorts, Red Socks");
+    const [confirmMeetTimeOffset, setConfirmMeetTimeOffset] = useState("-60");
+    const [confirmRefName, setConfirmRefName] = useState("Referee");
+    const [confirmCopyStatus, setConfirmCopyStatus] = useState<"idle" | "opp_copied" | "ref_copied">("idle");
 
     const getCurrentSeasonStr = () => {
         const d = new Date();
@@ -360,6 +372,19 @@ export default function MatchesPage() {
         return `${weekday} ${day} ${month}`;
     };
 
+    const handleOpenConfirmDetails = (match: Match) => {
+        setSelectedConfirmMatch(match);
+        setConfirmStadiumAddress(settings.homeGround || match.location || "");
+        setConfirmSurfaceType("3G Pitch");
+        setConfirmRefFee("45");
+        setConfirmPaymentMethod("Bank Transfer");
+        setConfirmDietaryDetails("Plates of chips/pizza at the clubhouse");
+        setConfirmKitColors("Red Shirts, Black Shorts, Red Socks");
+        setConfirmMeetTimeOffset("-60");
+        setConfirmRefName("Referee");
+        setConfirmCopyStatus("idle");
+    };
+
     const handleOpenShare = (match: Match) => {
         const computedMeetTime = calculateMeetTime(match.time, -60);
         const computedMeetLocation = match.isHome ? (settings.homeGround || match.location || "") : (match.location || "");
@@ -437,6 +462,55 @@ export default function MatchesPage() {
 
     const handleSendWhatsApp = () => {
         const text = getGeneratedPollText();
+        if (!text) return;
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+    };
+
+    const getOpponentConfirmText = () => {
+        if (!selectedConfirmMatch) return "";
+        const dateFormatted = formatMatchdayDate(selectedConfirmMatch.date);
+        const meetTime = calculateMeetTime(selectedConfirmMatch.time, parseInt(confirmMeetTimeOffset));
+        return `⚽️ MATCHDAY CONFIRMATION\nHi, hope you're well. Just confirming the match details for this weekend's home game:\n\n🗓 Date: ${dateFormatted}\n⏰ Kick-off: ${selectedConfirmMatch.time} (Meet: ${meetTime})\n🏆 Competition: ${selectedConfirmMatch.competition}\n🆚 ${settings.name} vs ${selectedConfirmMatch.opponent}\n\n📍 Venue: ${confirmStadiumAddress}\n🟢 Pitch Surface: ${confirmSurfaceType}\n👕 Kit Colors: ${confirmKitColors} (Please let us know if there is a kit clash!)\n\n🍔 Post-Match: ${confirmDietaryDetails}\n\nLooking forward to a good game. Let us know if you have any questions!`;
+    };
+
+    const getRefConfirmText = () => {
+        if (!selectedConfirmMatch) return "";
+        const dateFormatted = formatMatchdayDate(selectedConfirmMatch.date);
+        return `🏁 REFEREE CONFIRMATION\nHi ${confirmRefName}, hope you're well. Just confirming match details for this weekend's home game:\n\n🗓 Date: ${dateFormatted}\n⏰ Kick-off: ${selectedConfirmMatch.time}\n🏆 Competition: ${selectedConfirmMatch.competition}\n🆚 ${settings.name} vs ${selectedConfirmMatch.opponent}\n\n📍 Venue: ${confirmStadiumAddress}\n🟢 Pitch Surface: ${confirmSurfaceType}\n💰 Ref Fee: £${confirmRefFee} (${confirmPaymentMethod})\n\nLet us know if you can still cover this fixture. Thank you!`;
+    };
+
+    const handleCopyOpponentText = () => {
+        const text = getOpponentConfirmText();
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            setConfirmCopyStatus("opp_copied");
+            setTimeout(() => setConfirmCopyStatus("idle"), 2000);
+        }).catch(err => {
+            console.error("Failed to copy text:", err);
+            alert("Failed to copy to clipboard.");
+        });
+    };
+
+    const handleCopyRefText = () => {
+        const text = getRefConfirmText();
+        if (!text) return;
+        navigator.clipboard.writeText(text).then(() => {
+            setConfirmCopyStatus("ref_copied");
+            setTimeout(() => setConfirmCopyStatus("idle"), 2000);
+        }).catch(err => {
+            console.error("Failed to copy text:", err);
+            alert("Failed to copy to clipboard.");
+        });
+    };
+
+    const handleSendOpponentWhatsApp = () => {
+        const text = getOpponentConfirmText();
+        if (!text) return;
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+    };
+
+    const handleSendRefWhatsApp = () => {
+        const text = getRefConfirmText();
         if (!text) return;
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
     };
@@ -721,8 +795,19 @@ export default function MatchesPage() {
                     </div>
                     <div className="flex items-center gap-1">
                         {!isPast && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" onClick={() => handleOpenShare(match)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" onClick={() => handleOpenShare(match)} title="Share Player Poll">
                                 <MessageCircle className="h-4 w-4" />
+                            </Button>
+                        )}
+                        {!isPast && match.isHome && (
+                            <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" 
+                                onClick={() => handleOpenConfirmDetails(match)}
+                                title="Confirm Details with Opponent & Ref"
+                            >
+                                <Share2 className="h-4 w-4" />
                             </Button>
                         )}
                         {!isPast && (
@@ -1442,6 +1527,200 @@ export default function MatchesPage() {
                             className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
                         >
                             <ExternalLink className="h-4 w-4 mr-2" /> Send to WhatsApp
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Opposition & Referee Confirmation Modal */}
+            <Dialog open={selectedConfirmMatch !== null} onOpenChange={(open) => { if (!open) setSelectedConfirmMatch(null); }}>
+                <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-blue-700">
+                            <Share2 className="h-5 w-5" /> Home Game Confirmation Details
+                        </DialogTitle>
+                        <DialogDescription>
+                            Review and customize the matchday details for opposition managers, secretaries, and referees.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {selectedConfirmMatch && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-2 text-slate-800">
+                            {/* Left Column: Settings Form */}
+                            <div className="space-y-4 pr-0 md:pr-4 md:border-r border-slate-100">
+                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Matchday Variables</h4>
+                                
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">Stadium / Home Ground Address</Label>
+                                    <Input 
+                                        value={confirmStadiumAddress}
+                                        onChange={(e) => setConfirmStadiumAddress(e.target.value)}
+                                        className="text-xs border-slate-200"
+                                        placeholder="Enter stadium address"
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold">Pitch Surface</Label>
+                                        <Select value={confirmSurfaceType} onValueChange={setConfirmSurfaceType}>
+                                            <SelectTrigger className="text-xs border-slate-200">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="3G Pitch">3G Pitch</SelectItem>
+                                                <SelectItem value="4G Pitch">4G Pitch</SelectItem>
+                                                <SelectItem value="Grass">Grass</SelectItem>
+                                                <SelectItem value="AstroTurf">AstroTurf</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold">Meet Time (Offset)</Label>
+                                        <Select value={confirmMeetTimeOffset} onValueChange={setConfirmMeetTimeOffset}>
+                                            <SelectTrigger className="text-xs border-slate-200">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="-30">30m before KO</SelectItem>
+                                                <SelectItem value="-45">45m before KO</SelectItem>
+                                                <SelectItem value="-60">60m before KO</SelectItem>
+                                                <SelectItem value="-75">75m before KO</SelectItem>
+                                                <SelectItem value="-90">90m before KO</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">Our Kit Colors</Label>
+                                    <Input 
+                                        value={confirmKitColors}
+                                        onChange={(e) => setConfirmKitColors(e.target.value)}
+                                        className="text-xs border-slate-200"
+                                        placeholder="e.g. Red Shirts, Black Shorts"
+                                    />
+                                </div>
+
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-semibold">Post-Match Hospitality / Dietary</Label>
+                                    <Input 
+                                        value={confirmDietaryDetails}
+                                        onChange={(e) => setConfirmDietaryDetails(e.target.value)}
+                                        className="text-xs border-slate-200"
+                                        placeholder="e.g. Food provided at the pub"
+                                    />
+                                </div>
+
+                                <div className="border-t border-slate-100 pt-3 space-y-3">
+                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Referee Settings</h4>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold">Referee Name</Label>
+                                        <Input 
+                                            value={confirmRefName}
+                                            onChange={(e) => setConfirmRefName(e.target.value)}
+                                            className="text-xs border-slate-200"
+                                            placeholder="e.g. Mark, Sir, etc."
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold">Referee Fee (£)</Label>
+                                            <Input 
+                                                value={confirmRefFee}
+                                                onChange={(e) => setConfirmRefFee(e.target.value)}
+                                                className="text-xs border-slate-200"
+                                                placeholder="e.g. 45"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <Label className="text-xs font-semibold">Payment Method</Label>
+                                            <Select value={confirmPaymentMethod} onValueChange={setConfirmPaymentMethod}>
+                                                <SelectTrigger className="text-xs border-slate-200">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                                    <SelectItem value="Cash">Cash</SelectItem>
+                                                    <SelectItem value="Paid by Club">Paid by Club</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Right Column: Previews and Share Buttons */}
+                            <div className="space-y-4">
+                                <Tabs defaultValue="opponent" className="w-full">
+                                    <TabsList className="grid w-full grid-cols-2 bg-slate-100">
+                                        <TabsTrigger value="opponent" className="text-xs font-semibold">Opponent Manager</TabsTrigger>
+                                        <TabsTrigger value="referee" className="text-xs font-semibold">Referee</TabsTrigger>
+                                    </TabsList>
+
+                                    <TabsContent value="opponent" className="space-y-3 pt-2">
+                                        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Opponent Message Preview</Label>
+                                        <Textarea
+                                            value={getOpponentConfirmText()}
+                                            readOnly
+                                            className="text-xs min-h-[220px] font-mono bg-slate-50 border-slate-200 text-slate-600 focus-visible:ring-0 cursor-default"
+                                        />
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant={confirmCopyStatus === "opp_copied" ? "default" : "secondary"}
+                                                onClick={handleCopyOpponentText}
+                                                className={`text-xs font-semibold flex-1 transition-all ${
+                                                    confirmCopyStatus === "opp_copied" 
+                                                        ? "bg-green-600 hover:bg-green-600 text-white" 
+                                                        : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                                                }`}
+                                            >
+                                                {confirmCopyStatus === "opp_copied" ? "✓ Copied" : "Copy Message"}
+                                            </Button>
+                                            <Button
+                                                onClick={handleSendOpponentWhatsApp}
+                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex-1"
+                                            >
+                                                <ExternalLink className="h-3 w-3 mr-1.5" /> Send WhatsApp
+                                            </Button>
+                                        </div>
+                                    </TabsContent>
+
+                                    <TabsContent value="referee" className="space-y-3 pt-2">
+                                        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Referee Message Preview</Label>
+                                        <Textarea
+                                            value={getRefConfirmText()}
+                                            readOnly
+                                            className="text-xs min-h-[220px] font-mono bg-slate-50 border-slate-200 text-slate-600 focus-visible:ring-0 cursor-default"
+                                        />
+                                        <div className="flex gap-2">
+                                            <Button
+                                                variant={confirmCopyStatus === "ref_copied" ? "default" : "secondary"}
+                                                onClick={handleCopyRefText}
+                                                className={`text-xs font-semibold flex-1 transition-all ${
+                                                    confirmCopyStatus === "ref_copied" 
+                                                        ? "bg-green-600 hover:bg-green-600 text-white" 
+                                                        : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                                                }`}
+                                            >
+                                                {confirmCopyStatus === "ref_copied" ? "✓ Copied" : "Copy Message"}
+                                            </Button>
+                                            <Button
+                                                onClick={handleSendRefWhatsApp}
+                                                className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs flex-1"
+                                            >
+                                                <ExternalLink className="h-3 w-3 mr-1.5" /> Send WhatsApp
+                                            </Button>
+                                        </div>
+                                    </TabsContent>
+                                </Tabs>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter className="border-t border-slate-100 pt-3">
+                        <Button variant="outline" onClick={() => setSelectedConfirmMatch(null)}>
+                            Close
                         </Button>
                     </DialogFooter>
                 </DialogContent>
