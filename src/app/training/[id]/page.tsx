@@ -17,6 +17,22 @@ function formatSquad(squad: string) {
     return squad;
 }
 
+function formatFriendlyDate(dateStr: string) {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+
+    const weekday = new Intl.DateTimeFormat("en-GB", { weekday: 'long' }).format(d);
+    const day = d.getDate();
+    const month = new Intl.DateTimeFormat("en-GB", { month: 'long' }).format(d);
+
+    let suffix = "th";
+    if (day === 1 || day === 21 || day === 31) suffix = "st";
+    else if (day === 2 || day === 22) suffix = "nd";
+    else if (day === 3 || day === 23) suffix = "rd";
+
+    return `${weekday} ${day}${suffix} of ${month}`;
+}
+
 export default function TrainingSessionPage() {
     const routeParams = useParams();
     const [session, setSession] = useState<TrainingSession | null>(null);
@@ -350,7 +366,8 @@ export default function TrainingSessionPage() {
                             className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 md:flex-initial"
                             onClick={() => {
                                 const link = `${window.location.origin}/checkin/${session.id}`;
-                                const text = `Camden United check-in: Players, please log your training attendance for tonight's session here: ${link}`;
+                                const dateStr = formatFriendlyDate(session.date);
+                                const text = `⚽ *Camden United Training Invite*\n📅 *Date:* ${dateStr}\n⏰ *Time:* ${session.time}\n📍 *Location:* ${session.location}\n\nPlayers, please log your training attendance here:\n🔗 ${link}`;
                                 window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
                             }}
                         >
