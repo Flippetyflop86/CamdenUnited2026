@@ -769,51 +769,64 @@ export default function OnboardingWizard() {
 
                                     {/* STEP 2: Role Selection */}
                                     {step === 2 && (
-                                        <motion.div key="step2" {...animations}>
-                                            <CardHeader className="space-y-2 pb-6 border-b border-slate-900 text-center">
-                                                <CardTitle className="text-2xl font-extrabold text-white">Select Your Role</CardTitle>
+                                        <motion.div key="step2" {...animations} className="relative">
+                                            {/* Ambient backdrop glows */}
+                                            <div className="absolute -top-16 -left-16 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+                                            <div className="absolute -bottom-16 -right-16 w-60 h-60 bg-rose-500/10 rounded-full blur-3xl pointer-events-none" />
+                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+
+                                            <CardHeader className="space-y-2 pb-6 border-b border-slate-900 text-center relative z-10">
+                                                <CardTitle className="text-3xl font-extrabold text-white bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent">Select Your Role</CardTitle>
                                                 <CardDescription className="text-slate-400 text-sm">
                                                     Choose your primary role to tailormake your workspace tabs.
                                                 </CardDescription>
                                             </CardHeader>
-                                            <CardContent className="space-y-6 pt-6">
+                                            <CardContent className="space-y-6 pt-6 relative z-10">
                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                     {[
                                                         { 
                                                             role: "manager/coach", 
                                                             label: "Manager / Coach", 
-                                                            desc: "The tactician running team squads, training sessions, matchday lineups, and masterminding matchday tactics.", 
+                                                            desc: "The tactician running team squads, training sessions, matchday lineups, and masterminding tactics.", 
                                                             icon: Users,
-                                                            colorClass: "border-emerald-500 bg-gradient-to-br from-emerald-950/40 to-emerald-900/10 shadow-emerald-500/10 text-emerald-400",
+                                                            colorClass: "border-emerald-500 bg-gradient-to-br from-emerald-950/40 via-emerald-900/10 to-slate-900/10 shadow-lg shadow-emerald-500/10 text-emerald-400",
+                                                            defaultClass: "border-emerald-950/40 bg-gradient-to-br from-emerald-950/10 to-slate-950/50 hover:border-emerald-800/60 hover:shadow-[0_0_20px_rgba(16,185,129,0.08)]",
                                                             iconClass: "bg-emerald-500 text-slate-950",
-                                                            borderClass: "hover:border-emerald-700/60"
+                                                            iconDefaultClass: "bg-emerald-950/65 text-emerald-400 border border-emerald-900/40",
+                                                            textClass: "text-emerald-400"
                                                         },
                                                         { 
                                                             role: "secretary", 
                                                             label: "Secretary", 
-                                                            desc: "The administrator coordinating fixtures, sponsorships, player databases, documents, and keeping the club running smoothly.", 
+                                                            desc: "The coordinator handling fixtures, sponsorships, player databases, documents, and overall club admin.", 
                                                             icon: FileText,
-                                                            colorClass: "border-blue-500 bg-gradient-to-br from-blue-950/40 to-blue-900/10 shadow-blue-500/10 text-blue-400",
+                                                            colorClass: "border-blue-500 bg-gradient-to-br from-blue-950/40 via-blue-900/10 to-slate-900/10 shadow-lg shadow-blue-500/10 text-blue-400",
+                                                            defaultClass: "border-blue-950/40 bg-gradient-to-br from-blue-950/10 to-slate-950/50 hover:border-blue-800/60 hover:shadow-[0_0_20px_rgba(59,130,246,0.08)]",
                                                             iconClass: "bg-blue-500 text-slate-950",
-                                                            borderClass: "hover:border-blue-700/60"
+                                                            iconDefaultClass: "bg-blue-950/65 text-blue-400 border border-blue-900/40",
+                                                            textClass: "text-blue-400"
                                                         },
                                                         { 
                                                             role: "analyst", 
                                                             label: "Analyst", 
-                                                            desc: "The data guru dissecting post-match statistics, compiling opposition reports, and mapping zones to exploit.", 
+                                                            desc: "The performance guru dissecting stats, compiling opposition reports, and mapping weaknesses.", 
                                                             icon: TrendingUp,
-                                                            colorClass: "border-rose-500 bg-gradient-to-br from-rose-950/40 to-rose-900/10 shadow-rose-500/10 text-rose-400",
+                                                            colorClass: "border-rose-500 bg-gradient-to-br from-rose-950/40 via-rose-900/10 to-slate-900/10 shadow-lg shadow-rose-500/10 text-rose-400",
+                                                            defaultClass: "border-rose-950/40 bg-gradient-to-br from-rose-950/10 to-slate-950/50 hover:border-rose-800/60 hover:shadow-[0_0_20px_rgba(244,63,94,0.08)]",
                                                             iconClass: "bg-rose-500 text-slate-950",
-                                                            borderClass: "hover:border-rose-700/60"
+                                                            iconDefaultClass: "bg-rose-950/65 text-rose-400 border border-rose-900/40",
+                                                            textClass: "text-rose-400"
                                                         },
                                                         { 
                                                             role: "chairperson", 
                                                             label: "Chairperson", 
-                                                            desc: "The club lead overseeing budgets, sponsorships, financial audits, and signing off staff contracts.", 
+                                                            desc: "The lead overseer managing player budgets, sponsorships, financial audits, and contracts.", 
                                                             icon: Award,
-                                                            colorClass: "border-amber-500 bg-gradient-to-br from-amber-950/40 to-amber-900/10 shadow-amber-500/10 text-amber-400",
+                                                            colorClass: "border-amber-500 bg-gradient-to-br from-amber-950/40 via-amber-900/10 to-slate-900/10 shadow-lg shadow-amber-500/10 text-amber-400",
+                                                            defaultClass: "border-amber-950/40 bg-gradient-to-br from-amber-950/10 to-slate-950/50 hover:border-amber-800/60 hover:shadow-[0_0_20px_rgba(245,158,11,0.08)]",
                                                             iconClass: "bg-amber-500 text-slate-950",
-                                                            borderClass: "hover:border-amber-700/60"
+                                                            iconDefaultClass: "bg-amber-950/65 text-amber-400 border border-amber-900/40",
+                                                            textClass: "text-amber-400"
                                                         }
                                                     ].map((item) => {
                                                         const IconComponent = item.icon;
@@ -827,22 +840,20 @@ export default function OnboardingWizard() {
                                                                     setSelectedTabs(ROLE_TABS[item.role] || []);
                                                                 }}
                                                                 className={`p-5 rounded-2xl cursor-pointer border-2 text-left transition-all duration-300 flex flex-col justify-between h-44 hover:scale-[1.02] ${
-                                                                    isSelected
-                                                                        ? item.colorClass
-                                                                        : `border-slate-800 bg-slate-900/20 hover:bg-slate-900/30 ${item.borderClass}`
+                                                                    isSelected ? item.colorClass : item.defaultClass
                                                                 }`}
                                                             >
                                                                 <div className="flex items-center justify-between w-full">
-                                                                    <div className={`p-2.5 rounded-xl transition-all ${isSelected ? item.iconClass : 'bg-slate-800 text-slate-400'}`}>
+                                                                    <div className={`p-2.5 rounded-xl transition-all ${isSelected ? item.iconClass : item.iconDefaultClass}`}>
                                                                         <IconComponent className="w-5 h-5" />
                                                                     </div>
                                                                     {isSelected && (
-                                                                        <CheckCircle2 className="w-5 h-5" />
+                                                                        <CheckCircle2 className="w-5 h-5 text-white fill-white/10" />
                                                                     )}
                                                                 </div>
                                                                 <div className="mt-4">
-                                                                    <h4 className="font-bold text-base text-white">{item.label}</h4>
-                                                                    <p className="text-slate-400 text-xs mt-1 leading-relaxed">{item.desc}</p>
+                                                                    <h4 className={`font-bold text-base transition-colors ${isSelected ? 'text-white' : item.textClass}`}>{item.label}</h4>
+                                                                    <p className="text-slate-300 text-xs mt-1.5 leading-relaxed">{item.desc}</p>
                                                                 </div>
                                                             </button>
                                                         );
