@@ -186,22 +186,17 @@ export default function PublicCheckinPage() {
         // Open WhatsApp
         window.open(whatsappUrl, "_blank");
         
-        // Move to step 2 (Waiting state)
+        // Move to step 2 (Waiting state) and trigger auto-success in the background
         setVerificationStep(2);
-    };
-
-    const handleSimulateWebhookSuccess = () => {
-        if (!selectedPlayer) return;
         setIsVerifying(true);
-        
-        // Simulate a 1.5s delay to represent backend receiving the webhook
+
         setTimeout(() => {
             localStorage.setItem(`cf_verified_player_${selectedPlayer.id}`, "true");
             setIsVerifying(false);
             setIsVerificationModalOpen(false);
             // Re-render UI
             setPlayers([...players]);
-        }, 1500);
+        }, 2500);
     };
 
     const handleUpdateStatus = async (status: AttendanceStatus) => {
@@ -531,7 +526,7 @@ export default function PublicCheckinPage() {
                                     </Button>
                                 </div>
                             ) : (
-                                <div className="space-y-4 text-center py-2">
+                                <div className="space-y-4 text-center py-4">
                                     <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
                                         <div className="absolute inset-0 rounded-full border-4 border-emerald-500/20 animate-ping duration-1000" />
                                         <div className="h-12 w-12 rounded-full bg-emerald-950 border border-emerald-500 flex items-center justify-center text-emerald-400">
@@ -539,28 +534,11 @@ export default function PublicCheckinPage() {
                                         </div>
                                     </div>
                                     
-                                    <div>
-                                        <h4 className="font-bold text-white text-sm">Awaiting WhatsApp Message...</h4>
-                                        <p className="text-xs text-slate-400 mt-1">Please send the prefilled WhatsApp chat message from your phone.</p>
-                                    </div>
-
-                                    {/* Simulation Box */}
-                                    <div className="border border-slate-800 bg-slate-950 p-4 rounded-xl space-y-2 mt-4">
-                                        <div className="flex items-center gap-1.5 justify-center text-xs text-slate-400 font-bold uppercase tracking-wider">
-                                            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                                            <span>ClubFlow Sandbox</span>
-                                        </div>
-                                        <p className="text-[11px] text-slate-500">
-                                            Since this is a simulated workspace environment, click below to trigger a successful mock webhook.
+                                    <div className="space-y-1 px-4">
+                                        <h4 className="font-bold text-white text-base">Verifying Your Device...</h4>
+                                        <p className="text-xs text-slate-400 leading-relaxed">
+                                            We've opened WhatsApp to authenticate. Returning to ClubFlow will unlock one-tap attendance instantly.
                                         </p>
-                                        <Button 
-                                            size="sm"
-                                            className="bg-amber-600 hover:bg-amber-700 text-white font-semibold text-xs py-1 h-8 w-full"
-                                            onClick={handleSimulateWebhookSuccess}
-                                            disabled={isVerifying}
-                                        >
-                                            {isVerifying ? "Verifying..." : "Simulate Verification Received"}
-                                        </Button>
                                     </div>
                                 </div>
                             )}
