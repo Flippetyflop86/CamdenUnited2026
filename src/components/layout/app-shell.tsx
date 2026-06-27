@@ -14,18 +14,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const { settings, isLoaded } = useClub();
     const pathname = usePathname();
 
+    const isPublicCheckin = pathname?.startsWith("/checkin/");
     const isAuthPage = ["/login", "/signup", "/reset-password", "/update-password", "/join"].includes(pathname);
     const isOnboardingPage = pathname === "/onboarding";
+    const isNoShellPage = isAuthPage || isOnboardingPage || isPublicCheckin;
 
     useEffect(() => {
-        if (isLoaded && !settings.isOnboarded && !isAuthPage && !isOnboardingPage) {
+        if (isLoaded && !settings.isOnboarded && !isNoShellPage) {
             if (typeof window !== 'undefined') {
                 window.location.href = '/onboarding';
             }
         }
-    }, [isLoaded, settings.isOnboarded, isAuthPage, isOnboardingPage]);
+    }, [isLoaded, settings.isOnboarded, isNoShellPage]);
 
-    if (isAuthPage || isOnboardingPage) {
+    if (isNoShellPage) {
         return <main className="min-h-screen bg-slate-50">{children}</main>;
     }
 

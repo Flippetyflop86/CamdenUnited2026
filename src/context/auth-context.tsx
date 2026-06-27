@@ -34,7 +34,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const pathnameRef = useRef(pathname);
     useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
 
-    const AUTH_PAGES = ["/login", "/signup", "/reset-password", "/update-password", "/join"];
+    const isPublicPage = (path: string) => {
+        const AUTH_PAGES = ["/login", "/signup", "/reset-password", "/update-password", "/join"];
+        return AUTH_PAGES.includes(path) || (path && path.startsWith("/checkin/"));
+    };
 
     const fetchClubMembership = async (userId: string) => {
         setGlobalClubId(null);
@@ -83,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 fetchClubMembership(session.user.id);
             } else {
                 setIsLoading(false);
-                if (!AUTH_PAGES.includes(pathnameRef.current)) {
+                if (!isPublicPage(pathnameRef.current)) {
                     router.push("/login");
                 }
             }
@@ -111,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setPagePermissions([]);
                 setDisplayName(null);
                 setIsLoading(false);
-                if (!AUTH_PAGES.includes(pathnameRef.current)) {
+                if (!isPublicPage(pathnameRef.current)) {
                     router.push("/login");
                 }
             }
