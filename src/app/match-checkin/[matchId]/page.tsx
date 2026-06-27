@@ -589,13 +589,13 @@ export default function MatchCheckinPage() {
 
                             {pinMode === "set" ? (
                                 <div className="space-y-3">
-                                    <p className="text-xs text-slate-355 leading-relaxed font-semibold">
-                                        To secure your name slot, request an activation code from your coach on WhatsApp. They will reply with your code.
+                                    <p className="text-xs text-slate-350 leading-relaxed font-semibold">
+                                        To prevent anyone else from locking your slot, you need a verification code. Click below to send a request to your coach on WhatsApp. They will reply with your activation code.
                                     </p>
                                     <Button 
                                         type="button"
                                         onClick={() => {
-                                            const text = `Hi Coach, please verify me for match check-in on ClubFlow. My name is ${selectedPlayer.firstName} ${selectedPlayer.lastName}. My activation code is: ${otpCode}`;
+                                            const text = `Hi Coach, please approve my ClubFlow check-in registration. Player: ${selectedPlayer.firstName} ${selectedPlayer.lastName}. Verification Code: ${otpCode}`;
                                             window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
                                         }}
                                         className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 flex items-center justify-center gap-2 rounded-xl text-xs"
@@ -603,7 +603,7 @@ export default function MatchCheckinPage() {
                                         💬 Request Code via WhatsApp
                                     </Button>
                                     <div className="space-y-1.5 pt-1">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enter Activation Code</label>
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enter Approval Code from Coach</label>
                                         <Input
                                             type="text"
                                             maxLength={4}
