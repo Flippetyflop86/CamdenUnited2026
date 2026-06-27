@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Upload, CheckCircle2, ChevronRight, Image as ImageIcon, Users, Palette, Trophy, ShieldCheck, MapPin, Twitter, Instagram, Banknote, ShieldAlert, Award, Plus, Trash2, Shield, FileText, Target, TrendingUp } from "lucide-react";
+import { AlertCircle, Upload, CheckCircle2, ChevronRight, Image as ImageIcon, Users, Palette, Trophy, ShieldCheck, MapPin, Twitter, Instagram, Banknote, ShieldAlert, Award, Plus, Trash2, Shield, FileText, Target, TrendingUp, Briefcase, ClipboardList } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
@@ -788,7 +788,7 @@ export default function OnboardingWizard() {
                                                             role: "manager/coach", 
                                                             label: "Manager / Coach", 
                                                             desc: "The tactician running team squads, training sessions, matchday lineups, and masterminding tactics.", 
-                                                            icon: Users,
+                                                            icon: ClipboardList,
                                                             colorClass: "border-emerald-500 bg-gradient-to-br from-emerald-950/40 via-emerald-900/10 to-slate-900/10 shadow-lg shadow-emerald-500/10 text-emerald-400",
                                                             defaultClass: "border-emerald-950/40 bg-gradient-to-br from-emerald-950/10 to-slate-950/50 hover:border-emerald-800/60 hover:shadow-[0_0_20px_rgba(16,185,129,0.08)]",
                                                             iconClass: "bg-emerald-500 text-slate-950",
@@ -821,7 +821,7 @@ export default function OnboardingWizard() {
                                                             role: "chairperson", 
                                                             label: "Chairperson", 
                                                             desc: "The lead overseer managing player budgets, sponsorships, financial audits, and contracts.", 
-                                                            icon: Award,
+                                                            icon: Briefcase,
                                                             colorClass: "border-amber-500 bg-gradient-to-br from-amber-950/40 via-amber-900/10 to-slate-900/10 shadow-lg shadow-amber-500/10 text-amber-400",
                                                             defaultClass: "border-amber-950/40 bg-gradient-to-br from-amber-950/10 to-slate-950/50 hover:border-amber-800/60 hover:shadow-[0_0_20px_rgba(245,158,11,0.08)]",
                                                             iconClass: "bg-amber-500 text-slate-950",
