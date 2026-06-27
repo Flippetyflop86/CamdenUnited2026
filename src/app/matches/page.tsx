@@ -379,7 +379,8 @@ export default function MatchesPage() {
             parts.push(additionalNotes.trim());
         }
 
-        parts.push("Please confirm:\n\n✅ Available\n❌ Unavailable");
+        const checkinLink = `${window.location.origin}/match-checkin/${activeShareMatch.id}`;
+        parts.push(`🔗 Log availability here:\n${checkinLink}`);
 
         return parts.join("\n\n");
     };
