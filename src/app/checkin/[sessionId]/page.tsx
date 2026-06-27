@@ -8,19 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Input } from "@/components/ui/input";
 import { 
     CalendarDays, 
     MapPin, 
     Clock, 
-    MessageCircle, 
-    Check, 
     Shield, 
     AlertCircle, 
-    Sparkles, 
     ThumbsUp, 
     ThumbsDown,
-    Activity,
-    UserCheck
+    Lock,
+    KeyRound,
+    UserCheck,
+    HelpCircle
 } from "lucide-react";
 
 // Position order helper
@@ -29,6 +29,18 @@ const positionOrder: Record<string, number> = {
     "CDM": 3, "CM": 3, "CAM": 3, "RM": 3, "LM": 3, "MID": 3,
     "RW": 4, "LW": 4, "CF": 4, "ST": 4, "FWD": 4
 };
+
+// PIN Helper utilities
+function extractPin(notes: string | undefined | null): string | null {
+    if (!notes) return null;
+    const match = notes.match(/\[PIN:(\d{4})\]/);
+    return match ? match[1] : null;
+}
+
+function cleanNotes(notes: string | undefined | null): string {
+    if (!notes) return "";
+    return notes.replace(/\[PIN:\d{4}\]/, "").trim();
+}
 
 function formatFriendlyDate(dateStr: string) {
     const d = new Date(dateStr);
@@ -60,9 +72,13 @@ export default function PublicCheckinPage() {
     // Selected player for update/verification
     const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
     const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
-    const [isVerifying, setIsVerifying] = useState(false);
-    const [verificationStep, setVerificationStep] = useState<1 | 2>(1);
     
+    // PIN states
+    const [pinMode, setPinMode] = useState<"set" | "enter">("enter");
+    const [enteredPin, setEnteredPin] = useState("");
+    const [pinError, setPinError] = useState("");
+    const [isPinSubmitting, setIsPinSubmitting] = useState(false);
+
     // Status update states
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -139,6 +155,7 @@ export default function PublicCheckinPage() {
                     squad: p.squad,
                     isInTrainingSquad: p.is_in_training_squad,
                     imageUrl: p.image_url,
+                    notes: p.notes,
                 } as Player)).filter(p => {
                     if (isFirstTeamSession) {
                         return isFirstTeam(p.squad) || p.isInTrainingSquad;
@@ -166,37 +183,84 @@ export default function PublicCheckinPage() {
     const handlePlayerClick = (player: Player) => {
         setSelectedPlayer(player);
         setSuccessMessage(null);
-        if (isVerified(player.id)) {
-            // Already verified, can update status directly
-            // No verification modal needed
+        setEnteredPin("");
+        setPinError("");
+
+        const existingPin = extractPin(player.notes);
+
+        if (existingPin) {
+            // Player has a PIN set in the DB
+            if (isVerified(player.id)) {
+                // Device is already verified, show status selector directly
+            } else {
+                // Device not verified, prompt to enter PIN
+                setPinMode("enter");
+                setIsVerificationModalOpen(true);
+            }
         } else {
-            // Needs verification
-            setVerificationStep(1);
+            // Player has no PIN, prompt to set one
+            setPinMode("set");
             setIsVerificationModalOpen(true);
         }
     };
 
-    const handleVerifyViaWhatsApp = () => {
-        if (!selectedPlayer || !session) return;
-        
-        // Generate prefilled text
-        const text = `Verify me as ${selectedPlayer.firstName} ${selectedPlayer.lastName} for Camden United training session on ${formatFriendlyDate(session.date)} (Code: CF-${selectedPlayer.id.substring(0, 4)})`;
-        const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
-        
-        // Open WhatsApp
-        window.open(whatsappUrl, "_blank");
-        
-        // Move to step 2 (Waiting state) and trigger auto-success in the background
-        setVerificationStep(2);
-        setIsVerifying(true);
+    const handlePinSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedPlayer) return;
 
-        setTimeout(() => {
-            localStorage.setItem(`cf_verified_player_${selectedPlayer.id}`, "true");
-            setIsVerifying(false);
-            setIsVerificationModalOpen(false);
-            // Re-render UI
-            setPlayers([...players]);
-        }, 2500);
+        if (enteredPin.length !== 4 || !/^\d+$/.test(enteredPin)) {
+            setPinError("PIN must be exactly 4 digits.");
+            return;
+        }
+
+        setIsPinSubmitting(true);
+        setPinError("");
+
+        try {
+            if (pinMode === "set") {
+                // Save new PIN to database (embedded in notes)
+                const currentNotes = selectedPlayer.notes || "";
+                const stripped = cleanNotes(currentNotes);
+                const newNotes = `${stripped} [PIN:${enteredPin}]`.trim();
+
+                const { error: updateErr } = await supabase
+                    .from("players")
+                    .update({ notes: newNotes })
+                    .eq("id", selectedPlayer.id);
+
+                if (updateErr) throw updateErr;
+
+                // Update local list state
+                setPlayers(players.map(p => p.id === selectedPlayer.id ? { ...p, notes: newNotes } : p));
+                selectedPlayer.notes = newNotes;
+
+                // Save verification state locally
+                localStorage.setItem(`cf_verified_player_${selectedPlayer.id}`, "true");
+                
+                setIsVerificationModalOpen(false);
+                setSuccessMessage("PIN set successfully!");
+                
+                // Immediately trigger status card opening
+                setTimeout(() => setSuccessMessage(null), 1500);
+
+            } else {
+                // Verify existing PIN
+                const actualPin = extractPin(selectedPlayer.notes);
+
+                if (enteredPin === actualPin) {
+                    // PIN is correct! Save verification state locally
+                    localStorage.setItem(`cf_verified_player_${selectedPlayer.id}`, "true");
+                    setIsVerificationModalOpen(false);
+                } else {
+                    setPinError("Incorrect PIN. Please try again or ask your coach to reset it.");
+                }
+            }
+        } catch (err) {
+            console.error(err);
+            setPinError("An error occurred. Please try again.");
+        } finally {
+            setIsPinSubmitting(false);
+        }
     };
 
     const handleUpdateStatus = async (status: AttendanceStatus) => {
@@ -226,7 +290,7 @@ export default function PublicCheckinPage() {
                 updatedAttendance.push({ 
                     playerId: selectedPlayer.id, 
                     status,
-                    notes: "Checked in via public WhatsApp Link" 
+                    notes: "Checked in via public Attendance Link" 
                 });
             }
 
@@ -300,11 +364,11 @@ export default function PublicCheckinPage() {
                         )}
                         <div>
                             <h1 className="font-bold text-white tracking-tight">{clubName}</h1>
-                            <p className="text-xs text-slate-400">ClubFlow Check-in</p>
+                            <p className="text-xs text-slate-400">Secure check-in link</p>
                         </div>
                     </div>
-                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-950/20 px-2.5 py-1">
-                        Active Public Check-In
+                    <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-950/20 px-2.5 py-1">
+                        Attendance Portal
                     </Badge>
                 </div>
             </div>
@@ -367,7 +431,7 @@ export default function PublicCheckinPage() {
                                                 setSelectedPlayer(null);
                                                 setPlayers([...players]);
                                             }}
-                                            className="text-[10px] text-red-400 hover:text-red-350 underline hover:no-underline font-medium"
+                                            className="text-[10px] text-red-400 hover:text-red-305 underline hover:no-underline font-medium"
                                         >
                                             Reset Verification
                                         </button>
@@ -429,7 +493,7 @@ export default function PublicCheckinPage() {
                     <CardHeader className="pb-4">
                         <CardTitle className="text-lg text-white">Squad Roster</CardTitle>
                         <CardDescription className="text-slate-400">
-                            Find your name and click it. Verified names have a green badge.
+                            Find your name and click it. Secured slots require your 4-digit PIN.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -437,8 +501,8 @@ export default function PublicCheckinPage() {
                             {players.map((player) => {
                                 const record = session.attendance?.find(a => a.playerId === player.id);
                                 const status = record?.status ?? "Absent";
-                                const isPresent = status === "Present" || status === "Late";
                                 const isUserVerified = isVerified(player.id);
+                                const hasPin = extractPin(player.notes) !== null;
                                 
                                 return (
                                     <div
@@ -452,12 +516,16 @@ export default function PublicCheckinPage() {
                                             }
                                         `}
                                     >
-                                        {/* Verification indicator */}
-                                        {isUserVerified && (
-                                            <div className="absolute top-2 right-2 flex items-center justify-center h-4 w-4 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-400 text-[8px] font-bold">
+                                        {/* Security / Verification badge */}
+                                        {isUserVerified ? (
+                                            <div className="absolute top-2 right-2 flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-400 text-[8px] font-bold">
                                                 ✓
                                             </div>
-                                        )}
+                                        ) : hasPin ? (
+                                            <div className="absolute top-2 right-2 text-slate-500" title="Secured with PIN">
+                                                <Lock className="h-3 w-3" />
+                                            </div>
+                                        ) : null}
 
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                                             {player.position}
@@ -490,19 +558,21 @@ export default function PublicCheckinPage() {
                 </Card>
             </div>
 
-            {/* Verification Dialog Modal */}
+            {/* PIN Verification Modal */}
             {isVerificationModalOpen && selectedPlayer && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                         {/* Modal Header */}
                         <div className="p-5 border-b border-slate-800 bg-slate-900/80 flex justify-between items-start">
                             <div className="flex items-center gap-3">
                                 <div className="h-10 w-10 rounded-xl bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500">
-                                    <Shield className="h-5 w-5" />
+                                    {pinMode === "set" ? <KeyRound className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-lg text-white">Device Verification</h3>
-                                    <p className="text-xs text-slate-400">Verifying {selectedPlayer.firstName} {selectedPlayer.lastName}</p>
+                                    <h3 className="font-bold text-lg text-white">
+                                        {pinMode === "set" ? "Secure Your Slot" : "Enter Check-in PIN"}
+                                    </h3>
+                                    <p className="text-xs text-slate-400">For {selectedPlayer.firstName} {selectedPlayer.lastName}</p>
                                 </div>
                             </div>
                             <button 
@@ -514,48 +584,76 @@ export default function PublicCheckinPage() {
                         </div>
 
                         {/* Modal Content */}
-                        <div className="p-5 space-y-4 text-slate-300">
-                            {verificationStep === 1 ? (
+                        <form onSubmit={handlePinSubmit} className="p-5 space-y-4">
+                            {pinError && (
+                                <div className="bg-red-950/40 border border-red-500/30 rounded-xl p-3 flex items-center gap-2.5 text-red-400 text-xs animate-in shake duration-200">
+                                    <AlertCircle className="h-4.5 w-4.5 shrink-0" />
+                                    <span>{pinError}</span>
+                                </div>
+                            )}
+
+                            {pinMode === "set" ? (
                                 <div className="space-y-3">
-                                    <p className="text-sm leading-relaxed">
-                                        To prevent others from marking attendance on your behalf, we need to verify your phone/device. 
+                                    <p className="text-xs text-slate-300 leading-relaxed">
+                                        Choose a personal **4-digit PIN** to lock your name slot on this roster. Teammates won't be able to edit your status, and your phone will remember it automatically.
                                     </p>
-                                    <div className="bg-slate-950 rounded-xl p-3 border border-slate-800 space-y-2 text-xs">
-                                        <div className="flex gap-2">
-                                            <span className="text-red-500 font-bold">1.</span>
-                                            <span>Clicking below opens WhatsApp with a prefilled, unique confirmation message.</span>
-                                        </div>
-                                        <div className="flex gap-2">
-                                            <span className="text-red-500 font-bold">2.</span>
-                                            <span>Send the message. Our system instantly registers the sender's phone to verify this device.</span>
-                                        </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choose 4-Digit PIN</label>
+                                        <Input
+                                            type="password"
+                                            pattern="\d*"
+                                            inputMode="numeric"
+                                            maxLength={4}
+                                            required
+                                            value={enteredPin}
+                                            onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 4))}
+                                            placeholder="e.g. 2580"
+                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
+                                        />
                                     </div>
-                                    
                                     <Button 
-                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11"
-                                        onClick={handleVerifyViaWhatsApp}
+                                        type="submit"
+                                        disabled={isPinSubmitting || enteredPin.length !== 4}
+                                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
                                     >
-                                        <MessageCircle className="h-4 w-4 mr-2" /> Verify via WhatsApp
+                                        {isPinSubmitting ? "Securing Name..." : "Lock Name & Check-in"}
                                     </Button>
                                 </div>
                             ) : (
-                                <div className="space-y-4 text-center py-4">
-                                    <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
-                                        <div className="absolute inset-0 rounded-full border-4 border-emerald-500/20 animate-ping duration-1000" />
-                                        <div className="h-12 w-12 rounded-full bg-emerald-950 border border-emerald-500 flex items-center justify-center text-emerald-400">
-                                            <Activity className="h-5 w-5 animate-pulse" />
-                                        </div>
+                                <div className="space-y-3">
+                                    <p className="text-xs text-slate-300 leading-relaxed">
+                                        Your name slot is locked. Please enter your 4-digit PIN to check in.
+                                    </p>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enter PIN</label>
+                                        <Input
+                                            type="password"
+                                            pattern="\d*"
+                                            inputMode="numeric"
+                                            maxLength={4}
+                                            required
+                                            value={enteredPin}
+                                            onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 4))}
+                                            placeholder="••••"
+                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
+                                        />
                                     </div>
-                                    
-                                    <div className="space-y-1 px-4">
-                                        <h4 className="font-bold text-white text-base">Verifying Your Device...</h4>
-                                        <p className="text-xs text-slate-400 leading-relaxed">
-                                            We've opened WhatsApp to authenticate. Returning to ClubFlow will unlock one-tap attendance instantly.
+                                    <Button 
+                                        type="submit"
+                                        disabled={isPinSubmitting || enteredPin.length !== 4}
+                                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
+                                    >
+                                        {isPinSubmitting ? "Verifying..." : "Unlock Device"}
+                                    </Button>
+                                    <div className="text-center pt-1.5">
+                                        <p className="text-[10px] text-slate-500 flex items-center justify-center gap-1">
+                                            <HelpCircle className="h-3 w-3" />
+                                            <span>Forgot PIN? Ask your coach to reset it from their end.</span>
                                         </p>
                                     </div>
                                 </div>
                             )}
-                        </div>
+                        </form>
                     </div>
                 </div>
             )}

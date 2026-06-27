@@ -267,9 +267,21 @@ export default function SquadPage() {
     const positionOrder: Record<string, number> = { "GK": 1, "DEF": 2, "LB": 3, "CB": 4, "RB": 5, "LWB": 6, "RWB": 7, "CDM": 8, "MID": 9, "CM": 10, "LM": 11, "RM": 12, "CAM": 13, "LW": 14, "RW": 15, "FWD": 16, "CF": 17, "ST": 18 };
     const sortedPlayers = [...filteredPlayers].sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));
 
-    const handleEdit = (player: Player) => { setEditingPlayer(player); setPreviewImage(player.imageUrl || null); };
+    const handleEdit = (player: Player) => { 
+        // Strip PIN from notes before showing edit dialog
+        const cleanedNotes = player.notes ? player.notes.replace(/\[PIN:\d{4}\]/, "").trim() : "";
+        setEditingPlayer({ ...player, notes: cleanedNotes }); 
+        setPreviewImage(player.imageUrl || null); 
+    };
 
     const handleSavePlayer = async (updatedPlayer: Player) => {
+        // Find if they had an existing PIN in local state to preserve it
+        const originalPlayer = players.find(p => p.id === updatedPlayer.id);
+        const matchPin = originalPlayer?.notes?.match(/\[PIN:(\d{4})\]/);
+        const pinVal = matchPin ? matchPin[1] : null;
+        const cleanedNotes = updatedPlayer.notes ? updatedPlayer.notes.replace(/\[PIN:\d{4}\]/, "").trim() : "";
+        const finalNotes = pinVal ? `${cleanedNotes} [PIN:${pinVal}]`.trim() : cleanedNotes;
+
         const payload: any = {
             first_name: updatedPlayer.firstName,
             last_name: updatedPlayer.lastName,
@@ -281,7 +293,7 @@ export default function SquadPage() {
             medical_status: updatedPlayer.medicalStatus,
             availability: updatedPlayer.availability,
             image_url: updatedPlayer.imageUrl,
-            notes: updatedPlayer.notes,
+            notes: finalNotes,
             holiday_start: updatedPlayer.holidayStart || null,
             holiday_end: updatedPlayer.holidayEnd || null,
             is_in_training_squad: updatedPlayer.isInTrainingSquad,

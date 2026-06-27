@@ -147,6 +147,35 @@ export default function TrainingSessionPage() {
         setUnsavedChanges(true);
     };
 
+    const handleResetPlayerPin = async (playerId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        
+        const player = players.find(p => p.id === playerId);
+        if (!player) return;
+
+        if (window.confirm(`Are you sure you want to reset the Check-in PIN for ${player.firstName} ${player.lastName}? They will be prompted to set a new PIN next time they check in.`)) {
+            try {
+                const currentNotes = player.notes || "";
+                
+                // Helper to clean PIN from notes
+                const cleanedNotes = currentNotes.replace(/\[PIN:\d{4}\]/, "").trim();
+
+                const { error } = await supabase
+                    .from("players")
+                    .update({ notes: cleanedNotes })
+                    .eq("id", playerId);
+
+                if (error) throw error;
+
+                // Update local state
+                setPlayers(players.map(p => p.id === playerId ? { ...p, notes: cleanedNotes } : p));
+                alert(`PIN for ${player.firstName} has been reset successfully!`);
+            } catch (err: any) {
+                alert("Failed to reset PIN: " + err.message);
+            }
+        }
+    };
+
     const handleSave = async () => {
         if (!session) return;
         const { error } = await supabase
@@ -360,6 +389,7 @@ export default function TrainingSessionPage() {
                             const status = record?.status ?? 'Absent';
                             const isPresent = status === 'Present';
                             const isInjured = status === 'Injured';
+                            const hasPin = player.notes?.includes("[PIN:");
 
                             return (
                                 <div
@@ -376,6 +406,16 @@ export default function TrainingSessionPage() {
                                         }
                                     `}
                                 >
+                                    {/* Locked PIN Indicator & Reset button */}
+                                    {hasPin && (
+                                        <button
+                                            onClick={(e) => handleResetPlayerPin(player.id, e)}
+                                            title="Click to Reset Player Check-in PIN"
+                                            className="absolute top-1.5 left-1.5 rounded-full w-5 h-5 bg-slate-100 hover:bg-red-100 text-[10px] flex items-center justify-center transition-colors z-10 text-slate-500 hover:text-red-650"
+                                        >
+                                            🔒
+                                        </button>
+                                    )}
                                     {/* Injured toggle */}
                                     <button
                                         onClick={(e) => handleMarkInjured(player.id, e)}
