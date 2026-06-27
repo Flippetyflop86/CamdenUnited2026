@@ -402,7 +402,7 @@ export default function TrainingSessionPage() {
                                 const link = `${window.location.origin}/checkin/${session.id}`;
                                 const dateStr = formatFriendlyDate(session.date);
                                 const text = `⚽ *Camden United Training Invite*\n📅 *Date:* ${dateStr}\n⏰ *Time:* ${session.time}\n📍 *Location:* ${session.location}\n\nPlayers, please log your training attendance here:\n🔗 ${link}`;
-                                window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+                                window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
                             }}
                         >
                             <MessageCircle className="h-4 w-4 mr-2" /> Share to WhatsApp

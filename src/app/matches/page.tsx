@@ -438,7 +438,7 @@ export default function MatchesPage() {
     const handleSendWhatsApp = () => {
         const text = getGeneratedPollText();
         if (!text) return;
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
     };
 
     const handleSyncFixtures = async () => {

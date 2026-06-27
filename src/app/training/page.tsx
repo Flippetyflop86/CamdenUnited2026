@@ -366,7 +366,7 @@ export default function TrainingPage() {
     const handleSendTrainingWhatsApp = () => {
         const text = getTrainingGeneratedPollText();
         if (!text) return;
-        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+        window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
     };
 
     // Calculate Season Stats
