@@ -94,11 +94,12 @@ export default function OppositionReportsPage() {
     }
 
     const handleStartNewReport = () => {
+        const draftNotes = typeof window !== 'undefined' ? localStorage.getItem('cf_opp_notes_draft_new') : "";
         const newTeam: OppositionTeam = {
             id: "new",
             name: "",
-            formation: "4-4-2",
-            notes: "",
+            formation: "4-2-3-1",
+            notes: draftNotes || "",
             lineup: [],
             playerProfiles: [],
             exploitZones: [],
@@ -135,7 +136,11 @@ export default function OppositionReportsPage() {
 
     const handleEditTeam = () => {
         if (selectedTeam) {
-            setEditedTeam(selectedTeam);
+            const draftNotes = typeof window !== 'undefined' ? localStorage.getItem(`cf_opp_notes_draft_${selectedTeam.id}`) : "";
+            setEditedTeam({
+                ...selectedTeam,
+                notes: draftNotes || selectedTeam.notes
+            });
             setIsEditing(true);
         }
     };
@@ -187,6 +192,11 @@ export default function OppositionReportsPage() {
                 setSelectedTeam({ ...editedTeam, updatedAt: new Date().toISOString() });
                 // Optimistic update of list
                 setTeams(prev => prev.map(t => t.id === editedTeam.id ? { ...editedTeam, updatedAt: new Date().toISOString() } : t));
+            }
+
+            if (typeof window !== 'undefined') {
+                localStorage.removeItem(`cf_opp_notes_draft_${editedTeam.id}`);
+                localStorage.removeItem('cf_opp_notes_draft_new');
             }
 
             setIsEditing(false);
@@ -316,7 +326,7 @@ export default function OppositionReportsPage() {
     // Don't crash if something is null unexpectedly (though our logic tries to prevent it)
     const displayTeam = currentTeam || {
         name: "New Opposition Team",
-        formation: "4-4-2",
+        formation: "4-2-3-1",
         notes: ""
     } as OppositionTeam;
 
@@ -652,6 +662,9 @@ export default function OppositionReportsPage() {
                                                 ...editedTeam,
                                                 notes: e.target.value
                                             });
+                                            if (typeof window !== 'undefined') {
+                                                localStorage.setItem(`cf_opp_notes_draft_${editedTeam.id}`, e.target.value);
+                                            }
                                         }
                                     }}
                                     disabled={!isEditing}

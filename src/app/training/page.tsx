@@ -14,6 +14,7 @@ import { useClub } from "@/context/club-context";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { useSearchParams } from "next/navigation";
 
 // I'll stick to native date formatting for zero-dep speed unless complex.
 function formatDate(dateStr: string) {
@@ -40,11 +41,18 @@ function formatSquad(squad: string) {
 
 export default function TrainingPage() {
     const { settings } = useClub();
+    const searchParams = useSearchParams();
     const currentSquads = settings.squads || ["First Team"];
 
     const [sessions, setSessions] = useState<TrainingSession[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);
     const [activeTab, setActiveTab] = useState<'sessions' | 'stats'>('sessions');
+
+    useEffect(() => {
+        if (searchParams?.get("add") === "true") {
+            setIsDialogOpen(true);
+        }
+    }, [searchParams]);
 
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [editingSessionId, setEditingSessionId] = useState<string | null>(null);

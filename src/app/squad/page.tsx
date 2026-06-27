@@ -14,6 +14,7 @@ import { supabase } from "@/lib/supabase";
 import imageCompression from "browser-image-compression";
 import { UploadCloud, Loader2 } from "lucide-react";
 import { logActivity } from "@/lib/activity";
+import { useSearchParams } from "next/navigation";
 
 const getCurrentSeasonStr = () => {
     const d = new Date();
@@ -36,6 +37,41 @@ export default function SquadPage() {
     const { settings, updateSettings, isLoaded: isClubLoaded } = useClub();
     const { clubId, isLoading: isAuthLoading } = useAuth();
     const currentSquads = settings.squads || ["First Team"];
+    const searchParams = useSearchParams();
+
+    useEffect(() => {
+        if (searchParams?.get("add") === "true") {
+            setEditingPlayer({
+                id: "new",
+                firstName: "",
+                lastName: "",
+                position: "GK",
+                squadNumber: 0,
+                age: 0,
+                nationality: "English",
+                squad: currentSquads[0] || "First Team",
+                medicalStatus: "Available",
+                availability: true,
+                contractExpiry: "",
+                appearances: 0,
+                goals: 0,
+                assists: 0,
+                imageUrl: "",
+                isInTrainingSquad: true,
+                isInMatchdayTracker: false,
+                isContracted: false,
+                contractAmount: 0,
+                contractFrequency: "Weekly",
+                contractStartDate: "",
+                contractEndDate: "",
+                subsBillingModel: "Monthly",
+                subsCustomAmount: 0,
+                holidayStart: "",
+                holidayEnd: ""
+            });
+        }
+    }, [searchParams, currentSquads]);
+
     const [activeTab, setActiveTab] = useState("First Team");
     const [isManageSquadsOpen, setIsManageSquadsOpen] = useState(false);
     const [editingSquads, setEditingSquads] = useState<string[]>(currentSquads);

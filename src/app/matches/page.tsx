@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Match } from "@/types";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -23,9 +23,16 @@ import { calculateMeetTime, generateWhatsAppMessage } from "@/lib/whatsapp-utils
 
 export default function MatchesPage() {
     const router = useRouter();
+    const searchParams = useSearchParams();
     const [matches, setMatches] = useState<Match[]>([]);
     const [weatherForecast, setWeatherForecast] = useState<Record<string, { tempMax: number, tempMin: number, rain: number, snow: number, code: number }>>({});
     const [leagueTeams, setLeagueTeams] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (searchParams?.get("add") === "true") {
+            setIsAddOpen(true);
+        }
+    }, [searchParams]);
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const { settings, updateSettings } = useClub();

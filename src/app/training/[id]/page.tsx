@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TrainingSession, Player } from "@/types";
+import { TrainingSession, Player, AttendanceRecord } from "@/types";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { ArrowLeft, CalendarDays, MapPin, Clock, Download, Share2, Link2, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
+import { Input } from "@/components/ui/input";
 
 function formatSquad(squad: string) {
     if (squad === "firstTeam") return "First Team";
@@ -39,6 +40,8 @@ export default function TrainingSessionPage() {
     const [players, setPlayers] = useState<Player[]>([]);
     const [loading, setLoading] = useState(true);
     const [unsavedChanges, setUnsavedChanges] = useState(false);
+    const [attendanceStats, setAttendanceStats] = useState<Record<string, { present: number; total: number }>>({});
+    const [guestName, setGuestName] = useState("");
 
     useEffect(() => {
         const fetchSessionData = async () => {
@@ -47,9 +50,10 @@ export default function TrainingSessionPage() {
             if (!sessionId) return;
 
             try {
-                const [sessionRes, playersRes] = await Promise.all([
+                const [sessionRes, playersRes, allSessionsRes] = await Promise.all([
                     supabase.from('training_sessions').select('*').eq('id', sessionId).single(),
-                    supabase.from('players').select('*')
+                    supabase.from('players').select('*'),
+                    supabase.from('training_sessions').select('attendance')
                 ]);
 
                 if (playersRes.data) {
@@ -117,6 +121,23 @@ export default function TrainingSessionPage() {
 
                         setSession({ ...sessionRes.data, attendance: prePopulated });
                     }
+
+                    if (allSessionsRes.data) {
+                        const stats: Record<string, { present: number; total: number }> = {};
+                        allSessionsRes.data.forEach((s: any) => {
+                            const attList = s.attendance || [];
+                            attList.forEach((record: any) => {
+                                if (!stats[record.playerId]) {
+                                    stats[record.playerId] = { present: 0, total: 0 };
+                                }
+                                stats[record.playerId].total += 1;
+                                if (record.status === 'Present' || record.status === 'Late') {
+                                    stats[record.playerId].present += 1;
+                                }
+                            });
+                        });
+                        setAttendanceStats(stats);
+                    }
                 }
             } catch (error) {
                 console.error("Error fetching data:", error);
@@ -160,6 +181,19 @@ export default function TrainingSessionPage() {
         }
 
         setSession({ ...session, attendance: updated });
+        setUnsavedChanges(true);
+    };
+
+    const handleAddGuest = () => {
+        if (!guestName.trim() || !session) return;
+        const guestId = `guest:${guestName.trim()}_${Date.now()}`;
+        const newRecord: AttendanceRecord = { playerId: guestId, status: 'Present', notes: 'Guest Player' };
+        
+        setSession({
+            ...session,
+            attendance: [...session.attendance, newRecord]
+        });
+        setGuestName("");
         setUnsavedChanges(true);
     };
 
@@ -400,6 +434,17 @@ export default function TrainingSessionPage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-4">
+                    <div className="flex gap-2 mb-4 max-w-sm">
+                        <Input 
+                            placeholder="Guest Name (e.g. Liam Smith)" 
+                            value={guestName} 
+                            onChange={e => setGuestName(e.target.value)}
+                            className="h-9 text-xs"
+                        />
+                        <Button onClick={handleAddGuest} size="sm" variant="outline" className="h-9 font-bold">
+                            + Add Guest
+                        </Button>
+                    </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                         {eligiblePlayers.map((player) => {
                             const record = session.attendance.find(a => a.playerId === player.id);
@@ -407,6 +452,12 @@ export default function TrainingSessionPage() {
                             const isPresent = status === 'Present';
                             const isInjured = status === 'Injured';
                             const hasPin = player.notes?.includes("[PIN:");
+
+                            // Compute percentage
+                            const statRecord = attendanceStats[player.id];
+                            const attendancePercent = statRecord && statRecord.total > 0 
+                                ? Math.round((statRecord.present / statRecord.total) * 100)
+                                : null;
 
                             return (
                                 <div
@@ -443,9 +494,16 @@ export default function TrainingSessionPage() {
                                         🚑
                                     </button>
 
-                                    <span className={`text-[10px] font-bold uppercase tracking-wider ${isPresent ? 'text-green-100' : 'text-slate-400'}`}>
-                                        {player.position}
-                                    </span>
+                                    <div className="flex items-center gap-1">
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isPresent ? 'text-green-100' : 'text-slate-400'}`}>
+                                            {player.position}
+                                        </span>
+                                        {attendancePercent !== null && (
+                                            <span className={`text-[9px] font-semibold ${isPresent ? 'text-green-200' : 'text-indigo-650'}`}>
+                                                ({attendancePercent}%)
+                                            </span>
+                                        )}
+                                    </div>
                                     <span className={`text-sm font-bold leading-tight ${isPresent ? 'text-white' : isInjured ? 'text-red-700' : 'text-slate-800'}`}>
                                         {player.firstName}
                                     </span>
@@ -455,6 +513,51 @@ export default function TrainingSessionPage() {
                                     <div className={`mt-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full
                                         ${isPresent ? 'bg-green-400 text-white' : isInjured ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
                                         {isPresent ? '✓ Here' : isInjured ? 'Injured' : 'Absent'}
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {/* Guest Players */}
+                        {session.attendance.filter(a => a.playerId.startsWith('guest:')).map((record) => {
+                            const guestNameClean = record.playerId.split(':')[1].split('_')[0];
+                            const isPresent = record.status === 'Present';
+                            return (
+                                <div
+                                    key={record.playerId}
+                                    onClick={() => handleTogglePresent(record.playerId)}
+                                    className={`
+                                        relative flex flex-col items-center justify-center p-3 rounded-xl border-2 cursor-pointer
+                                        transition-all duration-150 select-none text-center gap-1 min-h-[100px]
+                                        ${isPresent
+                                            ? 'bg-emerald-600 border-emerald-450 shadow-md scale-[1.02]'
+                                            : 'bg-white border-slate-200 hover:border-slate-400 hover:bg-slate-50'
+                                        }
+                                    `}
+                                >
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm("Remove guest player?")) {
+                                                const updated = session.attendance.filter(a => a.playerId !== record.playerId);
+                                                setSession({ ...session, attendance: updated });
+                                                setUnsavedChanges(true);
+                                            }
+                                        }}
+                                        title="Remove Guest"
+                                        className="absolute top-1.5 right-1.5 rounded-full w-5 h-5 bg-slate-100 hover:bg-red-100 text-[10px] flex items-center justify-center transition-colors z-10 text-slate-500 hover:text-red-650"
+                                    >
+                                        ✕
+                                    </button>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                        Guest
+                                    </span>
+                                    <span className={`text-sm font-bold leading-tight ${isPresent ? 'text-white' : 'text-slate-800'}`}>
+                                        {guestNameClean}
+                                    </span>
+                                    <div className={`mt-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full
+                                        ${isPresent ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'}`}>
+                                        {isPresent ? '✓ Here' : 'Absent'}
                                     </div>
                                 </div>
                             );
