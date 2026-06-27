@@ -30,6 +30,23 @@ const positionOrder: Record<string, number> = {
     "RW": 4, "LW": 4, "CF": 4, "ST": 4, "FWD": 4
 };
 
+function formatFriendlyDate(dateStr: string) {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+
+    const weekday = new Intl.DateTimeFormat("en-GB", { weekday: 'long' }).format(d);
+    const day = d.getDate();
+    const month = new Intl.DateTimeFormat("en-GB", { month: 'long' }).format(d);
+
+    // Add ordinal suffix (st, nd, rd, th)
+    let suffix = "th";
+    if (day === 1 || day === 21 || day === 31) suffix = "st";
+    else if (day === 2 || day === 22) suffix = "nd";
+    else if (day === 3 || day === 23) suffix = "rd";
+
+    return `${weekday} ${day}${suffix} of ${month}`;
+}
+
 export default function PublicCheckinPage() {
     const params = useParams();
     const sessionId = Array.isArray(params?.sessionId) ? params.sessionId[0] : params?.sessionId;
@@ -163,7 +180,7 @@ export default function PublicCheckinPage() {
         if (!selectedPlayer || !session) return;
         
         // Generate prefilled text
-        const text = `Verify me as ${selectedPlayer.firstName} ${selectedPlayer.lastName} for Camden United training session on ${session.date} (Code: CF-${selectedPlayer.id.substring(0, 4)})`;
+        const text = `Verify me as ${selectedPlayer.firstName} ${selectedPlayer.lastName} for Camden United training session on ${formatFriendlyDate(session.date)} (Code: CF-${selectedPlayer.id.substring(0, 4)})`;
         const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
         
         // Open WhatsApp
@@ -320,7 +337,7 @@ export default function PublicCheckinPage() {
                             <CalendarDays className="h-5 w-5 text-red-500" />
                             <div>
                                 <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Date</p>
-                                <p className="font-medium text-white">{session.date}</p>
+                                <p className="font-medium text-white">{formatFriendlyDate(session.date)}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3 pt-3">
