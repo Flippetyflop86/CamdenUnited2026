@@ -32,6 +32,7 @@ export default function PlayerProfilePage() {
     const [seasonFilter, setSeasonFilter] = useState<string>("26/27");
     const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
     const [calculatedStats, setCalculatedStats] = useState({ apps: 0, goals: 0, assists: 0 });
+    const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
     // Invite player portal states
     const [inviteEmail, setInviteEmail] = useState("");
@@ -104,11 +105,27 @@ export default function PlayerProfilePage() {
         const fetchPlayer = async () => {
             if (!id) return;
             
-            const [playerRes, matchesRes, statsRes] = await Promise.all([
+            const [playerRes, matchesRes, statsRes, sessionsRes] = await Promise.all([
                 supabase.from('players').select('*, email, mobile_number, status, trusted_devices').eq('id', id).single(),
                 supabase.from('matches').select('id, date'),
-                supabase.from('match_player_stats').select('*').eq('player_id', id)
+                supabase.from('match_player_stats').select('*').eq('player_id', id),
+                supabase.from('training_sessions').select('id, date, topic, attendance').order('date', { ascending: false }).limit(10)
             ]);
+
+            if (sessionsRes.data) {
+                const playerSessions = sessionsRes.data.map((session: any) => {
+                    const attendanceList = session.attendance || [];
+                    const record = attendanceList.find((a: any) => a.playerId === id);
+                    return {
+                        id: session.id,
+                        date: session.date,
+                        topic: session.topic || "Squad Practice",
+                        status: record?.status || "Unanswered",
+                        notes: record?.notes || ""
+                    };
+                });
+                setRecentActivity(playerSessions);
+            }
 
             if (playerRes.data) {
                 const data = playerRes.data;
@@ -305,15 +322,34 @@ export default function PlayerProfilePage() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-4">
-                                {[1, 2, 3].map((_, i) => (
-                                    <div key={i} className="flex items-center gap-4 border-b pb-4 last:border-0 last:pb-0">
-                                        <div className="h-2 w-2 rounded-full bg-green-500" />
-                                        <div>
-                                            <p className="text-sm font-medium">Training Session - Feb {10 - i}</p>
-                                            <p className="text-xs text-slate-500">Rated 8/10 • Present</p>
-                                        </div>
-                                    </div>
-                                ))}
+                                {recentActivity.length === 0 ? (
+                                    <p className="text-sm text-slate-500 italic">No recent training activities recorded.</p>
+                                ) : (
+                                    recentActivity.map((activity, i) => {
+                                        const dateFormatted = new Date(activity.date).toLocaleDateString("en-GB", {
+                                            day: "numeric",
+                                            month: "short",
+                                            year: "numeric"
+                                        });
+                                        return (
+                                            <div key={i} className="flex items-center gap-4 border-b pb-4 last:border-0 last:pb-0">
+                                                <div className={`h-2.5 w-2.5 rounded-full ${
+                                                    activity.status === "Present" ? "bg-green-500" : activity.status === "Late" ? "bg-amber-500" : activity.status === "Absent" ? "bg-red-500" : "bg-slate-400"
+                                                }`} />
+                                                <div>
+                                                    <p className="text-sm font-medium text-slate-850">
+                                                        Training Session - {dateFormatted}
+                                                    </p>
+                                                    <p className="text-xs text-slate-500">
+                                                        Topic: {activity.topic} • <span className={`font-bold ${
+                                                            activity.status === "Present" ? "text-green-600" : activity.status === "Late" ? "text-amber-600" : activity.status === "Absent" ? "text-red-600" : "text-slate-500"
+                                                        }`}>{activity.status}</span> {activity.notes && `(${activity.notes})`}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
                             </div>
                         </CardContent>
                     </Card>
