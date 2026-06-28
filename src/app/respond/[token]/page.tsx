@@ -6,9 +6,26 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Clock, MapPin, CheckCircle2, AlertCircle, RefreshCw, Lock, LockOpen } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { CalendarDays, Clock, MapPin, CheckCircle, AlertCircle, RefreshCw, Lock, KeyRound, UserCheck, HelpCircle } from "lucide-react";
 
-export default function SecureEventResponderPage() {
+// Position order helper
+const positionOrder: Record<string, number> = {
+    "GK": 1, "RB": 2, "LB": 2, "CB": 2, "RWB": 2, "LWB": 2, "DEF": 2,
+    "CDM": 3, "CM": 3, "CAM": 3, "RM": 3, "LM": 3, "MID": 3,
+    "RW": 4, "LW": 4, "CF": 4, "ST": 4, "FWD": 4
+};
+
+// Web Crypto SHA-256 helper
+async function hashPin(pin: string): Promise<string> {
+    const msgBuffer = new TextEncoder().encode(pin);
+    const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+export default function PinDeviceResponderPage() {
     const params = useParams();
     const router = useRouter();
     const token = Array.isArray(params?.token) ? params.token[0] : params?.token;
@@ -17,36 +34,32 @@ export default function SecureEventResponderPage() {
     const [loading, setLoading] = useState(true);
     const [event, setEvent] = useState<any | null>(null);
     const [eventType, setEventType] = useState<"match" | "training" | null>(null);
-    const [player, setPlayer] = useState<any | null>(null);
+    const [players, setPlayers] = useState<any[]>([]);
     const [error, setError] = useState<string | null>(null);
 
-    // Auth states
-    const [sessionUser, setSessionUser] = useState<any | null>(null);
-    const [loginEmail, setLoginEmail] = useState("");
-    const [loginPassword, setLoginPassword] = useState("");
-    const [loginError, setLoginError] = useState("");
-    const [loginLoading, setLoginLoading] = useState(false);
+    // Selected player for verification
+    const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
+    const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
 
-    // Event lock state
-    const [isLocked, setIsLocked] = useState(false);
-    const [lockMessage, setLockMessage] = useState("");
+    // PIN & OTP states
+    const [pinMode, setPinMode] = useState<"set" | "enter">("enter");
+    const [enteredPin, setEnteredPin] = useState("");
+    const [otpCode, setOtpCode] = useState("");
+    const [enteredOtp, setEnteredOtp] = useState("");
+    const [pinError, setPinError] = useState("");
+    const [isPinSubmitting, setIsPinSubmitting] = useState(false);
 
     // RSVP states
-    const [currentRsvp, setCurrentRsvp] = useState<string>("Unanswered");
-    const [submitting, setSubmitting] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     useEffect(() => {
         if (!token) return;
 
-        async function verifyAndLoad() {
+        async function loadEventAndSquad() {
             try {
-                // 1. Fetch current auth session
-                const { data: { session } } = await supabase.auth.getSession();
-                setSessionUser(session?.user || null);
-
-                // 2. Fetch event by token
-                // Check matches by event_token
+                // 1. Fetch event by token
+                // Check matches by event_token or id
                 let { data: matchData } = await supabase
                     .from("matches")
                     .select("*")
@@ -99,48 +112,48 @@ export default function SecureEventResponderPage() {
                 setEvent(resolvedEvent);
                 setEventType(resolvedType);
 
-                // 3. Check Event Lock Type
-                checkLockState(resolvedEvent);
+                // 2. Fetch players for this club
+                const { data: squadData, error: squadErr } = await supabase
+                    .from("players")
+                    .select("*")
+                    .eq("club_id", resolvedEvent.club_id);
 
-                // 4. If logged in, fetch linked player profile
-                if (session?.user) {
-                    const { data: playerData, error: playerErr } = await supabase
-                        .from("players")
-                        .select("*")
-                        .eq("user_id", session.user.id)
-                        .single();
-
-                    if (playerErr || !playerData) {
-                        setError("You are not registered as a member of this club's squad. Please contact your coach.");
-                        setLoading(false);
-                        return;
-                    }
-
-                    setPlayer(playerData);
-
-                    // 5. Get current RSVP response
-                    if (resolvedType === "match") {
-                        const currentNotes = resolvedEvent.notes || "";
-                        const matchRaw = currentNotes.match(/\[AVAILABILITY:\s*(.*?)\s*\]/);
-                        if (matchRaw && matchRaw[1]) {
-                            try {
-                                const list = JSON.parse(matchRaw[1]);
-                                const record = list.find((a: any) => a.playerId === playerData.id);
-                                setCurrentRsvp(record?.status || "Unanswered");
-                            } catch (e) {
-                                setCurrentRsvp("Unanswered");
-                            }
-                        }
-                    } else {
-                        const attendance = resolvedEvent.attendance || [];
-                        const record = attendance.find((a: any) => a.playerId === playerData.id);
-                        if (record) {
-                            if (record.status === "Present") setCurrentRsvp("Available");
-                            else if (record.status === "Late") setCurrentRsvp("Maybe");
-                            else setCurrentRsvp("Unavailable");
-                        }
-                    }
+                if (squadErr || !squadData) {
+                    setError("Unable to load squad details.");
+                    setLoading(false);
+                    return;
                 }
+
+                // Filter squad matching if training
+                let eligible = [...squadData];
+                if (resolvedType === "training") {
+                    const isFirstTeamSession = resolvedEvent.squad === "All" || resolvedEvent.squad === "firstTeam" || resolvedEvent.squad === "First Team";
+                    const checkSquadMatch = (playerSquadsStr: string | undefined | null, targetSquad: string) => {
+                        if (!playerSquadsStr) return false;
+                        const squads = playerSquadsStr.split(",").map(s => s.trim().toLowerCase());
+                        const cleanTarget = targetSquad.toLowerCase();
+                        if (cleanTarget === "firstteam" || cleanTarget === "first team") {
+                            return squads.includes("first team") || squads.includes("firstteam");
+                        }
+                        return squads.includes(cleanTarget);
+                    };
+                    const isFirstTeam = (squad: string | undefined | null) => {
+                        if (!squad) return false;
+                        const squads = squad.split(",").map(s => s.trim().toLowerCase());
+                        return squads.includes("first team") || squads.includes("firstteam");
+                    };
+
+                    eligible = squadData.filter(p => {
+                        if (isFirstTeamSession) {
+                            return isFirstTeam(p.squad) || p.is_in_training_squad;
+                        }
+                        return checkSquadMatch(p.squad, resolvedEvent.squad);
+                    });
+                }
+
+                // Sort by position order
+                eligible.sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));
+                setPlayers(eligible);
 
             } catch (err: any) {
                 console.error(err);
@@ -150,72 +163,51 @@ export default function SecureEventResponderPage() {
             }
         }
 
-        verifyAndLoad();
+        loadEventAndSquad();
     }, [token]);
 
-    const checkLockState = (evt: any) => {
-        if (!evt.lock_type || evt.lock_type === "Never") {
-            setIsLocked(false);
-            return;
-        }
-
-        // Get match date and time
-        const eventDateStr = evt.date; // YYYY-MM-DD
-        const eventTimeStr = evt.time || "00:00";
-        const eventDateTime = new Date(`${eventDateStr}T${eventTimeStr}`);
-
-        if (isNaN(eventDateTime.getTime())) {
-            setIsLocked(false);
-            return;
-        }
-
-        let lockTime = eventDateTime.getTime();
-
-        if (evt.lock_type === "30m") {
-            lockTime = eventDateTime.getTime() - 30 * 60 * 1000;
-        } else if (evt.lock_type === "1h") {
-            lockTime = eventDateTime.getTime() - 60 * 60 * 1000;
-        } else if (evt.lock_type === "Custom" && evt.lock_time) {
-            lockTime = new Date(evt.lock_time).getTime();
-        }
-
-        const now = Date.now();
-        if (now > lockTime) {
-            setIsLocked(true);
-            setLockMessage(`Locked on ${new Date(lockTime).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}`);
-        }
+    const isVerified = (playerId: string) => {
+        if (typeof window === "undefined") return false;
+        return localStorage.getItem(`cf_verified_player_${playerId}`) === "true";
     };
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoginError("");
-        setLoginLoading(true);
+    const handlePlayerClick = (player: any) => {
+        setSelectedPlayer(player);
+        setSuccessMessage(null);
+        setEnteredPin("");
+        setEnteredOtp("");
+        setPinError("");
 
-        try {
-            const { data, error } = await supabase.auth.signInWithPassword({
-                email: loginEmail,
-                password: loginPassword,
-            });
+        const code = Math.floor(1000 + Math.random() * 9000).toString();
+        setOtpCode(code);
 
-            if (error) throw error;
-            if (data.session) {
-                window.location.reload();
+        if (player.pin_hash) {
+            if (isVerified(player.id)) {
+                toggleAvailability(player);
+            } else {
+                setPinMode("enter");
+                setIsVerificationModalOpen(true);
             }
-        } catch (err: any) {
-            setLoginError(err.message || "Failed to sign in. Please verify credentials.");
-        } finally {
-            setLoginLoading(false);
+        } else {
+            setPinMode("set");
+            setIsVerificationModalOpen(true);
         }
     };
 
-    const handleRsvp = async (status: "Available" | "Maybe" | "Unavailable") => {
-        if (isLocked) return;
-        if (!player || !event || !eventType) return;
+    const toggleAvailability = async (player: any, pinHashToSave?: string) => {
+        if (!event || !eventType) return;
+        setIsSubmitting(true);
 
-        setSubmitting(true);
         try {
             if (eventType === "match") {
-                const currentNotes = event.notes || "";
+                // Fetch fresh match details to prevent overrides
+                const { data: freshMatch } = await supabase
+                    .from("matches")
+                    .select("notes")
+                    .eq("id", event.id)
+                    .single();
+
+                const currentNotes = freshMatch?.notes || "";
                 let currentList: any[] = [];
                 const matchRaw = currentNotes.match(/\[AVAILABILITY:\s*(.*?)\s*\]/);
                 if (matchRaw && matchRaw[1]) {
@@ -226,13 +218,17 @@ export default function SecureEventResponderPage() {
                     }
                 }
 
+                // Toggle: Available -> Unavailable -> Available
+                const record = currentList.find(a => a.playerId === player.id);
+                const nextStatus = record?.status === "Available" ? "Unavailable" : "Available";
+
                 const updatedList = [...currentList];
-                const playerIndex = updatedList.findIndex((a: any) => a.playerId === player.id);
+                const playerIndex = updatedList.findIndex(a => a.playerId === player.id);
 
                 if (playerIndex >= 0) {
-                    updatedList[playerIndex] = { playerId: player.id, status };
+                    updatedList[playerIndex] = { playerId: player.id, status: nextStatus };
                 } else {
-                    updatedList.push({ playerId: player.id, status });
+                    updatedList.push({ playerId: player.id, status: nextStatus });
                 }
 
                 let cleanBaseNotes = currentNotes.replace(/\[AVAILABILITY:.*?\]\n?/, "").trim();
@@ -245,28 +241,28 @@ export default function SecureEventResponderPage() {
 
                 if (updateMatchErr) throw updateMatchErr;
                 setEvent({ ...event, notes: finalNotes });
+                setSuccessMessage(`${player.first_name} marked as ${nextStatus}!`);
 
             } else {
-                const existingAttendance = event.attendance || [];
+                // Fetch fresh training details
+                const { data: freshSession } = await supabase
+                    .from("training_sessions")
+                    .select("attendance")
+                    .eq("id", event.id)
+                    .single();
+
+                const existingAttendance = freshSession?.attendance || [];
+                const record = existingAttendance.find((a: any) => a.playerId === player.id);
+                const currentStatus = record?.status ?? "Absent";
+                const newStatus = (currentStatus === "Present" || currentStatus === "Late") ? "Absent" : "Present";
+
                 const updatedAttendance = [...existingAttendance];
                 const playerIndex = updatedAttendance.findIndex((a: any) => a.playerId === player.id);
 
-                let mappedStatus = "Absent";
-                if (status === "Available") mappedStatus = "Present";
-                if (status === "Maybe") mappedStatus = "Late";
-
                 if (playerIndex >= 0) {
-                    updatedAttendance[playerIndex] = {
-                        ...updatedAttendance[playerIndex],
-                        status: mappedStatus,
-                        notes: "RSVP: Self Managed"
-                    };
+                    updatedAttendance[playerIndex] = { ...updatedAttendance[playerIndex], status: newStatus };
                 } else {
-                    updatedAttendance.push({
-                        playerId: player.id,
-                        status: mappedStatus,
-                        notes: "RSVP: Self Managed"
-                    });
+                    updatedAttendance.push({ playerId: player.id, status: newStatus, notes: "RSVP: Self Managed" });
                 }
 
                 const { error: updateSessionErr } = await supabase
@@ -276,19 +272,75 @@ export default function SecureEventResponderPage() {
 
                 if (updateSessionErr) throw updateSessionErr;
                 setEvent({ ...event, attendance: updatedAttendance });
+                setSuccessMessage(`${player.first_name} marked as ${newStatus === "Present" ? "Available" : "Unavailable"}!`);
             }
 
-            setCurrentRsvp(status);
-            setSuccessMessage("Your availability has been updated.");
+            // Save new PIN if set
+            if (pinHashToSave) {
+                const { error: playerUpdateErr } = await supabase
+                    .from("players")
+                    .update({
+                        pin_hash: pinHashToSave,
+                        status: "Registered"
+                    })
+                    .eq("id", player.id);
+
+                if (playerUpdateErr) throw playerUpdateErr;
+
+                // Sync UI state
+                setPlayers(players.map(p => p.id === player.id ? { ...p, pin_hash: pinHashToSave, status: "Registered" } : p));
+            }
+
             setTimeout(() => {
+                setSelectedPlayer(null);
                 setSuccessMessage(null);
-                router.push("/player");
             }, 2500);
 
         } catch (err: any) {
-            alert("Error logging response: " + err.message);
+            alert("Error saving response: " + err.message);
         } finally {
-            setSubmitting(false);
+            setIsSubmitting(false);
+        }
+    };
+
+    const handlePinSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedPlayer) return;
+
+        if (enteredPin.length !== 4 || !/^\d+$/.test(enteredPin)) {
+            setPinError("PIN must be exactly 4 digits.");
+            return;
+        }
+
+        setIsPinSubmitting(true);
+        setPinError("");
+
+        try {
+            const hashed = await hashPin(enteredPin);
+
+            if (pinMode === "set") {
+                if (enteredOtp !== otpCode) {
+                    setPinError("Incorrect activation code. Ask your coach for the code.");
+                    setIsPinSubmitting(false);
+                    return;
+                }
+
+                localStorage.setItem(`cf_verified_player_${selectedPlayer.id}`, "true");
+                setIsVerificationModalOpen(false);
+                await toggleAvailability(selectedPlayer, hashed);
+            } else {
+                if (hashed === selectedPlayer.pin_hash) {
+                    localStorage.setItem(`cf_verified_player_${selectedPlayer.id}`, "true");
+                    setIsVerificationModalOpen(false);
+                    await toggleAvailability(selectedPlayer);
+                } else {
+                    setPinError("Incorrect PIN. Please try again.");
+                }
+            }
+        } catch (err: any) {
+            setPinError("An error occurred during verification.");
+        } finally {
+            setIsPinSubmitting(false);
         }
     };
 
@@ -296,7 +348,7 @@ export default function SecureEventResponderPage() {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
                 <div className="flex flex-col items-center gap-3">
-                    <RefreshCw className="h-10 w-10 text-red-600 animate-spin" />
+                    <RefreshCw className="h-10 w-10 text-red-650 animate-spin" />
                     <p className="text-slate-400 text-sm font-medium">Resolving secure access...</p>
                 </div>
             </div>
@@ -311,7 +363,7 @@ export default function SecureEventResponderPage() {
                         <AlertCircle className="h-6 w-6" />
                     </div>
                     <h3 className="font-bold text-white text-lg">Secure Link Expired</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">{error}</p>
+                    <p className="text-xs text-slate-450 leading-relaxed">{error}</p>
                 </Card>
             </div>
         );
@@ -321,143 +373,292 @@ export default function SecureEventResponderPage() {
     const formattedDate = new Date(event.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
     return (
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-            <Card className="w-full max-w-md border-slate-800 bg-slate-900 shadow-2xl overflow-hidden">
-                <CardHeader className="p-6 border-b border-slate-800 bg-slate-900/60 text-center">
-                    <span className="text-[10px] font-bold uppercase tracking-widest text-red-500">ClubFlow RSVP Portal</span>
-                    <CardTitle className="text-lg font-bold text-white mt-1.5">{eventName}</CardTitle>
-                    <div className="flex flex-col items-center gap-1.5 mt-3 text-xs text-slate-400">
-                        <div className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" /> {formattedDate}</div>
-                        <div className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> {event.time}</div>
-                        <div className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> {event.location}</div>
+        <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-12">
+            {/* Header Branding */}
+            <div className="bg-slate-900 border-b border-slate-800 py-4 px-6 mb-6">
+                <div className="max-w-4xl mx-auto flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 bg-red-600 rounded-xl flex items-center justify-center shadow-lg">
+                            <span className="font-black text-white text-xs">⚽</span>
+                        </div>
+                        <div>
+                            <h1 className="font-bold text-white tracking-tight">Camden United</h1>
+                            <p className="text-xs text-slate-400">RSVP availability portal</p>
+                        </div>
                     </div>
-                </CardHeader>
+                    <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-950/20 px-2.5 py-1">
+                        1-Tap Check-In
+                    </Badge>
+                </div>
+            </div>
 
-                <CardContent className="p-6 space-y-5">
-                    {/* User Auth Login/Signup required */}
-                    {!sessionUser && (
-                        <form onSubmit={handleLogin} className="space-y-4">
-                            <div className="text-center space-y-1">
-                                <h4 className="font-bold text-white text-sm">Lightweight Account Sign In</h4>
-                                <p className="text-xs text-slate-400">Sign in to confirm availability. Haven't registered yet? Check your invite email.</p>
+            <div className="max-w-4xl mx-auto px-4 space-y-6">
+                {/* Event Details Card */}
+                <Card className="bg-slate-900 border-slate-800 shadow-xl overflow-hidden relative border-l-4 border-l-red-650">
+                    <CardHeader className="pb-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <Badge className="bg-red-950/50 text-red-450 border border-red-900/50 uppercase tracking-wider text-[10px]">
+                                {event.squad || "Squad"} Event
+                            </Badge>
+                            <span className="text-xs text-slate-450 flex items-center gap-1 font-semibold">
+                                <Clock className="h-3.5 w-3.5" /> Kick Off: {event.time}
+                            </span>
+                        </div>
+                        <h2 className="text-xl font-black text-white mt-3">{eventName}</h2>
+                        <CardDescription className="text-slate-400 leading-relaxed mt-1">
+                            Please confirm whether you are attending the session on {formattedDate} at {event.time} at {event.location || "TBD"}.
+                            <span className="block mt-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
+                                💡 Select your name below to instantly toggle your availability.
+                            </span>
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-0 border-t border-slate-800/50 mt-2 text-sm text-slate-350">
+                        <div className="flex items-center gap-3 pt-3">
+                            <CalendarDays className="h-5 w-5 text-red-500" />
+                            <div>
+                                <p className="text-xs text-slate-550 uppercase tracking-wider font-semibold">Date</p>
+                                <p className="font-medium text-white">{formattedDate}</p>
                             </div>
+                        </div>
+                        <div className="flex items-center gap-3 pt-3">
+                            <MapPin className="h-5 w-5 text-red-500" />
+                            <div>
+                                <p className="text-xs text-slate-550 uppercase tracking-wider font-semibold">Location</p>
+                                <p className="font-medium text-white">{event.location || "TBD"}</p>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
 
-                            {loginError && (
-                                <div className="bg-red-950/40 border border-red-500/30 rounded-xl p-3 flex items-center gap-2 text-red-400 text-xs">
-                                    <AlertCircle className="h-4 w-4 shrink-0" />
-                                    <span>{loginError}</span>
+                {/* Success Toast */}
+                {selectedPlayer && successMessage && (
+                    <Card className="bg-slate-900 border-red-500/50 shadow-xl border-t-2 animate-in fade-in slide-in-from-top-4 duration-300">
+                        <CardContent className="p-4 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <Avatar className="h-10 w-10 border border-slate-700">
+                                    <AvatarImage src={selectedPlayer.image_url} />
+                                    <AvatarFallback className="bg-slate-800 text-white font-bold">
+                                        {selectedPlayer.first_name[0]}{selectedPlayer.last_name[0]}
+                                    </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <h3 className="text-base font-bold text-white">{selectedPlayer.first_name} {selectedPlayer.last_name}</h3>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-xs text-slate-400 font-semibold uppercase">{selectedPlayer.position} • Verified Device ✓</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl px-4 py-2 flex items-center gap-2 text-emerald-400 font-semibold text-sm">
+                                <UserCheck className="h-4.5 w-4.5 animate-pulse" />
+                                <span>{successMessage}</span>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Player List Grid */}
+                <Card className="bg-slate-900 border-slate-800 shadow-xl">
+                    <CardHeader className="pb-4">
+                        <CardTitle className="text-lg text-white font-bold">Squad List</CardTitle>
+                        <CardDescription className="text-slate-400">
+                            Select your name to toggle your availability. Secured slots require your 4-digit PIN.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                            {players.map((player) => {
+                                let isAvailable = false;
+                                if (eventType === "match") {
+                                    const currentNotes = event.notes || "";
+                                    const matchRaw = currentNotes.match(/\[AVAILABILITY:\s*(.*?)\s*\]/);
+                                    if (matchRaw && matchRaw[1]) {
+                                        try {
+                                            const list = JSON.parse(matchRaw[1]);
+                                            const record = list.find((a: any) => a.playerId === player.id);
+                                            isAvailable = record?.status === "Available";
+                                        } catch (e) {
+                                            isAvailable = false;
+                                        }
+                                    }
+                                } else {
+                                    const attendance = event.attendance || [];
+                                    const record = attendance.find((a: any) => a.playerId === player.id);
+                                    isAvailable = record?.status === "Present" || record?.status === "Late";
+                                }
+
+                                const isUserVerified = isVerified(player.id);
+                                const hasPin = !!player.pin_hash;
+
+                                return (
+                                    <div
+                                        key={player.id}
+                                        onClick={() => !isSubmitting && handlePlayerClick(player)}
+                                        className={`
+                                            relative flex flex-col items-center p-4 rounded-xl border cursor-pointer select-none text-center gap-1.5 transition-all duration-155 min-h-[110px]
+                                            ${isAvailable
+                                                ? "bg-emerald-950/30 border-emerald-500 shadow-md shadow-emerald-500/10 scale-[1.02]"
+                                                : "bg-slate-800/50 border-slate-800 hover:border-slate-700 hover:bg-slate-800"
+                                            }
+                                        `}
+                                    >
+                                        {/* Verification indicator */}
+                                        {isUserVerified ? (
+                                            <div className="absolute top-2 right-2 flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-400 text-[8px] font-bold">
+                                                ✓
+                                            </div>
+                                        ) : hasPin ? (
+                                            <div className="absolute top-2 right-2 text-slate-500" title="Secured with PIN">
+                                                <Lock className="h-3 w-3" />
+                                            </div>
+                                        ) : null}
+
+                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                                            {player.position}
+                                        </span>
+                                        <span className="text-sm font-bold text-white leading-tight">
+                                            {player.first_name}
+                                        </span>
+                                        <span className="text-xs text-slate-400 leading-tight">
+                                            {player.last_name}
+                                        </span>
+
+                                        <div className={`mt-1.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full
+                                            ${isAvailable 
+                                                ? "bg-emerald-950/50 text-emerald-400 border border-emerald-900/50" 
+                                                : "bg-slate-900 text-slate-500 border border-slate-800"
+                                            }`}
+                                        >
+                                            {isAvailable ? "Available" : "Unavailable"}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* PIN Verification Modal */}
+            {isVerificationModalOpen && selectedPlayer && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
+                    <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                        {/* Modal Header */}
+                        <div className="p-5 border-b border-slate-800 bg-slate-900/80 flex justify-between items-start">
+                            <div className="flex items-center gap-3">
+                                <div className="h-10 w-10 rounded-xl bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500">
+                                    {pinMode === "set" ? <KeyRound className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg text-white">
+                                        {pinMode === "set" ? "Secure Your Slot" : "Enter Check-in PIN"}
+                                    </h3>
+                                    <p className="text-xs text-slate-450 font-semibold">For {selectedPlayer.first_name} {selectedPlayer.last_name}</p>
+                                </div>
+                            </div>
+                            <button 
+                                onClick={() => setIsVerificationModalOpen(false)} 
+                                className="text-slate-500 hover:text-slate-200 text-lg transition-colors p-1"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        {/* Modal Content */}
+                        <form onSubmit={handlePinSubmit} className="p-5 space-y-4">
+                            {pinError && (
+                                <div className="bg-red-950/40 border border-red-500/30 rounded-xl p-3 flex items-center gap-2.5 text-red-400 text-xs">
+                                    <AlertCircle className="h-4.5 w-4.5 shrink-0" />
+                                    <span>{pinError}</span>
                                 </div>
                             )}
 
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Email Address</label>
-                                <Input
-                                    type="email"
-                                    required
-                                    value={loginEmail}
-                                    onChange={(e) => setLoginEmail(e.target.value)}
-                                    className="bg-slate-950 border-slate-800 text-white text-xs h-10"
-                                    placeholder="you@example.com"
-                                />
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Password</label>
-                                <Input
-                                    type="password"
-                                    required
-                                    value={loginPassword}
-                                    onChange={(e) => setLoginPassword(e.target.value)}
-                                    className="bg-slate-950 border-slate-800 text-white text-xs h-10"
-                                    placeholder="••••••••"
-                                />
-                            </div>
-
-                            <Button type="submit" disabled={loginLoading} className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-10">
-                                {loginLoading ? "Signing in..." : "Log In & Continue"}
-                            </Button>
-                        </form>
-                    )}
-
-                    {/* Authenticated Player view */}
-                    {sessionUser && player && (
-                        <div className="space-y-4 text-center">
-                            {successMessage ? (
-                                <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-4 flex flex-col items-center justify-center text-center gap-2 text-emerald-400 text-xs">
-                                    <CheckCircle2 className="h-6 w-6 animate-bounce" />
-                                    <span className="font-bold">{successMessage}</span>
+                            {pinMode === "set" ? (
+                                <div className="space-y-3">
+                                    <p className="text-xs text-slate-350 leading-relaxed font-semibold">
+                                        To prevent others from checking in under your name, choose a 4-digit PIN. Click below to verify your device with your coach.
+                                    </p>
+                                    <Button 
+                                        type="button"
+                                        onClick={() => {
+                                            const text = `Hi Coach, please approve my ClubFlow registration. Player: ${selectedPlayer.first_name} ${selectedPlayer.last_name}. Activation Code: ${otpCode}`;
+                                            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+                                        }}
+                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 flex items-center justify-center gap-2 rounded-xl text-xs"
+                                    >
+                                        💬 Verify via WhatsApp
+                                    </Button>
+                                    <div className="space-y-1.5 pt-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Coach Approval Code</label>
+                                        <Input
+                                            type="text"
+                                            maxLength={4}
+                                            required
+                                            value={enteredOtp}
+                                            onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, "").substring(0, 4))}
+                                            placeholder="e.g. 1234"
+                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
+                                        />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choose 4-Digit PIN</label>
+                                        <Input
+                                            type="password"
+                                            pattern="\d*"
+                                            inputMode="numeric"
+                                            maxLength={4}
+                                            required
+                                            value={enteredPin}
+                                            onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 4))}
+                                            placeholder="••••"
+                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
+                                        />
+                                    </div>
+                                    <Button 
+                                        type="submit"
+                                        disabled={isPinSubmitting || enteredPin.length !== 4 || enteredOtp !== otpCode}
+                                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
+                                    >
+                                        {isPinSubmitting ? "Securing Name..." : "Lock Name & Check-in"}
+                                    </Button>
                                 </div>
                             ) : (
-                                <>
-                                    <div className="flex items-center justify-center gap-2 border-b border-slate-800 pb-3 text-xs text-slate-400">
-                                        <span>Logged in as: <strong className="text-white">{player.first_name} {player.last_name}</strong></span>
-                                        {isLocked ? (
-                                            <span className="flex items-center gap-1 text-red-400 font-bold bg-red-950/20 border border-red-900/30 px-2 py-0.5 rounded">
-                                                <Lock className="h-3 w-3" /> Locked
-                                            </span>
-                                        ) : (
-                                            <span className="flex items-center gap-1 text-emerald-400 font-bold bg-emerald-950/20 border border-emerald-900/30 px-2 py-0.5 rounded">
-                                                <LockOpen className="h-3 w-3" /> Open
-                                            </span>
-                                        )}
+                                <div className="space-y-3">
+                                    <p className="text-xs text-slate-300 leading-relaxed font-semibold">
+                                        Your name slot is locked. Please enter your 4-digit PIN to check in.
+                                    </p>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enter PIN</label>
+                                        <Input
+                                            type="password"
+                                            pattern="\d*"
+                                            inputMode="numeric"
+                                            maxLength={4}
+                                            required
+                                            value={enteredPin}
+                                            onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 4))}
+                                            placeholder="••••"
+                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
+                                        />
                                     </div>
-
-                                    {isLocked && (
-                                        <div className="bg-red-950/30 border border-red-900/30 rounded-xl p-3 flex items-center justify-center gap-2 text-red-400 text-xs">
-                                            <AlertCircle className="h-4.5 w-4.5 shrink-0" />
-                                            <span>Responses locked ({lockMessage})</span>
-                                        </div>
-                                    )}
-
-                                    {!isLocked && (
-                                        <div className="grid grid-cols-3 gap-2.5 pt-2">
-                                            <Button
-                                                onClick={() => handleRsvp("Available")}
-                                                disabled={submitting}
-                                                className={`h-12 text-xs font-bold rounded-xl transition-all ${
-                                                    currentRsvp === "Available"
-                                                        ? "bg-emerald-600 text-white font-black scale-105"
-                                                        : "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                                                }`}
-                                            >
-                                                Available
-                                            </Button>
-                                            <Button
-                                                onClick={() => handleRsvp("Maybe")}
-                                                disabled={submitting}
-                                                className={`h-12 text-xs font-bold rounded-xl transition-all ${
-                                                    currentRsvp === "Maybe"
-                                                        ? "bg-amber-600 text-white font-black scale-105"
-                                                        : "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                                                }`}
-                                            >
-                                                Maybe
-                                            </Button>
-                                            <Button
-                                                onClick={() => handleRsvp("Unavailable")}
-                                                disabled={submitting}
-                                                className={`h-12 text-xs font-bold rounded-xl transition-all ${
-                                                    currentRsvp === "Unavailable"
-                                                        ? "bg-red-600 text-white font-black scale-105"
-                                                        : "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                                                }`}
-                                            >
-                                                Unavailable
-                                            </Button>
-                                        </div>
-                                    )}
-
-                                    {isLocked && (
-                                        <div className="py-2 text-slate-300 text-xs">
-                                            Your logged response: <strong className="text-white uppercase">{currentRsvp}</strong>
-                                        </div>
-                                    )}
-                                </>
+                                    <Button 
+                                        type="submit"
+                                        disabled={isPinSubmitting || enteredPin.length !== 4}
+                                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
+                                    >
+                                        {isPinSubmitting ? "Verifying..." : "Verify & Check-in"}
+                                    </Button>
+                                    <div className="text-center pt-1.5">
+                                        <p className="text-[10px] text-slate-500 flex items-center justify-center gap-1 font-semibold">
+                                            <HelpCircle className="h-3 w-3" />
+                                            <span>Forgot PIN? Ask your coach to reset it.</span>
+                                        </p>
+                                    </div>
+                                </div>
                             )}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
