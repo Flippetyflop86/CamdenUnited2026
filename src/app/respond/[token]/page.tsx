@@ -319,12 +319,6 @@ export default function PinDeviceResponderPage() {
             const hashed = await hashPin(enteredPin);
 
             if (pinMode === "set") {
-                if (enteredOtp !== otpCode) {
-                    setPinError("Incorrect activation code. Ask your coach for the code.");
-                    setIsPinSubmitting(false);
-                    return;
-                }
-
                 localStorage.setItem(`cf_verified_player_${selectedPlayer.id}`, "true");
                 setIsVerificationModalOpen(false);
                 await toggleAvailability(selectedPlayer, hashed);
@@ -575,30 +569,8 @@ export default function PinDeviceResponderPage() {
                             {pinMode === "set" ? (
                                 <div className="space-y-3">
                                     <p className="text-xs text-slate-355 leading-relaxed font-semibold">
-                                        To prevent others from checking in under your name, choose a 6-digit PIN. Click below to verify your device with your coach.
+                                        To prevent others from checking in under your name, choose a 6-digit PIN to lock your slot on this device.
                                     </p>
-                                    <Button 
-                                        type="button"
-                                        onClick={() => {
-                                            const text = `Hi Coach, please approve my ClubFlow registration. Player: ${selectedPlayer.first_name} ${selectedPlayer.last_name}. Activation Code: ${otpCode}`;
-                                            window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
-                                        }}
-                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold h-11 flex items-center justify-center gap-2 rounded-xl text-xs"
-                                    >
-                                        💬 Verify via WhatsApp
-                                    </Button>
-                                    <div className="space-y-1.5 pt-1">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Coach Approval Code</label>
-                                        <Input
-                                            type="text"
-                                            maxLength={4}
-                                            required
-                                            value={enteredOtp}
-                                            onChange={(e) => setEnteredOtp(e.target.value.replace(/\D/g, "").substring(0, 4))}
-                                            placeholder="e.g. 1234"
-                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
-                                        />
-                                    </div>
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choose 6-Digit PIN</label>
                                         <Input
@@ -615,7 +587,7 @@ export default function PinDeviceResponderPage() {
                                     </div>
                                     <Button 
                                         type="submit"
-                                        disabled={isPinSubmitting || enteredPin.length !== 6 || enteredOtp !== otpCode}
+                                        disabled={isPinSubmitting || enteredPin.length !== 6}
                                         className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
                                     >
                                         {isPinSubmitting ? "Securing Name..." : "Lock Name & Check-in"}
