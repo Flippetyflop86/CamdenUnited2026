@@ -5,7 +5,6 @@ import { cn } from "@/lib/utils";
 import { notFound, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ArrowLeft, Edit, AlertTriangle } from "lucide-react";
@@ -294,235 +293,78 @@ export default function PlayerProfilePage() {
                 </div>
             </div>
 
-            {/* Tabs Section */}
-            <Tabs defaultValue="overview" className="w-full">
-                <TabsList className="grid w-full grid-cols-4 lg:w-[500px]">
-                    <TabsTrigger value="overview">Overview</TabsTrigger>
-                    <TabsTrigger value="stats">Stats</TabsTrigger>
-                    <TabsTrigger value="medical">Medical</TabsTrigger>
-                    <TabsTrigger value="portal">Player Portal</TabsTrigger>
-                </TabsList>
+            <div className="mt-6 space-y-6">
+                <div className="flex justify-between items-center bg-slate-50 p-4 border rounded-lg">
+                    <span className="font-bold text-slate-700">Display Stats For:</span>
+                    <select
+                        value={seasonFilter}
+                        onChange={(e) => setSeasonFilter(e.target.value)}
+                        className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500"
+                    >
+                        <option value="All">All Time</option>
+                        {availableSeasons.map(s => (
+                            <option key={s} value={s}>{s} Season</option>
+                        ))}
+                    </select>
+                </div>
 
-                <TabsContent value="overview" className="mt-6 space-y-6">
-                    <div className="flex justify-between items-center bg-slate-50 p-4 border rounded-lg">
-                        <span className="font-bold text-slate-700">Display Stats For:</span>
-                        <select
-                            value={seasonFilter}
-                            onChange={(e) => setSeasonFilter(e.target.value)}
-                            className="h-9 px-3 bg-white border border-slate-200 rounded-md text-sm font-medium focus:outline-none focus:ring-2 focus:ring-red-500"
-                        >
-                            <option value="All">All Time</option>
-                            {availableSeasons.map(s => (
-                                <option key={s} value={s}>{s} Season</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                        <Card>
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Appearances</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold">{calculatedStats.apps}</div></CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Goals</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold">{calculatedStats.goals}</div></CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Assists</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold">{calculatedStats.assists}</div></CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Mins Played</CardTitle></CardHeader>
-                            <CardContent><div className="text-2xl font-bold">{player.appearances * 90}</div></CardContent>
-                        </Card>
-                    </div>
-
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <Card>
-                        <CardHeader>
-                            <CardTitle>Recent Activity</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-4">
-                                {recentActivity.length === 0 ? (
-                                    <p className="text-sm text-slate-500 italic">No recent training activities recorded.</p>
-                                ) : (
-                                    recentActivity.map((activity, i) => {
-                                        const dateFormatted = new Date(activity.date).toLocaleDateString("en-GB", {
-                                            day: "numeric",
-                                            month: "short",
-                                            year: "numeric"
-                                        });
-                                        return (
-                                            <div key={i} className="flex items-center gap-4 border-b pb-4 last:border-0 last:pb-0">
-                                                <div className={`h-2.5 w-2.5 rounded-full ${
-                                                    activity.status === "Present" ? "bg-green-500" : activity.status === "Late" ? "bg-amber-500" : activity.status === "Absent" ? "bg-red-500" : "bg-slate-400"
-                                                }`} />
-                                                <div>
-                                                    <p className="text-sm font-medium text-slate-850">
-                                                        Training Session - {dateFormatted}
-                                                    </p>
-                                                    <p className="text-xs text-slate-500">
-                                                        Topic: {activity.topic} • <span className={`font-bold ${
-                                                            activity.status === "Present" ? "text-green-600" : activity.status === "Late" ? "text-amber-600" : activity.status === "Absent" ? "text-red-600" : "text-slate-500"
-                                                        }`}>{activity.status}</span> {activity.notes && `(${activity.notes})`}
-                                                    </p>
-                                                </div>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Appearances</CardTitle></CardHeader>
+                        <CardContent><div className="text-2xl font-bold">{calculatedStats.apps}</div></CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Goals</CardTitle></CardHeader>
+                        <CardContent><div className="text-2xl font-bold">{calculatedStats.goals}</div></CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Assists</CardTitle></CardHeader>
+                        <CardContent><div className="text-2xl font-bold">{calculatedStats.assists}</div></CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Mins Played</CardTitle></CardHeader>
+                        <CardContent><div className="text-2xl font-bold">{player.appearances * 90}</div></CardContent>
+                    </Card>
+                </div>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Recent Activity</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            {recentActivity.length === 0 ? (
+                                <p className="text-sm text-slate-500 italic">No recent training activities recorded.</p>
+                            ) : (
+                                recentActivity.map((activity, i) => {
+                                    const dateFormatted = new Date(activity.date).toLocaleDateString("en-GB", {
+                                        day: "numeric",
+                                        month: "short",
+                                        year: "numeric"
+                                    });
+                                    return (
+                                        <div key={i} className="flex items-center gap-4 border-b pb-4 last:border-0 last:pb-0">
+                                            <div className={`h-2.5 w-2.5 rounded-full ${
+                                                activity.status === "Present" ? "bg-green-500" : activity.status === "Late" ? "bg-amber-500" : activity.status === "Absent" ? "bg-red-500" : "bg-slate-400"
+                                            }`} />
+                                            <div>
+                                                <p className="text-sm font-medium text-slate-850">
+                                                    Training Session - {dateFormatted}
+                                                </p>
+                                                <p className="text-xs text-slate-500">
+                                                    Topic: {activity.topic} • <span className={`font-bold ${
+                                                        activity.status === "Present" ? "text-green-600" : activity.status === "Late" ? "text-amber-600" : activity.status === "Absent" ? "text-red-600" : "text-slate-500"
+                                                    }`}>{activity.status}</span> {activity.notes && `(${activity.notes})`}
+                                                </p>
                                             </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="medical" className="mt-6">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Medical History</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            {(player as any).medicalNotes && (
-                                <div className="bg-red-50 border border-red-100 p-4 rounded-md flex gap-3 items-start">
-                                    <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5" />
-                                    <div>
-                                        <h4 className="font-semibold text-red-900">Current Injury</h4>
-                                        <p className="text-sm text-red-800">{(player as any).medicalNotes}</p>
-                                    </div>
-                                </div>
+                                        </div>
+                                    );
+                                })
                             )}
-
-                            <div>
-                                <h3 className="font-medium text-slate-900 mb-4">Past Injuries</h3>
-                                <p className="text-sm text-slate-500 italic">No past injury records found.</p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="stats" className="mt-6">
-                    <Card>
-                        <CardHeader><CardTitle>Detailed Statistics</CardTitle></CardHeader>
-                        <CardContent>
-                            <p className="text-slate-500">Advanced analytics and charts will appear here.</p>
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="portal" className="mt-6">
-                    <Card className="border-slate-200">
-                        <CardHeader>
-                            <CardTitle className="text-slate-900 text-base">Player Portal Integration</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-50 p-4 border rounded-xl">
-                                <div>
-                                    <p className="text-xs text-slate-500 font-bold uppercase">Portal Status</p>
-                                    <p className="text-sm font-semibold text-slate-800 mt-0.5">
-                                        {player && (player as any).status || "Pending Activation"}
-                                    </p>
-                                </div>
-                                {player && ((player as any).email || (player as any).mobileNumber) && (
-                                    <div className="text-slate-600 text-xs">
-                                        <p><strong>Email:</strong> {(player as any).email || "Not Set"}</p>
-                                        <p><strong>Mobile:</strong> {(player as any).mobileNumber || "Not Set"}</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {player && (player as any).status === "Registered" && (
-                                <div className="flex items-center justify-between border border-red-200 bg-red-50/50 p-4 rounded-xl mt-4">
-                                    <div>
-                                        <h4 className="text-sm font-bold text-red-900">Forgot PIN / Reset Profile</h4>
-                                        <p className="text-xs text-red-700 mt-0.5">
-                                            Resetting will delete the player's 6-digit PIN and require them to enter a new one next time they respond.
-                                        </p>
-                                    </div>
-                                    <Button 
-                                        variant="destructive" 
-                                        size="sm" 
-                                        onClick={handleResetPlayerPin}
-                                    >
-                                        Reset PIN
-                                    </Button>
-                                </div>
-                            )}
-
-                            {/* Invitation Form if no email is set */}
-                            {player && !(player as any).email && (
-                                <form onSubmit={handleInvitePlayer} className="space-y-4 border-t pt-4">
-                                    <h4 className="text-xs font-bold text-slate-700 uppercase">Send Player Portal Invite</h4>
-                                    {inviteError && (
-                                        <div className="text-red-600 bg-red-50 p-2.5 border border-red-100 rounded-lg text-xs">
-                                            {inviteError}
-                                        </div>
-                                    )}
-                                    {inviteSuccess && (
-                                        <div className="text-green-700 bg-green-50 p-2.5 border border-green-100 rounded-lg text-xs font-semibold">
-                                            Invitation email sent successfully!
-                                        </div>
-                                    )}
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Player Email Address</label>
-                                            <Input 
-                                                type="email" 
-                                                required 
-                                                value={inviteEmail} 
-                                                onChange={e => setInviteEmail(e.target.value)} 
-                                                placeholder="e.g. player@example.com"
-                                                className="text-xs border-slate-200"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <label className="text-[10px] font-bold text-slate-500 uppercase">Mobile Number (Optional)</label>
-                                            <Input 
-                                                type="tel" 
-                                                value={inviteMobile} 
-                                                onChange={e => setInviteMobile(e.target.value)} 
-                                                placeholder="e.g. 07123456789"
-                                                className="text-xs border-slate-200"
-                                            />
-                                        </div>
-                                    </div>
-                                    <Button type="submit" disabled={inviteLoading} className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs h-9">
-                                        {inviteLoading ? "Sending invite..." : "Invite Player"}
-                                    </Button>
-                                </form>
-                            )}
-
-                            {/* Trusted Devices list */}
-                            {player && (player as any).status === "Active" && (
-                                <div className="space-y-3 border-t pt-4">
-                                    <h4 className="text-xs font-bold text-slate-700 uppercase">Registered Trusted Devices</h4>
-                                    {!(player as any).trustedDevices || (player as any).trustedDevices.length === 0 ? (
-                                        <p className="text-xs text-slate-500 italic">No devices registered yet.</p>
-                                    ) : (
-                                        <div className="divide-y divide-slate-100 border rounded-lg">
-                                            {((player as any).trustedDevices || []).map((device: any, index: number) => (
-                                                <div key={index} className="p-3 flex items-center justify-between gap-4 text-xs">
-                                                    <div>
-                                                        <p className="font-bold text-slate-800">{device.name || `Device ${index + 1}`}</p>
-                                                        <p className="text-[10px] text-slate-500">Trusted: {device.trustedAt ? new Date(device.trustedAt).toLocaleString() : "Unknown"}</p>
-                                                    </div>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="sm" 
-                                                        onClick={() => handleRevokeDevice(device.token)}
-                                                        className="text-red-600 hover:bg-red-50 text-[10px] font-bold h-7"
-                                                    >
-                                                        Revoke Access
-                                                    </Button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-                </TabsContent>
-            </Tabs>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 }
