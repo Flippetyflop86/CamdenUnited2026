@@ -98,6 +98,27 @@ export default function PlayerProfilePage() {
         }
     };
 
+    const handleResetPlayerPin = async () => {
+        if (!player) return;
+        if (!confirm(`Are you sure you want to reset the PIN for ${player.firstName}? They will be required to choose a new 6-digit PIN the next time they respond.`)) return;
+
+        try {
+            const { error } = await supabase
+                .from("players")
+                .update({ 
+                    pin_hash: null, 
+                    status: "Pending Invitation" 
+                })
+                .eq("id", player.id);
+
+            if (error) throw error;
+            setPlayer(prev => prev ? { ...prev, status: "Pending Invitation" } as any : null);
+            alert("PIN has been successfully reset! The player can now choose a new PIN when they next open their availability link.");
+        } catch (err: any) {
+            alert("Failed to reset PIN: " + err.message);
+        }
+    };
+
     const { settings } = useClub();
     const currentSquads = settings.squads || ["First Team"];
 
@@ -408,6 +429,24 @@ export default function PlayerProfilePage() {
                                     </div>
                                 )}
                             </div>
+
+                            {player && (player as any).status === "Registered" && (
+                                <div className="flex items-center justify-between border border-red-200 bg-red-50/50 p-4 rounded-xl mt-4">
+                                    <div>
+                                        <h4 className="text-sm font-bold text-red-900">Forgot PIN / Reset Profile</h4>
+                                        <p className="text-xs text-red-700 mt-0.5">
+                                            Resetting will delete the player's 6-digit PIN and require them to enter a new one next time they respond.
+                                        </p>
+                                    </div>
+                                    <Button 
+                                        variant="destructive" 
+                                        size="sm" 
+                                        onClick={handleResetPlayerPin}
+                                    >
+                                        Reset PIN
+                                    </Button>
+                                </div>
+                            )}
 
                             {/* Invitation Form if no email is set */}
                             {player && !(player as any).email && (
