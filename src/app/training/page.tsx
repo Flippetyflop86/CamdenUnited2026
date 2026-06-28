@@ -363,7 +363,8 @@ export default function TrainingPage() {
             parts.push(additionalNotes.trim());
         }
 
-        parts.push("Please confirm your availability:\n\n✅ Available\n❌ Unavailable");
+        const checkinLink = `${window.location.origin}/respond/${activeShareSession.event_token || activeShareSession.id}`;
+        parts.push(`Please confirm your availability here:\n${checkinLink}`);
 
         return parts.join("\n\n");
     };

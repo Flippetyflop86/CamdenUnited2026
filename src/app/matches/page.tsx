@@ -449,7 +449,7 @@ export default function MatchesPage() {
             parts.push(additionalNotes.trim());
         }
 
-        const checkinLink = `${window.location.origin}/match-checkin/${activeShareMatch.id}`;
+        const checkinLink = `${window.location.origin}/respond/${activeShareMatch.event_token || activeShareMatch.id}`;
         parts.push(`🔗 Log availability here:\n${checkinLink}`);
 
         return parts.join("\n\n");

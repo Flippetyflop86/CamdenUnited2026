@@ -79,6 +79,9 @@ export interface TrainingSession {
     squad: string;
     attendance: AttendanceRecord[];
     notes?: string;
+    event_token?: string;
+    lock_type?: string;
+    lock_time?: string;
 }
 
 export interface Match {
@@ -97,6 +100,9 @@ export interface Match {
     notes?: string;
     surface?: "4G" | "Grass";
     location?: string;
+    event_token?: string;
+    lock_type?: string;
+    lock_time?: string;
 }
 
 export interface OppositionTeam {
