@@ -307,8 +307,8 @@ export default function PinDeviceResponderPage() {
         e.preventDefault();
         if (!selectedPlayer) return;
 
-        if (enteredPin.length !== 4 || !/^\d+$/.test(enteredPin)) {
-            setPinError("PIN must be exactly 4 digits.");
+        if (enteredPin.length !== 6 || !/^\d+$/.test(enteredPin)) {
+            setPinError("PIN must be exactly 6 digits.");
             return;
         }
 
@@ -461,7 +461,7 @@ export default function PinDeviceResponderPage() {
                     <CardHeader className="pb-4">
                         <CardTitle className="text-lg text-white font-bold">Squad List</CardTitle>
                         <CardDescription className="text-slate-400">
-                            Select your name to toggle your availability. Secured slots require your 4-digit PIN.
+                            Select your name to toggle your availability. Secured slots require your 6-digit PIN.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -574,8 +574,8 @@ export default function PinDeviceResponderPage() {
 
                             {pinMode === "set" ? (
                                 <div className="space-y-3">
-                                    <p className="text-xs text-slate-350 leading-relaxed font-semibold">
-                                        To prevent others from checking in under your name, choose a 4-digit PIN. Click below to verify your device with your coach.
+                                    <p className="text-xs text-slate-355 leading-relaxed font-semibold">
+                                        To prevent others from checking in under your name, choose a 6-digit PIN. Click below to verify your device with your coach.
                                     </p>
                                     <Button 
                                         type="button"
@@ -600,22 +600,22 @@ export default function PinDeviceResponderPage() {
                                         />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choose 4-Digit PIN</label>
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choose 6-Digit PIN</label>
                                         <Input
                                             type="password"
                                             pattern="\d*"
                                             inputMode="numeric"
-                                            maxLength={4}
+                                            maxLength={6}
                                             required
                                             value={enteredPin}
-                                            onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 4))}
-                                            placeholder="••••"
+                                            onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 6))}
+                                            placeholder="••••••"
                                             className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
                                         />
                                     </div>
                                     <Button 
                                         type="submit"
-                                        disabled={isPinSubmitting || enteredPin.length !== 4 || enteredOtp !== otpCode}
+                                        disabled={isPinSubmitting || enteredPin.length !== 6 || enteredOtp !== otpCode}
                                         className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
                                     >
                                         {isPinSubmitting ? "Securing Name..." : "Lock Name & Check-in"}
@@ -624,7 +624,7 @@ export default function PinDeviceResponderPage() {
                             ) : (
                                 <div className="space-y-3">
                                     <p className="text-xs text-slate-300 leading-relaxed font-semibold">
-                                        Your name slot is locked. Please enter your 4-digit PIN to check in.
+                                        Your name slot is locked. Please enter your 6-digit PIN to check in.
                                     </p>
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enter PIN</label>
@@ -632,17 +632,17 @@ export default function PinDeviceResponderPage() {
                                             type="password"
                                             pattern="\d*"
                                             inputMode="numeric"
-                                            maxLength={4}
+                                            maxLength={6}
                                             required
                                             value={enteredPin}
-                                            onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 4))}
-                                            placeholder="••••"
+                                            onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 6))}
+                                            placeholder="••••••"
                                             className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
                                         />
                                     </div>
                                     <Button 
                                         type="submit"
-                                        disabled={isPinSubmitting || enteredPin.length !== 4}
+                                        disabled={isPinSubmitting || enteredPin.length !== 6}
                                         className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
                                     >
                                         {isPinSubmitting ? "Verifying..." : "Verify & Check-in"}
