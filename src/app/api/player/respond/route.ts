@@ -6,7 +6,11 @@ import crypto from "crypto";
 function getAdminClient() {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!key) {
-        throw new Error("SUPABASE_SERVICE_ROLE_KEY environment variable is missing on the server. Please add it to your Vercel Project Settings.");
+        console.warn("SUPABASE_SERVICE_ROLE_KEY environment variable is missing on the server. Falling back to Anon Key.");
+        return createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
     }
     return createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
