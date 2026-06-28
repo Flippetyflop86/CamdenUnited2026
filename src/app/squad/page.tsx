@@ -125,6 +125,48 @@ export default function SquadPage() {
         }
     };
 
+    const [isResettingPlayers, setIsResettingPlayers] = useState(false);
+
+    const handleResetAllPlayers = async () => {
+        const registeredPlayers = players.filter(p => p.status === "Registered");
+        if (registeredPlayers.length === 0) {
+            alert("No registered player accounts to reset.");
+            return;
+        }
+
+        if (!confirm(`Warning: This will unlink and deactivate the Player Portal accounts for all ${registeredPlayers.length} registered players in this club. They will have to sign up again. Do you want to proceed?`)) {
+            return;
+        }
+
+        setIsResettingPlayers(true);
+        try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData?.session?.access_token;
+            if (!token) throw new Error("Authentication session missing");
+
+            const res = await fetch("/api/player/reset-all", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ clubId })
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || "Failed to reset player accounts");
+            }
+
+            alert("All player accounts have been successfully reset!");
+            fetchData();
+        } catch (err: any) {
+            alert("Reset failed: " + err.message);
+        } finally {
+            setIsResettingPlayers(false);
+        }
+    };
+
     const { settings, updateSettings, isLoaded: isClubLoaded } = useClub();
     const { clubId, isLoading: isAuthLoading } = useAuth();
     const currentSquads = settings.squads || ["First Team"];
@@ -556,6 +598,14 @@ export default function SquadPage() {
                         className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs h-9 flex-1 md:flex-none"
                     >
                         {isBulkInviting ? "Inviting..." : "Invite Remaining Players"}
+                    </Button>
+                    <Button 
+                        onClick={handleResetAllPlayers}
+                        disabled={isResettingPlayers}
+                        variant="destructive"
+                        className="bg-red-600 hover:bg-red-700 text-white font-semibold text-xs h-9 flex-1 md:flex-none"
+                    >
+                        {isResettingPlayers ? "Resetting..." : "Reset Logins"}
                     </Button>
                 </div>
             </div>
