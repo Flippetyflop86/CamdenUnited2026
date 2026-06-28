@@ -130,15 +130,7 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                     <div className="mt-2 sm:mt-4 text-center">
                         <CardTitle className="text-white text-sm sm:text-lg truncate max-w-[140px] sm:max-w-none">{player.firstName} {player.lastName}</CardTitle>
                         <p className="text-slate-400 text-xs sm:text-sm font-medium">{player.position} • {squadLabel} • {displayAge} yo</p>
-                        <div className="mt-1.5 flex items-center justify-center gap-1.5">
-                            {(player as any).status === "Registered" ? (
-                                <Badge className="bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-[9px] font-bold pointer-events-none">✓ Registered</Badge>
-                            ) : (player as any).status === "Inactive" ? (
-                                <Badge className="bg-slate-700/20 text-slate-400 border border-slate-600/30 text-[9px] font-bold pointer-events-none">Inactive</Badge>
-                            ) : (
-                                <Badge className="bg-amber-600/20 text-amber-400 border border-amber-500/30 text-[9px] font-bold pointer-events-none">⏳ Pending Invitation</Badge>
-                            )}
-                        </div>
+
                         {player.medicalStatus === "Holiday" && player.holidayStart && player.holidayEnd && (
                             <p className="text-slate-300 text-[10px] sm:text-xs">Holiday: {player.holidayStart} to {player.holidayEnd}</p>
                         )}

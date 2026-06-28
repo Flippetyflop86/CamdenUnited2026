@@ -562,7 +562,7 @@ export default function SquadPage() {
                 </div>
             </div>
 
-            {/* CSV Import & Invite Actions Row */}
+            {/* CSV Import Row */}
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex justify-end gap-2.5 flex-wrap">
                 <input 
                     type="file" 
@@ -577,21 +577,6 @@ export default function SquadPage() {
                     className="text-xs font-semibold h-9 flex-1 md:flex-none"
                 >
                     Import Squad CSV
-                </Button>
-                <Button 
-                    onClick={handleBulkInvite}
-                    disabled={isBulkInviting}
-                    className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs h-9 flex-1 md:flex-none"
-                >
-                    {isBulkInviting ? "Inviting..." : "Invite Remaining Players"}
-                </Button>
-                <Button 
-                    onClick={handleResetAllPlayers}
-                    disabled={isResettingPlayers}
-                    variant="destructive"
-                    className="bg-red-600 hover:bg-red-700 text-white font-semibold text-xs h-9 flex-1 md:flex-none"
-                >
-                    {isResettingPlayers ? "Resetting..." : "Reset Logins"}
                 </Button>
             </div>
 
