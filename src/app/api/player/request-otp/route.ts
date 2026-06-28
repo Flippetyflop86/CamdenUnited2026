@@ -1,9 +1,24 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
 import { sendEmail } from "@/lib/email-service";
-import crypto from "crypto";
+
+function getAdminClient() {
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!key) {
+        console.warn("SUPABASE_SERVICE_ROLE_KEY environment variable is missing on the server. Falling back to Anon Key.");
+        return createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+    }
+    return createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        key
+    );
+}
 
 export async function POST(request: Request) {
+    const supabaseAdmin = getAdminClient();
     try {
         const body = await request.json();
         const { playerId, purpose } = body; // 'new_device' or 'reset_pin'
@@ -13,7 +28,7 @@ export async function POST(request: Request) {
         }
 
         // 1. Fetch player details
-        const { data: player, error: fetchError } = await supabase
+        const { data: player, error: fetchError } = await supabaseAdmin
             .from("players")
             .select("*")
             .eq("id", playerId)
@@ -32,7 +47,7 @@ export async function POST(request: Request) {
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
 
         // 3. Save OTP details to database
-        const { error: updateError } = await supabase
+        const { error: updateError } = await supabaseAdmin
             .from("players")
             .update({
                 verification_code: otpCode,

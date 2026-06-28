@@ -25,11 +25,17 @@ export default function PinDeviceResponderPage() {
     const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
 
     // PIN states
-    const [pinMode, setPinMode] = useState<"set" | "enter">("enter");
+    const [pinMode, setPinMode] = useState<"set" | "enter" | "forgot">("enter");
     const [enteredPin, setEnteredPin] = useState("");
     const [enteredEmail, setEnteredEmail] = useState("");
     const [pinError, setPinError] = useState("");
     const [isPinSubmitting, setIsPinSubmitting] = useState(false);
+
+    // Self-service PIN reset states
+    const [isOtpSent, setIsOtpSent] = useState(false);
+    const [otpValue, setOtpValue] = useState("");
+    const [newPinValue, setNewPinValue] = useState("");
+    const [otpLoading, setOtpLoading] = useState(false);
 
     // RSVP states
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -173,6 +179,86 @@ export default function PinDeviceResponderPage() {
         }
 
         await submitResponse(selectedPlayer, enteredPin, emailToSubmit);
+    };
+
+    const handleRequestOtp = async () => {
+        if (!selectedPlayer) return;
+        setOtpLoading(true);
+        setPinError("");
+
+        try {
+            const res = await fetch("/api/player/request-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    playerId: selectedPlayer.id,
+                    purpose: "reset_pin"
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setPinError(data.error || "Failed to send reset code.");
+                return;
+            }
+
+            setIsOtpSent(true);
+        } catch (err) {
+            setPinError("Connection error. Please try again.");
+        } finally {
+            setOtpLoading(false);
+        }
+    };
+
+    const handleVerifyOtpAndResetPin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedPlayer) return;
+
+        if (otpValue.length !== 6 || !/^\d+$/.test(otpValue)) {
+            setPinError("Verification code must be 6 digits.");
+            return;
+        }
+
+        if (newPinValue.length !== 6 || !/^\d+$/.test(newPinValue)) {
+            setPinError("New PIN must be exactly 6 digits.");
+            return;
+        }
+
+        setOtpLoading(true);
+        setPinError("");
+
+        try {
+            const res = await fetch("/api/player/verify-otp", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    playerId: selectedPlayer.id,
+                    otpCode: otpValue,
+                    purpose: "reset_pin",
+                    newPin: newPinValue
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                setPinError(data.error || "Verification failed.");
+                return;
+            }
+
+            // PIN has been reset and updated!
+            // Now proceed to mark them as checked in with the new PIN!
+            await submitResponse(selectedPlayer, newPinValue);
+
+            // Reset states
+            setIsOtpSent(false);
+            setOtpValue("");
+            setNewPinValue("");
+
+        } catch (err) {
+            setPinError("Connection error. Please try again.");
+        } finally {
+            setOtpLoading(false);
+        }
     };
 
     if (loading) {
@@ -441,6 +527,84 @@ export default function PinDeviceResponderPage() {
                                         {isPinSubmitting ? "Securing Name..." : "Lock Name & Check-in"}
                                     </Button>
                                 </div>
+                            ) : pinMode === "forgot" ? (
+                                <div className="space-y-4">
+                                    {!isOtpSent ? (
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-slate-300 leading-relaxed font-semibold">
+                                                We will send a 6-digit verification code to your registered email to reset your PIN.
+                                            </p>
+                                            <Button 
+                                                type="button"
+                                                disabled={otpLoading}
+                                                onClick={handleRequestOtp}
+                                                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11 animate-pulse-once"
+                                            >
+                                                {otpLoading ? "Sending Code..." : "Send Verification Code"}
+                                            </Button>
+                                            <div className="text-center pt-1">
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setPinMode("enter")}
+                                                    className="text-[10px] text-slate-450 hover:text-slate-200 underline font-semibold"
+                                                >
+                                                    Back to PIN Entry
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-slate-300 leading-relaxed font-semibold">
+                                                Please check your inbox. Enter the 6-digit code sent to your email along with your new PIN below.
+                                            </p>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-450 font-semibold">6-Digit Reset Code</label>
+                                                <Input
+                                                    type="text"
+                                                    pattern="\d*"
+                                                    inputMode="numeric"
+                                                    maxLength={6}
+                                                    required
+                                                    value={otpValue}
+                                                    onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, "").substring(0, 6))}
+                                                    placeholder="••••••"
+                                                    className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-455 font-semibold">Choose New 6-Digit PIN</label>
+                                                <Input
+                                                    type="password"
+                                                    pattern="\d*"
+                                                    inputMode="numeric"
+                                                    maxLength={6}
+                                                    required
+                                                    value={newPinValue}
+                                                    onChange={(e) => setNewPinValue(e.target.value.replace(/\D/g, "").substring(0, 6))}
+                                                    placeholder="••••••"
+                                                    className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
+                                                />
+                                            </div>
+                                            <Button 
+                                                type="button"
+                                                disabled={otpLoading || otpValue.length !== 6 || newPinValue.length !== 6}
+                                                onClick={handleVerifyOtpAndResetPin}
+                                                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
+                                            >
+                                                {otpLoading ? "Resetting PIN..." : "Confirm & Reset PIN"}
+                                            </Button>
+                                            <div className="text-center pt-1">
+                                                <button 
+                                                    type="button"
+                                                    onClick={() => setIsOtpSent(false)}
+                                                    className="text-[10px] text-slate-450 hover:text-slate-200 underline font-semibold"
+                                                >
+                                                    Resend Code
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             ) : (
                                 <div className="space-y-3">
                                     <p className="text-xs text-slate-300 leading-relaxed font-semibold">
@@ -468,10 +632,17 @@ export default function PinDeviceResponderPage() {
                                         {isPinSubmitting ? "Verifying..." : "Verify & Check-in"}
                                     </Button>
                                     <div className="text-center pt-1.5">
-                                        <p className="text-[10px] text-slate-500 flex items-center justify-center gap-1 font-semibold">
-                                            <HelpCircle className="h-3 w-3" />
-                                            <span>Forgot PIN? Ask your coach to reset it.</span>
-                                        </p>
+                                        <button 
+                                            type="button"
+                                            onClick={() => {
+                                                setPinMode("forgot");
+                                                setIsOtpSent(false);
+                                                setPinError("");
+                                            }}
+                                            className="text-[10px] text-slate-450 hover:text-slate-200 underline font-semibold"
+                                        >
+                                            Forgot PIN? Reset via Email OTP
+                                        </button>
                                     </div>
                                 </div>
                             )}
