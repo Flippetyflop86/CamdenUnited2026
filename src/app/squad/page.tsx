@@ -562,52 +562,37 @@ export default function SquadPage() {
                 </div>
             </div>
 
-            {/* ClubFlow Adoption & CSV Import Row */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-                <div className="space-y-1">
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ClubFlow Adoption</p>
-                    <p className="text-sm font-semibold text-slate-850">
-                        {players.filter(p => (p as any).status === "Registered").length} / {players.length} Players Registered
-                    </p>
-                    {/* Visual Progress Bar */}
-                    <div className="w-48 h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1">
-                        <div 
-                            className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
-                            style={{ width: `${players.length > 0 ? (players.filter(p => (p as any).status === "Registered").length / players.length) * 100 : 0}%` }}
-                        />
-                    </div>
-                </div>
-                <div className="flex flex-wrap gap-2.5 w-full md:w-auto">
-                    <input 
-                        type="file" 
-                        ref={fileInputRef} 
-                        onChange={handleCSVImport} 
-                        accept=".csv" 
-                        className="hidden" 
-                    />
-                    <Button 
-                        variant="outline" 
-                        onClick={() => fileInputRef.current?.click()}
-                        className="text-xs font-semibold h-9 flex-1 md:flex-none"
-                    >
-                        Import Squad CSV
-                    </Button>
-                    <Button 
-                        onClick={handleBulkInvite}
-                        disabled={isBulkInviting}
-                        className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs h-9 flex-1 md:flex-none"
-                    >
-                        {isBulkInviting ? "Inviting..." : "Invite Remaining Players"}
-                    </Button>
-                    <Button 
-                        onClick={handleResetAllPlayers}
-                        disabled={isResettingPlayers}
-                        variant="destructive"
-                        className="bg-red-600 hover:bg-red-700 text-white font-semibold text-xs h-9 flex-1 md:flex-none"
-                    >
-                        {isResettingPlayers ? "Resetting..." : "Reset Logins"}
-                    </Button>
-                </div>
+            {/* CSV Import & Invite Actions Row */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex justify-end gap-2.5 flex-wrap">
+                <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleCSVImport} 
+                    accept=".csv" 
+                    className="hidden" 
+                />
+                <Button 
+                    variant="outline" 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs font-semibold h-9 flex-1 md:flex-none"
+                >
+                    Import Squad CSV
+                </Button>
+                <Button 
+                    onClick={handleBulkInvite}
+                    disabled={isBulkInviting}
+                    className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs h-9 flex-1 md:flex-none"
+                >
+                    {isBulkInviting ? "Inviting..." : "Invite Remaining Players"}
+                </Button>
+                <Button 
+                    onClick={handleResetAllPlayers}
+                    disabled={isResettingPlayers}
+                    variant="destructive"
+                    className="bg-red-600 hover:bg-red-700 text-white font-semibold text-xs h-9 flex-1 md:flex-none"
+                >
+                    {isResettingPlayers ? "Resetting..." : "Reset Logins"}
+                </Button>
             </div>
 
             <div className="flex space-x-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">

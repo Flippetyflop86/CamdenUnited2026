@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { sendEmail } from "@/lib/email-service";
 
 // Lazily initialize server-side supabase admin client to prevent build-time evaluation errors
 function getAdminClient() {
@@ -170,6 +171,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: "Missing required parameters." }, { status: 400 });
         }
 
+        let eventDetails: any = null;
+
         // 1. Fetch player
         const { data: player, error: playerError } = await supabaseAdmin
             .from("players")
@@ -191,9 +194,10 @@ export async function POST(request: Request) {
         if (eventType === "match") {
             const { data: match, error: fetchMatchErr } = await supabaseAdmin
                 .from("matches")
-                .select("notes")
+                .select("*")
                 .eq("id", eventId)
                 .single();
+            eventDetails = match;
 
             if (fetchMatchErr || !match) {
                 return NextResponse.json({ success: false, error: "Match event not found." }, { status: 404 });
@@ -232,9 +236,10 @@ export async function POST(request: Request) {
         } else if (eventType === "training") {
             const { data: session, error: fetchSessionErr } = await supabaseAdmin
                 .from("training_sessions")
-                .select("attendance")
+                .select("*")
                 .eq("id", eventId)
                 .single();
+            eventDetails = session;
 
             if (fetchSessionErr || !session) {
                 return NextResponse.json({ success: false, error: "Training session not found." }, { status: 404 });
@@ -267,6 +272,36 @@ export async function POST(request: Request) {
                 .eq("id", eventId);
 
             if (updateSessionErr) throw updateSessionErr;
+        }
+
+        // 4. Send email notification to managers asynchronously
+        try {
+            const { data: staff } = await supabaseAdmin
+                .from("club_members")
+                .select("*, app_users:user_id(username, name)")
+                .eq("club_id", player.club_id);
+
+            const managerEmails = (staff || [])
+                .map((s: any) => s.app_users?.username)
+                .filter(email => !!email);
+
+            if (eventDetails && managerEmails.length > 0) {
+                const playerName = `${player.first_name} ${player.last_name}`;
+                const eventName = eventType === "match" ? `Match vs ${eventDetails.opponent || "Opposition"}` : `Training: ${eventDetails.topic || "Squad Practice"}`;
+                
+                const mailSubject = `⚽ RSVP Update: ${playerName} is ${status}`;
+                const mailBody = `Hi Coach,\n\n${playerName} has updated their availability for the upcoming session:\n\n📅 Event: ${eventName}\n📅 Date: ${eventDetails.date}\n📍 Location: ${eventDetails.location || eventDetails.opponent || "TBD"}\n🙋 Attendance Status: ${status}\n\nLog in to your ClubFlow dashboard to view the full squad register.\n\nBest regards,\nClubFlow Team`;
+
+                for (const email of managerEmails) {
+                    await sendEmail({
+                        to: email,
+                        subject: mailSubject,
+                        text: mailBody
+                    });
+                }
+            }
+        } catch (emailErr) {
+            console.error("Failed to send manager RSVP notification email:", emailErr);
         }
 
         return NextResponse.json({ success: true, message: "Response saved successfully." });
