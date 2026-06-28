@@ -413,34 +413,34 @@ export default function MatchesPage() {
         if (!activeShareMatch) return "";
 
         let parts: string[] = [];
-        parts.push("⚽ MATCH AVAILABILITY");
+        parts.push("\u26BD MATCH AVAILABILITY");
 
         if (includeOpponent) {
             const homeTeam = activeShareMatch.isHome ? settings.name : activeShareMatch.opponent;
             const awayTeam = activeShareMatch.isHome ? activeShareMatch.opponent : settings.name;
-            parts.push(`🏆 ${homeTeam} vs ${awayTeam}`);
+            parts.push(`\ud83c\udfc6 ${homeTeam} vs ${awayTeam}`);
         }
 
         let details: string[] = [];
         const dateFormatted = formatMatchdayDate(activeShareMatch.date);
-        details.push(`📅 ${dateFormatted}`);
+        details.push(`\ud83d\udcc5 ${dateFormatted}`);
 
         if (includeKickoff) {
-            details.push(`🕒 Kick Off: ${activeShareMatch.time}`);
+            details.push(`\ud83d\udd52 Kick Off: ${activeShareMatch.time}`);
         }
 
         if (includeMeetTime && meetTime) {
             const locStr = meetLocation ? ` @ ${meetLocation}` : "";
-            details.push(`⏰ Meet: ${meetTime}${locStr}`);
+            details.push(`\u23F0 Meet: ${meetTime}${locStr}`);
         }
 
         if (includeVenue && activeShareMatch.location) {
             const venueType = activeShareMatch.isHome ? "Home" : "Away";
-            details.push(`🏟️ Venue (${venueType}): ${activeShareMatch.location}`);
+            details.push(`\ud83c\udfdf Venue (${venueType}): ${activeShareMatch.location}`);
         }
 
         if (includeCompetition && activeShareMatch.competition) {
-            details.push(`🏆 Competition: ${activeShareMatch.competition}`);
+            details.push(`\ud83c\udfc6 Competition: ${activeShareMatch.competition}`);
         }
 
         parts.push(details.join("\n"));
@@ -450,7 +450,7 @@ export default function MatchesPage() {
         }
 
         const checkinLink = `${window.location.origin}/respond/${activeShareMatch.event_token || activeShareMatch.id}`;
-        parts.push(`🔗 Log availability here:\n${checkinLink}`);
+        parts.push(`\ud83d\udd17 Log availability here:\n${checkinLink}`);
 
         return parts.join("\n\n");
     };

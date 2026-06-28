@@ -401,7 +401,7 @@ export default function TrainingSessionPage() {
                             onClick={() => {
                                 const link = `${window.location.origin}/respond/${session.event_token || session.id}`;
                                 const dateStr = formatFriendlyDate(session.date);
-                                const text = `⚽ *Camden United Training Invite*\n📅 *Date:* ${dateStr}\n⏰ *Time:* ${session.time}\n📍 *Location:* ${session.location}\n\nPlayers, please log your training availability here:\n🔗 ${link}`;
+                                const text = `\u26BD *Camden United Training Invite*\n\ud83d\udcc5 *Date:* ${dateStr}\n\u23F0 *Time:* ${session.time}\n\ud83d\udccd *Location:* ${session.location}\n\nPlayers, please log your training availability here:\n\ud83d\udd17 ${link}`;
                                 window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
                             }}
                         >

@@ -310,19 +310,19 @@ export default function TrainingPage() {
         const minutesStr = minutes < 10 ? '0' + minutes : minutes;
         const formatted = `${hours}:${minutesStr} ${ampm}`;
 
-        let emoji = "🕒";
-        if (hours === 7) emoji = minutes >= 30 ? "🕢" : "🕖";
-        else if (hours === 8) emoji = minutes >= 30 ? "🕣" : "🕗";
-        else if (hours === 9) emoji = minutes >= 30 ? "🕤" : "🕘";
-        else if (hours === 10) emoji = minutes >= 30 ? "🕥" : "🕙";
-        else if (hours === 11) emoji = minutes >= 30 ? "🕦" : "🕚";
-        else if (hours === 12) emoji = minutes >= 30 ? "🕧" : "🕛";
-        else if (hours === 1) emoji = minutes >= 30 ? "🕜" : "🕐";
-        else if (hours === 2) emoji = minutes >= 30 ? "🕝" : "🕑";
-        else if (hours === 3) emoji = minutes >= 30 ? "🕞" : "🕒";
-        else if (hours === 4) emoji = minutes >= 30 ? "🕟" : "🕓";
-        else if (hours === 5) emoji = minutes >= 30 ? "🕠" : "🕔";
-        else if (hours === 6) emoji = minutes >= 30 ? "🕡" : "🕕";
+        let emoji = "\ud83d\udd52";
+        if (hours === 7) emoji = minutes >= 30 ? "\ud83d\udd62" : "\ud83d\udd56";
+        else if (hours === 8) emoji = minutes >= 30 ? "\ud83d\udd63" : "\ud83d\udd57";
+        else if (hours === 9) emoji = minutes >= 30 ? "\ud83d\udd64" : "\ud83d\udd58";
+        else if (hours === 10) emoji = minutes >= 30 ? "\ud83d\udd59" : "\ud83d\udd59";
+        else if (hours === 11) emoji = minutes >= 30 ? "\ud83d\udd66" : "\ud83d\udd5a";
+        else if (hours === 12) emoji = minutes >= 30 ? "\ud83d\udd67" : "\ud83d\udd5b";
+        else if (hours === 1) emoji = minutes >= 30 ? "\ud83d\udd5c" : "\ud83d\udd50";
+        else if (hours === 2) emoji = minutes >= 30 ? "\ud83d\udd5d" : "\ud83d\udd51";
+        else if (hours === 3) emoji = minutes >= 30 ? "\ud83d\udd5e" : "\ud83d\udd52";
+        else if (hours === 4) emoji = minutes >= 30 ? "\ud83d\udd5f" : "\ud83d\udd53";
+        else if (hours === 5) emoji = minutes >= 30 ? "\ud83d\udd60" : "\ud83d\udd54";
+        else if (hours === 6) emoji = minutes >= 30 ? "\ud83d\udd61" : "\ud83d\udd55";
 
         return { time: formatted, emoji };
     };
@@ -340,21 +340,21 @@ export default function TrainingPage() {
         if (!activeShareSession) return "";
 
         let parts: string[] = [];
-        parts.push("⚽ TRAINING AVAILABILITY");
+        parts.push("\u26BD TRAINING AVAILABILITY");
 
         let details: string[] = [];
         const dateFormatted = formatTrainingDate(activeShareSession.date);
-        details.push(`📅 ${dateFormatted}`);
+        details.push(`\ud83d\udcc5 ${dateFormatted}`);
 
         const timeInfo = formatTime12h(activeShareSession.time);
         details.push(`${timeInfo.emoji} ${timeInfo.time}`);
 
         if (includeVenue && activeShareSession.location) {
-            details.push(`📍 ${activeShareSession.location}`);
+            details.push(`\ud83d\udccd ${activeShareSession.location}`);
         }
 
         if (includeTopic && activeShareSession.topic) {
-            details.push(`📋 Topic: ${activeShareSession.topic}`);
+            details.push(`\ud83d\udccb Topic: ${activeShareSession.topic}`);
         }
 
         parts.push(details.join("\n"));
