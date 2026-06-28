@@ -4,9 +4,13 @@ import crypto from "crypto";
 
 // Lazily initialize server-side supabase admin client to prevent build-time evaluation errors
 function getAdminClient() {
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!key) {
+        throw new Error("SUPABASE_SERVICE_ROLE_KEY environment variable is missing on the server. Please add it to your Vercel Project Settings.");
+    }
     return createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!
+        key
     );
 }
 
@@ -140,7 +144,7 @@ export async function GET(request: Request) {
 
     } catch (err: any) {
         console.error("GET respond error:", err);
-        return NextResponse.json({ success: false, error: "Internal server error" }, { status: 500 });
+        return NextResponse.json({ success: false, error: err.message || "Internal server error" }, { status: 500 });
     }
 }
 
