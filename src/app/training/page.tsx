@@ -515,7 +515,11 @@ export default function TrainingPage() {
             {activeTab === 'sessions' ? (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {upcomingSessions.map((session) => (
-                        <Card key={session.id} className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-red-600 group relative">
+                        <Card 
+                            key={session.id} 
+                            onClick={() => window.location.href = `/training/${session.id}`}
+                            className="hover:shadow-md transition-shadow cursor-pointer border-l-4 border-l-red-600 group relative"
+                        >
                             <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-indigo-650" onClick={(e) => handleRepeatNextWeek(session, e)} title="Repeat Next Week">
                                     <Repeat className="h-4 w-4" />
