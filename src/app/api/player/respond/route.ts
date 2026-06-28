@@ -153,7 +153,7 @@ export async function POST(request: Request) {
     const supabaseAdmin = getAdminClient();
     try {
         const body = await request.json();
-        const { playerId, eventId, eventType, status, pin } = body;
+        const { playerId, eventId, eventType, status, pin, email } = body;
 
         if (!playerId || !eventId || !eventType || !status || !pin) {
             return NextResponse.json({ success: false, error: "Missing required parameters." }, { status: 400 });
@@ -178,17 +178,21 @@ export async function POST(request: Request) {
 
         // 2. Handle PIN registration (if not set yet) or PIN verification
         if (!player.pin_hash) {
-            // Save new PIN
+            if (!email) {
+                return NextResponse.json({ success: false, error: "Email is required for registration." }, { status: 400 });
+            }
+            // Save new PIN and Email
             const { error: pinUpdateErr } = await supabaseAdmin
                 .from("players")
                 .update({
+                    email: email,
                     pin_hash: hashedInput,
                     status: "Registered"
                 })
                 .eq("id", playerId);
 
             if (pinUpdateErr) {
-                return NextResponse.json({ success: false, error: "Failed to set PIN." }, { status: 500 });
+                return NextResponse.json({ success: false, error: "Failed to set PIN and Email." }, { status: 500 });
             }
         } else {
             // Verify existing PIN

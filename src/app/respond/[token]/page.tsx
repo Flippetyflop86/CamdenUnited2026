@@ -27,6 +27,7 @@ export default function PinDeviceResponderPage() {
     // PIN states
     const [pinMode, setPinMode] = useState<"set" | "enter">("enter");
     const [enteredPin, setEnteredPin] = useState("");
+    const [enteredEmail, setEnteredEmail] = useState("");
     const [pinError, setPinError] = useState("");
     const [isPinSubmitting, setIsPinSubmitting] = useState(false);
 
@@ -87,7 +88,7 @@ export default function PinDeviceResponderPage() {
         }
     };
 
-    const submitResponse = async (player: any, pinCode: string) => {
+    const submitResponse = async (player: any, pinCode: string, emailStr?: string) => {
         setIsSubmitting(true);
         setPinError("");
         setIsPinSubmitting(true);
@@ -121,7 +122,8 @@ export default function PinDeviceResponderPage() {
                     eventId: event.id,
                     eventType,
                     status: nextStatus,
-                    pin: pinCode
+                    pin: pinCode,
+                    email: emailStr
                 })
             });
 
@@ -164,7 +166,13 @@ export default function PinDeviceResponderPage() {
             return;
         }
 
-        await submitResponse(selectedPlayer, enteredPin);
+        const emailToSubmit = pinMode === "set" ? enteredEmail : undefined;
+        if (pinMode === "set" && !enteredEmail.trim()) {
+            setPinError("Email address is required.");
+            return;
+        }
+
+        await submitResponse(selectedPlayer, enteredPin, emailToSubmit);
     };
 
     if (loading) {
@@ -398,8 +406,19 @@ export default function PinDeviceResponderPage() {
                             {pinMode === "set" ? (
                                 <div className="space-y-3">
                                     <p className="text-xs text-slate-355 leading-relaxed font-semibold">
-                                         To prevent others from checking in under your name, choose a 6-digit PIN to lock your slot on this device.
+                                        To prevent others from checking in under your name, enter your email and choose a 6-digit PIN to lock your slot on this device.
                                     </p>
+                                    <div className="space-y-1.5 pt-1">
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Email Address</label>
+                                        <Input
+                                            type="email"
+                                            required
+                                            value={enteredEmail}
+                                            onChange={(e) => setEnteredEmail(e.target.value)}
+                                            placeholder="you@example.com"
+                                            className="bg-slate-950 border-slate-800 text-white text-sm h-11 focus-visible:ring-red-500"
+                                        />
+                                    </div>
                                     <div className="space-y-1.5">
                                         <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choose 6-Digit PIN</label>
                                         <Input
@@ -416,7 +435,7 @@ export default function PinDeviceResponderPage() {
                                     </div>
                                     <Button 
                                         type="submit"
-                                        disabled={isPinSubmitting || enteredPin.length !== 6}
+                                        disabled={isPinSubmitting || enteredPin.length !== 6 || !enteredEmail}
                                         className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
                                     >
                                         {isPinSubmitting ? "Securing Name..." : "Lock Name & Check-in"}
