@@ -46,12 +46,21 @@ export default function SecureEventResponderPage() {
                 setSessionUser(session?.user || null);
 
                 // 2. Fetch event by token
-                // Check matches
-                const { data: matchData } = await supabase
+                // Check matches by event_token
+                let { data: matchData } = await supabase
                     .from("matches")
                     .select("*")
                     .eq("event_token", token)
                     .single();
+
+                if (!matchData && token && token.length === 36) {
+                    const { data: matchById } = await supabase
+                        .from("matches")
+                        .select("*")
+                        .eq("id", token)
+                        .single();
+                    if (matchById) matchData = matchById;
+                }
 
                 let resolvedEvent = null;
                 let resolvedType: "match" | "training" | null = null;
@@ -60,11 +69,20 @@ export default function SecureEventResponderPage() {
                     resolvedEvent = matchData;
                     resolvedType = "match";
                 } else {
-                    const { data: sessionData } = await supabase
+                    let { data: sessionData } = await supabase
                         .from("training_sessions")
                         .select("*")
                         .eq("event_token", token)
                         .single();
+
+                    if (!sessionData && token && token.length === 36) {
+                        const { data: sessionById } = await supabase
+                            .from("training_sessions")
+                            .select("*")
+                            .eq("id", token)
+                            .single();
+                        if (sessionById) sessionData = sessionById;
+                    }
 
                     if (sessionData) {
                         resolvedEvent = sessionData;
