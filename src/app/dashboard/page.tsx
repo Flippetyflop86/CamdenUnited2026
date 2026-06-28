@@ -152,7 +152,7 @@ export default function DashboardPage() {
     };
 
     const fetchSquad = async () => {
-        const { data } = await supabase.from('players').select('id, first_name, last_name, position, squad, image_url, date_of_birth');
+        const { data } = await supabase.from('players').select('id, first_name, last_name, position, squad, image_url, date_of_birth, appearances, goals, assists');
         if (data) {
             const mapped: Player[] = data.map((p: any) => ({
                 id: p.id,
@@ -167,9 +167,9 @@ export default function DashboardPage() {
                 medicalStatus: "Available",
                 contractExpiry: "",
                 availability: true,
-                appearances: 0,
-                goals: 0,
-                assists: 0
+                appearances: p.appearances || 0,
+                goals: p.goals || 0,
+                assists: p.assists || 0
             }));
             setPlayers(mapped);
 
@@ -825,6 +825,96 @@ export default function DashboardPage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* Player Stats Leaderboard */}
+            <div className="grid gap-6 md:grid-cols-3 relative z-10">
+                {/* Top Goalscorers */}
+                <Card className="bg-white/70 backdrop-blur-md border-white/40 shadow-sm border">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-505 flex items-center gap-2">
+                            <span>⚽</span> Top Goalscorers
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            {players
+                                .filter(p => p.goals > 0)
+                                .sort((a, b) => b.goals - a.goals)
+                                .slice(0, 5)
+                                .map((player, i) => (
+                                    <div key={player.id} className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-400 w-4">{i + 1}.</span>
+                                            <span className="font-semibold text-slate-800">{player.firstName} {player.lastName}</span>
+                                        </div>
+                                        <span className="font-black text-slate-900 bg-red-50 text-red-600 px-2 py-0.5 rounded border border-red-100">{player.goals} goal{player.goals !== 1 ? 's' : ''}</span>
+                                    </div>
+                                ))}
+                            {players.filter(p => p.goals > 0).length === 0 && (
+                                <p className="text-xs text-slate-400 italic text-center py-2">No goals scored yet.</p>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Top Playmakers */}
+                <Card className="bg-white/70 backdrop-blur-md border-white/40 shadow-sm border">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-505 flex items-center gap-2">
+                            <span>🅰️</span> Top Playmakers (Assists)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            {players
+                                .filter(p => p.assists > 0)
+                                .sort((a, b) => b.assists - a.assists)
+                                .slice(0, 5)
+                                .map((player, i) => (
+                                    <div key={player.id} className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-400 w-4">{i + 1}.</span>
+                                            <span className="font-semibold text-slate-800">{player.firstName} {player.lastName}</span>
+                                        </div>
+                                        <span className="font-black text-slate-900 bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100">{player.assists} assist{player.assists !== 1 ? 's' : ''}</span>
+                                    </div>
+                                ))}
+                            {players.filter(p => p.assists > 0).length === 0 && (
+                                <p className="text-xs text-slate-400 italic text-center py-2">No assists logged yet.</p>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Most Appearances */}
+                <Card className="bg-white/70 backdrop-blur-md border-white/40 shadow-sm border">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-slate-505 flex items-center gap-2">
+                            <span>🏃</span> Most Appearances
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-3">
+                            {players
+                                .filter(p => p.appearances > 0)
+                                .sort((a, b) => b.appearances - a.appearances)
+                                .slice(0, 5)
+                                .map((player, i) => (
+                                    <div key={player.id} className="flex items-center justify-between text-xs">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-slate-400 w-4">{i + 1}.</span>
+                                            <span className="font-semibold text-slate-800">{player.firstName} {player.lastName}</span>
+                                        </div>
+                                        <span className="font-black text-slate-900 bg-emerald-50 text-emerald-650 px-2 py-0.5 rounded border border-emerald-100">{player.appearances} match{player.appearances !== 1 ? 'es' : ''}</span>
+                                    </div>
+                                ))}
+                            {players.filter(p => p.appearances > 0).length === 0 && (
+                                <p className="text-xs text-slate-400 italic text-center py-2">No appearances logged yet.</p>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 }
