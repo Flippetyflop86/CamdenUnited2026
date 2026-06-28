@@ -88,7 +88,7 @@ export default function SquadPage() {
     };
 
     const handleBulkInvite = async () => {
-        const pendingPlayers = players.filter(p => p.status === "Pending Invitation" || !p.status);
+        const pendingPlayers = players.filter(p => p.status === "Pending Invitation" || p.status === "Pending Activation" || !p.status || p.status === "Pending");
         if (pendingPlayers.length === 0) {
             alert("No players are pending invitations!");
             return;
