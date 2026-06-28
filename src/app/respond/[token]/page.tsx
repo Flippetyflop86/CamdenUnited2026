@@ -6,10 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { CalendarDays, Clock, MapPin, AlertCircle, RefreshCw, Lock, KeyRound, UserCheck, HelpCircle } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { CalendarDays, Clock, MapPin, AlertCircle, RefreshCw, KeyRound, CheckCircle, UserCheck } from "lucide-react";
 
-export default function PinDeviceResponderPage() {
+export default function SessionCodeResponderPage() {
     const params = useParams();
     const token = Array.isArray(params?.token) ? params.token[0] : params?.token;
 
@@ -20,25 +20,14 @@ export default function PinDeviceResponderPage() {
     const [players, setPlayers] = useState<any[]>([]);
     const [error, setError] = useState<string | null>(null);
 
-    // Selected player for verification
+    // Verification modal states
     const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
-    const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [enteredCode, setEnteredCode] = useState("");
+    const [codeError, setCodeError] = useState("");
+    const [isVerifying, setIsVerifying] = useState(false);
 
-    // PIN states
-    const [pinMode, setPinMode] = useState<"set" | "enter" | "forgot">("enter");
-    const [enteredPin, setEnteredPin] = useState("");
-    const [enteredEmail, setEnteredEmail] = useState("");
-    const [pinError, setPinError] = useState("");
-    const [isPinSubmitting, setIsPinSubmitting] = useState(false);
-
-    // Self-service PIN reset states
-    const [isOtpSent, setIsOtpSent] = useState(false);
-    const [otpValue, setOtpValue] = useState("");
-    const [newPinValue, setNewPinValue] = useState("");
-    const [otpLoading, setOtpLoading] = useState(false);
-
-    // RSVP states
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    // RSVP success indicator
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
     const loadEventAndSquad = async () => {
@@ -67,40 +56,36 @@ export default function PinDeviceResponderPage() {
         }
     }, [token]);
 
-    const isVerified = (playerId: string) => {
-        if (typeof window === "undefined") return false;
-        return localStorage.getItem(`cf_verified_player_${playerId}`) === "true";
+    const isVerifiedForSession = () => {
+        if (typeof window === "undefined" || !event) return false;
+        return localStorage.getItem(`cf_session_verified_${event.id}`) === "true";
+    };
+
+    const getSavedCode = () => {
+        if (typeof window === "undefined" || !event) return "";
+        return localStorage.getItem(`cf_session_code_${event.id}`) || "";
     };
 
     const handlePlayerClick = (player: any) => {
         setSelectedPlayer(player);
         setSuccessMessage(null);
-        setEnteredPin("");
-        setPinError("");
+        setCodeError("");
 
-        if (player.has_pin) {
-            if (isVerified(player.id)) {
-                // If device already verified, toggle RSVP directly
-                // (We'll prompt for PIN if the backend rejects verification, but normally it's cached)
-                setPinMode("enter");
-                setIsVerificationModalOpen(true);
-            } else {
-                setPinMode("enter");
-                setIsVerificationModalOpen(true);
-            }
+        if (isVerifiedForSession()) {
+            // Already verified this session in this browser, toggle instantly
+            submitResponse(player, getSavedCode());
         } else {
-            setPinMode("set");
-            setIsVerificationModalOpen(true);
+            setEnteredCode("");
+            setIsModalOpen(true);
         }
     };
 
-    const submitResponse = async (player: any, pinCode: string, emailStr?: string) => {
-        setIsSubmitting(true);
-        setPinError("");
-        setIsPinSubmitting(true);
+    const submitResponse = async (player: any, codeVal: string) => {
+        setIsVerifying(true);
+        setCodeError("");
 
         try {
-            // Find current status to toggle it
+            // Determine current RSVP status to toggle it
             let currentStatus = "Unavailable";
             if (eventType === "match") {
                 const currentNotes = event.notes || "";
@@ -128,26 +113,26 @@ export default function PinDeviceResponderPage() {
                     eventId: event.id,
                     eventType,
                     status: nextStatus,
-                    pin: pinCode,
-                    email: emailStr
+                    code: codeVal
                 })
             });
 
             const data = await res.json();
 
             if (!res.ok || !data.success) {
-                setPinError(data.error || "Failed to submit response.");
-                setIsPinSubmitting(false);
-                setIsSubmitting(false);
+                setCodeError(data.error || "Incorrect code. Please check the WhatsApp invite.");
+                setIsVerifying(false);
                 return;
             }
 
-            // Successfully set/verified
-            localStorage.setItem(`cf_verified_player_${player.id}`, "true");
-            setIsVerificationModalOpen(false);
+            // Save verification locally
+            localStorage.setItem(`cf_session_verified_${event.id}`, "true");
+            localStorage.setItem(`cf_session_code_${event.id}`, codeVal);
+
+            setIsModalOpen(false);
             setSuccessMessage(`${player.first_name} marked as ${nextStatus}!`);
 
-            // Reload data in background
+            // Reload event rosters in background
             await loadEventAndSquad();
 
             setTimeout(() => {
@@ -156,109 +141,16 @@ export default function PinDeviceResponderPage() {
             }, 2500);
 
         } catch (err: any) {
-            setPinError("Connection error. Please try again.");
+            setCodeError("Connection error. Please try again.");
         } finally {
-            setIsPinSubmitting(false);
-            setIsSubmitting(false);
+            setIsVerifying(false);
         }
     };
 
-    const handlePinSubmit = async (e: React.FormEvent) => {
+    const handleCodeSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedPlayer) return;
-
-        if (enteredPin.length !== 6 || !/^\d+$/.test(enteredPin)) {
-            setPinError("PIN must be exactly 6 digits.");
-            return;
-        }
-
-        const emailToSubmit = pinMode === "set" ? enteredEmail : undefined;
-        if (pinMode === "set" && !enteredEmail.trim()) {
-            setPinError("Email address is required.");
-            return;
-        }
-
-        await submitResponse(selectedPlayer, enteredPin, emailToSubmit);
-    };
-
-    const handleRequestOtp = async () => {
-        if (!selectedPlayer) return;
-        setOtpLoading(true);
-        setPinError("");
-
-        try {
-            const res = await fetch("/api/player/request-otp", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    playerId: selectedPlayer.id,
-                    purpose: "reset_pin"
-                })
-            });
-
-            const data = await res.json();
-            if (!res.ok || !data.success) {
-                setPinError(data.error || "Failed to send reset code.");
-                return;
-            }
-
-            setIsOtpSent(true);
-        } catch (err) {
-            setPinError("Connection error. Please try again.");
-        } finally {
-            setOtpLoading(false);
-        }
-    };
-
-    const handleVerifyOtpAndResetPin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedPlayer) return;
-
-        if (otpValue.length !== 6 || !/^\d+$/.test(otpValue)) {
-            setPinError("Verification code must be 6 digits.");
-            return;
-        }
-
-        if (newPinValue.length !== 6 || !/^\d+$/.test(newPinValue)) {
-            setPinError("New PIN must be exactly 6 digits.");
-            return;
-        }
-
-        setOtpLoading(true);
-        setPinError("");
-
-        try {
-            const res = await fetch("/api/player/verify-otp", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    playerId: selectedPlayer.id,
-                    otpCode: otpValue,
-                    purpose: "reset_pin",
-                    newPin: newPinValue
-                })
-            });
-
-            const data = await res.json();
-            if (!res.ok || !data.success) {
-                setPinError(data.error || "Verification failed.");
-                return;
-            }
-
-            // PIN has been reset and updated!
-            // Now proceed to mark them as checked in with the new PIN!
-            await submitResponse(selectedPlayer, newPinValue);
-
-            // Reset states
-            setIsOtpSent(false);
-            setOtpValue("");
-            setNewPinValue("");
-
-        } catch (err) {
-            setPinError("Connection error. Please try again.");
-        } finally {
-            setOtpLoading(false);
-        }
+        if (!selectedPlayer || !enteredCode) return;
+        await submitResponse(selectedPlayer, enteredCode);
     };
 
     if (loading) {
@@ -266,7 +158,7 @@ export default function PinDeviceResponderPage() {
             <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
                 <div className="flex flex-col items-center gap-3">
                     <RefreshCw className="h-10 w-10 text-red-655 animate-spin" />
-                    <p className="text-slate-400 text-sm font-medium">Resolving secure access...</p>
+                    <p className="text-slate-400 text-sm font-medium">Resolving session details...</p>
                 </div>
             </div>
         );
@@ -280,7 +172,7 @@ export default function PinDeviceResponderPage() {
                         <AlertCircle className="h-6 w-6" />
                     </div>
                     <h3 className="font-bold text-white text-lg">Secure Link Expired</h3>
-                    <p className="text-xs text-slate-450 leading-relaxed">{error}</p>
+                    <p className="text-xs text-slate-400 leading-relaxed">{error}</p>
                 </Card>
             </div>
         );
@@ -300,32 +192,32 @@ export default function PinDeviceResponderPage() {
                         </div>
                         <div>
                             <h1 className="font-bold text-white tracking-tight">Camden United</h1>
-                            <p className="text-xs text-slate-400">RSVP availability portal</p>
+                            <p className="text-xs text-slate-400 font-medium">RSVP Portal</p>
                         </div>
                     </div>
                     <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-950/20 px-2.5 py-1">
-                        1-Tap Check-In
+                        Session Code Mode
                     </Badge>
                 </div>
             </div>
 
             <div className="max-w-4xl mx-auto px-4 space-y-6">
                 {/* Event Details Card */}
-                <Card className="bg-slate-900 border-slate-800 shadow-xl overflow-hidden relative border-l-4 border-l-red-650">
+                <Card className="bg-slate-900 border-slate-800 shadow-xl overflow-hidden border-l-4 border-l-red-650">
                     <CardHeader className="pb-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                             <Badge className="bg-red-950/50 text-red-450 border border-red-900/50 uppercase tracking-wider text-[10px]">
                                 {event.squad || "Squad"} Event
                             </Badge>
-                            <span className="text-xs text-slate-450 flex items-center gap-1 font-semibold">
-                                <Clock className="h-3.5 w-3.5" /> Kick Off: {event.time}
+                            <span className="text-xs text-slate-400 flex items-center gap-1 font-semibold">
+                                <Clock className="h-3.5 w-3.5" /> Start: {event.time}
                             </span>
                         </div>
                         <h2 className="text-xl font-black text-white mt-3">{eventName}</h2>
                         <CardDescription className="text-slate-400 leading-relaxed mt-1">
-                            Please confirm whether you are attending the session on {formattedDate} at {event.time} at {event.location || "TBD"}.
+                            Please confirm whether you are attending the session on {formattedDate}. 
                             <span className="block mt-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                💡 Select your name below to instantly toggle your availability.
+                                💡 Select your name below and enter the session code shared in your WhatsApp message.
                             </span>
                         </CardDescription>
                     </CardHeader>
@@ -333,15 +225,15 @@ export default function PinDeviceResponderPage() {
                         <div className="flex items-center gap-3 pt-3">
                             <CalendarDays className="h-5 w-5 text-red-500" />
                             <div>
-                                <p className="text-xs text-slate-550 uppercase tracking-wider font-semibold">Date</p>
+                                <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Date</p>
                                 <p className="font-medium text-white">{formattedDate}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3 pt-3">
                             <MapPin className="h-5 w-5 text-red-500" />
                             <div>
-                                <p className="text-xs text-slate-550 uppercase tracking-wider font-semibold">Location</p>
-                                <p className="font-medium text-white">{event.location || "TBD"}</p>
+                                <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Location</p>
+                                <p className="font-medium text-white">{event.location || event.opponent || "TBD"}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -353,16 +245,13 @@ export default function PinDeviceResponderPage() {
                         <CardContent className="p-4 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
                                 <Avatar className="h-10 w-10 border border-slate-700">
-                                    <AvatarImage src={selectedPlayer.image_url} />
-                                    <AvatarFallback className="bg-slate-800 text-white font-bold">
+                                    <AvatarFallback className="bg-slate-855 text-white font-bold text-sm">
                                         {selectedPlayer.first_name[0]}{selectedPlayer.last_name[0]}
                                     </AvatarFallback>
                                 </Avatar>
                                 <div>
                                     <h3 className="text-base font-bold text-white">{selectedPlayer.first_name} {selectedPlayer.last_name}</h3>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                        <span className="text-xs text-slate-400 font-semibold uppercase">{selectedPlayer.position} • Verified Device ✓</span>
-                                    </div>
+                                    <span className="text-xs text-slate-400 font-semibold uppercase">{selectedPlayer.position}</span>
                                 </div>
                             </div>
                             <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl px-4 py-2 flex items-center gap-2 text-emerald-400 font-semibold text-sm">
@@ -378,7 +267,7 @@ export default function PinDeviceResponderPage() {
                     <CardHeader className="pb-4">
                         <CardTitle className="text-lg text-white font-bold">Squad List</CardTitle>
                         <CardDescription className="text-slate-400">
-                            Select your name to toggle your availability. Secured slots require your 6-digit PIN.
+                            Find and tap your name to toggle availability.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -403,31 +292,25 @@ export default function PinDeviceResponderPage() {
                                     isAvailable = record?.status === "Present" || record?.status === "Late";
                                 }
 
-                                const isUserVerified = isVerified(player.id);
-                                const hasPin = player.has_pin;
+                                const isSessionVerified = isVerifiedForSession();
 
                                 return (
                                     <div
                                         key={player.id}
-                                        onClick={() => !isSubmitting && handlePlayerClick(player)}
+                                        onClick={() => !isVerifying && handlePlayerClick(player)}
                                         className={`
-                                            relative flex flex-col items-center p-4 rounded-xl border cursor-pointer select-none text-center gap-1.5 transition-all duration-155 min-h-[110px]
+                                            relative flex flex-col items-center p-4 rounded-xl border cursor-pointer select-none text-center gap-1.5 transition-all duration-150 min-h-[110px]
                                             ${isAvailable
                                                 ? "bg-emerald-950/30 border-emerald-500 shadow-md shadow-emerald-500/10 scale-[1.02]"
-                                                : "bg-slate-800/50 border-slate-800 hover:border-slate-700 hover:bg-slate-800"
+                                                : "bg-slate-800/50 border-slate-800 hover:border-slate-750 hover:bg-slate-800"
                                             }
                                         `}
                                     >
-                                        {/* Verification indicator */}
-                                        {isUserVerified ? (
-                                            <div className="absolute top-2 right-2 flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-400 text-[8px] font-bold">
+                                        {isSessionVerified && (
+                                            <div className="absolute top-2 right-2 flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-500/20 border border-emerald-450 text-emerald-400 text-[8px] font-bold">
                                                 ✓
                                             </div>
-                                        ) : hasPin ? (
-                                            <div className="absolute top-2 right-2 text-slate-500" title="Secured with PIN">
-                                                <Lock className="h-3 w-3" />
-                                            </div>
-                                        ) : null}
+                                        )}
 
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                                             {player.position}
@@ -455,25 +338,25 @@ export default function PinDeviceResponderPage() {
                 </Card>
             </div>
 
-            {/* PIN Verification Modal */}
-            {isVerificationModalOpen && selectedPlayer && (
+            {/* Code Verification Modal */}
+            {isModalOpen && selectedPlayer && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
                     <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                         {/* Modal Header */}
                         <div className="p-5 border-b border-slate-800 bg-slate-900/80 flex justify-between items-start">
                             <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-xl bg-red-600/10 border border-red-500/20 flex items-center justify-center text-red-500">
-                                    {pinMode === "set" ? <KeyRound className="h-5 w-5" /> : <Lock className="h-5 w-5" />}
+                                <div className="h-10 w-10 rounded-xl bg-red-650/10 border border-red-500/20 flex items-center justify-center text-red-500">
+                                    <KeyRound className="h-5 w-5" />
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-lg text-white">
-                                        {pinMode === "set" ? "Secure Your Slot" : "Enter Check-in PIN"}
+                                        Enter Session Code
                                     </h3>
-                                    <p className="text-xs text-slate-450 font-semibold">For {selectedPlayer.first_name} {selectedPlayer.last_name}</p>
+                                    <p className="text-xs text-slate-400 font-semibold">For {selectedPlayer.first_name} {selectedPlayer.last_name}</p>
                                 </div>
                             </div>
                             <button 
-                                onClick={() => setIsVerificationModalOpen(false)} 
+                                onClick={() => setIsModalOpen(false)} 
                                 className="text-slate-500 hover:text-slate-200 text-lg transition-colors p-1"
                             >
                                 ✕
@@ -481,171 +364,38 @@ export default function PinDeviceResponderPage() {
                         </div>
 
                         {/* Modal Content */}
-                        <form onSubmit={handlePinSubmit} className="p-5 space-y-4">
-                            {pinError && (
+                        <form onSubmit={handleCodeSubmit} className="p-5 space-y-4">
+                            {codeError && (
                                 <div className="bg-red-950/40 border border-red-500/30 rounded-xl p-3 flex items-center gap-2.5 text-red-400 text-xs">
                                     <AlertCircle className="h-4.5 w-4.5 shrink-0" />
-                                    <span>{pinError}</span>
+                                    <span>{codeError}</span>
                                 </div>
                             )}
 
-                            {pinMode === "set" ? (
-                                <div className="space-y-3">
-                                    <p className="text-xs text-slate-355 leading-relaxed font-semibold">
-                                        To prevent others from checking in under your name, enter your email and choose a 6-digit PIN to lock your slot on this device.
-                                    </p>
-                                    <div className="space-y-1.5 pt-1">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Email Address</label>
-                                        <Input
-                                            type="email"
-                                            required
-                                            value={enteredEmail}
-                                            onChange={(e) => setEnteredEmail(e.target.value)}
-                                            placeholder="you@example.com"
-                                            className="bg-slate-950 border-slate-800 text-white text-sm h-11 focus-visible:ring-red-500"
-                                        />
-                                    </div>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Choose 6-Digit PIN</label>
-                                        <Input
-                                            type="password"
-                                            pattern="\d*"
-                                            inputMode="numeric"
-                                            maxLength={6}
-                                            required
-                                            value={enteredPin}
-                                            onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 6))}
-                                            placeholder="••••••"
-                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
-                                        />
-                                    </div>
-                                    <Button 
-                                        type="submit"
-                                        disabled={isPinSubmitting || enteredPin.length !== 6 || !enteredEmail}
-                                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
-                                    >
-                                        {isPinSubmitting ? "Securing Name..." : "Lock Name & Check-in"}
-                                    </Button>
+                            <div className="space-y-3">
+                                <p className="text-xs text-slate-300 leading-relaxed font-semibold">
+                                    Please enter the 6-character session code (from the WhatsApp invite message) to confirm your RSVP.
+                                </p>
+                                <div className="space-y-1.5">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Session Code</label>
+                                    <Input
+                                        type="text"
+                                        required
+                                        autoFocus
+                                        value={enteredCode}
+                                        onChange={(e) => setEnteredCode(e.target.value.toUpperCase().trim())}
+                                        placeholder="e.g. CUA5DC"
+                                        className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500 uppercase"
+                                    />
                                 </div>
-                            ) : pinMode === "forgot" ? (
-                                <div className="space-y-4">
-                                    {!isOtpSent ? (
-                                        <div className="space-y-3">
-                                            <p className="text-xs text-slate-300 leading-relaxed font-semibold">
-                                                We will send a 6-digit verification code to your registered email to reset your PIN.
-                                            </p>
-                                            <Button 
-                                                type="button"
-                                                disabled={otpLoading}
-                                                onClick={handleRequestOtp}
-                                                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11 animate-pulse-once"
-                                            >
-                                                {otpLoading ? "Sending Code..." : "Send Verification Code"}
-                                            </Button>
-                                            <div className="text-center pt-1">
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => setPinMode("enter")}
-                                                    className="text-[10px] text-slate-450 hover:text-slate-200 underline font-semibold"
-                                                >
-                                                    Back to PIN Entry
-                                                </button>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-3">
-                                            <p className="text-xs text-slate-300 leading-relaxed font-semibold">
-                                                Please check your inbox. Enter the 6-digit code sent to your email along with your new PIN below.
-                                            </p>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-450 font-semibold">6-Digit Reset Code</label>
-                                                <Input
-                                                    type="text"
-                                                    pattern="\d*"
-                                                    inputMode="numeric"
-                                                    maxLength={6}
-                                                    required
-                                                    value={otpValue}
-                                                    onChange={(e) => setOtpValue(e.target.value.replace(/\D/g, "").substring(0, 6))}
-                                                    placeholder="••••••"
-                                                    className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
-                                                />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-bold uppercase tracking-wider text-slate-455 font-semibold">Choose New 6-Digit PIN</label>
-                                                <Input
-                                                    type="password"
-                                                    pattern="\d*"
-                                                    inputMode="numeric"
-                                                    maxLength={6}
-                                                    required
-                                                    value={newPinValue}
-                                                    onChange={(e) => setNewPinValue(e.target.value.replace(/\D/g, "").substring(0, 6))}
-                                                    placeholder="••••••"
-                                                    className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
-                                                />
-                                            </div>
-                                            <Button 
-                                                type="button"
-                                                disabled={otpLoading || otpValue.length !== 6 || newPinValue.length !== 6}
-                                                onClick={handleVerifyOtpAndResetPin}
-                                                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
-                                            >
-                                                {otpLoading ? "Resetting PIN..." : "Confirm & Reset PIN"}
-                                            </Button>
-                                            <div className="text-center pt-1">
-                                                <button 
-                                                    type="button"
-                                                    onClick={() => setIsOtpSent(false)}
-                                                    className="text-[10px] text-slate-450 hover:text-slate-200 underline font-semibold"
-                                                >
-                                                    Resend Code
-                                                </button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <div className="space-y-3">
-                                    <p className="text-xs text-slate-300 leading-relaxed font-semibold">
-                                        Your name slot is locked. Please enter your 6-digit PIN to check in.
-                                    </p>
-                                    <div className="space-y-1.5">
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Enter PIN</label>
-                                        <Input
-                                            type="password"
-                                            pattern="\d*"
-                                            inputMode="numeric"
-                                            maxLength={6}
-                                            required
-                                            value={enteredPin}
-                                            onChange={(e) => setEnteredPin(e.target.value.replace(/\D/g, "").substring(0, 6))}
-                                            placeholder="••••••"
-                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500"
-                                        />
-                                    </div>
-                                    <Button 
-                                        type="submit"
-                                        disabled={isPinSubmitting || enteredPin.length !== 6}
-                                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
-                                    >
-                                        {isPinSubmitting ? "Verifying..." : "Verify & Check-in"}
-                                    </Button>
-                                    <div className="text-center pt-1.5">
-                                        <button 
-                                            type="button"
-                                            onClick={() => {
-                                                setPinMode("forgot");
-                                                setIsOtpSent(false);
-                                                setPinError("");
-                                            }}
-                                            className="text-[10px] text-slate-450 hover:text-slate-200 underline font-semibold"
-                                        >
-                                            Forgot PIN? Reset via Email OTP
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
+                                <Button 
+                                    type="submit"
+                                    disabled={isVerifying || !enteredCode}
+                                    className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
+                                >
+                                    {isVerifying ? "Verifying..." : "Confirm Availability"}
+                                </Button>
+                            </div>
                         </form>
                     </div>
                 </div>

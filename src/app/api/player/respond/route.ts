@@ -18,6 +18,12 @@ function getAdminClient() {
     );
 }
 
+// Generate a deterministic 6-character session code based on ID
+function getSessionCode(id: string): string {
+    const cleanId = id.replace(/-/g, "");
+    return ("CU" + cleanId.substring(0, 4)).toUpperCase();
+}
+
 // Position order helper
 const positionOrder: Record<string, number> = {
     "GK": 1, "RB": 2, "LB": 2, "CB": 2, "RWB": 2, "LWB": 2, "DEF": 2,
@@ -143,6 +149,7 @@ export async function GET(request: Request) {
             success: true,
             event,
             eventType,
+            sessionCode: getSessionCode(event.id),
             players: cleanPlayers
         });
 
@@ -152,19 +159,15 @@ export async function GET(request: Request) {
     }
 }
 
-// POST handler: Verify PIN and save RSVP
+// POST handler: Verify Session Code and save RSVP
 export async function POST(request: Request) {
     const supabaseAdmin = getAdminClient();
     try {
         const body = await request.json();
-        const { playerId, eventId, eventType, status, pin, email } = body;
+        const { playerId, eventId, eventType, status, code } = body;
 
-        if (!playerId || !eventId || !eventType || !status || !pin) {
+        if (!playerId || !eventId || !eventType || !status || !code) {
             return NextResponse.json({ success: false, error: "Missing required parameters." }, { status: 400 });
-        }
-
-        if (pin.length !== 6 || !/^\d+$/.test(pin)) {
-            return NextResponse.json({ success: false, error: "PIN must be exactly 6 digits." }, { status: 400 });
         }
 
         // 1. Fetch player
@@ -178,31 +181,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: "Player not found." }, { status: 404 });
         }
 
-        const hashedInput = hashPin(pin);
-
-        // 2. Handle PIN registration (if not set yet) or PIN verification
-        if (!player.pin_hash) {
-            if (!email) {
-                return NextResponse.json({ success: false, error: "Email is required for registration." }, { status: 400 });
-            }
-            // Save new PIN and Email
-            const { error: pinUpdateErr } = await supabaseAdmin
-                .from("players")
-                .update({
-                    email: email,
-                    pin_hash: hashedInput,
-                    status: "Registered"
-                })
-                .eq("id", playerId);
-
-            if (pinUpdateErr) {
-                return NextResponse.json({ success: false, error: "Failed to set PIN and Email." }, { status: 500 });
-            }
-        } else {
-            // Verify existing PIN
-            if (hashedInput !== player.pin_hash) {
-                return NextResponse.json({ success: false, error: "Incorrect PIN." }, { status: 401 });
-            }
+        // 2. Verify Session Code
+        const expectedCode = getSessionCode(eventId);
+        if ((code || "").trim().toUpperCase() !== expectedCode) {
+            return NextResponse.json({ success: false, error: "Incorrect session code. Please verify the code in the WhatsApp invite." }, { status: 401 });
         }
 
         // 3. Update attendance

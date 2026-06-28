@@ -6,7 +6,7 @@ import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, CalendarDays, MapPin, Clock, Download, Share2, Link2, MessageCircle } from "lucide-react";
+import { ArrowLeft, CalendarDays, MapPin, Clock, Download, Share2, Link2, MessageCircle, Bell } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
@@ -42,6 +42,7 @@ export default function TrainingSessionPage() {
     const [unsavedChanges, setUnsavedChanges] = useState(false);
     const [attendanceStats, setAttendanceStats] = useState<Record<string, { present: number; total: number }>>({});
     const [guestName, setGuestName] = useState("");
+    const [isReminding, setIsReminding] = useState(false);
 
     useEffect(() => {
         const fetchSessionData = async () => {
@@ -258,6 +259,51 @@ export default function TrainingSessionPage() {
         document.body.removeChild(link);
     };
 
+    const handleRemindOutstanding = async () => {
+        if (!session) return;
+        setIsReminding(true);
+        try {
+            // Find how many players haven't responded
+            const respondedIds = (session.attendance || []).map((a: any) => a.playerId);
+            const outstandingCount = eligiblePlayers.filter(p => !respondedIds.includes(p.id)).length;
+
+            if (outstandingCount === 0) {
+                alert("All eligible squad players have already RSVP'd to this session!");
+                setIsReminding(false);
+                return;
+            }
+
+            if (!confirm(`Send email RSVP reminders to all ${outstandingCount} outstanding players?`)) {
+                setIsReminding(false);
+                return;
+            }
+
+            const res = await fetch("/api/communications/email", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    clubId: (session as any).club_id,
+                    recipientGroup: "Outstanding Players",
+                    subject: "Outstanding RSVP Reminder: {{TrainingDate}}",
+                    message: "Hi {{FirstName}},\n\nYou haven't updated your availability for our next session yet!\n\n📅 Date: {{TrainingDate}}\n📍 Location: {{Location}}\n\nClick the link below to confirm your slot:\n🔗 {{RsvpLink}}\n\nThank you,\nClub Management",
+                    eventId: session.id,
+                    eventType: "training"
+                })
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || "Failed to trigger email reminders.");
+            }
+
+            alert("Reminders sent successfully!");
+        } catch (err: any) {
+            alert("Failed to send reminders: " + err.message);
+        } finally {
+            setIsReminding(false);
+        }
+    };
+
     if (loading) return <div className="p-8 text-center">Loading session details...</div>;
     if (!session) return <div className="p-8 text-center">Session not found.</div>;
 
@@ -379,7 +425,9 @@ export default function TrainingSessionPage() {
                         </div>
                         <div>
                             <h3 className="font-semibold text-slate-900 text-sm">Secure Availability Link</h3>
-                            <p className="text-slate-500 text-xs">Share this secure link in WhatsApp. Players will be requested to register/log in to respond.</p>
+                            <p className="text-slate-500 text-xs">
+                                Share this link in WhatsApp. Session Code: <strong className="text-slate-950 font-bold bg-slate-200 px-1.5 py-0.5 rounded font-mono text-xs">{("CU" + (session.event_token || session.id).replace(/-/g, "").substring(0, 4)).toUpperCase()}</strong>
+                            </p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2 w-full md:w-auto">
@@ -401,7 +449,8 @@ export default function TrainingSessionPage() {
                             onClick={() => {
                                 const link = `${window.location.origin}/respond/${session.event_token || session.id}`;
                                 const dateStr = formatFriendlyDate(session.date);
-                                const text = `\u26BD *Camden United Training Invite*\n\ud83d\udcc5 *Date:* ${dateStr}\n\u23F0 *Time:* ${session.time}\n\ud83d\udccd *Location:* ${session.location}\n\nPlayers, please log your training availability here:\n\ud83d\udd17 ${link}`;
+                                const code = ("CU" + (session.event_token || session.id).replace(/-/g, "").substring(0, 4)).toUpperCase();
+                                const text = `\u26BD *Camden United Training Invite*\n\ud83d\udcc5 *Date:* ${dateStr}\n\u23F0 *Time:* ${session.time}\n\ud83d\udccd *Location:* ${session.location}\n🔑 *Session Code:* ${code}\n\nPlayers, please log your training availability here:\n\ud83d\udd17 ${link}`;
                                 window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
                             }}
                         >
@@ -423,6 +472,15 @@ export default function TrainingSessionPage() {
                     <div className="flex gap-2">
                         <Button variant="outline" size="sm" onClick={downloadSessionCSV}>
                             <Download className="h-4 w-4 mr-2" /> Export
+                        </Button>
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            disabled={isReminding}
+                            onClick={handleRemindOutstanding}
+                            className="border-amber-250 bg-amber-50 hover:bg-amber-100 text-amber-800"
+                        >
+                            <Bell className="h-4 w-4 mr-2" /> Remind Players
                         </Button>
                         <Button
                             onClick={handleSave}

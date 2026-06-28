@@ -31,7 +31,9 @@ import {
     Wallet,
     Lock,
     CreditCard,
-    Search
+    Search,
+    Mail,
+    History
 } from "lucide-react";
 
 import { useClub } from "@/context/club-context";
@@ -56,6 +58,14 @@ const navSections = [
             { href: "/opposition", label: "Opposition Reports", icon: ShieldHalf },
             { href: "/league",     label: "League Table",        icon: Trophy },
             { href: "/stats",      label: "Stats",               icon: BarChart },
+        ]
+    },
+    {
+        title: "Communications",
+        items: [
+            { href: "/communications/emails",    label: "Emails",      icon: Mail },
+            { href: "/communications/templates", label: "Templates",   icon: FileText },
+            { href: "/communications/history",   label: "History",     icon: History },
         ]
     },
     {
