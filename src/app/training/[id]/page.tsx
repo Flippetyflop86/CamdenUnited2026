@@ -473,15 +473,6 @@ export default function TrainingSessionPage() {
                         <Button variant="outline" size="sm" onClick={downloadSessionCSV}>
                             <Download className="h-4 w-4 mr-2" /> Export
                         </Button>
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            disabled={isReminding}
-                            onClick={handleRemindOutstanding}
-                            className="border-amber-250 bg-amber-50 hover:bg-amber-100 text-amber-800"
-                        >
-                            <Bell className="h-4 w-4 mr-2" /> Remind Players
-                        </Button>
                         <Button
                             onClick={handleSave}
                             disabled={!unsavedChanges}
