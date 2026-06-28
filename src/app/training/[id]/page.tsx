@@ -370,7 +370,7 @@ export default function TrainingSessionPage() {
                 </CardContent>
             </Card>
 
-            {/* Public Check-in Link Card */}
+            {/* Secure Check-in Link Card */}
             <Card className="w-full border-slate-200 bg-slate-50 shadow-sm border-l-4 border-l-emerald-500">
                 <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -378,8 +378,8 @@ export default function TrainingSessionPage() {
                             <Share2 className="h-5 w-5" />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-slate-900 text-sm">Public Attendance Check-in Link</h3>
-                            <p className="text-slate-500 text-xs">Share this bespoke link in WhatsApp. Players verify their browser once, then check in with one tap.</p>
+                            <h3 className="font-semibold text-slate-900 text-sm">Secure Availability Link</h3>
+                            <p className="text-slate-500 text-xs">Share this secure link in WhatsApp. Players will be requested to register/log in to respond.</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-2 w-full md:w-auto">
@@ -388,9 +388,9 @@ export default function TrainingSessionPage() {
                             size="sm"
                             className="bg-white border-slate-200 flex-1 md:flex-initial"
                             onClick={() => {
-                                const link = `${window.location.origin}/checkin/${session.id}`;
+                                const link = `${window.location.origin}/respond/${session.event_token || session.id}`;
                                 navigator.clipboard.writeText(link);
-                                alert("Check-in link copied to clipboard!");
+                                alert("Secure availability link copied to clipboard!");
                             }}
                         >
                             <Link2 className="h-4 w-4 mr-2" /> Copy Link
@@ -399,9 +399,9 @@ export default function TrainingSessionPage() {
                             size="sm"
                             className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 md:flex-initial"
                             onClick={() => {
-                                const link = `${window.location.origin}/checkin/${session.id}`;
+                                const link = `${window.location.origin}/respond/${session.event_token || session.id}`;
                                 const dateStr = formatFriendlyDate(session.date);
-                                const text = `⚽ *Camden United Training Invite*\n📅 *Date:* ${dateStr}\n⏰ *Time:* ${session.time}\n📍 *Location:* ${session.location}\n\nPlayers, please log your training attendance here:\n🔗 ${link}`;
+                                const text = `⚽ *Camden United Training Invite*\n📅 *Date:* ${dateStr}\n⏰ *Time:* ${session.time}\n📍 *Location:* ${session.location}\n\nPlayers, please log your training availability here:\n🔗 ${link}`;
                                 window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
                             }}
                         >
