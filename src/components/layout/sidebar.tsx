@@ -61,14 +61,6 @@ const navSections = [
         ]
     },
     {
-        title: "Communications",
-        items: [
-            { href: "/communications/emails",    label: "Emails",      icon: Mail },
-            { href: "/communications/templates", label: "Templates",   icon: FileText },
-            { href: "/communications/history",   label: "History",     icon: History },
-        ]
-    },
-    {
         title: "Off the Pitch",
         items: [
             { href: "/sponsors",      label: "Sponsorships",   icon: Briefcase },
