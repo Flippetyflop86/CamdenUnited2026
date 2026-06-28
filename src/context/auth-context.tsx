@@ -35,8 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
 
     const isPublicPage = (path: string) => {
-        const AUTH_PAGES = ["/login", "/signup", "/reset-password", "/update-password", "/join"];
-        return AUTH_PAGES.includes(path) || (path && path.startsWith("/checkin/"));
+        const AUTH_PAGES = ["/login", "/signup", "/reset-password", "/update-password", "/join", "/signup/player"];
+        return AUTH_PAGES.includes(path) || (path && path.startsWith("/checkin/")) || (path && path.startsWith("/respond/"));
     };
 
     const fetchClubMembership = async (userId: string) => {
