@@ -32,6 +32,7 @@ export default function DashboardPage() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncSuccess, setSyncSuccess] = useState(false);
     const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
+    const [activities, setActivities] = useState<any[]>([]);
 
     useEffect(() => {
         fetchData();
@@ -40,7 +41,8 @@ export default function DashboardPage() {
         const channels = [
             supabase.channel('public:matches').on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, fetchMatches),
             supabase.channel('public:players').on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetchSquad),
-            supabase.channel('public:matchday_xis').on('postgres_changes', { event: '*', schema: 'public', table: 'matchday_xis' }, fetchLineup)
+            supabase.channel('public:matchday_xis').on('postgres_changes', { event: '*', schema: 'public', table: 'matchday_xis' }, fetchLineup),
+            supabase.channel('public:activity_logs').on('postgres_changes', { event: '*', schema: 'public', table: 'activity_logs' }, fetchActivities)
         ];
 
         channels.forEach(c => c.subscribe());
@@ -75,6 +77,7 @@ export default function DashboardPage() {
         fetchMatches();
         fetchSquad();
         fetchLineup();
+        fetchActivities();
     };
 
     const fetchLineup = async () => {
@@ -86,6 +89,16 @@ export default function DashboardPage() {
         if (data && data.length > 0) {
             setLineup(data[0]);
         }
+    };
+
+    const fetchActivities = async () => {
+        const { data } = await supabase
+            .from('activity_logs')
+            .select('*')
+            .eq('action', 'Player RSVP Check-in')
+            .order('created_at', { ascending: false })
+            .limit(5);
+        if (data) setActivities(data);
     };
 
     const fetchMatches = async () => {
@@ -770,6 +783,48 @@ export default function DashboardPage() {
                     </div>
                 </Card>
             </div>
-        </div >
+
+            {/* Live Activity Feed */}
+            <Card className="bg-white/70 backdrop-blur-md border-white/40 shadow-sm border relative z-10">
+                <CardHeader className="pb-3">
+                    <CardTitle className="text-base font-bold text-slate-900">Recent Squad RSVP Check-ins</CardTitle>
+                    <CardDescription className="text-xs">Real-time availability updates from players</CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <div className="space-y-4">
+                        {activities.length === 0 ? (
+                            <p className="text-xs text-slate-500 italic text-center py-4">No recent RSVPs logged yet.</p>
+                        ) : (
+                            activities.map((act, i) => {
+                                const isAvailable = act.details.includes("marked Available") || act.details.includes("Present");
+                                return (
+                                    <div key={i} className="flex items-start justify-between gap-4 border-b pb-3 last:border-0 last:pb-0">
+                                        <div className="flex items-start gap-3">
+                                            <div className={`h-8 w-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${
+                                                isAvailable ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"
+                                            }`}>
+                                                {isAvailable ? "✓" : "✗"}
+                                            </div>
+                                            <div>
+                                                <p className="text-xs font-bold text-slate-800">{act.user_name}</p>
+                                                <p className="text-xs text-slate-550 mt-0.5">{act.details}</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-[10px] text-slate-405 shrink-0 font-medium mt-0.5">
+                                            {new Date(act.created_at).toLocaleDateString("en-GB", {
+                                                day: "numeric",
+                                                month: "short",
+                                                hour: "2-digit",
+                                                minute: "2-digit"
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </CardContent>
+            </Card>
+        </div>
     );
 }

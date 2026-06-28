@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import crypto from "crypto";
-import { sendEmail } from "@/lib/email-service";
 
 // Lazily initialize server-side supabase admin client to prevent build-time evaluation errors
 function getAdminClient() {
@@ -274,34 +273,22 @@ export async function POST(request: Request) {
             if (updateSessionErr) throw updateSessionErr;
         }
 
-        // 4. Send email notification to managers asynchronously
+        // 4. Log RSVP activity in the database for the manager's Dashboard Feed
         try {
-            const { data: staff } = await supabaseAdmin
-                .from("club_members")
-                .select("*, app_users:user_id(username, name)")
-                .eq("club_id", player.club_id);
-
-            const managerEmails = (staff || [])
-                .map((s: any) => s.app_users?.username)
-                .filter(email => !!email);
-
-            if (eventDetails && managerEmails.length > 0) {
+            if (eventDetails) {
                 const playerName = `${player.first_name} ${player.last_name}`;
                 const eventName = eventType === "match" ? `Match vs ${eventDetails.opponent || "Opposition"}` : `Training: ${eventDetails.topic || "Squad Practice"}`;
                 
-                const mailSubject = `⚽ RSVP Update: ${playerName} is ${status}`;
-                const mailBody = `Hi Coach,\n\n${playerName} has updated their availability for the upcoming session:\n\n📅 Event: ${eventName}\n📅 Date: ${eventDetails.date}\n📍 Location: ${eventDetails.location || eventDetails.opponent || "TBD"}\n🙋 Attendance Status: ${status}\n\nLog in to your ClubFlow dashboard to view the full squad register.\n\nBest regards,\nClubFlow Team`;
-
-                for (const email of managerEmails) {
-                    await sendEmail({
-                        to: email,
-                        subject: mailSubject,
-                        text: mailBody
-                    });
-                }
+                await supabaseAdmin.from("activity_logs").insert([{
+                    club_id: player.club_id,
+                    user_name: playerName,
+                    user_email: player.email || "player-portal",
+                    action: "Player RSVP Check-in",
+                    details: `${playerName} marked ${status === "Available" ? "Available" : "Unavailable"} for ${eventName} (${eventDetails.date})`
+                }]);
             }
-        } catch (emailErr) {
-            console.error("Failed to send manager RSVP notification email:", emailErr);
+        } catch (logErr) {
+            console.error("Failed to write check-in to activity_logs:", logErr);
         }
 
         return NextResponse.json({ success: true, message: "Response saved successfully." });
