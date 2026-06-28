@@ -243,17 +243,86 @@ export default function TrainingSessionPage() {
 
     const downloadSessionCSV = () => {
         if (!session) return;
-        const headers = ["Player", "Squad", "Position", "Status"];
-        const rows = eligiblePlayers.map(p => {
-            const record = session.attendance.find(a => a.playerId === p.id);
-            return [`${p.firstName} ${p.lastName}`, p.squad, p.position, record?.status ?? 'Absent'];
-        });
-        const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        
+        const title = `Camden United Training Register - ${session.date}`;
+        const squadName = formatSquad(session.squad as string);
+        
+        // Output formatted HTML Table that Excel automatically opens as a styled spreadsheet
+        const html = `
+          <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+          <head>
+            <!--[if gte mso 9]>
+            <xml>
+              <x:ExcelWorkbook>
+                <x:ExcelWorksheets>
+                  <x:ExcelWorksheet>
+                    <x:Name>Training Session</x:Name>
+                    <x:WorksheetOptions>
+                      <x:DisplayGridlines/>
+                    </x:WorksheetOptions>
+                  </x:ExcelWorksheet>
+                </x:ExcelWorksheets>
+              </x:ExcelWorkbook>
+            </xml>
+            <![endif]-->
+            <style>
+              body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+              table { border-collapse: collapse; margin-top: 10px; }
+              td, th { border: 1px solid #cbd5e1; padding: 10px 14px; font-size: 11pt; text-align: left; }
+              th { background-color: #0f172a; color: #ffffff; font-weight: bold; font-size: 11pt; border-bottom: 2px solid #0f172a; }
+              .header-row { font-size: 16pt; font-weight: bold; color: #0f172a; border: none; padding-bottom: 4px; }
+              .subheader-row { font-size: 10pt; color: #64748b; border: none; padding-bottom: 15px; }
+              .status-present { background-color: #d1fae5; color: #065f46; font-weight: bold; }
+              .status-absent { background-color: #fee2e2; color: #991b1b; }
+              .status-injured { background-color: #fef3c7; color: #92400e; }
+              .bold { font-weight: bold; }
+            </style>
+          </head>
+          <body>
+            <table>
+              <tr>
+                <td colspan="4" class="header-row">${title}</td>
+              </tr>
+              <tr>
+                <td colspan="4" class="subheader-row">Squad: ${squadName} &bull; Time: ${session.time} &bull; Location: ${session.location}</td>
+              </tr>
+              <tr><td colspan="4" style="border: none;"></td></tr>
+              <thead>
+                <tr>
+                  <th>Player Name</th>
+                  <th>Squad</th>
+                  <th>Position</th>
+                  <th>Attendance Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${eligiblePlayers.map(p => {
+                  const record = session.attendance.find(a => a.playerId === p.id);
+                  const status = record?.status ?? 'Absent';
+                  let statusClass = 'status-absent';
+                  if (status === 'Present' || status === 'Late') statusClass = 'status-present';
+                  else if (status === 'Injured') statusClass = 'status-injured';
+                  
+                  return `
+                    <tr>
+                      <td class="bold">${p.firstName} ${p.lastName}</td>
+                      <td>${p.squad}</td>
+                      <td>${p.position}</td>
+                      <td class="${statusClass}">${status}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </body>
+          </html>
+        `;
+
+        const blob = new Blob([html], { type: "application/vnd.ms-excel;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.href = url;
-        link.download = `session_${session.date}_${session.squad}.csv`;
+        link.download = `session_${session.date}_${session.squad}.xls`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
