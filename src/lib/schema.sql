@@ -193,17 +193,20 @@ create table staff (
   created_at timestamp with time zone default timezone('utc'::text, now())
 );
 
--- 16. Player Portal Schema Migrations
+-- 16. Player Availability & Club Member System Schema Migrations
+ALTER TABLE players ADD COLUMN IF NOT EXISTS user_id uuid;
 ALTER TABLE players ADD COLUMN IF NOT EXISTS email text;
 ALTER TABLE players ADD COLUMN IF NOT EXISTS mobile_number text;
-ALTER TABLE players ADD COLUMN IF NOT EXISTS status text DEFAULT 'Pending Activation';
-ALTER TABLE players ADD COLUMN IF NOT EXISTS pin_hash text;
-ALTER TABLE players ADD COLUMN IF NOT EXISTS trusted_devices jsonb DEFAULT '[]'::jsonb;
-ALTER TABLE players ADD COLUMN IF NOT EXISTS activation_token text;
-ALTER TABLE players ADD COLUMN IF NOT EXISTS activation_expires_at timestamp with time zone;
-ALTER TABLE players ADD COLUMN IF NOT EXISTS verification_code text;
-ALTER TABLE players ADD COLUMN IF NOT EXISTS verification_expires_at timestamp with time zone;
-ALTER TABLE players ADD COLUMN IF NOT EXISTS pin_attempts integer DEFAULT 0;
+ALTER TABLE players ADD COLUMN IF NOT EXISTS status text DEFAULT 'Pending Invitation';
 ALTER TABLE players ADD COLUMN IF NOT EXISTS emergency_contact jsonb DEFAULT '{}'::jsonb;
 ALTER TABLE players ADD COLUMN IF NOT EXISTS notification_preferences jsonb DEFAULT '{"email": true, "sms": true}'::jsonb;
+
+-- Event tokens & locking columns
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS event_token text UNIQUE;
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS lock_type text DEFAULT 'Never';
+ALTER TABLE matches ADD COLUMN IF NOT EXISTS lock_time timestamp with time zone;
+
+ALTER TABLE training_sessions ADD COLUMN IF NOT EXISTS event_token text UNIQUE;
+ALTER TABLE training_sessions ADD COLUMN IF NOT EXISTS lock_type text DEFAULT 'Never';
+ALTER TABLE training_sessions ADD COLUMN IF NOT EXISTS lock_time timestamp with time zone;
 

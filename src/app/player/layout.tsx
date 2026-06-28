@@ -14,48 +14,38 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
     const [playerName, setPlayerName] = useState("");
 
     useEffect(() => {
-        const playerId = localStorage.getItem("cf_player_id");
-        const deviceToken = localStorage.getItem("cf_player_device_token");
-
-        if (!playerId || !deviceToken) {
-            router.push("/");
-            return;
-        }
-
-        async function verifyDevice() {
+        async function checkSession() {
             try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.user) {
+                    router.push("/login");
+                    return;
+                }
+
                 const { data: player, error } = await supabase
                     .from("players")
-                    .select("id, first_name, last_name, trusted_devices")
-                    .eq("id", playerId)
+                    .select("id, first_name, last_name")
+                    .eq("user_id", session.user.id)
                     .single();
 
                 if (error || !player) {
-                    throw new Error("Authentication failed");
+                    setPlayerName(session.user.user_metadata?.first_name || "Player");
+                } else {
+                    setPlayerName(`${player.first_name} ${player.last_name}`);
                 }
-
-                const devices = Array.isArray(player.trusted_devices) ? player.trusted_devices : [];
-                const isTrusted = devices.some((d: any) => d.token === deviceToken);
-
-                if (!isTrusted) {
-                    throw new Error("Device untrusted");
-                }
-
-                setPlayerName(`${player.first_name} ${player.last_name}`);
                 setLoading(false);
             } catch (err) {
                 console.error("Layout verification failed:", err);
-                localStorage.clear();
-                router.push("/");
+                router.push("/login");
             }
         }
 
-        verifyDevice();
+        checkSession();
     }, [router]);
 
-    const handleLogout = () => {
-        localStorage.clear();
-        router.push("/");
+    const handleLogout = async () => {
+        await supabase.auth.signOut();
+        router.push("/login");
     };
 
     if (loading) {

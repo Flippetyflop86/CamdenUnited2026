@@ -15,6 +15,7 @@ import imageCompression from "browser-image-compression";
 import { UploadCloud, Loader2 } from "lucide-react";
 import { logActivity } from "@/lib/activity";
 import { useSearchParams } from "next/navigation";
+import Papa from "papaparse";
 
 const getCurrentSeasonStr = () => {
     const d = new Date();
@@ -33,6 +34,96 @@ export default function SquadPage() {
     const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const hasLoaded = useRef(false);
+
+    // CSV Import and Bulk Invite Hooks/Handlers
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isBulkInviting, setIsBulkInviting] = useState(false);
+
+    const handleCSVImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: async (results) => {
+                const rows = results.data as any[];
+                if (rows.length === 0) {
+                    alert("The CSV file is empty.");
+                    return;
+                }
+
+                // Parse columns: Name, Surname, Email, Phone, Position
+                const playersToInsert = rows
+                    .filter(row => row.Name || row.Surname)
+                    .map(row => ({
+                        club_id: clubId,
+                        first_name: row.Name || "Unknown",
+                        last_name: row.Surname || "Player",
+                        email: row.Email || null,
+                        mobile_number: row.Phone || null,
+                        position: row.Position || "MID",
+                        status: "Pending Invitation",
+                        medical_status: "Available",
+                        availability: true
+                    }));
+
+                if (playersToInsert.length === 0) {
+                    alert("No valid player rows found. Columns must be Name, Surname, Email, Phone, Position.");
+                    return;
+                }
+
+                try {
+                    const { error } = await supabase.from("players").insert(playersToInsert);
+                    if (error) throw error;
+
+                    logActivity("Imported Squad", `Imported ${playersToInsert.length} players via CSV.`);
+                    alert(`Successfully imported ${playersToInsert.length} players!`);
+                    fetchData();
+                } catch (err: any) {
+                    alert("Error importing players: " + err.message);
+                }
+            }
+        });
+    };
+
+    const handleBulkInvite = async () => {
+        const pendingPlayers = players.filter(p => p.status === "Pending Invitation" || !p.status);
+        if (pendingPlayers.length === 0) {
+            alert("No players are pending invitations!");
+            return;
+        }
+
+        if (!confirm(`Send Player Portal invitations to all ${pendingPlayers.length} pending players?`)) return;
+
+        setIsBulkInviting(true);
+        try {
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData?.session?.access_token;
+            if (!token) throw new Error("Authentication session missing");
+
+            const res = await fetch("/api/player/bulk-invite", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ clubId })
+            });
+
+            const data = await res.json();
+            if (!res.ok || !data.success) {
+                throw new Error(data.error || "Failed to trigger bulk invitation");
+            }
+
+            alert(`Invitations triggered successfully!`);
+            fetchData();
+        } catch (err: any) {
+            alert("Failed to send invitations: " + err.message);
+        } finally {
+            setIsBulkInviting(false);
+        }
+    };
 
     const { settings, updateSettings, isLoaded: isClubLoaded } = useClub();
     const { clubId, isLoading: isAuthLoading } = useAuth();
@@ -207,6 +298,7 @@ export default function SquadPage() {
 
                 return {
                     id: p.id,
+                    status: p.status || "Pending Invitation",
                     firstName: p.first_name,
                     lastName: p.last_name,
                     position: p.position as any,
@@ -424,6 +516,46 @@ export default function SquadPage() {
                     </Button>
                     <Button className="bg-red-600 hover:bg-red-700" onClick={() => setEditingPlayer({ id: "new", firstName: "", lastName: "", position: "GK", squadNumber: 0, age: 0, nationality: "English", squad: currentSquads[0], medicalStatus: "Available", availability: true, contractExpiry: "", appearances: 0, goals: 0, assists: 0, imageUrl: "", isInTrainingSquad: true, isInMatchdayTracker: false, isContracted: false, contractAmount: 0, contractFrequency: "Weekly", contractStartDate: "", contractEndDate: "", subsBillingModel: "Monthly", subsCustomAmount: 0, holidayStart: "", holidayEnd: "" })}>
                         <Plus className="h-4 w-4 mr-2" /> Add Player
+                    </Button>
+                </div>
+            </div>
+
+            {/* ClubFlow Adoption & CSV Import Row */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="space-y-1">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">ClubFlow Adoption</p>
+                    <p className="text-sm font-semibold text-slate-850">
+                        {players.filter(p => (p as any).status === "Registered").length} / {players.length} Players Registered
+                    </p>
+                    {/* Visual Progress Bar */}
+                    <div className="w-48 h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1">
+                        <div 
+                            className="bg-emerald-500 h-full rounded-full transition-all duration-500" 
+                            style={{ width: `${players.length > 0 ? (players.filter(p => (p as any).status === "Registered").length / players.length) * 100 : 0}%` }}
+                        />
+                    </div>
+                </div>
+                <div className="flex flex-wrap gap-2.5 w-full md:w-auto">
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleCSVImport} 
+                        accept=".csv" 
+                        className="hidden" 
+                    />
+                    <Button 
+                        variant="outline" 
+                        onClick={() => fileInputRef.current?.click()}
+                        className="text-xs font-semibold h-9 flex-1 md:flex-none"
+                    >
+                        Import Squad CSV
+                    </Button>
+                    <Button 
+                        onClick={handleBulkInvite}
+                        disabled={isBulkInviting}
+                        className="bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs h-9 flex-1 md:flex-none"
+                    >
+                        {isBulkInviting ? "Inviting..." : "Invite Remaining Players"}
                     </Button>
                 </div>
             </div>

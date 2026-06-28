@@ -107,7 +107,9 @@ export default function MatchesPage() {
         red_cards: "",
         notes: "",
         surface: "4G",
-        location: ""
+        location: "",
+        lockType: "Never",
+        lockTime: ""
     });
 
     // ... (keep state) ...
@@ -259,7 +261,7 @@ export default function MatchesPage() {
         const meetTimePrefix = `[MeetTime: ${formData.meetTime || ""}]`;
         const combinedNotes = `${locationPrefix}${surfacePrefix}${meetTimePrefix}\n${formData.notes || ""}`.trim();
 
-        const payload = {
+        const payload: any = {
             date: formData.date,
             time: formData.time,
             opponent: formData.opponent,
@@ -271,11 +273,14 @@ export default function MatchesPage() {
             assists: formData.assists,
             yellow_cards: formData.yellow_cards,
             red_cards: formData.red_cards,
-            notes: combinedNotes
+            notes: combinedNotes,
+            lock_type: formData.lockType || "Never",
+            lock_time: formData.lockTime ? new Date(formData.lockTime).toISOString() : null
         };
 
         try {
             if (isNew) {
+                payload.event_token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
                 const { error } = await supabase.from("matches").insert([payload]);
                 if (error) throw error;
             } else {
@@ -331,7 +336,9 @@ export default function MatchesPage() {
             red_cards: match.red_cards || "",
             notes: match.notes || "",
             surface: match.surface || "4G",
-            location: match.location || ""
+            location: match.location || "",
+            lockType: (match as any).lock_type || "Never",
+            lockTime: (match as any).lock_time ? new Date((match as any).lock_time).toISOString().slice(0, 16) : ""
         });
         setEditingId(match.id);
         const teamMatch = leagueTeams.find(t => t.name.toLowerCase() === match.opponent.toLowerCase());
@@ -606,7 +613,9 @@ export default function MatchesPage() {
             red_cards: "",
             notes: "",
             surface: "4G",
-            location: ""
+            location: "",
+            lockType: "Never",
+            lockTime: ""
         });
         setOpponentInstagram("");
         setOpponentBadgeUrl("");
@@ -1210,6 +1219,38 @@ export default function MatchesPage() {
                                                     className="h-14 text-xs"
                                                 />
                                             </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3 mt-2 pb-2 border-b border-dashed border-slate-100">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs font-bold text-slate-500">Availability Lock</Label>
+                                                <Select
+                                                    value={formData.lockType || "Never"}
+                                                    onValueChange={(v) => setFormData({ ...formData, lockType: v })}
+                                                >
+                                                    <SelectTrigger className="h-9 text-xs">
+                                                        <SelectValue placeholder="Select Lock Type" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="Never">Never Lock</SelectItem>
+                                                        <SelectItem value="Start">At Match Start</SelectItem>
+                                                        <SelectItem value="30m">30 Mins Before</SelectItem>
+                                                        <SelectItem value="1h">1 Hour Before</SelectItem>
+                                                        <SelectItem value="Custom">Custom Time</SelectItem>
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            {formData.lockType === "Custom" && (
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs font-bold text-slate-500">Custom Lock Time</Label>
+                                                    <Input
+                                                        type="datetime-local"
+                                                        value={formData.lockTime || ""}
+                                                        onChange={(e) => setFormData({ ...formData, lockTime: e.target.value })}
+                                                        className="h-9 text-xs"
+                                                    />
+                                                </div>
+                                            )}
                                         </div>
 
                                         <div className="space-y-1">

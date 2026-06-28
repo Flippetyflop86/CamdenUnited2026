@@ -6,8 +6,10 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { CalendarDays, Clock, MapPin, CheckCircle, XCircle, AlertCircle, RefreshCw } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function PlayerDashboard() {
+    const router = useRouter();
     const [playerName, setPlayerName] = useState("");
     const [playerId, setPlayerId] = useState("");
     const [upcomingMatches, setUpcomingMatches] = useState<any[]>([]);
@@ -15,16 +17,27 @@ export default function PlayerDashboard() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const storedPlayerId = localStorage.getItem("cf_player_id") || "";
-        const storedPlayerName = localStorage.getItem("cf_player_name") || "Player";
-        setPlayerId(storedPlayerId);
-        setPlayerName(storedPlayerName.split(" ")[0]);
-
-        if (!storedPlayerId) return;
-
-        async function fetchUpcoming() {
+        async function fetchPlayerAndUpcoming() {
             try {
-                // Fetch matches in the next 14 days
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.user) {
+                    router.push("/login");
+                    return;
+                }
+
+                const { data: player, error: playerErr } = await supabase
+                    .from("players")
+                    .select("*")
+                    .eq("user_id", session.user.id)
+                    .single();
+
+                if (playerErr || !player) {
+                    setPlayerName(session.user.user_metadata?.first_name || "Player");
+                } else {
+                    setPlayerId(player.id);
+                    setPlayerName(player.first_name);
+                }
+
                 const today = new Date().toISOString().split("T")[0];
                 const { data: matches } = await supabase
                     .from("matches")
@@ -33,7 +46,6 @@ export default function PlayerDashboard() {
                     .order("date", { ascending: true })
                     .limit(5);
 
-                // Fetch training sessions in the next 14 days
                 const { data: training } = await supabase
                     .from("training_sessions")
                     .select("*")
@@ -51,8 +63,8 @@ export default function PlayerDashboard() {
             }
         }
 
-        fetchUpcoming();
-    }, []);
+        fetchPlayerAndUpcoming();
+    }, [router]);
 
     // Get availability status for a match
     const getMatchRsvp = (match: any) => {
@@ -130,7 +142,7 @@ export default function PlayerDashboard() {
                                             <CalendarDays className="h-3 w-3" /> {dateFormatted} @ {event.time}
                                         </p>
                                     </div>
-                                    <Link href={`/respond/${event.id}`}>
+                                    <Link href={`/respond/${event.event_token || event.id}`}>
                                         <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs h-8 px-4 rounded-lg">
                                             Respond
                                         </Button>
@@ -183,7 +195,7 @@ export default function PlayerDashboard() {
                                                     {rsvp}
                                                 </span>
                                             </div>
-                                            <Link href={`/respond/${event.id}`}>
+                                            <Link href={`/respond/${event.event_token || event.id}`}>
                                                 <Button size="sm" variant="outline" className="border-slate-800 hover:bg-slate-800 text-white text-xs h-8">
                                                     Change
                                                 </Button>

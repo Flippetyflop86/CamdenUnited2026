@@ -62,12 +62,16 @@ export default function TrainingPage() {
         location: string;
         squad: string;
         topic: string;
+        lockType: string;
+        lockTime: string;
     }>({
         date: "",
         time: "20:15",
         location: settings.trainingLocation || "",
         squad: currentSquads[0] || "First Team",
-        topic: ""
+        topic: "",
+        lockType: "Never",
+        lockTime: ""
     });
 
     const [squadFilter, setSquadFilter] = useState<string>("All");
@@ -145,13 +149,20 @@ export default function TrainingPage() {
     // Note: Removed local storage save effect.
 
     const handleSchedule = async () => {
-        const payload = {
+        const isNew = !editingSessionId;
+        const payload: any = {
             date: newSession.date,
             time: newSession.time,
             location: newSession.location,
             squad: newSession.squad,
-            topic: newSession.topic || "General Session"
+            topic: newSession.topic || "General Session",
+            lock_type: newSession.lockType || "Never",
+            lock_time: newSession.lockTime ? new Date(newSession.lockTime).toISOString() : null
         };
+
+        if (isNew) {
+            payload.event_token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        }
 
         try {
             if (editingSessionId) {
@@ -175,7 +186,9 @@ export default function TrainingPage() {
                 time: "20:15",
                 location: settings.trainingLocation || "",
                 squad: currentSquads[0] || "First Team",
-                topic: ""
+                topic: "",
+                lockType: "Never",
+                lockTime: ""
             });
             setEditingSessionId(null);
         } catch (e: any) {
@@ -218,7 +231,9 @@ export default function TrainingPage() {
             time: session.time,
             location: session.location,
             squad: session.squad,
-            topic: session.topic || ""
+            topic: session.topic || "",
+            lockType: (session as any).lock_type || "Never",
+            lockTime: (session as any).lock_time ? new Date((session as any).lock_time).toISOString().slice(0, 16) : ""
         });
         setEditingSessionId(session.id);
         setIsDialogOpen(true);
@@ -243,7 +258,9 @@ export default function TrainingPage() {
             time: "20:15",
             location: settings.trainingLocation || "",
             squad: currentSquads[0] || "First Team",
-            topic: ""
+            topic: "",
+            lockType: "Never",
+            lockTime: ""
         });
         setIsDialogOpen(true);
     };
@@ -694,6 +711,34 @@ export default function TrainingPage() {
                                     onChange={(e) => setNewSession({ ...newSession, topic: e.target.value })}
                                     placeholder="e.g. Possession & Pressing"
                                 />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 pb-2 border-b border-dashed border-slate-100">
+                                <div className="space-y-2">
+                                    <label className="text-sm font-medium text-slate-800">Availability Lock</label>
+                                    <select
+                                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                        value={newSession.lockType || "Never"}
+                                        onChange={(e) => setNewSession({ ...newSession, lockType: e.target.value })}
+                                    >
+                                        <option value="Never">Never Lock</option>
+                                        <option value="Start">At Training Start</option>
+                                        <option value="30m">30 Mins Before</option>
+                                        <option value="1h">1 Hour Before</option>
+                                        <option value="Custom">Custom Time</option>
+                                    </select>
+                                </div>
+                                {newSession.lockType === "Custom" && (
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-slate-800">Custom Lock Time</label>
+                                        <Input
+                                            type="datetime-local"
+                                            value={newSession.lockTime || ""}
+                                            onChange={(e) => setNewSession({ ...newSession, lockTime: e.target.value })}
+                                            className="h-10 text-sm"
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="p-4 border-t bg-slate-50 flex justify-end gap-2">

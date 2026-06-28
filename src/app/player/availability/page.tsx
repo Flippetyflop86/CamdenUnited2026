@@ -13,13 +13,21 @@ export default function PlayerAvailabilityHistory() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        const storedPlayerId = localStorage.getItem("cf_player_id") || "";
-        setPlayerId(storedPlayerId);
-
-        if (!storedPlayerId) return;
-
-        async function fetchHistory() {
+        async function fetchPlayerAndHistory() {
             try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.user) return;
+
+                const { data: player } = await supabase
+                    .from("players")
+                    .select("*")
+                    .eq("user_id", session.user.id)
+                    .single();
+
+                if (player) {
+                    setPlayerId(player.id);
+                }
+
                 // Fetch matches
                 const { data: matches } = await supabase
                     .from("matches")
@@ -45,7 +53,7 @@ export default function PlayerAvailabilityHistory() {
             }
         }
 
-        fetchHistory();
+        fetchPlayerAndHistory();
     }, []);
 
     // Get availability status for a match
@@ -139,7 +147,7 @@ export default function PlayerAvailabilityHistory() {
                                             </span>
                                         </div>
                                         {isUpcoming && (
-                                            <Link href={`/respond/${event.id}`}>
+                                            <Link href={`/respond/${event.event_token || event.id}`}>
                                                 <Button size="sm" variant="outline" className="border-slate-800 hover:bg-slate-800 text-white text-xs h-8">
                                                     Change
                                                 </Button>

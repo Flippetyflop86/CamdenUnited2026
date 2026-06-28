@@ -36,7 +36,17 @@ export default function LoginPage() {
             }
 
             if (data.session) {
-                router.push("/dashboard");
+                const { data: member } = await supabase
+                    .from("club_members")
+                    .select("role")
+                    .eq("user_id", data.session.user.id)
+                    .single();
+
+                if (member?.role === "Player") {
+                    router.push("/player");
+                } else {
+                    router.push("/dashboard");
+                }
             }
         } catch (err: any) {
             setError(err.message || "Failed to sign in. Please check your credentials.");

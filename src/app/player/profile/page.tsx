@@ -7,7 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { User, Phone, ShieldAlert, KeyRound, CheckCircle, AlertCircle, RefreshCw } from "lucide-react";
-import crypto from "crypto";
 
 export default function PlayerProfileSettings() {
     const [playerId, setPlayerId] = useState("");
@@ -23,10 +22,9 @@ export default function PlayerProfileSettings() {
     const [emergencyRelationship, setEmergencyRelationship] = useState("");
     const [emergencyPhone, setEmergencyPhone] = useState("");
 
-    // PIN change inputs
-    const [currentPin, setCurrentPin] = useState("");
-    const [newPin, setNewPin] = useState("");
-    const [confirmNewPin, setConfirmNewPin] = useState("");
+    // Password change inputs
+    const [newPassword, setNewPassword] = useState("");
+    const [confirmPassword, setConfirmPassword] = useState("");
 
     // Preferences
     const [emailNotifications, setEmailNotifications] = useState(true);
@@ -38,20 +36,19 @@ export default function PlayerProfileSettings() {
     const [submitting, setSubmitting] = useState(false);
 
     useEffect(() => {
-        const storedPlayerId = localStorage.getItem("cf_player_id") || "";
-        setPlayerId(storedPlayerId);
-
-        if (!storedPlayerId) return;
-
         async function fetchProfile() {
             try {
+                const { data: { session } } = await supabase.auth.getSession();
+                if (!session?.user) return;
+
                 const { data, error } = await supabase
                     .from("players")
                     .select("*")
-                    .eq("id", storedPlayerId)
+                    .eq("user_id", session.user.id)
                     .single();
 
                 if (data) {
+                    setPlayerId(data.id);
                     setFirstName(data.first_name || "");
                     setLastName(data.last_name || "");
                     setMobile(data.mobile_number || "");
@@ -112,56 +109,37 @@ export default function PlayerProfileSettings() {
         }
     };
 
-    const handleUpdatePin = async (e: React.FormEvent) => {
+    const handleUpdatePassword = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
         setSuccessMessage(null);
 
-        if (newPin.length !== 4 || !/^\d+$/.test(newPin)) {
-            setError("New PIN must be exactly 4 digits.");
+        if (newPassword.length < 6) {
+            setError("Password must be at least 6 characters.");
             return;
         }
 
-        if (newPin !== confirmNewPin) {
-            setError("New PIN and confirmation do not match.");
+        if (newPassword !== confirmPassword) {
+            setError("Passwords do not match.");
             return;
         }
 
         setSubmitting(true);
 
         try {
-            // Fetch current PIN hash to verify
-            const { data: player, error: fetchErr } = await supabase
-                .from("players")
-                .select("pin_hash")
-                .eq("id", playerId)
-                .single();
-
-            if (fetchErr || !player) throw new Error("Could not verify profile");
-
-            const hashedCurrent = crypto.createHash("sha256").update(currentPin).digest("hex");
-            if (hashedCurrent !== player.pin_hash) {
-                setError("Current PIN is incorrect.");
-                setSubmitting(false);
-                return;
-            }
-
-            const hashedNew = crypto.createHash("sha256").update(newPin).digest("hex");
-            const { error: updateErr } = await supabase
-                .from("players")
-                .update({ pin_hash: hashedNew })
-                .eq("id", playerId);
+            const { error: updateErr } = await supabase.auth.updateUser({
+                password: newPassword
+            });
 
             if (updateErr) throw updateErr;
 
-            setSuccessMessage("PIN changed successfully!");
-            setCurrentPin("");
-            setNewPin("");
-            setConfirmNewPin("");
+            setSuccessMessage("Password changed successfully!");
+            setNewPassword("");
+            setConfirmPassword("");
             setTimeout(() => setSuccessMessage(null), 3000);
 
         } catch (err: any) {
-            setError(err.message || "Failed to update PIN.");
+            setError(err.message || "Failed to update password.");
         } finally {
             setSubmitting(false);
         }
@@ -180,7 +158,7 @@ export default function PlayerProfileSettings() {
         <div className="space-y-6 sm:ml-44">
             <div>
                 <h1 className="text-2xl font-black tracking-tight text-white">Your Profile</h1>
-                <p className="text-xs text-slate-400">Update your preferred contact name, emergency information, and change security PIN.</p>
+                <p className="text-xs text-slate-400">Update your preferred contact name, emergency information, and change security credentials.</p>
             </div>
 
             {successMessage && (
@@ -277,62 +255,42 @@ export default function PlayerProfileSettings() {
                     </Button>
                 </form>
 
-                {/* Change PIN Form */}
-                <form onSubmit={handleUpdatePin} className="space-y-4">
+                {/* Change Password Form */}
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
                     <Card className="border-slate-800 bg-slate-900/60 shadow-lg">
                         <CardHeader className="py-4 border-b border-slate-800 bg-slate-900/40">
                             <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
-                                <KeyRound className="h-4 w-4 text-red-500" /> Change Security PIN
+                                <KeyRound className="h-4 w-4 text-red-500" /> Change Account Password
                             </CardTitle>
-                            <CardDescription className="text-[10px] text-slate-400">Change your portal login authentication PIN.</CardDescription>
+                            <CardDescription className="text-[10px] text-slate-400">Change your portal login authentication password.</CardDescription>
                         </CardHeader>
                         <CardContent className="p-4 space-y-3">
                             <div className="space-y-1">
-                                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Current 4-Digit PIN</label>
+                                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">New Password</label>
                                 <Input
                                     type="password"
-                                    pattern="\d*"
-                                    inputMode="numeric"
-                                    maxLength={4}
                                     required
-                                    value={currentPin}
-                                    onChange={(e) => setCurrentPin(e.target.value.replace(/\D/g, "").substring(0, 4))}
-                                    placeholder="••••"
-                                    className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-base h-10"
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    className="bg-slate-950 border-slate-800 text-white text-xs h-10"
                                 />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">New 4-Digit PIN</label>
+                                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Confirm New Password</label>
                                 <Input
                                     type="password"
-                                    pattern="\d*"
-                                    inputMode="numeric"
-                                    maxLength={4}
                                     required
-                                    value={newPin}
-                                    onChange={(e) => setNewPin(e.target.value.replace(/\D/g, "").substring(0, 4))}
-                                    placeholder="••••"
-                                    className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-base h-10"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-bold uppercase tracking-wider text-slate-400">Confirm New PIN</label>
-                                <Input
-                                    type="password"
-                                    pattern="\d*"
-                                    inputMode="numeric"
-                                    maxLength={4}
-                                    required
-                                    value={confirmNewPin}
-                                    onChange={(e) => setConfirmNewPin(e.target.value.replace(/\D/g, "").substring(0, 4))}
-                                    placeholder="••••"
-                                    className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-base h-10"
+                                    value={confirmPassword}
+                                    onChange={(e) => setConfirmPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    className="bg-slate-950 border-slate-800 text-white text-xs h-10"
                                 />
                             </div>
                         </CardContent>
                     </Card>
                     <Button type="submit" disabled={submitting} className="w-full bg-slate-800 hover:bg-slate-700 border border-slate-700 text-white font-bold h-11">
-                        Change Security PIN
+                        Change Account Password
                     </Button>
                 </form>
             </div>

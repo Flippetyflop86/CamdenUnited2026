@@ -45,6 +45,7 @@ export interface Player {
     // Subs Billing Info
     subsBillingModel?: "Monthly" | "Pay-As-You-Go" | "Matchday-PAYG" | "Both-PAYG" | "Exempt";
     subsCustomAmount?: number;
+    status?: string;
 }
 
 export interface Staff {
