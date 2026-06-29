@@ -349,11 +349,22 @@ export default function DashboardPage() {
     const getPositionCounts = () => {
         const counts = { GK: 0, DEF: 0, MID: 0, FWD: 0 };
         players.forEach(p => {
-            const pos = p.position.toUpperCase();
-            if (['GK'].includes(pos)) counts.GK++;
-            else if (['CB', 'RB', 'LB', 'DEF', 'RWB', 'LWB'].includes(pos)) counts.DEF++;
-            else if (['CM', 'CDM', 'CAM', 'MID', 'RM', 'LM'].includes(pos)) counts.MID++;
-            else if (['ST', 'CF', 'RW', 'LW', 'FWD'].includes(pos)) counts.FWD++;
+            const pos = (p.position || "").trim().toUpperCase();
+            if (pos === 'GK' || pos.includes('GK') || pos.includes('KEEPER') || pos.includes('GOAL')) {
+                counts.GK++;
+            } else if (['CB', 'RB', 'LB', 'DEF', 'RWB', 'LWB'].includes(pos) || pos.includes('DEF') || pos.includes('BACK')) {
+                counts.DEF++;
+            } else if (['CM', 'CDM', 'CAM', 'MID', 'RM', 'LM'].includes(pos) || pos.includes('MID') || pos.includes('CENT') || pos.includes('RM') || pos.includes('LM')) {
+                counts.MID++;
+            } else if (['ST', 'CF', 'RW', 'LW', 'FWD', 'ATT'].includes(pos) || pos.includes('STRIKER') || pos.includes('WING') || pos.includes('FWD') || pos.includes('FORWARD') || pos.includes('ST') || pos.includes('CF') || pos.includes('RW') || pos.includes('LW')) {
+                counts.FWD++;
+            } else {
+                // Intelligent fallback based on key letters in the position name
+                if (pos.includes('M')) counts.MID++;
+                else if (pos.includes('D') || pos.includes('B')) counts.DEF++;
+                else if (pos.includes('F') || pos.includes('S') || pos.includes('W') || pos.includes('A')) counts.FWD++;
+                else counts.MID++; // Final fallback to avoid losing the player count
+            }
         });
         return counts;
     };
