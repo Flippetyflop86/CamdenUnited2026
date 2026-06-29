@@ -442,7 +442,22 @@ export default function SquadPage() {
             if ((sClean === 'midweek' || sClean === 'midweek team') && (tabClean === 'midweek' || tabClean === 'midweek team')) return true;
             return sClean === tabClean;
         });
-        const matchesPosition = positionFilter === "All" || (positionFilter === "GK" && player.position === "GK") || (positionFilter === "DEF" && ["DEF", "LB", "CB", "RB", "LWB", "RWB"].includes(player.position)) || (positionFilter === "MID" && ["MID", "CDM", "CM", "CAM", "LM", "RM"].includes(player.position)) || (positionFilter === "FWD" && ["FWD", "CF", "ST", "LW", "RW"].includes(player.position));
+        const playerPos = (player.position || "").trim().toUpperCase();
+        const matchesPosition = positionFilter === "All" || (() => {
+            if (positionFilter === "GK") {
+                return playerPos === 'GK' || playerPos.includes('GK') || playerPos.includes('KEEPER') || playerPos.includes('GOAL');
+            }
+            if (positionFilter === "DEF") {
+                return ['CB', 'RB', 'LB', 'DEF', 'RWB', 'LWB'].includes(playerPos) || playerPos.includes('DEF') || playerPos.includes('BACK');
+            }
+            if (positionFilter === "MID") {
+                return ['CM', 'CDM', 'CAM', 'MID', 'RM', 'LM'].includes(playerPos) || playerPos.includes('MID') || playerPos.includes('CENT') || playerPos.includes('RM') || playerPos.includes('LM');
+            }
+            if (positionFilter === "FWD") {
+                return ['ST', 'CF', 'RW', 'LW', 'FWD', 'ATT'].includes(playerPos) || playerPos.includes('STRIKER') || playerPos.includes('WING') || playerPos.includes('FWD') || playerPos.includes('FORWARD') || playerPos.includes('ST') || playerPos.includes('CF') || playerPos.includes('RW') || playerPos.includes('LW');
+            }
+            return false;
+        })();
         const matchesAvailability = !showAvailableOnly || player.medicalStatus === "Available";
         return matchesSearch && matchesSquad && matchesPosition && matchesAvailability;
     });
