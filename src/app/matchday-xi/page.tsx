@@ -5,7 +5,7 @@ import { MatchdayXI, Player, Match, Position } from "@/types";
 import { FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, Trash2, Save, FileDown, Calendar, MapPin, Clock, GripVertical, Trophy, MessageCircle, Search, X, Loader2 } from "lucide-react";
+import { Plus, Trash2, Save, FileDown, Calendar, MapPin, Clock, GripVertical, Trophy, MessageCircle, Search, X, Loader2, RefreshCw } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -337,6 +337,43 @@ export default function MatchdayXIPage() {
         };
         setLineup(cleared);
         saveLineup(cleared);
+    };
+
+    const handleAutoFillLastLineup = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('matchday_xis')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(2);
+
+            if (error) throw error;
+            
+            let lastLineup = data?.[0];
+            if (lineup && lastLineup && lastLineup.id === lineup.id) {
+                lastLineup = data?.[1];
+            }
+
+            if (!lastLineup) {
+                alert("No previous lineups found to auto-fill!");
+                return;
+            }
+
+            if (!confirm(`Populate pitch with the lineup from previous match using formation ${lastLineup.formation}?`)) return;
+
+            const updated = {
+                ...lineup,
+                formation: lastLineup.formation,
+                starters: lastLineup.starters || {},
+                substitutes: lastLineup.substitutes || [],
+                updatedAt: new Date().toISOString()
+            };
+            setLineup(updated as any);
+            saveLineup(updated as any);
+            alert("Lineup successfully copied from previous match!");
+        } catch (err: any) {
+            alert("Error auto-filling last lineup: " + err.message);
+        }
     };
 
     // --- Drag and Drop Logic ---
@@ -741,6 +778,10 @@ export default function MatchdayXIPage() {
                     <Button onClick={handleClearLineup} variant="outline" className="border-slate-300 hover:bg-slate-100 text-slate-700">
                         <Trash2 className="h-4 w-4 mr-2" />
                         Clear Pitch
+                    </Button>
+                    <Button onClick={handleAutoFillLastLineup} variant="outline" className="border-slate-300 hover:bg-slate-100 text-slate-700">
+                        <RefreshCw className="h-4 w-4 mr-2" />
+                        Fill Last Lineup
                     </Button>
                     <Button onClick={handleCopyToWhatsApp} className="bg-emerald-600 hover:bg-emerald-700 text-white border-none hidden sm:flex">
                         <MessageCircle className="h-4 w-4 mr-2" />

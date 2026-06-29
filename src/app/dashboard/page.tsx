@@ -34,6 +34,8 @@ export default function DashboardPage() {
     const [syncSuccess, setSyncSuccess] = useState(false);
     const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
     const [activities, setActivities] = useState<any[]>([]);
+    const [auditLogs, setAuditLogs] = useState<any[]>([]);
+    const [activityTab, setActivityTab] = useState<'rsvp' | 'audit'>('rsvp');
 
     useEffect(() => {
         fetchData();
@@ -46,10 +48,10 @@ export default function DashboardPage() {
             supabase.channel('public:activity_logs').on('postgres_changes', { event: '*', schema: 'public', table: 'activity_logs' }, fetchActivities)
         ];
 
-        channels.forEach(c => c.subscribe());
+        channels.forEach(channel => channel.subscribe());
 
         return () => {
-            channels.forEach(c => supabase.removeChannel(c));
+            channels.forEach(channel => supabase.removeChannel(channel));
         };
     }, []);
 
@@ -93,13 +95,23 @@ export default function DashboardPage() {
     };
 
     const fetchActivities = async () => {
-        const { data } = await supabase
+        // Fetch RSVPs
+        const { data: rsvpData } = await supabase
             .from('activity_logs')
             .select('*')
             .eq('action', 'Player RSVP Check-in')
             .order('created_at', { ascending: false })
-            .limit(5);
-        if (data) setActivities(data);
+            .limit(10);
+        if (rsvpData) setActivities(rsvpData);
+
+        // Fetch Audit Logs (everything except RSVPs)
+        const { data: auditData } = await supabase
+            .from('activity_logs')
+            .select('*')
+            .neq('action', 'Player RSVP Check-in')
+            .order('created_at', { ascending: false })
+            .limit(10);
+        if (auditData) setAuditLogs(auditData);
     };
 
     const fetchMatches = async () => {
@@ -789,32 +801,76 @@ export default function DashboardPage() {
 
             {/* Live Activity Feed */}
             <Card className="bg-white/70 backdrop-blur-md border-white/40 shadow-sm border relative z-10">
-                <CardHeader className="pb-3">
-                    <CardTitle className="text-base font-bold text-slate-900">Recent Squad RSVP Check-ins</CardTitle>
-                    <CardDescription className="text-xs">Real-time availability updates from players</CardDescription>
+                <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
+                    <div>
+                        <CardTitle className="text-base font-bold text-slate-900">Activity & Audit Logs</CardTitle>
+                        <CardDescription className="text-xs">Real-time availability updates and administrative records</CardDescription>
+                    </div>
+                    <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200 shrink-0">
+                        <button 
+                            onClick={() => setActivityTab('rsvp')} 
+                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activityTab === 'rsvp' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                            RSVPs
+                        </button>
+                        <button 
+                            onClick={() => setActivityTab('audit')} 
+                            className={`px-3 py-1 text-xs font-bold rounded-md transition-all ${activityTab === 'audit' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'}`}
+                        >
+                            Audit History
+                        </button>
+                    </div>
                 </CardHeader>
                 <CardContent>
                     <div className="space-y-4">
-                        {activities.length === 0 ? (
-                            <p className="text-xs text-slate-500 italic text-center py-4">No recent RSVPs logged yet.</p>
+                        {activityTab === 'rsvp' ? (
+                            activities.length === 0 ? (
+                                <p className="text-xs text-slate-500 italic text-center py-4">No recent RSVPs logged yet.</p>
+                            ) : (
+                                activities.map((act, i) => {
+                                    const isAvailable = act.details.includes("marked Available") || act.details.includes("Present");
+                                    return (
+                                        <div key={i} className="flex items-start justify-between gap-4 border-b pb-3 last:border-0 last:pb-0">
+                                            <div className="flex items-start gap-3">
+                                                <div className={`h-8 w-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${
+                                                    isAvailable ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"
+                                                }`}>
+                                                    {isAvailable ? "✓" : "✗"}
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs font-bold text-slate-800">{act.user_name}</p>
+                                                    <p className="text-xs text-slate-550 mt-0.5">{act.details}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-[10px] text-slate-405 shrink-0 font-medium mt-0.5">
+                                                {new Date(act.created_at).toLocaleDateString("en-GB", {
+                                                    day: "numeric",
+                                                    month: "short",
+                                                    hour: "2-digit",
+                                                    minute: "2-digit"
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )
                         ) : (
-                            activities.map((act, i) => {
-                                const isAvailable = act.details.includes("marked Available") || act.details.includes("Present");
-                                return (
+                            auditLogs.length === 0 ? (
+                                <p className="text-xs text-slate-500 italic text-center py-4">No audit logs recorded yet.</p>
+                            ) : (
+                                auditLogs.map((log, i) => (
                                     <div key={i} className="flex items-start justify-between gap-4 border-b pb-3 last:border-0 last:pb-0">
                                         <div className="flex items-start gap-3">
-                                            <div className={`h-8 w-8 rounded-full flex items-center justify-center font-black text-xs shrink-0 ${
-                                                isAvailable ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : "bg-red-50 text-red-700 border border-red-200"
-                                            }`}>
-                                                {isAvailable ? "✓" : "✗"}
+                                            <div className="h-8 w-8 rounded-full bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center font-bold text-xs shrink-0">
+                                                ⚙️
                                             </div>
                                             <div>
-                                                <p className="text-xs font-bold text-slate-800">{act.user_name}</p>
-                                                <p className="text-xs text-slate-550 mt-0.5">{act.details}</p>
+                                                <p className="text-xs font-bold text-slate-800">{log.action}</p>
+                                                <p className="text-xs text-slate-550 mt-0.5">{log.details || "Administrative modification."}</p>
                                             </div>
                                         </div>
                                         <div className="text-[10px] text-slate-405 shrink-0 font-medium mt-0.5">
-                                            {new Date(act.created_at).toLocaleDateString("en-GB", {
+                                            {new Date(log.created_at).toLocaleDateString("en-GB", {
                                                 day: "numeric",
                                                 month: "short",
                                                 hour: "2-digit",
@@ -822,8 +878,8 @@ export default function DashboardPage() {
                                             })}
                                         </div>
                                     </div>
-                                );
-                            })
+                                ))
+                            )
                         )}
                     </div>
                 </CardContent>

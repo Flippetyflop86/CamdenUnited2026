@@ -589,6 +589,17 @@ export default function FinancePage() {
         return starting + totalIncome - totalExpense;
     })();
 
+    const expenseTotalsByCategory = (() => {
+        const categories: Record<string, number> = {};
+        transactions
+            .filter(t => t.type === "Expense")
+            .forEach(t => {
+                const cat = t.category || "Miscellaneous";
+                categories[cat] = (categories[cat] || 0) + t.amount;
+            });
+        return Object.entries(categories).sort((a, b) => b[1] - a[1]);
+    })();
+
     const getPlayerAttendedSessionsCount = (player: Player) => {
         const override = localStorage.getItem(`clubflow_training_attended_${player.id}_${currentMonthStr}`);
         if (override !== null) {
@@ -2071,6 +2082,70 @@ export default function FinancePage() {
                                             </div>
                                         );
                                     })
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Expense Breakdowns Category Chart */}
+                        <Card className="border-slate-200/80 shadow-md">
+                            <CardHeader className="border-b bg-slate-50/50 p-4">
+                                <CardTitle className="text-xs font-bold flex items-center gap-2">
+                                    <TrendingDown className="h-4 w-4 text-red-500" />
+                                    Expense Breakdowns
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-4 space-y-4">
+                                {expenseTotalsByCategory.length === 0 ? (
+                                    <div className="text-center py-6 text-slate-400 text-xs italic">No expenses recorded yet.</div>
+                                ) : (
+                                    (() => {
+                                        const totalExp = expenseTotalsByCategory.reduce((sum, [_, amt]) => sum + amt, 0);
+                                        return (
+                                            <div className="space-y-3">
+                                                {/* Visual Donut representation */}
+                                                <div className="h-4 w-full rounded-full bg-slate-100 flex overflow-hidden">
+                                                    {expenseTotalsByCategory.slice(0, 5).map(([cat, amt], idx) => {
+                                                        const pct = totalExp > 0 ? (amt / totalExp) * 100 : 0;
+                                                        const colors = ["bg-red-500", "bg-amber-500", "bg-blue-500", "bg-indigo-500", "bg-purple-500", "bg-slate-550"];
+                                                        const color = colors[idx] || "bg-slate-400";
+                                                        if (pct <= 0) return null;
+                                                        return (
+                                                            <div 
+                                                                key={cat} 
+                                                                style={{ width: `${pct}%` }} 
+                                                                className={`${color} h-full`}
+                                                                title={`${cat}: £${amt.toFixed(2)} (${Math.round(pct)}%)`}
+                                                            />
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                <div className="space-y-2 pt-1">
+                                                    {expenseTotalsByCategory.map(([cat, amt], idx) => {
+                                                        const pct = totalExp > 0 ? (amt / totalExp) * 100 : 0;
+                                                        const colors = ["bg-red-500", "bg-amber-500", "bg-blue-500", "bg-indigo-500", "bg-purple-500", "bg-slate-500"];
+                                                        const textColor = ["text-red-500", "text-amber-500", "text-blue-500", "text-indigo-500", "text-purple-500", "text-slate-550"];
+                                                        const color = colors[idx] || "bg-slate-400";
+                                                        const txtColor = textColor[idx] || "text-slate-550";
+                                                        return (
+                                                            <div key={cat} className="text-xs space-y-1">
+                                                                <div className="flex justify-between font-medium">
+                                                                    <span className="flex items-center gap-1.5 text-slate-700">
+                                                                        <span className={`w-2 h-2 rounded-full ${color}`} />
+                                                                        {cat}
+                                                                    </span>
+                                                                    <span className="font-bold text-slate-800">
+                                                                        £{amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 
+                                                                        <span className={`text-[10px] ${txtColor} ml-1 font-semibold`}>({Math.round(pct)}%)</span>
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()
                                 )}
                             </CardContent>
                         </Card>
