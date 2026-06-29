@@ -10,6 +10,7 @@ import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { formatPlayerName } from "@/lib/utils";
+import { calculateMeetTime } from "@/lib/whatsapp-utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const POSITION_ORDER: { [key: string]: number } = {
@@ -602,7 +603,8 @@ export default function MatchdayXIPage() {
             msgTemplate += `*${nextMatch.isHome ? '🏠 Home' : '🚌 Away'} vs {opponent}*\n`;
             msgTemplate += `🏆 {competition}\n`;
             msgTemplate += `📅 {date}\n`;
-            msgTemplate += `⏰ Kick-off: {time}\n\n`;
+            msgTemplate += `⏰ Kick-off: {time}\n`;
+            msgTemplate += `📍 Meet Time: {meet_time}\n\n`;
         } else {
             msgTemplate += `*Upcoming Match TBD*\n\n`;
         }
@@ -612,11 +614,14 @@ export default function MatchdayXIPage() {
             ? new Date(nextMatch.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) 
             : new Date().toLocaleDateString('en-GB');
 
+        const meetTime = nextMatch && nextMatch.time ? calculateMeetTime(nextMatch.time, -60) : "TBD";
+
         const formattedMsg = msgTemplate
             .replace(/{opponent}/g, nextMatch ? nextMatch.opponent : "TBD")
             .replace(/{competition}/g, nextMatch ? (nextMatch.competition || "Match") : "Match")
             .replace(/{date}/g, dateFormatted)
-            .replace(/{time}/g, nextMatch ? nextMatch.time : "TBD");
+            .replace(/{time}/g, nextMatch ? nextMatch.time : "TBD")
+            .replace(/{meet_time}/g, meetTime);
 
         navigator.clipboard.writeText(formattedMsg).then(() => {
             alert("Matchday availability poll copied to clipboard! Paste it into WhatsApp.");
