@@ -589,7 +589,7 @@ export default function MatchdayXIPage() {
     const handleCopyToWhatsApp = () => {
         if (!lineup) return;
         
-        let msgTemplate = `⚽ *MATCHDAY DETAILS* ⚽\n\n`;
+        let msgTemplate = `⚽ *MATCHDAY AVAILABILITY POLL* ⚽\n\n`;
         if (nextMatch) {
             msgTemplate += `*${nextMatch.isHome ? '🏠 Home' : '🚌 Away'} vs {opponent}*\n`;
             msgTemplate += `🏆 {competition}\n`;
@@ -598,7 +598,7 @@ export default function MatchdayXIPage() {
         } else {
             msgTemplate += `*Upcoming Match TBD*\n\n`;
         }
-        msgTemplate += `🔴 Please confirm if you are driving directly or need a lift! Let's go boys!`;
+        msgTemplate += `🔴 Please confirm your availability for this match as soon as possible! Let's go boys!`;
 
         const dateFormatted = nextMatch 
             ? new Date(nextMatch.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) 
@@ -611,7 +611,7 @@ export default function MatchdayXIPage() {
             .replace(/{time}/g, nextMatch ? nextMatch.time : "TBD");
 
         navigator.clipboard.writeText(formattedMsg).then(() => {
-            alert("Matchday details copied to clipboard! Paste it into WhatsApp.");
+            alert("Matchday availability poll copied to clipboard! Paste it into WhatsApp.");
         }).catch(err => {
             console.error('Failed to copy: ', err);
             alert("Failed to copy to clipboard.");
