@@ -64,6 +64,8 @@ export default function TrainingPage() {
         topic: string;
         lockType: string;
         lockTime: string;
+        repeatWeekly?: boolean;
+        repeatWeeks?: number;
     }>({
         date: "",
         time: "20:15",
@@ -71,7 +73,9 @@ export default function TrainingPage() {
         squad: currentSquads[0] || "First Team",
         topic: "",
         lockType: "Never",
-        lockTime: ""
+        lockTime: "",
+        repeatWeekly: false,
+        repeatWeeks: 4
     });
 
     const [squadFilter, setSquadFilter] = useState<string>("All");
@@ -172,10 +176,37 @@ export default function TrainingPage() {
                     .eq("id", editingSessionId);
                 if (error) throw error;
             } else {
-                // New session
+                // New session(s)
+                const sessionsToInsert = [];
+                const numWeeks = newSession.repeatWeekly ? (newSession.repeatWeeks || 4) : 1;
+                
+                for (let i = 0; i < numWeeks; i++) {
+                    const sessionDate = new Date(newSession.date);
+                    sessionDate.setDate(sessionDate.getDate() + (i * 7));
+                    const dateStr = sessionDate.toISOString().split('T')[0];
+                    
+                    const token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+                    
+                    let finalLockTime = null;
+                    if (newSession.lockType === "Custom" && newSession.lockTime) {
+                        const originalLock = new Date(newSession.lockTime);
+                        originalLock.setDate(originalLock.getDate() + (i * 7));
+                        finalLockTime = originalLock.toISOString();
+                    }
+
+                    sessionsToInsert.push({
+                        ...payload,
+                        date: dateStr,
+                        event_token: token,
+                        lock_time: finalLockTime,
+                        attendance: [],
+                        notes: ""
+                    });
+                }
+
                 const { error } = await supabase
                     .from("training_sessions")
-                    .insert([{ ...payload, attendance: [], notes: "" }]);
+                    .insert(sessionsToInsert);
                 if (error) throw error;
             }
             // Fetch/Subscribe will handle UI update
@@ -188,7 +219,9 @@ export default function TrainingPage() {
                 squad: currentSquads[0] || "First Team",
                 topic: "",
                 lockType: "Never",
-                lockTime: ""
+                lockTime: "",
+                repeatWeekly: false,
+                repeatWeeks: 4
             });
             setEditingSessionId(null);
         } catch (e: any) {
@@ -745,6 +778,34 @@ export default function TrainingPage() {
                                     </div>
                                 )}
                             </div>
+
+                            {!editingSessionId && (
+                                <div className="space-y-3 pt-2">
+                                    <div className="flex items-center gap-2">
+                                        <input 
+                                            type="checkbox" 
+                                            id="repeatWeekly" 
+                                            checked={newSession.repeatWeekly || false}
+                                            onChange={(e) => setNewSession({ ...newSession, repeatWeekly: e.target.checked, repeatWeeks: e.target.checked ? 4 : 1 })}
+                                            className="h-4 w-4 rounded border-slate-350 text-slate-900 focus:ring-slate-500 cursor-pointer"
+                                        />
+                                        <label htmlFor="repeatWeekly" className="text-sm font-semibold text-slate-700 cursor-pointer">Repeat Weekly</label>
+                                    </div>
+                                    {newSession.repeatWeekly && (
+                                        <div className="space-y-1 pl-6">
+                                            <label className="text-xs font-semibold text-slate-550">Number of weeks (1 to 12)</label>
+                                            <Input
+                                                type="number"
+                                                min={1}
+                                                max={12}
+                                                value={newSession.repeatWeeks || 4}
+                                                onChange={(e) => setNewSession({ ...newSession, repeatWeeks: Math.max(1, Math.min(12, parseInt(e.target.value) || 1)) })}
+                                                className="w-24 h-9 text-xs"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                         <div className="p-4 border-t bg-slate-50 flex justify-end gap-2">
                             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>Cancel</Button>

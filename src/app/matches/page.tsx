@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink, CloudRain, Snowflake, Thermometer, CloudLightning, Sun, AlertCircle, BarChart3, Share2 } from "lucide-react";
+import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink, CloudRain, Snowflake, Thermometer, CloudLightning, Sun, AlertCircle, BarChart3, Share2, Coins } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -53,6 +53,49 @@ export default function MatchesPage() {
     const [includeKickoff, setIncludeKickoff] = useState(true);
     const [includeMeetTime, setIncludeMeetTime] = useState(true);
     const [meetTime, setMeetTime] = useState("");
+
+    // Matchday Expenses State
+    const [isExpenseOpen, setIsExpenseOpen] = useState(false);
+    const [selectedExpenseMatch, setSelectedExpenseMatch] = useState<Match | null>(null);
+    const [expenseAmount, setExpenseAmount] = useState("");
+    const [expenseCategory, setExpenseCategory] = useState("Ref Fees");
+    const [expenseNotes, setExpenseNotes] = useState("");
+
+    const handleSaveExpense = async () => {
+        if (!selectedExpenseMatch) return;
+        const amt = parseFloat(expenseAmount);
+        if (isNaN(amt) || amt <= 0) {
+            alert("Please enter a valid expense amount.");
+            return;
+        }
+
+        const notesPart = expenseNotes.trim() ? ` (${expenseNotes.trim()})` : "";
+        const desc = `${expenseCategory} - vs ${selectedExpenseMatch.opponent}${notesPart}`;
+
+        const payload = {
+            date: selectedExpenseMatch.date,
+            description: desc,
+            amount: amt,
+            type: "Expense",
+            category: expenseCategory,
+            is_recurring: false,
+            frequency: null
+        };
+
+        try {
+            const { error } = await supabase
+                .from("finance_transactions")
+                .insert([payload]);
+
+            if (error) throw error;
+            alert("Expense logged successfully!");
+            setIsExpenseOpen(false);
+            setExpenseAmount("");
+            setExpenseNotes("");
+        } catch (e: any) {
+            alert("Failed to log expense: " + e.message);
+        }
+    };
     const [meetLocation, setMeetLocation] = useState("");
     const [additionalNotes, setAdditionalNotes] = useState("");
     const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
@@ -808,6 +851,18 @@ export default function MatchesPage() {
                                 <MessageCircle className="h-4 w-4" />
                             </Button>
                         )}
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50" 
+                            onClick={() => {
+                                setSelectedExpenseMatch(match);
+                                setIsExpenseOpen(true);
+                            }} 
+                            title="Log Matchday Expense"
+                        >
+                            <Coins className="h-4 w-4" />
+                        </Button>
                         {!isPast && match.isHome && (
                             <Button 
                                 variant="ghost" 
@@ -1763,6 +1818,65 @@ export default function MatchesPage() {
                         <Button variant="outline" onClick={() => setSelectedConfirmMatch(null)}>
                             Close
                         </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Quick Match Expense Modal */}
+            <Dialog open={isExpenseOpen} onOpenChange={setIsExpenseOpen}>
+                <DialogContent className="sm:max-w-[400px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-slate-900">
+                            <Coins className="h-5 w-5 text-amber-500" /> Log Matchday Expense
+                        </DialogTitle>
+                        <DialogDescription>
+                            Quickly log referee fees, pitch hire, or other cash payouts for the match vs <span className="font-bold text-slate-800">{selectedExpenseMatch?.opponent}</span> ({selectedExpenseMatch?.date}).
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-2 text-slate-900">
+                        <div className="space-y-1">
+                            <Label htmlFor="expenseAmount" className="text-xs font-bold text-slate-500">Amount (£)</Label>
+                            <Input
+                                id="expenseAmount"
+                                type="number"
+                                step="0.01"
+                                placeholder="e.g. 40.00"
+                                value={expenseAmount}
+                                onChange={e => setExpenseAmount(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label htmlFor="expenseCategory" className="text-xs font-bold text-slate-500">Category</Label>
+                            <select
+                                id="expenseCategory"
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                value={expenseCategory}
+                                onChange={e => setExpenseCategory(e.target.value)}
+                            >
+                                <option value="Ref Fees">Ref Fees</option>
+                                <option value="Pitch Hire">Pitch Hire</option>
+                                <option value="Equipment">Equipment</option>
+                                <option value="Matchday Food/Drink">Matchday Food/Drink</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label htmlFor="expenseNotes" className="text-xs font-bold text-slate-500">Notes (Optional)</Label>
+                            <Input
+                                id="expenseNotes"
+                                placeholder="e.g. Cash paid to ref John"
+                                value={expenseNotes}
+                                onChange={e => setExpenseNotes(e.target.value)}
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setIsExpenseOpen(false)}>Cancel</Button>
+                        <Button onClick={handleSaveExpense} className="bg-amber-600 hover:bg-amber-700 text-white">Save Expense</Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

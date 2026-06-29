@@ -624,10 +624,12 @@ export default function MatchdayXIPage() {
             .replace(/{meet_time}/g, meetTime);
 
         navigator.clipboard.writeText(formattedMsg).then(() => {
-            alert("Matchday availability poll copied to clipboard! Paste it into WhatsApp.");
+            const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(formattedMsg)}`;
+            window.open(whatsappUrl, '_blank');
         }).catch(err => {
             console.error('Failed to copy: ', err);
-            alert("Failed to copy to clipboard.");
+            const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(formattedMsg)}`;
+            window.open(whatsappUrl, '_blank');
         });
     };
 
