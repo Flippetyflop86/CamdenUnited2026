@@ -4,6 +4,18 @@
 -- Copy and paste this entire script into your Supabase SQL Editor 
 -- (found in your Supabase dashboard) to secure your database tables!
 
+-- 0. Create activity_logs table if it does not exist
+CREATE TABLE IF NOT EXISTS activity_logs (
+    id uuid primary key default uuid_generate_v4(),
+    club_id uuid,
+    user_id uuid,
+    user_email text,
+    user_name text,
+    action text not null,
+    details text,
+    created_at timestamp with time zone default timezone('utc'::text, now())
+);
+
 -- 1. Enable RLS on all main tables
 ALTER TABLE players ENABLE ROW LEVEL SECURITY;
 ALTER TABLE matches ENABLE ROW LEVEL SECURITY;
