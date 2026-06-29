@@ -210,6 +210,17 @@ export default function SquadPage() {
     const [editingSquads, setEditingSquads] = useState<string[]>(currentSquads);
     const [isUploadingImage, setIsUploadingImage] = useState(false);
 
+    // Image Cropping States
+    const [croppingImageSrc, setCroppingImageSrc] = useState<string | null>(null);
+    const [croppingFileName, setCroppingFileName] = useState<string>("");
+    const [zoom, setZoom] = useState(1);
+    const [pan, setPan] = useState({ x: 0, y: 0 });
+    const [isDragging, setIsDragging] = useState(false);
+    const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+    
+    const cropperImageRef = useRef<HTMLImageElement>(null);
+    const cropperCanvasRef = useRef<HTMLCanvasElement>(null);
+
     const [seasonFilter, setSeasonFilter] = useState<string>(getCurrentSeasonStr());
     const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
 
@@ -504,41 +515,68 @@ export default function SquadPage() {
         }
     };
 
-    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || e.target.files.length === 0 || !editingPlayer) return;
         const file = e.target.files[0];
+        
+        // Reset cropper controls
+        setZoom(1);
+        setPan({ x: 0, y: 0 });
+        
+        setCroppingFileName(file.name);
+        setCroppingImageSrc(URL.createObjectURL(file));
+    };
+
+    const handleCropSave = async () => {
+        if (!cropperImageRef.current || !cropperCanvasRef.current || !editingPlayer) return;
         setIsUploadingImage(true);
+        const canvas = cropperCanvasRef.current;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) return;
 
-        try {
-            // Compress Image
-            const options = {
-                maxSizeMB: 0.1,
-                maxWidthOrHeight: 400,
-                useWebWorker: true
-            };
-            const compressedFile = await imageCompression(file, options);
+        canvas.width = 400;
+        canvas.height = 400;
 
-            // Upload to Supabase Storage
-            const nameBase = `${Date.now()}_${compressedFile.name}`;
-            const fileName = clubId ? `${clubId}/${nameBase}` : nameBase;
-            const { data, error } = await supabase.storage
-                .from('player-avatars')
-                .upload(fileName, compressedFile, { cacheControl: '3600', upsert: false });
+        const img = cropperImageRef.current;
+        ctx.clearRect(0, 0, 400, 400);
+        ctx.save();
+        ctx.translate(200, 200);
+        ctx.scale(zoom, zoom);
+        ctx.translate(pan.x, pan.y);
 
-            if (error) throw error;
+        const scale = Math.max(400 / img.naturalWidth, 400 / img.naturalHeight);
+        const w = img.naturalWidth * scale;
+        const h = img.naturalHeight * scale;
+        ctx.drawImage(img, -w / 2, -h / 2, w, h);
+        ctx.restore();
 
-            // Get Public URL
-            const { data: { publicUrl } } = supabase.storage.from('player-avatars').getPublicUrl(data.path);
-            
-            // Update State
-            setEditingPlayer({ ...editingPlayer, imageUrl: publicUrl });
+        // Convert canvas to blob and upload
+        canvas.toBlob(async (blob) => {
+            if (!blob) {
+                setIsUploadingImage(false);
+                return;
+            }
+            try {
+                // Upload to Supabase Storage
+                const nameBase = `${Date.now()}_${croppingFileName || 'avatar.jpg'}`;
+                const fileName = clubId ? `${clubId}/${nameBase}` : nameBase;
+                const { data, error } = await supabase.storage
+                    .from('player-avatars')
+                    .upload(fileName, blob, { contentType: 'image/jpeg', cacheControl: '3600', upsert: false });
 
-        } catch (error: any) {
-            console.error("Upload error", error);
-            alert("Failed to upload image. Make sure you created the 'player-avatars' public bucket in Supabase.");
-        } finally {
-            setIsUploadingImage(false);
-        }
+                if (error) throw error;
+
+                const { data: { publicUrl } } = supabase.storage.from('player-avatars').getPublicUrl(data.path);
+                
+                setEditingPlayer({ ...editingPlayer, imageUrl: publicUrl });
+                setCroppingImageSrc(null); // Close modal
+            } catch (err: any) {
+                console.error("Upload error", err);
+                alert("Failed to upload cropped image: " + err.message);
+            } finally {
+                setIsUploadingImage(false);
+            }
+        }, 'image/jpeg', 0.9);
     };
 
     if (!isClubLoaded || isAuthLoading) {
@@ -1065,6 +1103,117 @@ export default function SquadPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Custom Image Cropper Modal */}
+            {croppingImageSrc && (
+                <div className="fixed inset-0 z-50 bg-black/85 flex items-center justify-center p-4 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-6">
+                        <div className="space-y-1">
+                            <h3 className="text-xl font-semibold text-slate-900">Crop Profile Photo</h3>
+                            <p className="text-sm text-slate-500">Drag to center, slide to zoom. Make sure the head is in the circle!</p>
+                        </div>
+
+                        {/* Cropping Area */}
+                        <div 
+                            className="relative w-full aspect-square bg-slate-100 rounded-xl overflow-hidden cursor-move border border-slate-200 select-none touch-none"
+                            onMouseDown={(e) => {
+                                setIsDragging(true);
+                                setDragStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+                            }}
+                            onMouseMove={(e) => {
+                                if (!isDragging) return;
+                                setPan({
+                                    x: e.clientX - dragStart.x,
+                                    y: e.clientY - dragStart.y
+                                });
+                            }}
+                            onMouseUp={() => setIsDragging(false)}
+                            onMouseLeave={() => setIsDragging(false)}
+                            
+                            // Touch support for mobile devices
+                            onTouchStart={(e) => {
+                                if (e.touches.length === 0) return;
+                                setIsDragging(true);
+                                setDragStart({ x: e.touches[0].clientX - pan.x, y: e.touches[0].clientY - pan.y });
+                            }}
+                            onTouchMove={(e) => {
+                                if (!isDragging || e.touches.length === 0) return;
+                                setPan({
+                                    x: e.touches[0].clientX - dragStart.x,
+                                    y: e.touches[0].clientY - dragStart.y
+                                });
+                            }}
+                            onTouchEnd={() => setIsDragging(false)}
+                        >
+                            {/* Draggable Preview Image */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                ref={cropperImageRef}
+                                src={croppingImageSrc}
+                                alt="Crop Preview"
+                                draggable={false}
+                                className="absolute max-w-none origin-center pointer-events-none select-none"
+                                style={{
+                                    transform: `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                                    left: '50%',
+                                    top: '50%',
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover'
+                                }}
+                            />
+
+                            {/* Circular Mask Overlay */}
+                            <div className="absolute inset-0 pointer-events-none border-[3px] border-white/80 rounded-full" 
+                                 style={{ 
+                                     boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.5)' 
+                                 }} 
+                            />
+                        </div>
+
+                        {/* Zoom Control */}
+                        <div className="space-y-2">
+                            <div className="flex justify-between text-xs font-medium text-slate-500">
+                                <span>Zoom</span>
+                                <span>{Math.round(zoom * 100)}%</span>
+                            </div>
+                            <input
+                                type="range"
+                                min="1"
+                                max="3"
+                                step="0.02"
+                                value={zoom}
+                                onChange={(e) => setZoom(parseFloat(e.target.value))}
+                                className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-red-600 border border-slate-200"
+                            />
+                        </div>
+
+                        {/* Hidden canvas for generating crop */}
+                        <canvas ref={cropperCanvasRef} className="hidden" />
+
+                        {/* Actions */}
+                        <div className="flex justify-end gap-3 pt-2">
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                onClick={() => setCroppingImageSrc(null)}
+                                disabled={isUploadingImage}
+                            >
+                                Cancel
+                            </Button>
+                            <Button 
+                                type="button" 
+                                onClick={handleCropSave}
+                                disabled={isUploadingImage}
+                                className="bg-red-600 hover:bg-red-700 text-white"
+                            >
+                                {isUploadingImage ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+                                {isUploadingImage ? "Saving..." : "Crop & Save"}
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
         </div>
     );
