@@ -101,6 +101,49 @@ export async function POST(request: Request) {
             if (settingsError) throw settingsError;
         }
 
+        // 6. Seed mock training sessions with attendance
+        const { data: dbPlayers } = await supabase
+            .from("players")
+            .select("id")
+            .eq("club_id", clubId);
+
+        if (dbPlayers && dbPlayers.length > 0) {
+            // Delete existing sessions first to avoid clutter
+            await supabase.from("training_sessions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+
+            const today = new Date();
+            const topics = ["Passing & Possession", "Defending Transitions", "Shooting & Finishing"];
+            const sessionsToInsert = [];
+
+            for (let i = 0; i < 3; i++) {
+                const date = new Date();
+                date.setDate(today.getDate() + ((i - 1) * 7)); // -7 days, today, +7 days
+                const dateStr = date.toISOString().split("T")[0];
+
+                const attendance = dbPlayers.map(p => ({
+                    playerId: p.id,
+                    status: Math.random() > 0.3 ? "Present" : Math.random() > 0.5 ? "Absent" : "Late",
+                    notes: ""
+                }));
+
+                sessionsToInsert.push({
+                    date: dateStr,
+                    time: "20:00",
+                    location: "Market Road Pitches",
+                    squad: "All",
+                    topic: topics[i],
+                    lock_type: "Never",
+                    lock_time: null,
+                    event_token: Math.random().toString(36).substring(2, 15),
+                    attendance,
+                    notes: `Promotional drill session ${i+1}`
+                });
+            }
+
+            const { error: trError } = await supabase.from("training_sessions").insert(sessionsToInsert);
+            if (trError) console.warn("Failed to seed training sessions:", trError);
+        }
+
         return NextResponse.json({ success: true, results });
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
