@@ -902,6 +902,9 @@ export default function MatchesPage() {
                                     <Instagram className="h-4 w-4" />
                                 </a>
                             )}
+                            {match.isHome && settings.logo && (
+                                <img src={settings.logo} alt="Club Logo" className="h-6 w-6 object-contain shrink-0 rounded-full" />
+                            )}
                             {!match.isHome && teamInfo?.badge_url && (
                                 <img src={teamInfo.badge_url} alt="Badge" className="h-6 w-6 object-contain shrink-0" />
                             )}
@@ -910,7 +913,7 @@ export default function MatchesPage() {
                             </span>
                             {match.isHome && <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded shrink-0">H</span>}
                         </div>
-
+ 
                         {/* Score / VS */}
                         <div className="flex flex-col items-center min-w-[100px]">
                             <div className="text-2xl font-black text-slate-900 tracking-tight flex items-center justify-center min-w-[80px]">
@@ -935,11 +938,14 @@ export default function MatchesPage() {
                                 </span>
                             )}
                         </div>
-
+ 
                         {/* Away Team */}
                         <div className="flex-1 flex items-center justify-start gap-3 text-left">
                             {!match.isHome && <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded shrink-0">A</span>}
                             <span className={`font-bold text-lg flex items-center gap-2 ${!match.isHome ? 'text-slate-900' : 'text-slate-500'}`}>
+                                {!match.isHome && settings.logo && (
+                                    <img src={settings.logo} alt="Club Logo" className="h-6 w-6 object-contain shrink-0 rounded-full" />
+                                )}
                                 {match.isHome && teamInfo?.badge_url && (
                                     <img src={teamInfo.badge_url} alt="Badge" className="h-6 w-6 object-contain shrink-0" />
                                 )}
