@@ -38,7 +38,8 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
     const positionBorderClass = getPositionBorder(player.position);
     const statusClass = getStatusColor(player.medicalStatus);
 
-    const [displayImage, setDisplayImage] = useState(player.imageUrl || "/placeholder-player.png");
+    const defaultImage = player.imageUrl && player.imageUrl !== "/placeholder-player.png" ? player.imageUrl : "";
+    const [displayImage, setDisplayImage] = useState(defaultImage);
 
     useEffect(() => {
         const load = async () => {
@@ -49,14 +50,14 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                     if (blob) {
                         setDisplayImage(blob);
                     } else {
-                        // Fallback if IDB image is missing (e.g. data cleared or not synced)
-                        setDisplayImage("/placeholder-player.png");
+                        setDisplayImage("");
                     }
                 } catch (e) {
-                    setDisplayImage("/placeholder-player.png");
+                    setDisplayImage("");
                 }
             } else {
-                setDisplayImage(player.imageUrl || "/placeholder-player.png");
+                const img = player.imageUrl && player.imageUrl !== "/placeholder-player.png" ? player.imageUrl : "";
+                setDisplayImage(img);
             }
         };
         load();

@@ -252,7 +252,7 @@ export default function PlayerProfilePage() {
             {/* Header Section */}
             <div className="flex flex-col md:flex-row gap-6 items-start bg-white p-6 rounded-lg border shadow-sm">
                 <Avatar className="h-32 w-32 border-4 border-slate-100">
-                    <AvatarImage src={player.imageUrl} />
+                    <AvatarImage src={player.imageUrl && player.imageUrl !== "/placeholder-player.png" ? player.imageUrl : ""} />
                     <AvatarFallback className="text-4xl bg-slate-900 text-white font-bold">
                         {player.firstName[0]}{player.lastName[0]}
                     </AvatarFallback>
