@@ -167,7 +167,17 @@ export default function DashboardPage() {
     const fetchSquad = async () => {
         const { data } = await supabase.from('players').select('id, first_name, last_name, position, squad, image_url, date_of_birth, appearances, goals, assists, nickname, use_nickname');
         if (data) {
-            const mapped: Player[] = data.map((p: any) => ({
+            const mainSquad = settings.squads?.[0] || "First Team";
+            const mainSquadClean = mainSquad.toLowerCase().replace(/[\s-_]+/g, '');
+            
+            // Filter loaded players to the main squad (First Team) only
+            const filteredPlayers = data.filter((p: any) => {
+                const sClean = (p.squad || "").toLowerCase().replace(/[\s-_]+/g, '');
+                if ((sClean === 'firstteam' || sClean === 'first team') && (mainSquadClean === 'firstteam' || mainSquadClean === 'first team')) return true;
+                return sClean === mainSquadClean;
+            });
+
+            const mapped: Player[] = filteredPlayers.map((p: any) => ({
                 id: p.id,
                 firstName: p.first_name,
                 lastName: p.last_name,
@@ -285,7 +295,7 @@ export default function DashboardPage() {
         {
             title: `${mainSquad} Squad`,
             value: mainSquadCount.toString(),
-            description: otherSquadsStr || "No other squads",
+            description: "View Squad",
             icon: Users,
             link: "/squad",
             linkText: "+ Add Players"
