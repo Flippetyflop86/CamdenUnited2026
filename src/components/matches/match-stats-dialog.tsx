@@ -32,8 +32,75 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
     const [syncUrl, setSyncUrl] = useState("");
     const [showSyncInput, setShowSyncInput] = useState(false);
 
+    // Paste Import State
+    const [showPasteInput, setShowPasteInput] = useState(false);
+    const [pasteText, setPasteText] = useState("");
+    const [isParsing, setIsParsing] = useState(false);
+
     const { settings } = useClub();
     const currentSquads = settings.squads || ["First Team"];
+
+    const handlePasteImport = async () => {
+        if (!pasteText.trim()) return;
+        setIsParsing(true);
+        try {
+            const lines = pasteText.split('\n');
+            let matchedCount = 0;
+            let goalsAdded = 0;
+            
+            for (const line of lines) {
+                const cleanLine = line.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+                for (const p of players) {
+                    const fullName = `${p.first_name.toLowerCase()} ${p.last_name.toLowerCase()}`;
+                    const initialLastName = `${p.first_name[0]?.toLowerCase()} ${p.last_name.toLowerCase()}`;
+                    
+                    if (cleanLine.includes(fullName) || cleanLine.includes(initialLastName) || cleanLine.includes(p.last_name.toLowerCase())) {
+                        let stat = stats.find(s => s.player_id === p.id);
+                        if (!stat) {
+                            const newStat = { match_id: matchId, player_id: p.id, goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90 };
+                            const { data, error } = await supabase.from('match_player_stats').insert([newStat]).select().single();
+                            if (data) {
+                                stats.push(data);
+                                setStats([...stats]);
+                                stat = data;
+                            }
+                        }
+                        
+                        if (stat) {
+                            const goalEmojis = (line.match(/⚽/g) || []).length;
+                            let additionalGoals = goalEmojis;
+
+                            const lineLower = line.toLowerCase();
+                            if (lineLower.includes('goal')) {
+                                const countMatch = line.match(/\((\d+)\)/) || line.match(/goals?\s*(\d+)/i) || line.match(/(\d+)\s*goals?/i);
+                                if (countMatch) {
+                                    additionalGoals = parseInt(countMatch[1]);
+                                } else if (additionalGoals === 0) {
+                                    additionalGoals = 1;
+                                }
+                            }
+
+                            if (additionalGoals > 0) {
+                                await supabase.from('match_player_stats').update({ goals: additionalGoals }).eq('id', stat.id);
+                                goalsAdded += additionalGoals;
+                            }
+                        }
+                        
+                        matchedCount++;
+                        break;
+                    }
+                }
+            }
+            alert(`Successfully imported statistics!\n\nAdded/matched ${matchedCount} players.\nGoals logged: ${goalsAdded}.`);
+            setPasteText("");
+            setShowPasteInput(false);
+            fetchData();
+        } catch (e: any) {
+            alert("Parsing failed: " + e.message);
+        } finally {
+            setIsParsing(false);
+        }
+    };
 
     useEffect(() => {
         if (isOpen || variant === 'inline') {
@@ -180,10 +247,29 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                                     </Button>
                                     <Button size="sm" variant="ghost" onClick={() => setShowSyncInput(false)} className="h-8 px-2 text-slate-400">Cancel</Button>
                                 </div>
+                            ) : showPasteInput ? (
+                                <div className="flex items-center gap-2">
+                                    <Input 
+                                        placeholder="Paste lineup/report text..." 
+                                        value={pasteText}
+                                        onChange={(e) => setPasteText(e.target.value)}
+                                        className="h-8 text-xs w-64 bg-white"
+                                    />
+                                    <Button size="sm" onClick={handlePasteImport} disabled={isParsing} className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
+                                        {isParsing ? <RefreshCw className="h-3 w-3 animate-spin mr-1" /> : null}
+                                        Import
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => setShowPasteInput(false)} className="h-8 px-2 text-slate-400">Cancel</Button>
+                                </div>
                             ) : (
-                                <Button size="sm" variant="outline" onClick={() => setShowSyncInput(true)} className="h-8 text-xs bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100">
-                                    <LinkIcon className="h-3 w-3 mr-1.5" /> Auto-Fetch from URL
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    <Button size="sm" variant="outline" onClick={() => setShowSyncInput(true)} className="h-8 text-xs bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100">
+                                        <LinkIcon className="h-3 w-3 mr-1.5" /> Auto-Fetch from URL
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => setShowPasteInput(true)} className="h-8 text-xs bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100">
+                                        📋 Paste Text List
+                                    </Button>
+                                </div>
                             )}
                         </div>
                     </div>
@@ -321,10 +407,29 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                                     </Button>
                                     <Button size="sm" variant="ghost" onClick={() => setShowSyncInput(false)} className="h-8 px-2 text-slate-400">Cancel</Button>
                                 </div>
+                            ) : showPasteInput ? (
+                                <div className="flex items-center gap-2">
+                                    <Input 
+                                        placeholder="Paste lineup/report text..." 
+                                        value={pasteText}
+                                        onChange={(e) => setPasteText(e.target.value)}
+                                        className="h-8 text-xs w-64 bg-white"
+                                    />
+                                    <Button size="sm" onClick={handlePasteImport} disabled={isParsing} className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white">
+                                        {isParsing ? <RefreshCw className="h-3 w-3 animate-spin mr-1" /> : null}
+                                        Import
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => setShowPasteInput(false)} className="h-8 px-2 text-slate-400">Cancel</Button>
+                                </div>
                             ) : (
-                                <Button size="sm" variant="outline" onClick={() => setShowSyncInput(true)} className="h-8 text-xs bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100">
-                                    <LinkIcon className="h-3 w-3 mr-1.5" /> Auto-Fetch from URL
-                                </Button>
+                                <div className="flex items-center gap-2">
+                                    <Button size="sm" variant="outline" onClick={() => setShowSyncInput(true)} className="h-8 text-xs bg-indigo-50 text-indigo-700 border-indigo-200 hover:bg-indigo-100">
+                                        <LinkIcon className="h-3 w-3 mr-1.5" /> Auto-Fetch from URL
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => setShowPasteInput(true)} className="h-8 text-xs bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100">
+                                        📋 Paste Text List
+                                    </Button>
+                                </div>
                             )}
                         </div>
                     </div>
