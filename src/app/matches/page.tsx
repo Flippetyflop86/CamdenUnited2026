@@ -874,7 +874,7 @@ export default function MatchesPage() {
                                 <Share2 className="h-4 w-4" />
                             </Button>
                         )}
-                        {!isPast && (
+                        {isPast && (
                             <Button 
                                 variant="ghost" 
                                 size="icon" 
