@@ -17,14 +17,47 @@ export async function POST(request: Request) {
         }
 
         // 2. Fetch club membership and verify role is Manager
-        const { data: member, error: memberError } = await supabase
+        let member: any = null;
+        const { data: existingMember } = await supabase
             .from("club_members")
             .select("club_id, role")
             .eq("user_id", user.id)
-            .single();
+            .maybeSingle();
 
-        if (memberError || !member) {
-            return NextResponse.json({ success: false, error: "Forbidden: Could not verify club membership" }, { status: 403 });
+        if (!existingMember) {
+            // Auto-create a club first
+            const { data: newClub, error: clubErr } = await supabase
+                .from("clubs")
+                .insert([{
+                    name: "Camden United",
+                    primary_color: "#ef4444"
+                }])
+                .select()
+                .single();
+
+            if (clubErr || !newClub) {
+                return NextResponse.json({ success: false, error: "Failed to auto-create club during seed: " + (clubErr?.message || "Unknown error") }, { status: 500 });
+            }
+
+            // Create membership
+            const { data: newMember, error: memberErr } = await supabase
+                .from("club_members")
+                .insert([{
+                    club_id: newClub.id,
+                    user_id: user.id,
+                    role: "Manager",
+                    display_name: user.user_metadata?.full_name || "Leon"
+                }])
+                .select()
+                .single();
+
+            if (memberErr || !newMember) {
+                return NextResponse.json({ success: false, error: "Failed to auto-create club membership: " + (memberErr?.message || "Unknown error") }, { status: 500 });
+            }
+
+            member = newMember;
+        } else {
+            member = existingMember;
         }
 
         const roleClean = (member.role || "").toLowerCase();
