@@ -87,49 +87,65 @@ export async function POST(request: Request) {
             matches: 0,
         };
 
-        // 3. Migrate Players (explicitly inject clubId)
+        // Wipe existing data for this club first to remove real Camden United data
+        await supabase.from("players").delete().eq("club_id", clubId);
+        await supabase.from("matches").delete().eq("club_id", clubId);
+        await supabase.from("training_sessions").delete().eq("club_id", clubId);
+
+        const FIRST_NAMES = ["David", "James", "Robert", "John", "Michael", "William", "Kieran", "Thomas", "Daniel", "Matthew", "Steven", "Chris", "Andrew", "Ryan", "Luke", "Alex", "Sam", "Harry", "Jack", "Oliver"];
+        const LAST_NAMES = ["Smith", "Jones", "Taylor", "Brown", "Wilson", "Johnson", "Davis", "Walker", "Green", "Wood", "Harris", "Clark", "Lewis", "Robinson", "Hall", "Wright", "King", "Baker", "Carter", "Ward"];
+        const OPPONENTS = ["Rangers FC", "City Athletic", "Rovers FC", "Wanderers FC", "Town FC", "Albion FC", "United FC", "County FC", "Real FC", "Athletic Club"];
+
+        // 3. Seed Players with randomized generic names
         if (initialData.players && initialData.players.length > 0) {
-            const playersToInsert = initialData.players.map((p: any) => ({
-                club_id: clubId,
-                first_name: p.firstName,
-                last_name: p.lastName,
-                position: p.position,
-                squad_number: p.squadNumber,
-                age: p.age,
-                date_of_birth: p.dateOfBirth,
-                nationality: p.nationality,
-                squad: p.squad, // 'firstTeam', etc.
-                medical_status: p.medicalStatus,
-                availability: p.availability,
-                contract_expiry: p.contractExpiry,
-                image_url: p.imageUrl,
-                appearances: p.appearances || 0,
-                goals: p.goals || 0,
-                assists: p.assists || 0,
-                is_in_training_squad: p.isInTrainingSquad
-            }));
+            const playersToInsert = initialData.players.map((p: any, index: number) => {
+                const randomFirstName = FIRST_NAMES[index % FIRST_NAMES.length];
+                const randomLastName = LAST_NAMES[(index + 3) % LAST_NAMES.length];
+                return {
+                    club_id: clubId,
+                    first_name: randomFirstName,
+                    last_name: randomLastName,
+                    position: p.position,
+                    squad_number: p.squadNumber || (index + 1),
+                    age: p.age,
+                    date_of_birth: p.dateOfBirth,
+                    nationality: p.nationality || "English",
+                    squad: p.squad, 
+                    medical_status: p.medicalStatus || "Available",
+                    availability: p.availability || false,
+                    contract_expiry: p.contractExpiry,
+                    image_url: "/placeholder-player.png", 
+                    appearances: p.appearances || 0,
+                    goals: p.goals || 0,
+                    assists: p.assists || 0,
+                    is_in_training_squad: p.isInTrainingSquad || true
+                };
+            });
 
             const { error: playerError } = await supabase.from("players").insert(playersToInsert);
             if (playerError) throw playerError;
             results.players = playersToInsert.length;
         }
 
-        // 4. Migrate Matches (explicitly inject clubId)
+        // 4. Seed Matches with randomized generic opponents
         const localMatches = initialData["camden-united-matches-v6"] as any[];
         if (localMatches && localMatches.length > 0) {
-            const matchesToInsert = localMatches.map((m: any) => ({
-                club_id: clubId,
-                date: m.date,
-                time: m.time,
-                opponent: m.opponent,
-                is_home: m.isHome,
-                competition: m.competition,
-                scoreline: m.scoreline,
-                result: m.result,
-                goalscorers: m.goalscorers,
-                assists: m.assists,
-                notes: m.notes
-            }));
+            const matchesToInsert = localMatches.map((m: any, index: number) => {
+                const randomOpponent = OPPONENTS[index % OPPONENTS.length];
+                return {
+                    club_id: clubId,
+                    date: m.date,
+                    time: m.time,
+                    opponent: randomOpponent,
+                    is_home: m.isHome,
+                    competition: m.competition || "League",
+                    scoreline: m.scoreline,
+                    result: m.result,
+                    goalscorers: null, 
+                    assists: null,
+                    notes: "Pre-season friendly demo"
+                };
+            });
 
             const { error: matchError } = await supabase.from("matches").insert(matchesToInsert);
             if (matchError) throw matchError;
