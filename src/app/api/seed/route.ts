@@ -29,7 +29,7 @@ export async function POST(request: Request) {
             const { data: newClub, error: clubErr } = await supabase
                 .from("clubs")
                 .insert([{
-                    name: "Camden United",
+                    name: "ClubFlow United",
                     primary_color: "#ef4444"
                 }])
                 .select()
