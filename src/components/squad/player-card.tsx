@@ -1,4 +1,5 @@
 import { Player } from "@/types";
+import { formatPlayerName } from "@/lib/utils";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -128,7 +129,7 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                         </AvatarFallback>
                     </Avatar>
                     <div className="mt-2 sm:mt-4 text-center">
-                        <CardTitle className="text-white text-sm sm:text-lg truncate max-w-[140px] sm:max-w-none">{player.firstName} {player.lastName}</CardTitle>
+                        <CardTitle className="text-white text-sm sm:text-lg truncate max-w-[140px] sm:max-w-none">{formatPlayerName(player)}</CardTitle>
                         <p className="text-slate-400 text-xs sm:text-sm font-medium">{player.position} • {squadLabel} • {displayAge} yo</p>
 
                         {player.medicalStatus === "Holiday" && player.holidayStart && player.holidayEnd && (

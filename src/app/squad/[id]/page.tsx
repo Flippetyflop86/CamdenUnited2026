@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { cn } from "@/lib/utils";
+import { cn, formatPlayerName } from "@/lib/utils";
 import { notFound, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -99,7 +99,7 @@ export default function PlayerProfilePage() {
 
     const handleResetPlayerPin = async () => {
         if (!player) return;
-        if (!confirm(`Are you sure you want to reset the PIN for ${player.firstName}? They will be required to choose a new 6-digit PIN the next time they respond.`)) return;
+        if (!confirm(`Are you sure you want to reset the PIN for ${formatPlayerName(player)}? They will be required to choose a new 6-digit PIN the next time they respond.`)) return;
 
         try {
             const { error } = await supabase
@@ -172,7 +172,9 @@ export default function PlayerProfilePage() {
                     email: data.email,
                     mobileNumber: data.mobile_number,
                     status: data.status || "Pending Activation",
-                    trustedDevices: data.trusted_devices || []
+                    trustedDevices: data.trusted_devices || [],
+                    nickname: data.nickname || "",
+                    useNickname: data.use_nickname || false
                 } as any);
             }
 
@@ -259,7 +261,7 @@ export default function PlayerProfilePage() {
                 <div className="flex-1 space-y-2">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
-                            <h2 className="text-3xl font-bold text-slate-900">{player.firstName} {player.lastName}</h2>
+                            <h2 className="text-3xl font-bold text-slate-900">{formatPlayerName(player)}</h2>
                             <div className="flex items-center gap-3 mt-1">
                                 <span className="text-slate-500 font-medium">{player.position}</span>
                                 <Badge className="bg-slate-900">{squadLabel}</Badge>

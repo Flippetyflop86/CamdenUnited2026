@@ -9,6 +9,7 @@ import { Plus, Trash2, Save, FileDown, Calendar, MapPin, Clock, GripVertical, Tr
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
+import { formatPlayerName } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const POSITION_ORDER: { [key: string]: number } = {
@@ -175,6 +176,8 @@ export default function MatchdayXIPage() {
                 imageUrl: p.image_url, // Added mapping
                 isInMatchdayTracker: p.is_in_matchday_tracker,
                 secondaryPositions: p.secondary_position ? p.secondary_position.split(",").map((s: string) => s.trim() as Position) : [],
+                nickname: p.nickname || "",
+                useNickname: p.use_nickname || false
             }));
 
             // Sort logic using global POSITION_ORDER
@@ -435,7 +438,12 @@ export default function MatchdayXIPage() {
 
         const formation = FORMATIONS[lineup.formation];
 
-        const getDisplayName = (player: { firstName: string; lastName: string }) => {
+        const getDisplayName = (player: { firstName: string; lastName: string; nickname?: string; useNickname?: boolean }) => {
+            const nickname = player.nickname ?? "";
+            const useNickname = player.useNickname ?? false;
+            if (useNickname && nickname.trim().length > 0) {
+                return nickname.trim();
+            }
             const fullName = `${player.firstName} ${player.lastName}`;
             if (fullName === "Mohamed Abdalla") return "Suarez";
             if (fullName === "Said Tahir") return "Bobo";
@@ -810,10 +818,7 @@ export default function MatchdayXIPage() {
                         {sortedPlayers
                             .filter(p => squadFilter === "All" || getPositionCategory(p.position) === squadFilter)
                             .map(player => {
-                                const fullName = `${player.firstName} ${player.lastName}`;
-                                let displayName = player.firstName;
-                                if (fullName === "Mohamed Abdalla") displayName = "Suarez";
-                                if (fullName === "Said Tahir") displayName = "Bobo";
+                                const displayName = formatPlayerName(player);
 
                                 return (
                                     <div 
@@ -981,10 +986,7 @@ export default function MatchdayXIPage() {
                         {lineup.substitutes.map((rawSubId, idx) => {
                             const player = rawSubId ? players.find(p => p.id === rawSubId) : null;
                             const subId = player ? rawSubId : "";
-                            const fullName = player ? `${player.firstName} ${player.lastName}` : "";
-                            let displayName = player ? player.firstName : "";
-                            if (fullName === "Mohamed Abdalla") displayName = "Suarez";
-                            if (fullName === "Said Tahir") displayName = "Bobo";
+                            const displayName = formatPlayerName(player);
 
                             return (
                                 <div 

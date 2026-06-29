@@ -370,7 +370,9 @@ export default function SquadPage() {
                     contractStartDate: p.contract_start_date,
                     contractEndDate: p.contract_end_date,
                     subsBillingModel: p.subs_billing_model || "Monthly",
-                    subsCustomAmount: p.subs_custom_amount !== undefined && p.subs_custom_amount !== null ? Number(p.subs_custom_amount) : 0
+                    subsCustomAmount: p.subs_custom_amount !== undefined && p.subs_custom_amount !== null ? Number(p.subs_custom_amount) : 0,
+                    nickname: p.nickname || "",
+                    useNickname: p.use_nickname || false
                 };
             });
 
@@ -475,7 +477,9 @@ export default function SquadPage() {
             contract_start_date: updatedPlayer.contractStartDate ? updatedPlayer.contractStartDate : null,
             contract_end_date: updatedPlayer.contractEndDate ? updatedPlayer.contractEndDate : null,
             subs_billing_model: updatedPlayer.subsBillingModel || "Monthly",
-            subs_custom_amount: updatedPlayer.subsCustomAmount !== undefined && updatedPlayer.subsCustomAmount !== null ? updatedPlayer.subsCustomAmount : 0
+            subs_custom_amount: updatedPlayer.subsCustomAmount !== undefined && updatedPlayer.subsCustomAmount !== null ? updatedPlayer.subsCustomAmount : 0,
+            nickname: updatedPlayer.nickname || null,
+            use_nickname: updatedPlayer.useNickname || false
         };
         try {
             let error;
@@ -635,6 +639,23 @@ export default function SquadPage() {
                                 <div className="space-y-1">
                                     <label className="block text-xs font-medium text-slate-500">Last Name</label>
                                     <Input value={editingPlayer.lastName} onChange={(e) => setEditingPlayer({ ...editingPlayer, lastName: e.target.value })} className="h-8 text-sm" />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-medium text-slate-500">Nickname (Optional)</label>
+                                    <Input value={editingPlayer.nickname || ""} onChange={(e) => setEditingPlayer({ ...editingPlayer, nickname: e.target.value })} placeholder="e.g. Suarez" className="h-8 text-sm" />
+                                </div>
+                                <div className="flex items-center gap-2 pt-6">
+                                    <input 
+                                        type="checkbox" 
+                                        id="useNickname" 
+                                        checked={editingPlayer.useNickname || false} 
+                                        onChange={(e) => setEditingPlayer({ ...editingPlayer, useNickname: e.target.checked })} 
+                                        className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 cursor-pointer"
+                                    />
+                                    <label htmlFor="useNickname" className="text-xs font-semibold text-slate-700 cursor-pointer">Use Nickname across site</label>
                                 </div>
                             </div>
                             

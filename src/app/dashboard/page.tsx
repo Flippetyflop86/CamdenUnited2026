@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { supabase } from "@/lib/supabase";
+import { formatPlayerName } from "@/lib/utils";
 
 export default function DashboardPage() {
     const { settings, updateSettings } = useClub();
@@ -152,7 +153,7 @@ export default function DashboardPage() {
     };
 
     const fetchSquad = async () => {
-        const { data } = await supabase.from('players').select('id, first_name, last_name, position, squad, image_url, date_of_birth, appearances, goals, assists');
+        const { data } = await supabase.from('players').select('id, first_name, last_name, position, squad, image_url, date_of_birth, appearances, goals, assists, nickname, use_nickname');
         if (data) {
             const mapped: Player[] = data.map((p: any) => ({
                 id: p.id,
@@ -169,7 +170,9 @@ export default function DashboardPage() {
                 availability: true,
                 appearances: p.appearances || 0,
                 goals: p.goals || 0,
-                assists: p.assists || 0
+                assists: p.assists || 0,
+                nickname: p.nickname || "",
+                useNickname: p.use_nickname || false
             }));
             setPlayers(mapped);
 
@@ -388,7 +391,7 @@ export default function DashboardPage() {
                 {formation.map((pos, idx) => {
                     const playerId = lineup.starters?.[idx];
                     const player = playerId ? players.find(p => p.id === playerId) : null;
-                    const name = player ? `${player.firstName.charAt(0)}. ${player.lastName}` : pos.label;
+                    const name = player ? (player.useNickname && player.nickname ? player.nickname : `${player.firstName.charAt(0)}. ${player.lastName}`) : pos.label;
                     
                     return (
                         <div 
@@ -511,7 +514,7 @@ export default function DashboardPage() {
                                 <p className="text-xs text-slate-550">
                                     {birthdays.map(b => {
                                         const daysText = b.daysLeft === 0 ? "today!" : `in ${b.daysLeft} days (${b.nextBirthday.getDate()} ${b.nextBirthday.toLocaleString('en-GB', { month: 'short' })})`;
-                                        return `${b.player.firstName} ${b.player.lastName} turns ${new Date().getFullYear() - new Date(b.player.dateOfBirth!).getFullYear()} ${daysText}`;
+                                        return `${formatPlayerName(b.player)} turns ${new Date().getFullYear() - new Date(b.player.dateOfBirth!).getFullYear()} ${daysText}`;
                                     }).join(", ")}
                                 </p>
                             </div>
@@ -845,7 +848,7 @@ export default function DashboardPage() {
                                     <div key={player.id} className="flex items-center justify-between text-xs">
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold text-slate-400 w-4">{i + 1}.</span>
-                                            <span className="font-semibold text-slate-800">{player.firstName} {player.lastName}</span>
+                                            <span className="font-semibold text-slate-800">{formatPlayerName(player)}</span>
                                         </div>
                                         <span className="font-black text-slate-900 bg-red-50 text-red-600 px-2 py-0.5 rounded border border-red-100">{player.goals} goal{player.goals !== 1 ? 's' : ''}</span>
                                     </div>
@@ -874,7 +877,7 @@ export default function DashboardPage() {
                                     <div key={player.id} className="flex items-center justify-between text-xs">
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold text-slate-400 w-4">{i + 1}.</span>
-                                            <span className="font-semibold text-slate-800">{player.firstName} {player.lastName}</span>
+                                            <span className="font-semibold text-slate-800">{formatPlayerName(player)}</span>
                                         </div>
                                         <span className="font-black text-slate-900 bg-blue-50 text-blue-600 px-2 py-0.5 rounded border border-blue-100">{player.assists} assist{player.assists !== 1 ? 's' : ''}</span>
                                     </div>
@@ -903,7 +906,7 @@ export default function DashboardPage() {
                                     <div key={player.id} className="flex items-center justify-between text-xs">
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold text-slate-400 w-4">{i + 1}.</span>
-                                            <span className="font-semibold text-slate-800">{player.firstName} {player.lastName}</span>
+                                            <span className="font-semibold text-slate-800">{formatPlayerName(player)}</span>
                                         </div>
                                         <span className="font-black text-slate-900 bg-emerald-50 text-emerald-650 px-2 py-0.5 rounded border border-emerald-100">{player.appearances} match{player.appearances !== 1 ? 'es' : ''}</span>
                                     </div>

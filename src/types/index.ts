@@ -34,6 +34,8 @@ export interface Player {
     isInTrainingSquad?: boolean;
     isInMatchdayTracker?: boolean;
     secondaryPositions?: Position[];
+    nickname?: string;
+    useNickname?: boolean;
 
     // Contract Info
     isContracted?: boolean;

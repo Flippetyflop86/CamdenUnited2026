@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { CalendarDays, Clock, MapPin, AlertCircle, RefreshCw, KeyRound, CheckCircle, UserCheck } from "lucide-react";
+import { formatPlayerName } from "@/lib/utils";
 
 export default function SessionCodeResponderPage() {
     const params = useParams();
@@ -130,7 +131,7 @@ export default function SessionCodeResponderPage() {
             localStorage.setItem(`cf_session_code_${event.id}`, codeVal);
 
             setIsModalOpen(false);
-            setSuccessMessage(`${player.first_name} marked as ${nextStatus}!`);
+            setSuccessMessage(`${formatPlayerName(player)} marked as ${nextStatus}!`);
 
             // Reload event rosters in background
             await loadEventAndSquad();
@@ -250,7 +251,7 @@ export default function SessionCodeResponderPage() {
                                     </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                    <h3 className="text-base font-bold text-white">{selectedPlayer.first_name} {selectedPlayer.last_name}</h3>
+                                    <h3 className="text-base font-bold text-white">{formatPlayerName(selectedPlayer)}</h3>
                                     <span className="text-xs text-slate-400 font-semibold uppercase">{selectedPlayer.position}</span>
                                 </div>
                             </div>
@@ -315,12 +316,20 @@ export default function SessionCodeResponderPage() {
                                         <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
                                             {player.position}
                                         </span>
-                                        <span className="text-sm font-bold text-white leading-tight">
-                                            {player.first_name}
-                                        </span>
-                                        <span className="text-xs text-slate-400 leading-tight">
-                                            {player.last_name}
-                                        </span>
+                                        {player.use_nickname && player.nickname ? (
+                                            <span className="text-sm font-bold text-white leading-tight py-1.5">
+                                                {player.nickname}
+                                            </span>
+                                        ) : (
+                                            <>
+                                                <span className="text-sm font-bold text-white leading-tight">
+                                                    {player.first_name}
+                                                </span>
+                                                <span className="text-xs text-slate-400 leading-tight">
+                                                    {player.last_name}
+                                                </span>
+                                            </>
+                                        )}
 
                                         <div className={`mt-1.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full
                                             ${isAvailable 
@@ -352,7 +361,7 @@ export default function SessionCodeResponderPage() {
                                     <h3 className="font-bold text-lg text-white">
                                         Enter Session Code
                                     </h3>
-                                    <p className="text-xs text-slate-400 font-semibold">For {selectedPlayer.first_name} {selectedPlayer.last_name}</p>
+                                    <p className="text-xs text-slate-400 font-semibold">For {formatPlayerName(selectedPlayer)}</p>
                                 </div>
                             </div>
                             <button 
