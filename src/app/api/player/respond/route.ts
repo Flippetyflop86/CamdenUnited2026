@@ -269,7 +269,9 @@ export async function POST(request: Request) {
             const playerIndex = updatedAttendance.findIndex(a => a.playerId === playerId);
 
             // Map UI status to DB status
-            const mappedStatus = status === "Available" ? "Present" : "Absent";
+            let mappedStatus = "Absent";
+            if (status === "Available") mappedStatus = "Present";
+            else if (status === "Maybe") mappedStatus = "Late";
 
             if (playerIndex >= 0) {
                 updatedAttendance[playerIndex] = { 

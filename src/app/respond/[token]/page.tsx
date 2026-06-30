@@ -30,6 +30,7 @@ export default function SessionCodeResponderPage() {
 
     // RSVP success indicator
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [searchTerm, setSearchTerm] = useState("");
 
     const loadEventAndSquad = async () => {
         try {
@@ -73,39 +74,18 @@ export default function SessionCodeResponderPage() {
         setCodeError("");
 
         if (isVerifiedForSession()) {
-            // Already verified this session in this browser, toggle instantly
-            submitResponse(player, getSavedCode());
+            setEnteredCode(getSavedCode());
         } else {
             setEnteredCode("");
-            setIsModalOpen(true);
         }
+        setIsModalOpen(true);
     };
 
-    const submitResponse = async (player: any, codeVal: string) => {
+    const submitResponse = async (player: any, codeVal: string, status: "Available" | "Maybe" | "Unavailable") => {
         setIsVerifying(true);
         setCodeError("");
 
         try {
-            // Determine current RSVP status to toggle it
-            let currentStatus = "Unavailable";
-            if (eventType === "match") {
-                const currentNotes = event.notes || "";
-                const matchRaw = currentNotes.match(/\[AVAILABILITY:\s*(.*?)\s*\]/);
-                if (matchRaw && matchRaw[1]) {
-                    try {
-                        const list = JSON.parse(matchRaw[1]);
-                        const record = list.find((a: any) => a.playerId === player.id);
-                        currentStatus = record?.status || "Unavailable";
-                    } catch (e) {}
-                }
-            } else {
-                const attendance = event.attendance || [];
-                const record = attendance.find((a: any) => a.playerId === player.id);
-                currentStatus = (record?.status === "Present" || record?.status === "Late") ? "Available" : "Unavailable";
-            }
-
-            const nextStatus = currentStatus === "Available" ? "Unavailable" : "Available";
-
             const res = await fetch("/api/player/respond", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -113,7 +93,7 @@ export default function SessionCodeResponderPage() {
                     playerId: player.id,
                     eventId: event.id,
                     eventType,
-                    status: nextStatus,
+                    status,
                     code: codeVal
                 })
             });
@@ -131,7 +111,7 @@ export default function SessionCodeResponderPage() {
             localStorage.setItem(`cf_session_code_${event.id}`, codeVal);
 
             setIsModalOpen(false);
-            setSuccessMessage(`${formatPlayerName(player)} marked as ${nextStatus}!`);
+            setSuccessMessage(`${formatPlayerName(player)} marked as ${status}!`);
 
             // Reload event rosters in background
             await loadEventAndSquad();
@@ -146,12 +126,6 @@ export default function SessionCodeResponderPage() {
         } finally {
             setIsVerifying(false);
         }
-    };
-
-    const handleCodeSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!selectedPlayer || !enteredCode) return;
-        await submitResponse(selectedPlayer, enteredCode);
     };
 
     if (loading) {
@@ -266,82 +240,105 @@ export default function SessionCodeResponderPage() {
                 {/* Player List Grid */}
                 <Card className="bg-slate-900 border-slate-800 shadow-xl">
                     <CardHeader className="pb-4">
-                        <CardTitle className="text-lg text-white font-bold">Squad List</CardTitle>
-                        <CardDescription className="text-slate-400">
-                            Find and tap your name to toggle availability.
-                        </CardDescription>
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                            <div>
+                                <CardTitle className="text-lg text-white font-bold">Squad List</CardTitle>
+                                <CardDescription className="text-slate-400">
+                                    Search for your name and select it to RSVP.
+                                </CardDescription>
+                            </div>
+                            <div className="w-full sm:w-64">
+                                <Input 
+                                    placeholder="Search your name..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="bg-slate-950 border-slate-800 text-white h-9 text-xs focus-visible:ring-red-500"
+                                />
+                            </div>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                            {players.map((player) => {
-                                let isAvailable = false;
-                                if (eventType === "match") {
-                                    const currentNotes = event.notes || "";
-                                    const matchRaw = currentNotes.match(/\[AVAILABILITY:\s*(.*?)\s*\]/);
-                                    if (matchRaw && matchRaw[1]) {
-                                        try {
-                                            const list = JSON.parse(matchRaw[1]);
-                                            const record = list.find((a: any) => a.playerId === player.id);
-                                            isAvailable = record?.status === "Available";
-                                        } catch (e) {
-                                            isAvailable = false;
+                            {players
+                                .filter(player => {
+                                    const fullName = `${player.first_name} ${player.last_name}`.toLowerCase();
+                                    const nickname = (player.nickname || "").toLowerCase();
+                                    const search = searchTerm.toLowerCase();
+                                    return fullName.includes(search) || nickname.includes(search);
+                                })
+                                .map((player) => {
+                                    let playerStatus: "Available" | "Maybe" | "Unavailable" = "Unavailable";
+                                    if (eventType === "match") {
+                                        const currentNotes = event.notes || "";
+                                        const matchRaw = currentNotes.match(/\[AVAILABILITY:\s*(.*?)\s*\]/);
+                                        if (matchRaw && matchRaw[1]) {
+                                            try {
+                                                const list = JSON.parse(matchRaw[1]);
+                                                const record = list.find((a: any) => a.playerId === player.id);
+                                                if (record?.status === "Available") playerStatus = "Available";
+                                                else if (record?.status === "Maybe") playerStatus = "Maybe";
+                                            } catch (e) {}
                                         }
+                                    } else {
+                                        const attendance = event.attendance || [];
+                                        const record = attendance.find((a: any) => a.playerId === player.id);
+                                        if (record?.status === "Present") playerStatus = "Available";
+                                        else if (record?.status === "Late") playerStatus = "Maybe";
                                     }
-                                } else {
-                                    const attendance = event.attendance || [];
-                                    const record = attendance.find((a: any) => a.playerId === player.id);
-                                    isAvailable = record?.status === "Present" || record?.status === "Late";
-                                }
 
-                                const isSessionVerified = isVerifiedForSession();
+                                    const isSessionVerified = isVerifiedForSession();
 
-                                return (
-                                    <div
-                                        key={player.id}
-                                        onClick={() => !isVerifying && handlePlayerClick(player)}
-                                        className={`
-                                            relative flex flex-col items-center p-4 rounded-xl border cursor-pointer select-none text-center gap-1.5 transition-all duration-150 min-h-[110px]
-                                            ${isAvailable
-                                                ? "bg-emerald-950/30 border-emerald-500 shadow-md shadow-emerald-500/10 scale-[1.02]"
-                                                : "bg-slate-800/50 border-slate-800 hover:border-slate-750 hover:bg-slate-800"
-                                            }
-                                        `}
-                                    >
-                                        {isSessionVerified && (
-                                            <div className="absolute top-2 right-2 flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-500/20 border border-emerald-450 text-emerald-400 text-[8px] font-bold">
-                                                ✓
-                                            </div>
-                                        )}
-
-                                        <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
-                                            {player.position}
-                                        </span>
-                                        {player.use_nickname && player.nickname ? (
-                                            <span className="text-sm font-bold text-white leading-tight py-1.5">
-                                                {player.nickname}
-                                            </span>
-                                        ) : (
-                                            <>
-                                                <span className="text-sm font-bold text-white leading-tight">
-                                                    {player.first_name}
-                                                </span>
-                                                <span className="text-xs text-slate-400 leading-tight">
-                                                    {player.last_name}
-                                                </span>
-                                            </>
-                                        )}
-
-                                        <div className={`mt-1.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full
-                                            ${isAvailable 
-                                                ? "bg-emerald-950/50 text-emerald-400 border border-emerald-900/50" 
-                                                : "bg-slate-900 text-slate-500 border border-slate-800"
-                                            }`}
+                                    return (
+                                        <div
+                                            key={player.id}
+                                            onClick={() => !isVerifying && handlePlayerClick(player)}
+                                            className={`
+                                                relative flex flex-col items-center p-4 rounded-xl border cursor-pointer select-none text-center gap-1.5 transition-all duration-150 min-h-[110px]
+                                                ${playerStatus === "Available"
+                                                    ? "bg-emerald-950/20 border-emerald-500/50 shadow-md shadow-emerald-500/5 scale-[1.02]"
+                                                    : playerStatus === "Maybe"
+                                                    ? "bg-amber-950/20 border-amber-500/50 shadow-md shadow-amber-500/5 scale-[1.02]"
+                                                    : "bg-slate-800/50 border-slate-800 hover:border-slate-750 hover:bg-slate-800"
+                                                }
+                                            `}
                                         >
-                                            {isAvailable ? "Available" : "Unavailable"}
+                                            {isSessionVerified && (
+                                                <div className="absolute top-2 right-2 flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-500/20 border border-emerald-450 text-emerald-400 text-[8px] font-bold">
+                                                    ✓
+                                                </div>
+                                            )}
+
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                                                {player.position}
+                                            </span>
+                                            {player.use_nickname && player.nickname ? (
+                                                <span className="text-sm font-bold text-white leading-tight py-1.5">
+                                                    {player.nickname}
+                                                </span>
+                                            ) : (
+                                                <>
+                                                    <span className="text-sm font-bold text-white leading-tight">
+                                                        {player.first_name}
+                                                    </span>
+                                                    <span className="text-xs text-slate-400 leading-tight">
+                                                        {player.last_name}
+                                                    </span>
+                                                </>
+                                            )}
+
+                                            <div className={`mt-1.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border
+                                                ${playerStatus === "Available" 
+                                                    ? "bg-emerald-950/50 text-emerald-400 border-emerald-900/50" 
+                                                    : playerStatus === "Maybe"
+                                                    ? "bg-amber-950/50 text-amber-400 border-amber-900/50"
+                                                    : "bg-slate-900 text-slate-505 border-slate-800"
+                                                }`}
+                                            >
+                                                {playerStatus === "Available" ? "Available" : playerStatus === "Maybe" ? "Maybe" : "Unavailable"}
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })}
                         </div>
                     </CardContent>
                 </Card>
@@ -359,7 +356,7 @@ export default function SessionCodeResponderPage() {
                                 </div>
                                 <div>
                                     <h3 className="font-bold text-lg text-white">
-                                        Enter Session Code
+                                        Confirm RSVP
                                     </h3>
                                     <p className="text-xs text-slate-400 font-semibold">For {formatPlayerName(selectedPlayer)}</p>
                                 </div>
@@ -373,7 +370,7 @@ export default function SessionCodeResponderPage() {
                         </div>
 
                         {/* Modal Content */}
-                        <form onSubmit={handleCodeSubmit} className="p-5 space-y-4">
+                        <div className="p-5 space-y-4">
                             {codeError && (
                                 <div className="bg-red-950/40 border border-red-500/30 rounded-xl p-3 flex items-center gap-2.5 text-red-400 text-xs">
                                     <AlertCircle className="h-4.5 w-4.5 shrink-0" />
@@ -381,31 +378,57 @@ export default function SessionCodeResponderPage() {
                                 </div>
                             )}
 
-                            <div className="space-y-3">
-                                <p className="text-xs text-slate-300 leading-relaxed font-semibold">
-                                    Please enter the 6-character session code (from the WhatsApp invite message) to confirm your RSVP.
-                                </p>
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Session Code</label>
-                                    <Input
-                                        type="text"
-                                        required
-                                        autoFocus
-                                        value={enteredCode}
-                                        onChange={(e) => setEnteredCode(e.target.value.toUpperCase().trim())}
-                                        placeholder="e.g. CUA5DC"
-                                        className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500 uppercase"
-                                    />
+                            <div className="space-y-4">
+                                {!isVerifiedForSession() && (
+                                    <div className="space-y-1.5">
+                                        <p className="text-xs text-slate-350 leading-relaxed font-medium">
+                                            Please enter the 6-character session code from the WhatsApp invite.
+                                        </p>
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Session Code</label>
+                                        <Input
+                                            type="text"
+                                            required
+                                            autoFocus
+                                            value={enteredCode}
+                                            onChange={(e) => setEnteredCode(e.target.value.toUpperCase().trim())}
+                                            placeholder="e.g. CUA5DC"
+                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500 uppercase"
+                                        />
+                                    </div>
+                                )}
+
+                                <div className="space-y-2 pt-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Select Availability</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <Button 
+                                            type="button"
+                                            disabled={isVerifying || (!isVerifiedForSession() && !enteredCode)}
+                                            onClick={() => submitResponse(selectedPlayer, enteredCode, "Available")}
+                                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-10 transition-colors"
+                                        >
+                                            Available
+                                        </Button>
+                                        <Button 
+                                            type="button"
+                                            disabled={isVerifying || (!isVerifiedForSession() && !enteredCode)}
+                                            onClick={() => submitResponse(selectedPlayer, enteredCode, "Maybe")}
+                                            className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs h-10 transition-colors"
+                                        >
+                                            Maybe
+                                        </Button>
+                                        <Button 
+                                            type="button"
+                                            disabled={isVerifying || (!isVerifiedForSession() && !enteredCode)}
+                                            onClick={() => submitResponse(selectedPlayer, enteredCode, "Unavailable")}
+                                            className="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs h-10 transition-colors"
+                                        >
+                                            No
+                                        </Button>
+                                    </div>
+                                    {isVerifying && <p className="text-[10px] text-slate-500 text-center animate-pulse mt-1">Verifying code & saving RSVP...</p>}
                                 </div>
-                                <Button 
-                                    type="submit"
-                                    disabled={isVerifying || !enteredCode}
-                                    className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
-                                >
-                                    {isVerifying ? "Verifying..." : "Confirm Availability"}
-                                </Button>
                             </div>
-                        </form>
+                        </div>
                     </div>
                 </div>
             )}
