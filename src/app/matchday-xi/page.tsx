@@ -638,7 +638,8 @@ export default function MatchdayXIPage() {
             msgTemplate += `🏆 {competition}\n`;
             msgTemplate += `📅 {date}\n`;
             msgTemplate += `⏰ Kick-off: {time}\n`;
-            msgTemplate += `📍 Meet Time: {meet_time}\n\n`;
+            msgTemplate += `📍 Meet Time: {meet_time}\n`;
+            msgTemplate += `🔑 Session Code: {code}\n\n`;
         } else {
             msgTemplate += `*Upcoming Match TBD*\n\n`;
         }
@@ -653,13 +654,15 @@ export default function MatchdayXIPage() {
             : new Date().toLocaleDateString('en-GB');
 
         const meetTime = nextMatch && nextMatch.time ? calculateMeetTime(nextMatch.time, -60) : "TBD";
+        const sessionCode = nextMatch ? ("CU" + (nextMatch.event_token || nextMatch.id).replace(/-/g, "").substring(0, 4)).toUpperCase() : "TBD";
 
         const formattedMsg = msgTemplate
             .replace(/{opponent}/g, nextMatch ? nextMatch.opponent : "TBD")
             .replace(/{competition}/g, nextMatch ? (nextMatch.competition || "Match") : "Match")
             .replace(/{date}/g, dateFormatted)
             .replace(/{time}/g, nextMatch ? nextMatch.time : "TBD")
-            .replace(/{meet_time}/g, meetTime);
+            .replace(/{meet_time}/g, meetTime)
+            .replace(/{code}/g, sessionCode);
 
         navigator.clipboard.writeText(formattedMsg).then(() => {
             const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(formattedMsg)}`;

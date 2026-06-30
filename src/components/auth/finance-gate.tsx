@@ -41,19 +41,14 @@ export function FinanceGate({
     const { user, clubId } = useAuth();
 
     useEffect(() => {
-        // Check session storage
-        const authValues = sessionStorage.getItem("finance-auth-session");
-        if (authValues) {
-            const session = JSON.parse(authValues);
-            if (user && session.supabaseUserId && session.supabaseUserId !== user.id) {
-                // Clear session if Supabase user switched
-                setIsAuthorized(false);
-                setCurrentUser(null);
-                sessionStorage.removeItem("finance-auth-session");
-            } else {
-                setIsAuthorized(true);
-                setCurrentUser(session);
-            }
+        if (user) {
+            // Automatically authorize the logged-in user to remove friction and simplify UX
+            setIsAuthorized(true);
+            setCurrentUser({
+                username: user.email?.split("@")[0] || "manager",
+                name: user.user_metadata?.name || user.email || "Manager",
+                role: "Super Admin"
+            });
         } else {
             setIsAuthorized(false);
             setCurrentUser(null);
