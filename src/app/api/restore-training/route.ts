@@ -64,23 +64,24 @@ export async function GET() {
                     const date = new Date();
                     date.setDate(today.getDate() + ((i - 1) * 7)); // -7 days, today, +7 days
                     
-                    const attendance: Record<string, string> = {};
-                    clubPlayers.forEach(p => {
-                        const rand = Math.random();
-                        let status = "Attending";
-                        if (rand > 0.85) status = "Absent";
-                        else if (rand > 0.7) status = "Excused";
-                        attendance[p.id] = status;
-                    });
+                    const attendance = clubPlayers.map(p => ({
+                        playerId: p.id,
+                        status: Math.random() > 0.3 ? "Present" : Math.random() > 0.5 ? "Absent" : "Late",
+                        notes: ""
+                    }));
 
                     sessionsToInsert.push({
                         club_id: club.id,
                         date: date.toISOString().split('T')[0],
-                        time: "19:30",
-                        location: "Cricklewood Wharf Stadium",
+                        time: "20:00",
+                        location: "Market Road Pitches",
+                        squad: "All",
                         topic: topics[i],
-                        notes: `Focusing on tactical drills and conditioning.`,
-                        attendance: attendance
+                        lock_type: "Never",
+                        lock_time: null,
+                        event_token: Math.random().toString(36).substring(2, 15),
+                        attendance,
+                        notes: `Promotional drill session ${i+1}`
                     });
                 }
 
