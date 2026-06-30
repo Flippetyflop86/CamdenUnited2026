@@ -529,7 +529,7 @@ export default function TrainingPage() {
                     </div>
                     {activeTab === 'sessions' && (
                         <div className="flex gap-2">
-                            <Button className="bg-emerald-600 hover:bg-emerald-700 hidden sm:flex" onClick={() => {
+                            <Button className="bg-emerald-600 hover:bg-emerald-700 flex" onClick={() => {
                                 const nextSession = upcomingSessions.find(s => new Date(s.date) >= new Date(new Date().setHours(0,0,0,0)));
                                 if (nextSession) {
                                     handleOpenShare(nextSession);

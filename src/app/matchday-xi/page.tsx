@@ -787,7 +787,7 @@ export default function MatchdayXIPage() {
                         <RefreshCw className="h-4 w-4 mr-2" />
                         Fill Last Lineup
                     </Button>
-                    <Button onClick={handleCopyToWhatsApp} className="bg-emerald-600 hover:bg-emerald-700 text-white border-none hidden sm:flex">
+                    <Button onClick={handleCopyToWhatsApp} className="bg-emerald-600 hover:bg-emerald-700 text-white border-none flex">
                         <MessageCircle className="h-4 w-4 mr-2" />
                         Copy to WhatsApp
                     </Button>
