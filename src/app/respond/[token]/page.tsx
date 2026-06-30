@@ -133,10 +133,10 @@ export default function SessionCodeResponderPage() {
 
     if (loading) {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
                 <div className="flex flex-col items-center gap-3">
-                    <RefreshCw className="h-10 w-10 text-red-655 animate-spin" />
-                    <p className="text-slate-400 text-sm font-medium">Resolving session details...</p>
+                    <RefreshCw className="h-10 w-10 text-red-600 animate-spin" />
+                    <p className="text-slate-600 text-sm font-semibold">Resolving session details...</p>
                 </div>
             </div>
         );
@@ -144,13 +144,13 @@ export default function SessionCodeResponderPage() {
 
     if (error) {
         return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-                <Card className="w-full max-w-sm border-slate-800 bg-slate-900 shadow-2xl p-6 text-center space-y-4">
-                    <div className="h-12 w-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 mx-auto">
+            <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
+                <Card className="w-full max-w-sm border-slate-200 bg-white shadow-xl p-6 text-center space-y-4">
+                    <div className="h-12 w-12 rounded-full bg-red-50 border border-red-200 flex items-center justify-center text-red-650 mx-auto">
                         <AlertCircle className="h-6 w-6" />
                     </div>
-                    <h3 className="font-bold text-white text-lg">Secure Link Expired</h3>
-                    <p className="text-xs text-slate-400 leading-relaxed">{error}</p>
+                    <h3 className="font-bold text-slate-900 text-lg">Secure Link Expired</h3>
+                    <p className="text-xs text-slate-550 leading-relaxed">{error}</p>
                 </Card>
             </div>
         );
@@ -160,20 +160,20 @@ export default function SessionCodeResponderPage() {
     const formattedDate = new Date(event.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-12">
+        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans pb-12">
             {/* Header Branding */}
-            <div className="bg-slate-900 border-b border-slate-800 py-4 px-6 mb-6">
+            <div className="bg-white border-b border-slate-200 py-4 px-6 mb-6 shadow-sm">
                 <div className="max-w-4xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 bg-red-600 rounded-xl flex items-center justify-center shadow-lg">
+                        <div className="h-10 w-10 bg-red-600 rounded-xl flex items-center justify-center shadow-md">
                             <span className="font-black text-white text-xs">⚽</span>
                         </div>
                         <div>
-                            <h1 className="font-bold text-white tracking-tight">Camden United</h1>
-                            <p className="text-xs text-slate-400 font-medium">RSVP Portal</p>
+                            <h1 className="font-extrabold text-slate-900 tracking-tight">Camden United</h1>
+                            <p className="text-xs text-slate-500 font-semibold">RSVP Portal</p>
                         </div>
                     </div>
-                    <Badge variant="outline" className="border-red-500/30 text-red-400 bg-red-950/20 px-2.5 py-1">
+                    <Badge variant="outline" className="border-red-200 text-red-600 bg-red-50/50 px-2.5 py-1 font-bold">
                         Session Code Mode
                     </Badge>
                 </div>
@@ -181,37 +181,37 @@ export default function SessionCodeResponderPage() {
 
             <div className="max-w-4xl mx-auto px-4 space-y-6">
                 {/* Event Details Card */}
-                <Card className="bg-slate-900 border-slate-800 shadow-xl overflow-hidden border-l-4 border-l-red-650">
+                <Card className="bg-white border-slate-200 shadow-md overflow-hidden border-l-4 border-l-red-650">
                     <CardHeader className="pb-3">
                         <div className="flex flex-wrap items-center justify-between gap-2">
-                            <Badge className="bg-red-950/50 text-red-450 border border-red-900/50 uppercase tracking-wider text-[10px]">
+                            <Badge className="bg-red-50 text-red-650 border border-red-200 uppercase tracking-wider text-[10px] font-bold">
                                 {event.squad || "Squad"} Event
                             </Badge>
-                            <span className="text-xs text-slate-400 flex items-center gap-1 font-semibold">
+                            <span className="text-xs text-slate-500 flex items-center gap-1 font-bold">
                                 <Clock className="h-3.5 w-3.5" /> Start: {event.time}
                             </span>
                         </div>
-                        <h2 className="text-xl font-black text-white mt-3">{eventName}</h2>
-                        <CardDescription className="text-slate-400 leading-relaxed mt-1">
+                        <h2 className="text-xl font-black text-slate-900 mt-3">{eventName}</h2>
+                        <CardDescription className="text-slate-500 leading-relaxed mt-1 font-medium">
                             Please confirm whether you are attending the session on {formattedDate}. 
                             <span className="block mt-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
                                 💡 Select your name below and enter the session code shared in your WhatsApp message.
                             </span>
                         </CardDescription>
                     </CardHeader>
-                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-0 border-t border-slate-800/50 mt-2 text-sm text-slate-350">
+                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-0 border-t border-slate-100 mt-2 text-sm text-slate-600">
                         <div className="flex items-center gap-3 pt-3">
                             <CalendarDays className="h-5 w-5 text-red-500" />
                             <div>
-                                <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Date</p>
-                                <p className="font-medium text-white">{formattedDate}</p>
+                                <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Date</p>
+                                <p className="font-semibold text-slate-800">{formattedDate}</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-3 pt-3">
                             <MapPin className="h-5 w-5 text-red-500" />
                             <div>
-                                <p className="text-xs text-slate-500 uppercase tracking-wider font-semibold">Location</p>
-                                <p className="font-medium text-white">{event.location || event.opponent || "TBD"}</p>
+                                <p className="text-xs text-slate-400 uppercase tracking-wider font-bold">Location</p>
+                                <p className="font-semibold text-slate-800">{event.location || event.opponent || "TBD"}</p>
                             </div>
                         </div>
                     </CardContent>
@@ -222,15 +222,15 @@ export default function SessionCodeResponderPage() {
                     const cleanNotes = event.notes ? event.notes.replace(/\[AVAILABILITY:.*?\]/g, "").trim() : "";
                     if (!cleanNotes) return null;
                     return (
-                        <Card className="bg-slate-900 border-red-950 border overflow-hidden shadow-xl">
-                            <div className="bg-red-950/20 border-l-4 border-l-red-650 p-4">
+                        <Card className="bg-red-50/20 border-red-200 border overflow-hidden shadow-sm">
+                            <div className="bg-red-50/40 border-l-4 border-l-red-600 p-4">
                                 <div className="flex gap-3">
                                     <div className="text-red-500 font-bold shrink-0">📋</div>
                                     <div>
-                                        <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">
+                                        <h4 className="text-xs font-bold text-red-700 uppercase tracking-wider mb-1">
                                             Coach's Instructions
                                         </h4>
-                                        <p className="text-xs text-slate-350 leading-relaxed whitespace-pre-line font-medium">
+                                        <p className="text-xs text-slate-700 leading-relaxed whitespace-pre-line font-semibold">
                                             {cleanNotes}
                                         </p>
                                     </div>
@@ -242,20 +242,20 @@ export default function SessionCodeResponderPage() {
 
                 {/* Success Toast */}
                 {selectedPlayer && successMessage && (
-                    <Card className="bg-slate-900 border-red-500/50 shadow-xl border-t-2 animate-in fade-in slide-in-from-top-4 duration-300">
+                    <Card className="bg-white border-emerald-500 shadow-lg border-t-2 animate-in fade-in slide-in-from-top-4 duration-300">
                         <CardContent className="p-4 flex items-center justify-between gap-3">
                             <div className="flex items-center gap-3">
-                                <Avatar className="h-10 w-10 border border-slate-700">
-                                    <AvatarFallback className="bg-slate-855 text-white font-bold text-sm">
+                                <Avatar className="h-10 w-10 border border-slate-200">
+                                    <AvatarFallback className="bg-slate-100 text-slate-700 font-bold text-sm">
                                         {selectedPlayer.first_name[0]}{selectedPlayer.last_name[0]}
                                     </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                    <h3 className="text-base font-bold text-white">{formatPlayerName(selectedPlayer)}</h3>
-                                    <span className="text-xs text-slate-400 font-semibold uppercase">{selectedPlayer.position}</span>
+                                    <h3 className="text-base font-extrabold text-slate-900">{formatPlayerName(selectedPlayer)}</h3>
+                                    <span className="text-xs text-slate-500 font-bold uppercase">{selectedPlayer.position}</span>
                                 </div>
                             </div>
-                            <div className="bg-emerald-950/40 border border-emerald-500/30 rounded-xl px-4 py-2 flex items-center gap-2 text-emerald-400 font-semibold text-sm">
+                            <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-2 flex items-center gap-2 text-emerald-700 font-bold text-sm">
                                 <UserCheck className="h-4.5 w-4.5 animate-pulse" />
                                 <span>{successMessage}</span>
                             </div>
@@ -264,12 +264,12 @@ export default function SessionCodeResponderPage() {
                 )}
 
                 {/* Player List Grid */}
-                <Card className="bg-slate-900 border-slate-800 shadow-xl">
+                <Card className="bg-white border-slate-200 shadow-md">
                     <CardHeader className="pb-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
-                                <CardTitle className="text-lg text-white font-bold">Squad List</CardTitle>
-                                <CardDescription className="text-slate-400">
+                                <CardTitle className="text-lg text-slate-900 font-black">Squad List</CardTitle>
+                                <CardDescription className="text-slate-500 font-medium">
                                     Search for your name and select it to RSVP.
                                 </CardDescription>
                             </div>
@@ -278,7 +278,7 @@ export default function SessionCodeResponderPage() {
                                     placeholder="Search your name..."
                                     value={searchTerm}
                                     onChange={(e) => setSearchTerm(e.target.value)}
-                                    className="bg-slate-950 border-slate-800 text-white h-9 text-xs focus-visible:ring-red-500"
+                                    className="bg-slate-50 border-slate-200 text-slate-900 h-9 text-xs focus-visible:ring-red-500 font-medium"
                                 />
                             </div>
                         </div>
@@ -321,32 +321,32 @@ export default function SessionCodeResponderPage() {
                                             className={`
                                                 relative flex flex-col items-center p-4 rounded-xl border cursor-pointer select-none text-center gap-1.5 transition-all duration-150 min-h-[110px]
                                                 ${playerStatus === "Available"
-                                                    ? "bg-emerald-950/20 border-emerald-500/50 shadow-md shadow-emerald-500/5 scale-[1.02]"
+                                                    ? "bg-emerald-50 border-emerald-500 shadow-sm scale-[1.02] text-emerald-950"
                                                     : playerStatus === "Maybe"
-                                                    ? "bg-amber-950/20 border-amber-500/50 shadow-md shadow-amber-500/5 scale-[1.02]"
-                                                    : "bg-slate-800/50 border-slate-800 hover:border-slate-750 hover:bg-slate-800"
+                                                    ? "bg-amber-50 border-amber-500 shadow-sm scale-[1.02] text-amber-950"
+                                                    : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-800 shadow-sm"
                                                 }
                                             `}
                                         >
                                             {isSessionVerified && (
-                                                <div className="absolute top-2 right-2 flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-500/20 border border-emerald-450 text-emerald-400 text-[8px] font-bold">
+                                                <div className="absolute top-2 right-2 flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-700 text-[8px] font-bold">
                                                     ✓
                                                 </div>
                                             )}
 
-                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">
+                                            <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">
                                                 {player.position}
                                             </span>
                                             {player.use_nickname && player.nickname ? (
-                                                <span className="text-sm font-bold text-white leading-tight py-1.5">
+                                                <span className="text-sm font-bold text-slate-800 leading-tight py-1.5">
                                                     {player.nickname}
                                                 </span>
                                             ) : (
                                                 <>
-                                                    <span className="text-sm font-bold text-white leading-tight">
+                                                    <span className="text-sm font-bold text-slate-800 leading-tight">
                                                         {player.first_name}
                                                     </span>
-                                                    <span className="text-xs text-slate-400 leading-tight">
+                                                    <span className="text-xs text-slate-500 leading-tight">
                                                         {player.last_name}
                                                     </span>
                                                 </>
@@ -354,10 +354,10 @@ export default function SessionCodeResponderPage() {
 
                                             <div className={`mt-1.5 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border
                                                 ${playerStatus === "Available" 
-                                                    ? "bg-emerald-950/50 text-emerald-400 border-emerald-900/50" 
+                                                    ? "bg-emerald-100 text-emerald-700 border-emerald-300" 
                                                     : playerStatus === "Maybe"
-                                                    ? "bg-amber-950/50 text-amber-400 border-amber-900/50"
-                                                    : "bg-slate-900 text-slate-505 border-slate-800"
+                                                    ? "bg-amber-100 text-amber-700 border-amber-300"
+                                                    : "bg-slate-100 text-slate-500 border-slate-200"
                                                 }`}
                                             >
                                                 {playerStatus === "Available" ? "Available" : playerStatus === "Maybe" ? "Maybe" : "Unavailable"}
@@ -372,24 +372,24 @@ export default function SessionCodeResponderPage() {
 
             {/* Code Verification Modal */}
             {isModalOpen && selectedPlayer && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
-                    <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                    <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
                         {/* Modal Header */}
-                        <div className="p-5 border-b border-slate-800 bg-slate-900/80 flex justify-between items-start">
+                        <div className="p-5 border-b border-slate-150 bg-slate-50 flex justify-between items-start">
                             <div className="flex items-center gap-3">
-                                <div className="h-10 w-10 rounded-xl bg-red-650/10 border border-red-500/20 flex items-center justify-center text-red-500">
+                                <div className="h-10 w-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center text-red-600">
                                     <KeyRound className="h-5 w-5" />
                                 </div>
                                 <div>
-                                    <h3 className="font-bold text-lg text-white">
+                                    <h3 className="font-extrabold text-lg text-slate-900">
                                         Confirm RSVP
                                     </h3>
-                                    <p className="text-xs text-slate-400 font-semibold">For {formatPlayerName(selectedPlayer)}</p>
+                                    <p className="text-xs text-slate-500 font-bold">For {formatPlayerName(selectedPlayer)}</p>
                                 </div>
                             </div>
                             <button 
                                 onClick={() => setIsModalOpen(false)} 
-                                className="text-slate-500 hover:text-slate-200 text-lg transition-colors p-1"
+                                className="text-slate-400 hover:text-slate-700 text-lg transition-colors p-1"
                             >
                                 ✕
                             </button>
@@ -398,7 +398,7 @@ export default function SessionCodeResponderPage() {
                         {/* Modal Content */}
                         <div className="p-5 space-y-4">
                             {codeError && (
-                                <div className="bg-red-950/40 border border-red-500/30 rounded-xl p-3 flex items-center gap-2.5 text-red-400 text-xs">
+                                <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2.5 text-red-650 text-xs font-semibold">
                                     <AlertCircle className="h-4.5 w-4.5 shrink-0" />
                                     <span>{codeError}</span>
                                 </div>
@@ -407,10 +407,10 @@ export default function SessionCodeResponderPage() {
                             <div className="space-y-4">
                                 {!isVerifiedForSession() && (
                                     <div className="space-y-1.5">
-                                        <p className="text-xs text-slate-350 leading-relaxed font-medium">
+                                        <p className="text-xs text-slate-600 leading-relaxed font-medium">
                                             Please enter the 6-character session code from the WhatsApp invite.
                                         </p>
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Session Code</label>
+                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Session Code</label>
                                         <Input
                                             type="text"
                                             required
@@ -418,24 +418,24 @@ export default function SessionCodeResponderPage() {
                                             value={enteredCode}
                                             onChange={(e) => setEnteredCode(e.target.value.toUpperCase().trim())}
                                             placeholder="e.g. CUA5DC"
-                                            className="bg-slate-950 border-slate-800 text-white font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500 uppercase"
+                                            className="bg-slate-50 border-slate-200 text-slate-900 font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500 uppercase font-bold"
                                         />
                                     </div>
                                 )}
 
                                 <div className="space-y-1.5 pt-1">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-450 font-mono">Notes / Reason (Optional)</label>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Notes / Reason (Optional)</label>
                                     <Input
                                         type="text"
                                         value={rsvpNote}
                                         onChange={(e) => setRsvpNote(e.target.value)}
                                         placeholder="e.g. Traffic, Injured, running late"
-                                        className="bg-slate-950 border-slate-800 text-white text-xs h-9 focus-visible:ring-red-500"
+                                        className="bg-slate-50 border-slate-200 text-slate-900 text-xs h-9 focus-visible:ring-red-500 font-medium"
                                     />
                                 </div>
 
                                 <div className="space-y-2 pt-2">
-                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Select Availability</label>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Select Availability</label>
                                     <div className="grid grid-cols-3 gap-2">
                                         <Button 
                                             type="button"

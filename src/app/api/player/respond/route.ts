@@ -106,32 +106,12 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, error: "Unable to load squad details." }, { status: 500 });
         }
 
-        // Filter squad matching if training
-        let eligible = [...squadData];
-        if (eventType === "training") {
-            const isFirstTeamSession = event.squad === "All" || event.squad === "firstTeam" || event.squad === "First Team";
-            const checkSquadMatch = (playerSquadsStr: string | undefined | null, targetSquad: string) => {
-                if (!playerSquadsStr) return false;
-                const squads = playerSquadsStr.split(",").map(s => s.trim().toLowerCase());
-                const cleanTarget = targetSquad.toLowerCase();
-                if (cleanTarget === "firstteam" || cleanTarget === "first team") {
-                    return squads.includes("first team") || squads.includes("firstteam");
-                }
-                return squads.includes(cleanTarget);
-            };
-            const isFirstTeam = (squad: string | undefined | null) => {
-                if (!squad) return false;
-                const squads = squad.split(",").map(s => s.trim().toLowerCase());
-                return squads.includes("first team") || squads.includes("firstteam");
-            };
-
-            eligible = squadData.filter(p => {
-                if (isFirstTeamSession) {
-                    return isFirstTeam(p.squad) || p.is_in_training_squad;
-                }
-                return checkSquadMatch(p.squad, event.squad);
-            });
-        }
+        // Filter squad to First Team only for both matches and training
+        const eligible = squadData.filter((player: any) => {
+            const playerSquad = player.squad || "";
+            const cleanSquad = playerSquad.toLowerCase().replace(/[\s-_]+/g, "");
+            return cleanSquad.includes("firstteam") || cleanSquad.includes("first team") || playerSquad === "" || playerSquad === null;
+        });
 
         // Sort by position order
         eligible.sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));
