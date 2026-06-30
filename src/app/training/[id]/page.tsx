@@ -412,6 +412,10 @@ export default function TrainingSessionPage() {
 
     const eligiblePlayers = players
         .filter(p => {
+            // Show player if they have a recorded attendance status for this session (prevents trialists/other squads from being hidden)
+            const hasRecord = session.attendance.some(a => a.playerId === p.id);
+            if (hasRecord) return true;
+
             const matchesSquad = isFirstTeamSession 
                 ? (isFirstTeam(p.squad) || p.isInTrainingSquad)
                 : checkSquadMatch(p.squad, session.squad);
