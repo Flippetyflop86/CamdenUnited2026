@@ -206,10 +206,7 @@ export default function MatchdayXIPage() {
                     competition: upcoming.competition || "League",
                     isHome: upcoming.is_home,
                     result: upcoming.result,
-                    // Remove extra fields not in Match interface
-                    // location: upcoming.location, 
-                    // stats: upcoming.stats,
-                    // goals: upcoming.goals
+                    event_token: upcoming.event_token
                 });
             }
         }
@@ -645,7 +642,11 @@ export default function MatchdayXIPage() {
         } else {
             msgTemplate += `*Upcoming Match TBD*\n\n`;
         }
-        msgTemplate += `🔴 Please confirm your availability for this match as soon as possible! Let's go boys!`;
+        msgTemplate += `🔴 Please confirm your availability for this match as soon as possible! Let's go boys!\n\n`;
+        if (nextMatch) {
+            const checkinLink = `${window.location.origin}/respond/${nextMatch.event_token || nextMatch.id}`;
+            msgTemplate += `🔗 Log availability here:\n${checkinLink}`;
+        }
 
         const dateFormatted = nextMatch 
             ? new Date(nextMatch.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) 
