@@ -31,6 +31,7 @@ export default function SessionCodeResponderPage() {
     // RSVP success indicator
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
+    const [rsvpNote, setRsvpNote] = useState("");
 
     const loadEventAndSquad = async () => {
         try {
@@ -72,7 +73,8 @@ export default function SessionCodeResponderPage() {
         setSelectedPlayer(player);
         setSuccessMessage(null);
         setCodeError("");
-
+        setRsvpNote(""); // Reset note input
+ 
         if (isVerifiedForSession()) {
             setEnteredCode(getSavedCode());
         } else {
@@ -80,11 +82,11 @@ export default function SessionCodeResponderPage() {
         }
         setIsModalOpen(true);
     };
-
-    const submitResponse = async (player: any, codeVal: string, status: "Available" | "Maybe" | "Unavailable") => {
+ 
+    const submitResponse = async (player: any, codeVal: string, status: "Available" | "Maybe" | "Unavailable", noteVal: string) => {
         setIsVerifying(true);
         setCodeError("");
-
+ 
         try {
             const res = await fetch("/api/player/respond", {
                 method: "POST",
@@ -94,33 +96,34 @@ export default function SessionCodeResponderPage() {
                     eventId: event.id,
                     eventType,
                     status,
-                    code: codeVal
+                    code: codeVal,
+                    notes: noteVal
                 })
             });
-
+ 
             const data = await res.json();
-
+ 
             if (!res.ok || !data.success) {
                 setCodeError(data.error || "Incorrect code. Please check the WhatsApp invite.");
                 setIsVerifying(false);
                 return;
             }
-
+ 
             // Save verification locally
             localStorage.setItem(`cf_session_verified_${event.id}`, "true");
             localStorage.setItem(`cf_session_code_${event.id}`, codeVal);
-
+ 
             setIsModalOpen(false);
             setSuccessMessage(`${formatPlayerName(player)} marked as ${status}!`);
-
+ 
             // Reload event rosters in background
             await loadEventAndSquad();
-
+ 
             setTimeout(() => {
                 setSelectedPlayer(null);
                 setSuccessMessage(null);
             }, 2500);
-
+ 
         } catch (err: any) {
             setCodeError("Connection error. Please try again.");
         } finally {
@@ -213,6 +216,29 @@ export default function SessionCodeResponderPage() {
                         </div>
                     </CardContent>
                 </Card>
+
+                {/* Coach's Instructions Banner */}
+                {(() => {
+                    const cleanNotes = event.notes ? event.notes.replace(/\[AVAILABILITY:.*?\]/g, "").trim() : "";
+                    if (!cleanNotes) return null;
+                    return (
+                        <Card className="bg-slate-900 border-red-950 border overflow-hidden shadow-xl">
+                            <div className="bg-red-950/20 border-l-4 border-l-red-650 p-4">
+                                <div className="flex gap-3">
+                                    <div className="text-red-500 font-bold shrink-0">📋</div>
+                                    <div>
+                                        <h4 className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">
+                                            Coach's Instructions
+                                        </h4>
+                                        <p className="text-xs text-slate-350 leading-relaxed whitespace-pre-line font-medium">
+                                            {cleanNotes}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </Card>
+                    );
+                })()}
 
                 {/* Success Toast */}
                 {selectedPlayer && successMessage && (
@@ -397,13 +423,24 @@ export default function SessionCodeResponderPage() {
                                     </div>
                                 )}
 
+                                <div className="space-y-1.5 pt-1">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-slate-450 font-mono">Notes / Reason (Optional)</label>
+                                    <Input
+                                        type="text"
+                                        value={rsvpNote}
+                                        onChange={(e) => setRsvpNote(e.target.value)}
+                                        placeholder="e.g. Traffic, Injured, running late"
+                                        className="bg-slate-950 border-slate-800 text-white text-xs h-9 focus-visible:ring-red-500"
+                                    />
+                                </div>
+
                                 <div className="space-y-2 pt-2">
                                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-450">Select Availability</label>
                                     <div className="grid grid-cols-3 gap-2">
                                         <Button 
                                             type="button"
                                             disabled={isVerifying || (!isVerifiedForSession() && !enteredCode)}
-                                            onClick={() => submitResponse(selectedPlayer, enteredCode, "Available")}
+                                            onClick={() => submitResponse(selectedPlayer, enteredCode, "Available", rsvpNote)}
                                             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-10 transition-colors"
                                         >
                                             Available
@@ -411,7 +448,7 @@ export default function SessionCodeResponderPage() {
                                         <Button 
                                             type="button"
                                             disabled={isVerifying || (!isVerifiedForSession() && !enteredCode)}
-                                            onClick={() => submitResponse(selectedPlayer, enteredCode, "Maybe")}
+                                            onClick={() => submitResponse(selectedPlayer, enteredCode, "Maybe", rsvpNote)}
                                             className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs h-10 transition-colors"
                                         >
                                             Maybe
@@ -419,7 +456,7 @@ export default function SessionCodeResponderPage() {
                                         <Button 
                                             type="button"
                                             disabled={isVerifying || (!isVerifiedForSession() && !enteredCode)}
-                                            onClick={() => submitResponse(selectedPlayer, enteredCode, "Unavailable")}
+                                            onClick={() => submitResponse(selectedPlayer, enteredCode, "Unavailable", rsvpNote)}
                                             className="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs h-10 transition-colors"
                                         >
                                             No

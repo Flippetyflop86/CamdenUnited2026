@@ -164,7 +164,7 @@ export async function POST(request: Request) {
     const supabaseAdmin = getAdminClient();
     try {
         const body = await request.json();
-        const { playerId, eventId, eventType, status, code } = body;
+        const { playerId, eventId, eventType, status, code, notes } = body;
 
         if (!playerId || !eventId || !eventType || !status || !code) {
             return NextResponse.json({ success: false, error: "Missing required parameters." }, { status: 400 });
@@ -237,9 +237,9 @@ export async function POST(request: Request) {
             const playerIndex = updatedList.findIndex(a => a.playerId === playerId);
 
             if (playerIndex >= 0) {
-                updatedList[playerIndex] = { playerId, status };
+                updatedList[playerIndex] = { playerId, status, notes: notes || "" };
             } else {
-                updatedList.push({ playerId, status });
+                updatedList.push({ playerId, status, notes: notes || "" });
             }
 
             const cleanBaseNotes = currentNotes.replace(/\[AVAILABILITY:.*?\]\n?/, "").trim();
@@ -277,13 +277,13 @@ export async function POST(request: Request) {
                 updatedAttendance[playerIndex] = { 
                     ...updatedAttendance[playerIndex], 
                     status: mappedStatus,
-                    notes: "RSVP: Self Managed"
+                    notes: notes || "RSVP"
                 };
             } else {
                 updatedAttendance.push({ 
                     playerId, 
                     status: mappedStatus, 
-                    notes: "RSVP: Self Managed" 
+                    notes: notes || "RSVP" 
                 });
             }
 
