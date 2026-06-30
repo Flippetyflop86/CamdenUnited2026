@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TrainingSession, Player, AttendanceRecord } from "@/types";
+import { TrainingSession, Player, AttendanceRecord, Position } from "@/types";
 import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -51,9 +51,10 @@ export default function TrainingSessionPage() {
             if (!sessionId) return;
 
             try {
-                const [sessionRes, playersRes, allSessionsRes] = await Promise.all([
+                const [sessionRes, playersRes, recruitsRes, allSessionsRes] = await Promise.all([
                     supabase.from('training_sessions').select('*').eq('id', sessionId).single(),
                     supabase.from('players').select('*'),
+                    supabase.from('recruits').select('*').eq('on_trial', true),
                     supabase.from('training_sessions').select('attendance')
                 ]);
 
@@ -80,7 +81,37 @@ export default function TrainingSessionPage() {
                         notes: p.notes,
                         isInTrainingSquad: p.is_in_training_squad
                     }));
-                    setPlayers(mappedPlayers);
+
+                    const mappedTrialists: Player[] = (recruitsRes.data || []).map((r: any) => {
+                        const nameParts = (r.name || "").trim().split(/\s+/);
+                        const firstName = nameParts[0] || "Trialist";
+                        const lastName = nameParts.slice(1).join(" ") || "";
+                        return {
+                            id: r.id,
+                            firstName,
+                            lastName,
+                            position: (r.primary_position || "ST") as Position,
+                            squadNumber: 0,
+                            age: r.age || 0,
+                            nationality: "British",
+                            squad: "Trialist",
+                            medicalStatus: "Available",
+                            holidayStart: undefined,
+                            holidayEnd: undefined,
+                            availability: true,
+                            contractExpiry: "2026-06-30",
+                            imageUrl: undefined,
+                            appearances: 0,
+                            goals: 0,
+                            assists: 0,
+                            dateOfBirth: undefined,
+                            notes: r.notes || "Active Trialist",
+                            isInTrainingSquad: true
+                        };
+                    });
+
+                    const allCombined = [...mappedPlayers, ...mappedTrialists];
+                    setPlayers(allCombined);
 
                     if (sessionRes.data) {
                         const existingAttendance: any[] = sessionRes.data.attendance || [];
@@ -108,7 +139,7 @@ export default function TrainingSessionPage() {
                             return squads.includes('first team') || squads.includes('firstteam');
                         };
                         
-                        const eligible = mappedPlayers.filter(p => {
+                        const eligible = allCombined.filter(p => {
                             if (isFirstTeamSession) {
                                 return isFirstTeam(p.squad) || p.isInTrainingSquad;
                             } else {
