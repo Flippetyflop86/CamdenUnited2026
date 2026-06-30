@@ -184,7 +184,27 @@ export async function POST(request: Request) {
         }
 
         // 2. Verify Session Code
-        const expectedCode = getSessionCode(eventId);
+        let expectedCode = "";
+        if (eventType === "match") {
+            const { data: match } = await supabaseAdmin
+                .from("matches")
+                .select("id, event_token")
+                .eq("id", eventId)
+                .single();
+            if (match) {
+                expectedCode = ("CU" + (match.event_token || match.id).replace(/-/g, "").substring(0, 4)).toUpperCase();
+            }
+        } else {
+            const { data: session } = await supabaseAdmin
+                .from("training_sessions")
+                .select("id, event_token")
+                .eq("id", eventId)
+                .single();
+            if (session) {
+                expectedCode = ("CU" + (session.event_token || session.id).replace(/-/g, "").substring(0, 4)).toUpperCase();
+            }
+        }
+
         if ((code || "").trim().toUpperCase() !== expectedCode) {
             return NextResponse.json({ success: false, error: "Incorrect session code. Please verify the code in the WhatsApp invite." }, { status: 401 });
         }
