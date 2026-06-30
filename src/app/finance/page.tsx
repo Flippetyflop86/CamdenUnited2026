@@ -1575,15 +1575,15 @@ export default function FinancePage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 
                 {/* 1. BANK BALANCE / CASH RESERVES */}
-                <Card className="border-slate-800 bg-gradient-to-br from-slate-900 via-indigo-950/20 to-slate-950 text-white shadow-xl overflow-hidden relative group hover:border-slate-700 transition-all">
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/10 rounded-full blur-2xl group-hover:bg-indigo-500/20 transition-all" />
+                <Card className="border-slate-200 bg-white shadow-md hover:shadow-lg transition-all relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full blur-2xl group-hover:bg-emerald-500/10 transition-all" />
                     <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
                             <div>
-                                <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-indigo-300">Bank Balance & Reserves</CardTitle>
+                                <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Bank Balance & Reserves</CardTitle>
                                 <CardDescription className="text-[9px] text-slate-400">Total cleared funds</CardDescription>
                             </div>
-                            <div className="p-2 bg-indigo-500/10 rounded-xl text-indigo-400">
+                            <div className="p-2 bg-emerald-50 rounded-xl text-emerald-600">
                                 <Wallet className="h-5 w-5" />
                             </div>
                         </div>
@@ -1592,30 +1592,30 @@ export default function FinancePage() {
                         <div>
                             {isEditingBalance ? (
                                 <div className="flex items-center gap-2">
-                                    <span className="text-xl font-extrabold">£</span>
+                                    <span className="text-xl font-extrabold text-slate-800">£</span>
                                     <Input 
                                         type="number"
                                         value={newStartingBalance}
                                         onChange={e => setNewStartingBalance(e.target.value)}
-                                        className="bg-slate-800 border-slate-700 text-white max-w-[140px] text-lg font-bold h-10 px-2 rounded-lg focus-visible:ring-indigo-500"
+                                        className="bg-slate-50 border-slate-200 text-slate-900 max-w-[140px] text-lg font-bold h-10 px-2 rounded-lg focus-visible:ring-emerald-500"
                                     />
-                                    <Button size="sm" onClick={saveStartingBalance} className="bg-indigo-600 hover:bg-indigo-500 text-white text-xs h-10 rounded-lg px-3">Save</Button>
-                                    <Button size="icon" variant="ghost" onClick={() => setIsEditingBalance(false)} className="text-slate-400 hover:text-white h-10 w-10"><X className="h-4 w-4" /></Button>
+                                    <Button size="sm" onClick={saveStartingBalance} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs h-10 rounded-lg px-3">Save</Button>
+                                    <Button size="icon" variant="ghost" onClick={() => setIsEditingBalance(false)} className="text-slate-400 hover:text-slate-600 h-10 w-10"><X className="h-4 w-4" /></Button>
                                 </div>
                             ) : (
                                 <div className="flex items-baseline gap-2">
-                                    <span className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-white via-slate-100 to-indigo-200 bg-clip-text text-transparent">
+                                    <span className="text-4xl font-extrabold tracking-tight text-slate-900">
                                         £{bankBalance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </span>
                                     <button 
                                         onClick={() => setIsEditingBalance(true)}
-                                        className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold underline flex items-center gap-1 cursor-pointer"
+                                        className="text-xs text-indigo-650 hover:text-indigo-750 font-semibold underline flex items-center gap-1 cursor-pointer"
                                     >
                                         <Pencil className="h-3 w-3" /> Edit
                                     </button>
                                 </div>
                             )}
-                            <p className="text-[9px] text-slate-400 mt-1.5 font-medium">Starting: £{(settings.financeStartingBalance || 0).toFixed(2)}</p>
+                            <p className="text-[9px] text-slate-500 mt-1.5 font-medium">Starting: £{(settings.financeStartingBalance || 0).toFixed(2)}</p>
                         </div>
                     </CardContent>
                 </Card>
