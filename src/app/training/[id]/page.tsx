@@ -151,7 +151,11 @@ export default function TrainingSessionPage() {
                             return existing || { playerId: p.id, status: 'Absent', notes: '' };
                         });
 
-                        setSession({ ...sessionRes.data, attendance: prePopulated });
+                        // Preserve any existing attendance records for players not in the main eligible squad list (guests, trialists)
+                        const nonEligibleExisting = existingAttendance.filter(a => !eligible.some(p => p.id === a.playerId));
+                        const finalAttendance = [...prePopulated, ...nonEligibleExisting];
+
+                        setSession({ ...sessionRes.data, attendance: finalAttendance });
                     }
 
                     if (allSessionsRes.data) {
