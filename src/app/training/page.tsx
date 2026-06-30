@@ -303,15 +303,17 @@ export default function TrainingPage() {
     };
 
     const getSessionAttendanceStats = (session: TrainingSession) => {
-        const attendedCount = session.attendance.filter(a => a.status === 'Present' || a.status === 'Late').length;
+        const regAttendedCount = session.attendance.filter(a => !a.playerId.startsWith('guest:') && (a.status === 'Present' || a.status === 'Late')).length;
+        const trialistAttendedCount = session.attendance.filter(a => a.playerId.startsWith('guest:') && (a.status === 'Present' || a.status === 'Late')).length;
+
         const eligiblePlayers = players.filter(p => 
             session.squad === "All" 
                 ? (isFirstTeamSquad(p.squad) || p.isInTrainingSquad) 
                 : (p.squad === session.squad || (session.squad === "First Team" && isFirstTeamSquad(p.squad)))
         );
         const totalEligible = eligiblePlayers.length;
-        const percentage = totalEligible > 0 ? Math.round((attendedCount / totalEligible) * 100) : 0;
-        return { attendedCount, totalEligible, percentage };
+        const percentage = totalEligible > 0 ? Math.round((regAttendedCount / totalEligible) * 100) : 0;
+        return { regAttendedCount, trialistAttendedCount, totalEligible, percentage };
     };
 
     const filteredSessions = sessions.filter(s => squadFilter === "All" || s.squad === squadFilter);
@@ -583,11 +585,14 @@ export default function TrainingPage() {
                                         <span>{session.location}</span>
                                     </div>
                                     {(() => {
-                                        const { attendedCount, totalEligible, percentage } = getSessionAttendanceStats(session);
+                                        const { regAttendedCount, trialistAttendedCount, totalEligible, percentage } = getSessionAttendanceStats(session);
                                         return (
                                             <div className="flex items-center gap-2">
                                                 <Users className="h-4 w-4 text-slate-400" />
-                                                <span>{attendedCount} / {totalEligible} ({percentage}%) players attended</span>
+                                                <span>
+                                                    {regAttendedCount} / {totalEligible} ({percentage}%) squad players
+                                                    {trialistAttendedCount > 0 && ` (+${trialistAttendedCount} trialists)`}
+                                                </span>
                                             </div>
                                         );
                                     })()}
