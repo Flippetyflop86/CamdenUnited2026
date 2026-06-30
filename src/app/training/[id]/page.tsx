@@ -464,16 +464,6 @@ export default function TrainingSessionPage() {
 
     return (
         <div className="space-y-6">
-            {/* Temporary Debug Info */}
-            <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl text-xs space-y-1 text-slate-700 font-mono shadow-sm">
-                <p className="font-bold text-slate-900 mb-1">🔍 DIAGNOSTIC LOG (TEMPORARY):</p>
-                <p>• Session Squad Filter: "{session.squad}"</p>
-                <p>• Total Players Loaded (Squad + Trialists): {players.length}</p>
-                <p>• Regular Squad Players: {players.filter(p => p.squad !== 'Trialist').length}</p>
-                <p>• Mapped Trialists (Recruits on Trial): {players.filter(p => p.squad === 'Trialist').length}</p>
-                <p>• Trialists List: {players.filter(p => p.squad === 'Trialist').map(p => `${p.firstName} ${p.lastName} (ID: ${p.id.substring(0,6)})`).join(', ') || 'None'}</p>
-                <p>• Attendance Registry Size: {session.attendance?.length || 0} records</p>
-            </div>
             {/* Header */}
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" asChild>
