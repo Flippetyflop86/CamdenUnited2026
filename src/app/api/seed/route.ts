@@ -174,7 +174,7 @@ export async function POST(request: Request) {
 
         if (dbPlayers && dbPlayers.length > 0) {
             // Delete existing sessions first to avoid clutter
-            await supabase.from("training_sessions").delete().neq("id", "00000000-0000-0000-0000-000000000000");
+            await supabase.from("training_sessions").delete().eq("club_id", clubId);
 
             const today = new Date();
             const topics = ["Passing & Possession", "Defending Transitions", "Shooting & Finishing"];
