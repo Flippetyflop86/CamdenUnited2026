@@ -97,14 +97,20 @@ export async function GET(request: Request) {
         }
 
         // 2. Fetch squad players for this club
-        const { data: squadData, error: squadErr } = await supabaseAdmin
-            .from("players")
-            .select("id, first_name, last_name, position, squad, pin_hash, is_in_training_squad")
-            .eq("club_id", event.club_id);
+        const [playersRes, recruitsRes] = await Promise.all([
+            supabaseAdmin
+                .from("players")
+                .select("id, first_name, last_name, position, squad, pin_hash, is_in_training_squad")
+                .eq("club_id", event.club_id),
+            supabaseAdmin
+                .from("recruits")
+                .select("id, name, primary_position, on_trial, club_id")
+                .eq("club_id", event.club_id)
+                .eq("on_trial", true)
+        ]);
 
-        if (squadErr || !squadData) {
-            return NextResponse.json({ success: false, error: "Unable to load squad details." }, { status: 500 });
-        }
+        const squadData = playersRes.data || [];
+        const recruitsData = recruitsRes.data || [];
 
         // Filter squad to First Team only for both matches and training
         const eligible = squadData.filter((player: any) => {
@@ -125,12 +131,27 @@ export async function GET(request: Request) {
             has_pin: !!p.pin_hash
         }));
 
+        const cleanRecruits = recruitsData.map((r: any) => {
+            const nameParts = (r.name || "").trim().split(/\s+/);
+            const first_name = nameParts[0] || "Trialist";
+            const last_name = nameParts.slice(1).join(" ") || "";
+            return {
+                id: r.id,
+                first_name,
+                last_name,
+                position: r.primary_position || "ST",
+                has_pin: false
+            };
+        });
+
+        const allCombinedPlayers = [...cleanPlayers, ...cleanRecruits];
+
         return NextResponse.json({
             success: true,
             event,
             eventType,
             sessionCode: getSessionCode(event.id),
-            players: cleanPlayers
+            players: allCombinedPlayers
         });
 
     } catch (err: any) {
@@ -151,15 +172,37 @@ export async function POST(request: Request) {
         }
 
         let eventDetails: any = null;
+        let player: any = null;
 
-        // 1. Fetch player
-        const { data: player, error: playerError } = await supabaseAdmin
+        // 1. Fetch player (or fallback to recruits table if they are a trialist)
+        const { data: playerData } = await supabaseAdmin
             .from("players")
             .select("*")
             .eq("id", playerId)
-            .single();
+            .maybeSingle();
 
-        if (playerError || !player) {
+        if (playerData) {
+            player = playerData;
+        } else {
+            const { data: recruitData } = await supabaseAdmin
+                .from("recruits")
+                .select("*")
+                .eq("id", playerId)
+                .maybeSingle();
+
+            if (recruitData) {
+                const nameParts = (recruitData.name || "").trim().split(/\s+/);
+                player = {
+                    id: recruitData.id,
+                    first_name: nameParts[0] || "Trialist",
+                    last_name: nameParts.slice(1).join(" ") || "",
+                    email: "trialist-portal",
+                    club_id: recruitData.club_id
+                };
+            }
+        }
+
+        if (!player) {
             return NextResponse.json({ success: false, error: "Player not found." }, { status: 404 });
         }
 
