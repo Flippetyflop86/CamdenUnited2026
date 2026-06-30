@@ -1539,12 +1539,12 @@ export default function FinancePage() {
                 <div>
                     <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
                         <Sparkles className="h-4 w-4 text-indigo-500" />
-                        Club Accounting Engine
+                        Choose How To Track Finances
                     </h3>
                     <p className="text-[11px] text-slate-500 mt-0.5">
                         {accountingMethod === "accrual" 
-                            ? "Accrual Basis matches monthly forecasted/amortized revenues and commitments to show true operational run-rate." 
-                            : "Cash Basis tracks actual money received and spent inside this current month's transactions."}
+                            ? "Projected Budget: Shows expected monthly values (including player subs and sponsor contracts) to plan ahead." 
+                            : "Actual Cash Flow: Shows only the real cash sent or received in your transactions this month."}
                     </p>
                 </div>
                 <div className="flex items-center gap-2 p-1 bg-slate-200/60 rounded-xl border border-slate-300/40">
@@ -1556,7 +1556,7 @@ export default function FinancePage() {
                                 : "text-slate-600 hover:text-slate-900"
                         }`}
                     >
-                        Accrual Basis
+                        Projected Budget (Expected)
                     </button>
                     <button
                         onClick={() => setAccountingMethod("cash")}
@@ -1566,7 +1566,7 @@ export default function FinancePage() {
                                 : "text-slate-600 hover:text-slate-900"
                         }`}
                     >
-                        Cash Basis
+                        Actual Cash Flow (Cleared)
                     </button>
                 </div>
             </div>
@@ -1627,10 +1627,10 @@ export default function FinancePage() {
                         <div className="flex justify-between items-start">
                             <div>
                                 <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-500">
-                                    {accountingMethod === "accrual" ? "Monthly Forecast (Accrual)" : "Cash Flow Actuals"}
+                                    {accountingMethod === "accrual" ? "Projected Budget Plan" : "Cash Flow This Month"}
                                 </CardTitle>
                                 <CardDescription className="text-[9px] text-slate-400">
-                                    {accountingMethod === "accrual" ? "Monthly run-rate equivalent" : "Cleared this month"}
+                                    {accountingMethod === "accrual" ? "Estimated monthly averages" : "Actual cleared money"}
                                 </CardDescription>
                             </div>
                             <div className="p-2 bg-slate-100 rounded-xl text-slate-600">
@@ -1641,7 +1641,7 @@ export default function FinancePage() {
                     <CardContent className="space-y-4">
                         <div className="flex justify-between items-baseline">
                             <div>
-                                <p className="text-[9px] uppercase font-bold text-slate-400">In / Out</p>
+                                <p className="text-[9px] uppercase font-bold text-slate-400">Income / Expenses</p>
                                 <div className="flex items-center gap-2 mt-0.5">
                                     <span className="text-md font-bold text-green-600">
                                         +£{Math.round(accountingMethod === "accrual" ? monthlyIncomeForecast : cashIncomeActual)}
@@ -1653,7 +1653,7 @@ export default function FinancePage() {
                                 </div>
                             </div>
                             <div className="text-right">
-                                <p className="text-[9px] uppercase font-bold text-slate-400">Net Profit</p>
+                                <p className="text-[9px] uppercase font-bold text-slate-400">Net Balance</p>
                                 <span className={`text-xl font-black ${
                                     (accountingMethod === "accrual" ? monthlyIncomeForecast - monthlyExpensesCommitment : cashIncomeActual - cashExpenseActual) >= 0 
                                         ? "text-green-600" 
@@ -1688,8 +1688,8 @@ export default function FinancePage() {
                     <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
                             <div>
-                                <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Cash Runway & Subs Health</CardTitle>
-                                <CardDescription className="text-[9px] text-slate-400">Safety net metrics</CardDescription>
+                                <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-slate-500">Financial Safety Runway</CardTitle>
+                                <CardDescription className="text-[9px] text-slate-400">How long savings will last</CardDescription>
                             </div>
                             <div className="p-2 bg-indigo-50 rounded-xl text-indigo-600">
                                 <Calendar className="h-5 w-5" />
@@ -1700,9 +1700,9 @@ export default function FinancePage() {
                         <div>
                             <div className="flex items-baseline justify-between">
                                 <span className="text-2xl font-black text-slate-800">{runwayMonths} Months</span>
-                                <span className="text-xs text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded-full">Runway</span>
+                                <span className="text-xs text-slate-500 font-semibold bg-slate-100 px-2 py-0.5 rounded-full">Safety Net</span>
                             </div>
-                            <p className="text-[9px] text-slate-500 mt-1">Based on monthly fixed commitments of £{Math.round(monthlyExpensesCommitment)}</p>
+                            <p className="text-[9px] text-slate-500 mt-1">If income stopped, savings cover our regular costs (£{Math.round(monthlyExpensesCommitment)}/mo) for this long.</p>
                         </div>
                         
                         {settings.subsEnabled && (
@@ -1835,18 +1835,18 @@ export default function FinancePage() {
                                 <CardHeader className="border-b bg-indigo-50/20 p-4">
                                     <div className="flex items-center gap-2">
                                         <Sparkles className="h-4 w-4 text-indigo-600" />
-                                        <CardTitle className="text-sm font-bold text-indigo-950">Accrual Revenue & Expense Breakdowns</CardTitle>
+                                        <CardTitle className="text-sm font-bold text-indigo-950">Projected Revenue & Expense Breakdowns</CardTitle>
                                     </div>
                                     <CardDescription className="text-[11px] text-indigo-900/60 mt-0.5">
-                                        Amortization schedules and monthly-equivalent accounting logic
+                                        Detailed breakdown of monthly expected income and regular costs
                                     </CardDescription>
                                 </CardHeader>
                                 <CardContent className="p-4 space-y-4">
                                     {/* Secured Sponsors Amortization Details */}
                                     <div className="space-y-2">
                                         <h4 className="text-xs font-bold text-indigo-900 flex justify-between">
-                                            <span>1. Sponsor Contracts (Amortized Monthly)</span>
-                                            <span className="text-[10px] text-indigo-700">Monthly recognized income</span>
+                                            <span>1. Sponsor Contracts (Spread Monthly)</span>
+                                            <span className="text-[10px] text-indigo-700">Expected monthly value</span>
                                         </h4>
                                         <div className="bg-white border border-indigo-100 rounded-xl overflow-hidden divide-y divide-slate-100">
                                             {sponsors.filter(s => s.status === "Secured").length === 0 ? (
@@ -1872,7 +1872,7 @@ export default function FinancePage() {
                                     {settings.subsEnabled && (
                                         <div className="space-y-2">
                                             <h4 className="text-xs font-bold text-indigo-900 flex justify-between">
-                                                <span>2. Accrued Player Subscriptions</span>
+                                                <span>2. Expected Player Subscriptions</span>
                                                 <span className="text-[10px] text-indigo-700">Dues expected this month</span>
                                             </h4>
                                             <div className="bg-white border border-indigo-100 rounded-xl p-3 text-xs space-y-2">
@@ -1885,7 +1885,7 @@ export default function FinancePage() {
                                                     <span className="font-medium text-emerald-600">£{subsOverview.received.toFixed(2)}</span>
                                                 </div>
                                                 <div className="flex justify-between text-[10px]">
-                                                    <span className="text-slate-400">- Accrued Outstanding:</span>
+                                                    <span className="text-slate-400">- Expected Outstanding:</span>
                                                     <span className="font-medium text-red-500">£{subsOverview.outstanding.toFixed(2)}</span>
                                                 </div>
                                             </div>
@@ -1895,8 +1895,8 @@ export default function FinancePage() {
                                     {/* Recurring commitments and bills */}
                                     <div className="space-y-2">
                                         <h4 className="text-xs font-bold text-indigo-900 flex justify-between">
-                                            <span>3. Recurring Outgoing Commitments</span>
-                                            <span className="text-[10px] text-indigo-700">Monthly amortized costs</span>
+                                            <span>3. Regular Cost Commitments</span>
+                                            <span className="text-[10px] text-indigo-700">Average monthly cost</span>
                                         </h4>
                                         <div className="bg-white border border-indigo-100 rounded-xl overflow-hidden divide-y divide-slate-100">
                                             {subscriptions.length === 0 && (!settings.contractsEnabled || players.filter(p => p.isContracted).length === 0) ? (
