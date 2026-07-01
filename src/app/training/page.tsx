@@ -468,61 +468,122 @@ export default function TrainingPage() {
         })
         .sort((a, b) => b.stats.percentage - a.stats.percentage); // Sort by %
 
-    const downloadStatsCSV = () => {
+    const downloadStatsExcel = () => {
         // Calculate average attendance rate
         const avgAttendance = playerStats.length > 0
             ? Math.round(playerStats.reduce((sum, p) => sum + p.stats.percentage, 0) / playerStats.length)
             : 0;
 
-        // Custom sponsor-friendly banner rows at the top of the CSV file
-        const metaRows = [
-            ["========================================================================="],
-            [`CAMDEN UNITED FOOTBALL CLUB - PLAYER DEVELOPMENT & ATTENDANCE REPORT`],
-            [`Season: ${displaySeasonLabel}`],
-            [`Report Generated: ${new Date().toLocaleDateString("en-GB")} at ${new Date().toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit' })}`],
-            [`Official Club Sponsor: Supporting Grassroots Talent & Player Progression`],
-            ["========================================================================="],
-            [],
-            ["SQUAD PERFORMANCE SUMMARY"],
-            ["Total Tracked Players", playerStats.length],
-            ["Total Training Sessions", leaderboardSessions.length],
-            ["Average Attendance Rate", `${avgAttendance}%`],
-            [],
-            ["DETAILED ATTENDANCE BREAKDOWN"],
-        ];
+        const htmlContent = `
+            <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head>
+                <!--[if gte mso 9]>
+                <xml>
+                    <x:ExcelWorkbook>
+                        <x:ExcelWorksheets>
+                            <x:ExcelWorksheet>
+                                <x:Name>Attendance Report</x:Name>
+                                <x:WorksheetOptions>
+                                    <x:DisplayGridlines/>
+                                </x:WorksheetOptions>
+                            </x:ExcelWorksheet>
+                        </x:ExcelWorksheets>
+                    </x:ExcelWorkbook>
+                </xml>
+                <![endif]-->
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 20px; }
+                    .header-title { font-size: 16pt; font-weight: bold; color: #dc2626; }
+                    .header-subtitle { font-size: 12pt; font-weight: bold; color: #4b5563; }
+                    .header-meta { font-size: 10pt; color: #6b7280; }
+                    .summary-table { border-collapse: collapse; margin-top: 15px; margin-bottom: 20px; }
+                    .summary-table td { border: 1px solid #e5e7eb; padding: 8px; font-size: 10pt; }
+                    .summary-hdr { background-color: #f3f4f6; font-weight: bold; color: #1f2937; }
+                    .data-table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+                    .data-table th { background-color: #dc2626; color: white; font-weight: bold; border: 1px solid #b91c1c; padding: 10px; text-align: left; font-size: 11pt; }
+                    .data-table td { border: 1px solid #e5e7eb; padding: 8px; font-size: 10pt; }
+                    .tier-elite { background-color: #4ade80; color: #064e3b; font-weight: bold; }
+                    .tier-excellent { background-color: #fef08a; color: #713f12; font-weight: bold; }
+                    .tier-active { background-color: #fed7aa; color: #7c2d12; font-weight: bold; }
+                    .tier-critical { background-color: #fca5a5; color: #7f1d1d; font-weight: bold; }
+                </style>
+            </head>
+            <body>
+                <div class="header-title">CAMDEN UNITED FOOTBALL CLUB</div>
+                <div class="header-subtitle">PLAYER DEVELOPMENT & ATTENDANCE REPORT</div>
+                <div class="header-meta"><b>Season:</b> ${displaySeasonLabel}</div>
+                <div class="header-meta"><b>Report Generated:</b> ${new Date().toLocaleDateString("en-GB")} at ${new Date().toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit' })}</div>
+                <div class="header-meta"><b>Official Club Sponsor:</b> Supporting Grassroots Talent & Player Progression</div>
+                <br/>
+                <table class="summary-table">
+                    <tr class="summary-hdr">
+                        <td colspan="2">SQUAD PERFORMANCE SUMMARY</td>
+                    </tr>
+                    <tr>
+                        <td>Total Tracked Players</td>
+                        <td><b>${playerStats.length}</b></td>
+                    </tr>
+                    <tr>
+                        <td>Total Training Sessions</td>
+                        <td><b>${leaderboardSessions.length}</b></td>
+                    </tr>
+                    <tr>
+                        <td>Average Squad Attendance</td>
+                        <td style="color: #15803d; font-weight: bold;">${avgAttendance}%</td>
+                    </tr>
+                </table>
+                <br/>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Player Name</th>
+                            <th>Squad Team</th>
+                            <th>Attended Sessions</th>
+                            <th>Total Sessions</th>
+                            <th>Attendance Rate</th>
+                            <th>Engagement Tier</th>
+                            <th>Primary Position</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${playerStats.map(p => {
+                            const pct = p.stats.percentage;
+                            let tierClass = "tier-critical";
+                            let engagementTier = "Action Required (<50%)";
+                            if (pct >= 90) {
+                                tierClass = "tier-elite";
+                                engagementTier = "Elite (90%+)";
+                            } else if (pct >= 75) {
+                                tierClass = "tier-excellent";
+                                engagementTier = "Excellent (75-89%)";
+                            } else if (pct >= 50) {
+                                tierClass = "tier-active";
+                                engagementTier = "Active (50-74%)";
+                            }
 
-        const headers = ["Player Name", "Squad Team", "Attended Sessions", "Total Sessions", "Attendance Rate", "Engagement Tier", "Primary Position"];
-        
-        const rows = playerStats.map(p => {
-            const pct = p.stats.percentage;
-            let engagementTier = "Action Required (<50%)";
-            if (pct >= 90) engagementTier = "Elite (90%+)";
-            else if (pct >= 75) engagementTier = "Excellent (75-89%)";
-            else if (pct >= 50) engagementTier = "Active (50-74%)";
+                            return `
+                                <tr>
+                                    <td><b>${p.firstName} ${p.lastName}</b></td>
+                                    <td>${p.squad}</td>
+                                    <td align="center">${p.stats.attended}</td>
+                                    <td align="center">${p.stats.total}</td>
+                                    <td align="center" class="${tierClass}">${pct}%</td>
+                                    <td class="${tierClass}">${engagementTier}</td>
+                                    <td>${p.position || 'N/A'}</td>
+                                </tr>
+                            `;
+                        }).join("")}
+                    </tbody>
+                </table>
+            </body>
+            </html>
+        `;
 
-            return [
-                `"${p.firstName} ${p.lastName}"`,
-                `"${p.squad}"`,
-                p.stats.attended,
-                p.stats.total,
-                `"${pct}%"`,
-                `"${engagementTier}"`,
-                `"${p.position || 'N/A'}"`
-            ];
-        });
-
-        // Add UTF-8 BOM prefix so Excel opens special characters and quotes correctly
-        const csvContent = "\uFEFF" + [
-            ...metaRows.map(row => row.join(",")),
-            headers.join(","),
-            ...rows.map(row => row.join(","))
-        ].join("\n");
-
-        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+        const blob = new Blob([htmlContent], { type: "application/vnd.ms-excel;charset=utf-8;" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `camden_united_training_report_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute("download", `camden_united_training_report_${new Date().toISOString().split('T')[0]}.xls`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -669,8 +730,8 @@ export default function TrainingPage() {
                                 <CardDescription>Tracking {displaySeasonLabel}</CardDescription>
                             </div>
                             <div className="flex items-center gap-4">
-                                <Button variant="outline" size="sm" onClick={downloadStatsCSV}>
-                                    <Download className="h-4 w-4 mr-2" /> Export CSV
+                                <Button variant="outline" size="sm" onClick={downloadStatsExcel}>
+                                    <Download className="h-4 w-4 mr-2" /> Export Excel
                                 </Button>
                                 <div className="text-right">
                                     <p className="text-sm font-medium text-slate-500">Total Sessions</p>
