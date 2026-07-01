@@ -469,16 +469,51 @@ export default function TrainingPage() {
         .sort((a, b) => b.stats.percentage - a.stats.percentage); // Sort by %
 
     const downloadStatsCSV = () => {
-        const headers = ["Player", "Squad", "Attended", "Total", "Percentage"];
-        const rows = playerStats.map(p => [
-            `${p.firstName} ${p.lastName}`,
-            p.squad,
-            p.stats.attended,
-            p.stats.total,
-            `${p.stats.percentage}%`
-        ]);
+        // Calculate average attendance rate
+        const avgAttendance = playerStats.length > 0
+            ? Math.round(playerStats.reduce((sum, p) => sum + p.stats.percentage, 0) / playerStats.length)
+            : 0;
 
-        const csvContent = [
+        // Custom sponsor-friendly banner rows at the top of the CSV file
+        const metaRows = [
+            ["========================================================================="],
+            [`CAMDEN UNITED FOOTBALL CLUB - PLAYER DEVELOPMENT & ATTENDANCE REPORT`],
+            [`Season: ${displaySeasonLabel}`],
+            [`Report Generated: ${new Date().toLocaleDateString("en-GB")} at ${new Date().toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit' })}`],
+            [`Official Club Sponsor: Supporting Grassroots Talent & Player Progression`],
+            ["========================================================================="],
+            [],
+            ["SQUAD PERFORMANCE SUMMARY"],
+            ["Total Tracked Players", playerStats.length],
+            ["Total Training Sessions", leaderboardSessions.length],
+            ["Average Attendance Rate", `${avgAttendance}%`],
+            [],
+            ["DETAILED ATTENDANCE BREAKDOWN"],
+        ];
+
+        const headers = ["Player Name", "Squad Team", "Attended Sessions", "Total Sessions", "Attendance Rate", "Engagement Tier", "Primary Position"];
+        
+        const rows = playerStats.map(p => {
+            const pct = p.stats.percentage;
+            let engagementTier = "Action Required (<50%)";
+            if (pct >= 90) engagementTier = "Elite (90%+)";
+            else if (pct >= 75) engagementTier = "Excellent (75-89%)";
+            else if (pct >= 50) engagementTier = "Active (50-74%)";
+
+            return [
+                `"${p.firstName} ${p.lastName}"`,
+                `"${p.squad}"`,
+                p.stats.attended,
+                p.stats.total,
+                `"${pct}%"`,
+                `"${engagementTier}"`,
+                `"${p.position || 'N/A'}"`
+            ];
+        });
+
+        // Add UTF-8 BOM prefix so Excel opens special characters and quotes correctly
+        const csvContent = "\uFEFF" + [
+            ...metaRows.map(row => row.join(",")),
             headers.join(","),
             ...rows.map(row => row.join(","))
         ].join("\n");
@@ -487,7 +522,7 @@ export default function TrainingPage() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `training_stats_${displaySeasonLabel.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`);
+        link.setAttribute("download", `camden_united_training_report_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
