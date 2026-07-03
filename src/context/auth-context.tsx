@@ -94,6 +94,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     router.push("/login");
                 }
             }
+        }).catch(err => {
+            const isAbort = err?.name === 'AbortError' || err?.message?.includes('signal is aborted');
+            if (!isAbort) {
+                console.error("Failed to get auth session on mount:", err);
+            }
+            setIsLoading(false);
+            if (!isPublicPage(pathnameRef.current)) {
+                router.push("/login");
+            }
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
