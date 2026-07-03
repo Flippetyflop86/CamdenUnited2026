@@ -36,11 +36,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const isPublicPage = (path: string) => {
         const AUTH_PAGES = ["/login", "/signup", "/reset-password", "/update-password", "/join", "/signup/player"];
-        if (!path) return false;
-        return AUTH_PAGES.includes(path) || 
-               path.startsWith("/checkin") || 
-               path.startsWith("/match-checkin") || 
-               path.startsWith("/respond");
+        let currentPath = path;
+        if (typeof window !== 'undefined') {
+            currentPath = window.location.pathname;
+        }
+        if (!currentPath) return false;
+        return AUTH_PAGES.includes(currentPath) || 
+               currentPath.startsWith("/checkin") || 
+               currentPath.startsWith("/match-checkin") || 
+               currentPath.startsWith("/respond");
     };
 
     const fetchClubMembership = async (userId: string) => {
