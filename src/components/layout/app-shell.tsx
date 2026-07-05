@@ -15,9 +15,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [isFabOpen, setIsFabOpen] = useState(false);
 
-    const isPublicCheckin = pathname?.startsWith("/checkin") || pathname?.startsWith("/match-checkin") || pathname?.startsWith("/respond");
-    const isAuthPage = ["/login", "/signup", "/reset-password", "/update-password", "/join"].includes(pathname);
-    const isOnboardingPage = pathname === "/onboarding";
+    const cleanPath = pathname?.endsWith("/") && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
+    const isPublicCheckin = cleanPath?.startsWith("/checkin") || cleanPath?.startsWith("/match-checkin") || cleanPath?.startsWith("/respond");
+    const isAuthPage = ["/login", "/signup", "/reset-password", "/update-password", "/join"].includes(cleanPath);
+    const isOnboardingPage = cleanPath === "/onboarding";
     const isNoShellPage = isAuthPage || isOnboardingPage || isPublicCheckin;
 
     useEffect(() => {

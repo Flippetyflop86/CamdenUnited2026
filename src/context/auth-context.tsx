@@ -41,10 +41,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             currentPath = window.location.pathname;
         }
         if (!currentPath) return false;
-        return AUTH_PAGES.includes(currentPath) || 
-               currentPath.startsWith("/checkin") || 
-               currentPath.startsWith("/match-checkin") || 
-               currentPath.startsWith("/respond");
+        const cleanPath = currentPath.endsWith("/") && currentPath.length > 1 ? currentPath.slice(0, -1) : currentPath;
+        return AUTH_PAGES.includes(cleanPath) || 
+               cleanPath.startsWith("/checkin") || 
+               cleanPath.startsWith("/match-checkin") || 
+               cleanPath.startsWith("/respond");
     };
 
     const fetchClubMembership = async (userId: string) => {
