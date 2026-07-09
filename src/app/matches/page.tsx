@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink, CloudRain, Snowflake, Thermometer, CloudLightning, Sun, AlertCircle, BarChart3, Share2, Coins } from "lucide-react";
+import { Plus, Minus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink, CloudRain, Snowflake, Thermometer, CloudLightning, Sun, AlertCircle, BarChart3, Share2, Coins } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -135,6 +135,139 @@ export default function MatchesPage() {
     const [seasonFilter, setSeasonFilter] = useState<string>("26/27");
     const [resultSort, setResultSort] = useState<"desc" | "asc">("desc"); // desc = Newest First
 
+    const [players, setPlayers] = useState<any[]>([]);
+    const [selectedGoals, setSelectedGoals] = useState<Array<{ playerId: string; count: number }>>([]);
+    const [selectedAssists, setSelectedAssists] = useState<Array<{ playerId: string; count: number }>>([]);
+
+    const fetchPlayers = async () => {
+        const { data, error } = await supabase
+            .from('players')
+            .select('id, first_name, last_name, nickname, use_nickname')
+            .order('first_name');
+        if (data) setPlayers(data);
+    };
+
+    // Format name correctly (first initial + last name) e.g. "J.Smith"
+    const getFormattedPlayerName = (player: any) => {
+        if (!player) return "";
+        const firstInitial = player.first_name ? player.first_name[0] : "";
+        return `${firstInitial}.${player.last_name}`;
+    };
+
+    // Sync dropdown selections back to text representation for display compatibility
+    useEffect(() => {
+        if (players.length === 0) return;
+        const goalsText = selectedGoals
+            .map(g => {
+                const player = players.find(p => p.id === g.playerId);
+                const name = player ? getFormattedPlayerName(player) : "Unknown";
+                return `${name}${g.count > 1 ? ` (${g.count})` : ""}`;
+            })
+            .join(", ");
+        setFormData((prev: any) => ({ ...prev, goalscorers: goalsText }));
+    }, [selectedGoals, players]);
+
+    useEffect(() => {
+        if (players.length === 0) return;
+        const assistsText = selectedAssists
+            .map(a => {
+                const player = players.find(p => p.id === a.playerId);
+                const name = player ? getFormattedPlayerName(player) : "Unknown";
+                return `${name}${a.count > 1 ? ` (${a.count})` : ""}`;
+            })
+            .join(", ");
+        setFormData((prev: any) => ({ ...prev, assists: assistsText }));
+    }, [selectedAssists, players]);
+
+    const syncMatchPlayerStats = async (matchId: string, selectedGoals: Array<{playerId: string, count: number}>, selectedAssists: Array<{playerId: string, count: number}>) => {
+        const playersInvolved = new Set<string>();
+        selectedGoals.forEach(g => playersInvolved.add(g.playerId));
+        selectedAssists.forEach(a => playersInvolved.add(a.playerId));
+
+        const { data: existingStats, error: fetchErr } = await supabase
+            .from('match_player_stats')
+            .select('*')
+            .eq('match_id', matchId);
+
+        if (fetchErr) {
+            console.error("Error fetching existing match player stats:", fetchErr);
+            return;
+        }
+
+        const existingMap = new Map<string, any>();
+        existingStats?.forEach(s => existingMap.set(s.player_id, s));
+
+        for (const playerId of playersInvolved) {
+            const goalsCount = selectedGoals.find(g => g.playerId === playerId)?.count || 0;
+            const assistsCount = selectedAssists.find(a => a.playerId === playerId)?.count || 0;
+
+            const existing = existingMap.get(playerId);
+            if (existing) {
+                const { error: updateErr } = await supabase
+                    .from('match_player_stats')
+                    .update({ goals: goalsCount, assists: assistsCount })
+                    .eq('id', existing.id);
+                if (updateErr) console.error("Error updating player stat:", updateErr);
+            } else {
+                const { error: insertErr } = await supabase
+                    .from('match_player_stats')
+                    .insert([{
+                        match_id: matchId,
+                        player_id: playerId,
+                        goals: goalsCount,
+                        assists: assistsCount,
+                        minutes_played: 90,
+                        yellow_cards: 0,
+                        red_cards: 0
+                    }]);
+                if (insertErr) console.error("Error inserting player stat:", insertErr);
+            }
+        }
+
+        for (const existing of existingStats || []) {
+            if (!playersInvolved.has(existing.player_id)) {
+                const hasOtherStats = (existing.yellow_cards || 0) > 0 || (existing.red_cards || 0) > 0 || (existing.minutes_played || 90) !== 90;
+                if (hasOtherStats) {
+                    await supabase
+                        .from('match_player_stats')
+                        .update({ goals: 0, assists: 0 })
+                        .eq('id', existing.id);
+                } else {
+                    await supabase
+                        .from('match_player_stats')
+                        .delete()
+                        .eq('id', existing.id);
+                }
+            }
+        }
+    };
+
+    const addGoalscorerRow = () => {
+        if (players.length === 0) return;
+        setSelectedGoals(prev => [...prev, { playerId: players[0].id, count: 1 }]);
+    };
+    
+    const updateGoalscorerRow = (index: number, playerId: string, count: number) => {
+        setSelectedGoals(prev => prev.map((item, idx) => idx === index ? { playerId, count: Math.max(1, count) } : item));
+    };
+
+    const deleteGoalscorerRow = (index: number) => {
+        setSelectedGoals(prev => prev.filter((_, idx) => idx !== index));
+    };
+
+    const addAssisterRow = () => {
+        if (players.length === 0) return;
+        setSelectedAssists(prev => [...prev, { playerId: players[0].id, count: 1 }]);
+    };
+    
+    const updateAssisterRow = (index: number, playerId: string, count: number) => {
+        setSelectedAssists(prev => prev.map((item, idx) => idx === index ? { playerId, count: Math.max(1, count) } : item));
+    };
+
+    const deleteAssisterRow = (index: number) => {
+        setSelectedAssists(prev => prev.filter((_, idx) => idx !== index));
+    };
+
     // Form State
     const [formData, setFormData] = useState<any>({
         date: "",
@@ -170,6 +303,7 @@ export default function MatchesPage() {
     useEffect(() => {
         fetchMatches();
         fetchLeagueTeams();
+        fetchPlayers();
 
         const fetchWeather = async () => {
             try {
@@ -322,13 +456,19 @@ export default function MatchesPage() {
         };
 
         try {
+            let matchId = editingId;
             if (isNew) {
                 payload.event_token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-                const { error } = await supabase.from("matches").insert([payload]);
+                const { data, error } = await supabase.from("matches").insert([payload]).select().single();
                 if (error) throw error;
+                matchId = data.id;
             } else {
                 const { error } = await supabase.from("matches").update(payload).eq("id", editingId);
                 if (error) throw error;
+            }
+
+            if (matchId) {
+                await syncMatchPlayerStats(matchId, selectedGoals, selectedAssists);
             }
 
             // Sync details to league_teams inline
@@ -364,7 +504,27 @@ export default function MatchesPage() {
         }
     };
 
-    const handleEditMatch = (match: Match) => {
+    const handleEditMatch = async (match: Match) => {
+        const { data: stats } = await supabase
+            .from('match_player_stats')
+            .select('*')
+            .eq('match_id', match.id);
+
+        const goalsList: Array<{ playerId: string, count: number }> = [];
+        const assistsList: Array<{ playerId: string, count: number }> = [];
+
+        stats?.forEach(s => {
+            if (s.goals > 0) {
+                goalsList.push({ playerId: s.player_id, count: s.goals });
+            }
+            if (s.assists > 0) {
+                assistsList.push({ playerId: s.player_id, count: s.assists });
+            }
+        });
+
+        setSelectedGoals(goalsList);
+        setSelectedAssists(assistsList);
+
         setFormData({
             date: match.date,
             time: match.time,
@@ -662,6 +822,8 @@ export default function MatchesPage() {
         });
         setOpponentInstagram("");
         setOpponentBadgeUrl("");
+        setSelectedGoals([]);
+        setSelectedAssists([]);
     };
 
     const handleBadgeFile = async (file: File) => {
@@ -1242,22 +1404,162 @@ export default function MatchesPage() {
 
                                         <div className="grid grid-cols-2 gap-3">
                                             <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Goalscorers</Label>
-                                                <Textarea
-                                                    placeholder="e.g. J.Smith (2), D.Jones"
+                                                <Label className="text-xs font-bold text-slate-500">Goalscorers (Preview)</Label>
+                                                <Input
+                                                    readOnly
+                                                    placeholder="Dropdown selection auto-populates this field..."
                                                     value={formData.goalscorers}
-                                                    onChange={(e) => setFormData({ ...formData, goalscorers: e.target.value })}
-                                                    className="h-16 text-xs"
+                                                    className="h-9 text-xs bg-slate-50 cursor-default"
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Assists</Label>
-                                                <Textarea
-                                                    placeholder="e.g. M.Ali, K.West"
+                                                <Label className="text-xs font-bold text-slate-500">Assists (Preview)</Label>
+                                                <Input
+                                                    readOnly
+                                                    placeholder="Dropdown selection auto-populates this field..."
                                                     value={formData.assists}
-                                                    onChange={(e) => setFormData({ ...formData, assists: e.target.value })}
-                                                    className="h-16 text-xs"
+                                                    className="h-9 text-xs bg-slate-50 cursor-default"
                                                 />
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-4 bg-slate-50/60 p-3 rounded-xl border border-slate-100 mt-2">
+                                            {/* Goals / Scorers Section */}
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-center">
+                                                    <Label className="text-xs font-bold text-slate-700">⚽ Goalscorers (Dropdown Selection)</Label>
+                                                    <Button 
+                                                        type="button" 
+                                                        variant="outline" 
+                                                        size="sm" 
+                                                        onClick={addGoalscorerRow}
+                                                        className="h-7 text-[11px] font-semibold text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                                                    >
+                                                        <Plus className="h-3 w-3 mr-1" /> Add Scorer
+                                                    </Button>
+                                                </div>
+                                                
+                                                <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
+                                                    {selectedGoals.map((row, index) => (
+                                                        <div key={index} className="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-slate-200">
+                                                            <Select
+                                                                value={row.playerId}
+                                                                onValueChange={(val) => updateGoalscorerRow(index, val, row.count)}
+                                                            >
+                                                                <SelectTrigger className="h-8 text-xs flex-1 bg-white">
+                                                                    <SelectValue placeholder="Select Player" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {players.map(p => (
+                                                                        <SelectItem key={p.id} value={p.id} className="text-xs">
+                                                                            {p.use_nickname && p.nickname ? p.nickname : `${p.first_name} ${p.last_name}`}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                            
+                                                            <div className="flex items-center border rounded-md overflow-hidden bg-white h-8 shrink-0">
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => updateGoalscorerRow(index, row.playerId, row.count - 1)} 
+                                                                    className="px-1.5 hover:bg-slate-100 h-full border-r"
+                                                                >
+                                                                    <Minus className="h-3 w-3" />
+                                                                </button>
+                                                                <span className="w-8 text-center text-xs font-bold text-slate-800">{row.count}</span>
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => updateGoalscorerRow(index, row.playerId, row.count + 1)} 
+                                                                    className="px-1.5 hover:bg-slate-100 h-full border-l"
+                                                                >
+                                                                    <Plus className="h-3 w-3" />
+                                                                </button>
+                                                            </div>
+                                                            
+                                                            <Button 
+                                                                type="button" 
+                                                                variant="ghost" 
+                                                                size="icon" 
+                                                                onClick={() => deleteGoalscorerRow(index)}
+                                                                className="h-8 w-8 text-slate-400 hover:text-red-500"
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                    {selectedGoals.length === 0 && (
+                                                        <p className="text-[10px] text-slate-400 italic text-center py-2 bg-white rounded border border-dashed">No goalscorers selected.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Assists Section */}
+                                            <div className="space-y-2">
+                                                <div className="flex justify-between items-center">
+                                                    <Label className="text-xs font-bold text-slate-700">🅰️ Assists (Dropdown Selection)</Label>
+                                                    <Button 
+                                                        type="button" 
+                                                        variant="outline" 
+                                                        size="sm" 
+                                                        onClick={addAssisterRow}
+                                                        className="h-7 text-[11px] font-semibold text-blue-700 border-blue-200 hover:bg-blue-50"
+                                                    >
+                                                        <Plus className="h-3 w-3 mr-1" /> Add Assister
+                                                    </Button>
+                                                </div>
+                                                
+                                                <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
+                                                    {selectedAssists.map((row, index) => (
+                                                        <div key={index} className="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-slate-200">
+                                                            <Select
+                                                                value={row.playerId}
+                                                                onValueChange={(val) => updateAssisterRow(index, val, row.count)}
+                                                            >
+                                                                <SelectTrigger className="h-8 text-xs flex-1 bg-white">
+                                                                    <SelectValue placeholder="Select Player" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    {players.map(p => (
+                                                                        <SelectItem key={p.id} value={p.id} className="text-xs">
+                                                                            {p.use_nickname && p.nickname ? p.nickname : `${p.first_name} ${p.last_name}`}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                            
+                                                            <div className="flex items-center border rounded-md overflow-hidden bg-white h-8 shrink-0">
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => updateAssisterRow(index, row.playerId, row.count - 1)} 
+                                                                    className="px-1.5 hover:bg-slate-100 h-full border-r"
+                                                                >
+                                                                    <Minus className="h-3 w-3" />
+                                                                </button>
+                                                                <span className="w-8 text-center text-xs font-bold text-slate-800">{row.count}</span>
+                                                                <button 
+                                                                    type="button"
+                                                                    onClick={() => updateAssisterRow(index, row.playerId, row.count + 1)} 
+                                                                    className="px-1.5 hover:bg-slate-100 h-full border-l"
+                                                                >
+                                                                    <Plus className="h-3 w-3" />
+                                                                </button>
+                                                            </div>
+                                                            
+                                                            <Button 
+                                                                type="button" 
+                                                                variant="ghost" 
+                                                                size="icon" 
+                                                                onClick={() => deleteAssisterRow(index)}
+                                                                className="h-8 w-8 text-slate-400 hover:text-red-500"
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </div>
+                                                    ))}
+                                                    {selectedAssists.length === 0 && (
+                                                        <p className="text-[10px] text-slate-400 italic text-center py-2 bg-white rounded border border-dashed">No assisters selected.</p>
+                                                    )}
+                                                </div>
                                             </div>
                                         </div>
 
