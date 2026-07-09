@@ -1442,21 +1442,17 @@ export default function MatchesPage() {
                                                 <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
                                                     {selectedGoals.map((row, index) => (
                                                         <div key={index} className="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-slate-200">
-                                                            <Select
+                                                            <select
                                                                 value={row.playerId}
-                                                                onValueChange={(val) => updateGoalscorerRow(index, val, row.count)}
+                                                                onChange={(e) => updateGoalscorerRow(index, e.target.value, row.count)}
+                                                                className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 cursor-pointer text-slate-700 font-medium flex-1 outline-none"
                                                             >
-                                                                <SelectTrigger className="h-8 text-xs flex-1 bg-white">
-                                                                    <SelectValue placeholder="Select Player" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {players.map(p => (
-                                                                        <SelectItem key={p.id} value={p.id} className="text-xs">
-                                                                            {p.use_nickname && p.nickname ? p.nickname : `${p.first_name} ${p.last_name}`}
-                                                                        </SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
+                                                                {players.map(p => (
+                                                                    <option key={p.id} value={p.id}>
+                                                                        {p.use_nickname && p.nickname ? p.nickname : `${p.first_name} ${p.last_name}`}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
                                                             
                                                             <div className="flex items-center border rounded-md overflow-hidden bg-white h-8 shrink-0">
                                                                 <button 
@@ -1511,21 +1507,17 @@ export default function MatchesPage() {
                                                 <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
                                                     {selectedAssists.map((row, index) => (
                                                         <div key={index} className="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-slate-200">
-                                                            <Select
+                                                            <select
                                                                 value={row.playerId}
-                                                                onValueChange={(val) => updateAssisterRow(index, val, row.count)}
+                                                                onChange={(e) => updateAssisterRow(index, e.target.value, row.count)}
+                                                                className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 cursor-pointer text-slate-700 font-medium flex-1 outline-none"
                                                             >
-                                                                <SelectTrigger className="h-8 text-xs flex-1 bg-white">
-                                                                    <SelectValue placeholder="Select Player" />
-                                                                </SelectTrigger>
-                                                                <SelectContent>
-                                                                    {players.map(p => (
-                                                                        <SelectItem key={p.id} value={p.id} className="text-xs">
-                                                                            {p.use_nickname && p.nickname ? p.nickname : `${p.first_name} ${p.last_name}`}
-                                                                        </SelectItem>
-                                                                    ))}
-                                                                </SelectContent>
-                                                            </Select>
+                                                                {players.map(p => (
+                                                                    <option key={p.id} value={p.id}>
+                                                                        {p.use_nickname && p.nickname ? p.nickname : `${p.first_name} ${p.last_name}`}
+                                                                    </option>
+                                                                ))}
+                                                            </select>
                                                             
                                                             <div className="flex items-center border rounded-md overflow-hidden bg-white h-8 shrink-0">
                                                                 <button 
