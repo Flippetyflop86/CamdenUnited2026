@@ -79,6 +79,7 @@ export default function TrainingPage() {
     });
 
     const [squadFilter, setSquadFilter] = useState<string>("All");
+    const [timeFilter, setTimeFilter] = useState<"upcoming" | "past" | "all">("upcoming");
 
     // WhatsApp Generated Availability Poll State
     const [activeShareSession, setActiveShareSession] = useState<TrainingSession | null>(null);
@@ -318,9 +319,30 @@ export default function TrainingPage() {
 
     const filteredSessions = sessions.filter(s => squadFilter === "All" || s.squad === squadFilter);
 
-    const upcomingSessions = filteredSessions.sort((a, b) =>
-        new Date(a.date).getTime() - new Date(b.date).getTime()
-    );
+    // Helper for finding upcoming sessions for WhatsApp poll
+    const trueUpcomingSessions = [...filteredSessions]
+        .filter(s => {
+            const todayStr = new Date().toISOString().split("T")[0];
+            return s.date >= todayStr;
+        })
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    // Filter and sort display sessions based on selected time filter (upcoming vs past)
+    const displaySessions = [...filteredSessions]
+        .filter(s => {
+            const todayStr = new Date().toISOString().split("T")[0];
+            if (timeFilter === "upcoming") return s.date >= todayStr;
+            if (timeFilter === "past") return s.date < todayStr;
+            return true;
+        })
+        .sort((a, b) => {
+            if (timeFilter === "past") {
+                // Past sessions: show most recent first
+                return new Date(b.date).getTime() - new Date(a.date).getTime();
+            }
+            // Upcoming sessions: show closest first
+            return new Date(a.date).getTime() - new Date(b.date).getTime();
+        });
 
     const formatTrainingDate = (dateStr: string) => {
         const d = new Date(dateStr);
@@ -624,9 +646,20 @@ export default function TrainingPage() {
                         </button>
                     </div>
                     {activeTab === 'sessions' && (
+                        <select
+                            value={timeFilter}
+                            onChange={(e) => setTimeFilter(e.target.value as any)}
+                            className="flex h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 cursor-pointer text-slate-700 font-medium"
+                        >
+                            <option value="upcoming">Upcoming</option>
+                            <option value="past">Past</option>
+                            <option value="all">All Sessions</option>
+                        </select>
+                    )}
+                    {activeTab === 'sessions' && (
                         <div className="flex gap-2">
                             <Button className="bg-emerald-600 hover:bg-emerald-700 flex" onClick={() => {
-                                const nextSession = upcomingSessions.find(s => new Date(s.date) >= new Date(new Date().setHours(0,0,0,0)));
+                                const nextSession = trueUpcomingSessions[0];
                                 if (nextSession) {
                                     handleOpenShare(nextSession);
                                 } else {
@@ -645,7 +678,7 @@ export default function TrainingPage() {
 
             {activeTab === 'sessions' ? (
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                    {upcomingSessions.map((session) => (
+                    {displaySessions.map((session) => (
                         <Card 
                             key={session.id} 
                             onClick={() => window.location.href = `/training/${session.id}`}
@@ -715,7 +748,7 @@ export default function TrainingPage() {
                             </CardContent>
                         </Card>
                     ))}
-                    {upcomingSessions.length === 0 && (
+                    {displaySessions.length === 0 && (
                         <div className="col-span-full py-12 text-center text-slate-500 border-2 border-dashed rounded-lg">
                             No training sessions scheduled.
                         </div>
