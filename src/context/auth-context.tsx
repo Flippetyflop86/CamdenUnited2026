@@ -41,6 +41,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             currentPath = window.location.pathname;
         }
         if (!currentPath) return false;
+
+        // If the URL has an auth-handling hash, treat it as a public page to avoid redirecting to /login
+        if (typeof window !== 'undefined' && window.location.hash) {
+            const hash = window.location.hash;
+            if (hash.includes("type=recovery") || hash.includes("access_token=")) {
+                return true;
+            }
+        }
+
         const cleanPath = currentPath.endsWith("/") && currentPath.length > 1 ? currentPath.slice(0, -1) : currentPath;
         return AUTH_PAGES.includes(cleanPath) || 
                cleanPath.startsWith("/checkin") || 
@@ -88,6 +97,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
+        // Intercept password recovery or access token fragments and route them immediately to /update-password
+        if (typeof window !== 'undefined' && window.location.hash) {
+            const hash = window.location.hash;
+            if (hash.includes("type=recovery") || hash.includes("access_token=")) {
+                if (window.location.pathname !== "/update-password") {
+                    router.replace("/update-password" + hash);
+                    return;
+                }
+            }
+        }
+
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
             setUser(session?.user ?? null);
