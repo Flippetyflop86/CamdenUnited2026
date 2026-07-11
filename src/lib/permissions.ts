@@ -24,6 +24,7 @@ export const ALL_PAGE_PERMISSIONS: PagePermission[] = [
     { key: "sponsors",     label: "Sponsorships", href: "/sponsors",     description: "Sponsor deals and contacts",     group: "Off the Pitch" },
     { key: "recruitment",  label: "Recruitment",  href: "/recruitment",  description: "Player recruitment pipeline",    group: "Off the Pitch" },
     { key: "finance",      label: "Finance",      href: "/finance",      description: "Income, expenses and balances",  group: "Off the Pitch" },
+    { key: "payments",     label: "Player Payments", href: "/player-payments", description: "Collect payments and fees", group: "Off the Pitch" },
     { key: "budgets",      label: "Player Budgets", href: "/budgets",    description: "Individual player budgets",      group: "Off the Pitch" },
     { key: "inventory",    label: "Inventory",    href: "/inventory",    description: "Kit and equipment tracker",      group: "Off the Pitch" },
     { key: "staff",        label: "Staff",        href: "/staff",        description: "Staff profiles and contracts",   group: "Off the Pitch" },
@@ -38,7 +39,7 @@ export const MANAGER_ONLY_PAGES: string[] = [];
 export const ALWAYS_VISIBLE_PAGES = ["/dashboard"];
 
 // These pages are pre-ticked by default when creating an invite, but can be revoked.
-export const DEFAULT_GRANTED_PERMISSIONS = ["sponsors", "finance", "budgets"];
+export const DEFAULT_GRANTED_PERMISSIONS = ["sponsors", "finance", "budgets", "payments"];
 
 export const PERMISSION_GROUPS = [...new Set(ALL_PAGE_PERMISSIONS.map(p => p.group))];
 

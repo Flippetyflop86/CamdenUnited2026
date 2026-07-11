@@ -66,6 +66,7 @@ const navSections = [
             { href: "/sponsors",      label: "Sponsorships",   icon: Briefcase },
             { href: "/recruitment",   label: "Recruitment",    icon: UserPlus },
             { href: "/finance",       label: "Finance",        icon: Coins },
+            { href: "/player-payments", label: "Player Payments", icon: Wallet },
             { href: "/budgets",       label: "Player Budgets", icon: Wallet },
             { href: "/inventory",     label: "Inventory",      icon: Clipboard },
             { href: "/staff",         label: "Staff",          icon: Users },
