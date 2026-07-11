@@ -103,7 +103,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (hash.includes("type=recovery") || hash.includes("access_token=")) {
                 if (window.location.pathname !== "/update-password") {
                     router.replace("/update-password" + hash);
-                    return;
                 }
             }
         }
