@@ -38,7 +38,8 @@ const CLUSTERED_TABLES = [
     'club_members',
     'club_invitations',
     'app_users',
-    'club_payments'
+    'club_payments',
+    'player_payment_requests'
 ];
 
 // Helper to determine if we are in browser context

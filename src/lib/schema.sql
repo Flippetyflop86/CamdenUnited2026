@@ -210,3 +210,25 @@ ALTER TABLE training_sessions ADD COLUMN IF NOT EXISTS event_token text UNIQUE;
 ALTER TABLE training_sessions ADD COLUMN IF NOT EXISTS lock_type text DEFAULT 'Never';
 ALTER TABLE training_sessions ADD COLUMN IF NOT EXISTS lock_time timestamp with time zone;
 
+-- Stripe Connect Integrations
+ALTER TABLE clubs ADD COLUMN IF NOT EXISTS stripe_connect_account_id text;
+ALTER TABLE clubs ADD COLUMN IF NOT EXISTS stripe_connect_onboarding_completed boolean DEFAULT false;
+
+-- Player Payment Requests table
+CREATE TABLE IF NOT EXISTS player_payment_requests (
+  id uuid primary key default uuid_generate_v4(),
+  club_id uuid, -- Reference to clubs
+  player_id uuid references players(id) on delete cascade,
+  amount numeric not null,
+  description text not null,
+  status text not null default 'Unpaid', -- 'Unpaid', 'Paid'
+  stripe_checkout_session_id text,
+  created_at timestamp with time zone default timezone('utc'::text, now()),
+  paid_at timestamp with time zone
+);
+
+-- Enable RLS for player_payment_requests
+ALTER TABLE player_payment_requests ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow anyone to select player_payment_requests" ON player_payment_requests FOR SELECT USING (true);
+CREATE POLICY "Allow managers to manage player_payment_requests" ON player_payment_requests FOR ALL TO authenticated USING (true);
+
