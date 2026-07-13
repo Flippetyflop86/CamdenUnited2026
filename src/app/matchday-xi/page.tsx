@@ -252,6 +252,73 @@ export default function MatchdayXIPage() {
         fetchLineupOnly();
     }, [selectedMatchId, matches, activeSquadTab]);
 
+    const syncLineupAppearancesToDatabase = async (matchId: string, newLineup: MatchdayXI & { usedSubstitutes?: string[] }) => {
+        const playerIds = new Set<string>();
+
+        if (newLineup.starters) {
+            Object.values(newLineup.starters).forEach((id: any) => {
+                if (id) playerIds.add(id);
+            });
+        }
+
+        if (newLineup.usedSubstitutes && Array.isArray(newLineup.usedSubstitutes)) {
+            newLineup.usedSubstitutes.forEach((id: any) => {
+                if (id) playerIds.add(id);
+            });
+        } else if (newLineup.substitutes && Array.isArray(newLineup.substitutes)) {
+            newLineup.substitutes.forEach((id: any) => {
+                if (id) playerIds.add(id);
+            });
+        }
+
+        // Fetch current stats for the match
+        const { data: existingStats, error: fetchErr } = await supabase
+            .from('match_player_stats')
+            .select('*')
+            .eq('match_id', matchId);
+
+        if (fetchErr) {
+            console.error("Error fetching match stats:", fetchErr);
+            return;
+        }
+
+        const existingMap = new Map<string, any>();
+        existingStats?.forEach(s => existingMap.set(s.player_id, s));
+
+        // 1. Ensure rows exist for everyone in the lineup
+        for (const playerId of playerIds) {
+            const existing = existingMap.get(playerId);
+            if (!existing) {
+                const { error: insertErr } = await supabase
+                    .from('match_player_stats')
+                    .insert([{
+                        match_id: matchId,
+                        player_id: playerId,
+                        goals: 0,
+                        assists: 0,
+                        minutes_played: 90,
+                        yellow_cards: 0,
+                        red_cards: 0
+                    }]);
+                if (insertErr) console.error("Error inserting stats row:", insertErr);
+            }
+        }
+
+        // 2. Remove rows for players NOT in the lineup anymore (who have no other stats)
+        for (const existing of existingStats || []) {
+            if (!playerIds.has(existing.player_id)) {
+                const hasStats = (existing.goals || 0) > 0 || (existing.assists || 0) > 0 || (existing.yellow_cards || 0) > 0 || (existing.red_cards || 0) > 0;
+                if (!hasStats) {
+                    const { error: deleteErr } = await supabase
+                        .from('match_player_stats')
+                        .delete()
+                        .eq('id', existing.id);
+                    if (deleteErr) console.error("Error deleting stats row:", deleteErr);
+                }
+            }
+        }
+    };
+
     const saveLineup = async (newLineup: MatchdayXI & { usedSubstitutes?: string[] }) => {
         if (!selectedMatchId) return;
         const currentMatch = matches.find(m => m.id === selectedMatchId);
@@ -280,6 +347,11 @@ export default function MatchdayXIPage() {
         if (error) {
             console.error("Save Match Lineup Error:", error);
             alert("Database Error: " + error.message);
+        }
+
+        // If this match has already been completed, automatically sync appearances directly to the squad page!
+        if (currentMatch.result && currentMatch.result !== "Pending") {
+            await syncLineupAppearancesToDatabase(selectedMatchId, newLineup);
         }
 
         // Also save as fallback template to matchday_xis
