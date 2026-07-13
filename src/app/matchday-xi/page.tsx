@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { MatchdayXI, Player, Match, Position } from "@/types";
 import { FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,7 @@ export default function MatchdayXIPage() {
     const [matches, setMatches] = useState<Match[]>([]);
     const [selectedMatchId, setSelectedMatchId] = useState<string>("");
     const [nextMatch, setNextMatch] = useState<Match | null>(null);
+    const loadedLineupKeyRef = useRef<string>("");
     const [draggedPlayer, setDraggedPlayer] = useState<string | null>(null);
     const [draggedSource, setDraggedSource] = useState<{type: 'squad' | 'pitch' | 'sub', index?: number} | null>(null);
     const [squadFilter, setSquadFilter] = useState<"All" | "GK" | "DEF" | "MID" | "FWD">("All");
@@ -99,8 +100,8 @@ export default function MatchdayXIPage() {
         await Promise.all([fetchLineupOnly(), fetchPlayers(), fetchMatches()]);
     };
 
-    const fetchLineupOnly = async () => {
-        if (selectedMatchId) return;
+    const fetchLineupOnly = async (isFallback = false) => {
+        if (selectedMatchId && !isFallback) return;
         try {
             const { data, error } = await supabase
                 .from('matchday_xis')
@@ -223,6 +224,12 @@ export default function MatchdayXIPage() {
     // Load lineup when selectedMatchId changes
     useEffect(() => {
         if (!selectedMatchId || matches.length === 0) return;
+
+        const currentKey = `${activeSquadTab}-${selectedMatchId}`;
+        if (loadedLineupKeyRef.current === currentKey) {
+            return;
+        }
+
         const currentMatch = matches.find(m => m.id === selectedMatchId);
         if (!currentMatch) return;
 
@@ -243,6 +250,7 @@ export default function MatchdayXIPage() {
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 });
+                loadedLineupKeyRef.current = currentKey;
                 return;
             } catch (e) {
                 console.error("Failed to parse lineup from match notes:", e);
@@ -250,7 +258,8 @@ export default function MatchdayXIPage() {
         }
 
         // Fallback to fetch latest general lineup
-        fetchLineupOnly();
+        fetchLineupOnly(true);
+        loadedLineupKeyRef.current = currentKey;
     }, [selectedMatchId, matches, activeSquadTab]);
 
     const syncLineupAppearancesToDatabase = async (matchId: string, newLineup: MatchdayXI & { usedSubstitutes?: string[] }) => {
