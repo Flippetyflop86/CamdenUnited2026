@@ -100,6 +100,7 @@ export default function MatchdayXIPage() {
     };
 
     const fetchLineupOnly = async () => {
+        if (selectedMatchId) return;
         try {
             const { data, error } = await supabase
                 .from('matchday_xis')
