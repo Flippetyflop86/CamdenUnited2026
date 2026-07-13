@@ -138,6 +138,7 @@ export default function MatchesPage() {
     const [players, setPlayers] = useState<any[]>([]);
     const [selectedGoals, setSelectedGoals] = useState<Array<{ playerId: string; count: number }>>([]);
     const [selectedAssists, setSelectedAssists] = useState<Array<{ playerId: string; count: number }>>([]);
+    const [selectedAppearances, setSelectedAppearances] = useState<string[]>([]);
 
     const fetchPlayers = async () => {
         const { data, error } = await supabase
@@ -179,8 +180,13 @@ export default function MatchesPage() {
         setFormData((prev: any) => ({ ...prev, assists: assistsText }));
     }, [selectedAssists, players]);
 
-    const syncMatchPlayerStats = async (matchId: string, selectedGoals: Array<{playerId: string, count: number}>, selectedAssists: Array<{playerId: string, count: number}>) => {
-        const playersInvolved = new Set<string>();
+    const syncMatchPlayerStats = async (
+        matchId: string, 
+        selectedGoals: Array<{playerId: string, count: number}>, 
+        selectedAssists: Array<{playerId: string, count: number}>,
+        selectedAppearances: string[]
+    ) => {
+        const playersInvolved = new Set<string>(selectedAppearances);
         selectedGoals.forEach(g => playersInvolved.add(g.playerId));
         selectedAssists.forEach(a => playersInvolved.add(a.playerId));
 
@@ -468,7 +474,7 @@ export default function MatchesPage() {
             }
 
             if (matchId) {
-                await syncMatchPlayerStats(matchId, selectedGoals, selectedAssists);
+                await syncMatchPlayerStats(matchId, selectedGoals, selectedAssists, selectedAppearances);
             }
 
             // Sync details to league_teams inline
@@ -524,6 +530,9 @@ export default function MatchesPage() {
 
         setSelectedGoals(goalsList);
         setSelectedAssists(assistsList);
+        
+        const appearanceList: string[] = stats?.map(s => s.player_id) || [];
+        setSelectedAppearances(appearanceList);
 
         setFormData({
             date: match.date,
@@ -824,6 +833,7 @@ export default function MatchesPage() {
         setOpponentBadgeUrl("");
         setSelectedGoals([]);
         setSelectedAssists([]);
+        setSelectedAppearances([]);
     };
 
     const handleBadgeFile = async (file: File) => {
@@ -1551,6 +1561,41 @@ export default function MatchesPage() {
                                                     {selectedAssists.length === 0 && (
                                                         <p className="text-[10px] text-slate-400 italic text-center py-2 bg-white rounded border border-dashed">No assisters selected.</p>
                                                     )}
+                                                </div>
+                                            </div>
+                                            {/* Matchday Appearances Section */}
+                                            <div className="space-y-2 pt-2 border-t border-slate-200 col-span-2">
+                                                <Label className="text-xs font-bold text-slate-700">👕 Additional Appearances (Select players who played but had no goals/assists)</Label>
+                                                <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-lg border border-slate-200 max-h-[140px] overflow-y-auto">
+                                                    {players.map(p => {
+                                                        const isScorerOrAssister = selectedGoals.some(g => g.playerId === p.id) || selectedAssists.some(a => a.playerId === p.id);
+                                                        const isSelected = selectedAppearances.includes(p.id) || isScorerOrAssister;
+                                                        
+                                                        return (
+                                                            <button
+                                                                type="button"
+                                                                key={p.id}
+                                                                disabled={isScorerOrAssister}
+                                                                onClick={() => {
+                                                                    if (selectedAppearances.includes(p.id)) {
+                                                                        setSelectedAppearances(prev => prev.filter(id => id !== p.id));
+                                                                    } else {
+                                                                        setSelectedAppearances(prev => [...prev, p.id]);
+                                                                    }
+                                                                }}
+                                                                className={`px-2 py-1 rounded-md text-[10px] font-semibold border transition-all ${
+                                                                    isScorerOrAssister
+                                                                        ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed flex items-center gap-1"
+                                                                        : isSelected
+                                                                            ? "bg-emerald-50 text-emerald-700 border-emerald-300 font-bold shadow-sm"
+                                                                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                                                                }`}
+                                                            >
+                                                                {isScorerOrAssister && "⚽/🅰️ "}
+                                                                {p.first_name} {p.last_name}
+                                                            </button>
+                                                        );
+                                                    })}
                                                 </div>
                                             </div>
                                         </div>
