@@ -226,9 +226,9 @@ export default function SquadPage() {
     const [includeFriendlies, setIncludeFriendlies] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
             const val = localStorage.getItem("clubflow_include_friendlies_squad");
-            return val !== "false";
+            return val === "true";
         }
-        return true;
+        return false;
     });
 
     const toggleIncludeFriendlies = () => {
