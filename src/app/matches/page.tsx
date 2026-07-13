@@ -532,7 +532,33 @@ export default function MatchesPage() {
         setSelectedAssists(assistsList);
         
         const appearanceList: string[] = stats?.map(s => s.player_id) || [];
-        setSelectedAppearances(appearanceList);
+        if (appearanceList.length > 0) {
+            setSelectedAppearances(appearanceList);
+        } else {
+            // Automatically pre-populate default appearances from the latest Matchday XI lineup
+            supabase
+                .from('matchday_xis')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .then(({ data }) => {
+                    if (data && data.length > 0) {
+                        const latestLineup = data[0];
+                        const playerIds = new Set<string>();
+                        if (latestLineup.starters) {
+                            Object.values(latestLineup.starters).forEach((id: any) => {
+                                if (id) playerIds.add(id);
+                            });
+                        }
+                        if (latestLineup.substitutes && Array.isArray(latestLineup.substitutes)) {
+                            latestLineup.substitutes.forEach((id: any) => {
+                                if (id) playerIds.add(id);
+                            });
+                        }
+                        setSelectedAppearances(Array.from(playerIds));
+                    }
+                });
+        }
 
         setFormData({
             date: match.date,
@@ -562,6 +588,49 @@ export default function MatchesPage() {
             setOpponentBadgeUrl("");
         }
         setIsAddOpen(true);
+    };
+
+    const handleAutofillFromMatchdayXI = async () => {
+        try {
+            const { data: lineupData, error: lineupErr } = await supabase
+                .from('matchday_xis')
+                .select('*')
+                .order('created_at', { ascending: false })
+                .limit(1);
+
+            if (lineupErr) throw lineupErr;
+
+            if (!lineupData || lineupData.length === 0) {
+                alert("No Matchday XI lineup found to load.");
+                return;
+            }
+
+            const latestLineup = lineupData[0];
+            const playerIds = new Set<string>();
+
+            if (latestLineup.starters) {
+                Object.values(latestLineup.starters).forEach((id: any) => {
+                    if (id) playerIds.add(id);
+                });
+            }
+
+            if (latestLineup.substitutes && Array.isArray(latestLineup.substitutes)) {
+                latestLineup.substitutes.forEach((id: any) => {
+                    if (id) playerIds.add(id);
+                });
+            }
+
+            if (playerIds.size === 0) {
+                alert("The latest Matchday XI lineup is empty.");
+                return;
+            }
+
+            const uniqueIds = Array.from(playerIds);
+            setSelectedAppearances(uniqueIds);
+        } catch (err: any) {
+            console.error("Error auto-filling from Matchday XI:", err);
+            alert("Failed to load lineup: " + err.message);
+        }
     };
 
     const handleDeleteMatch = async (id: string) => {
@@ -1565,7 +1634,18 @@ export default function MatchesPage() {
                                             </div>
                                             {/* Matchday Appearances Section */}
                                             <div className="space-y-2 pt-2 border-t border-slate-200 col-span-2">
-                                                <Label className="text-xs font-bold text-slate-700">👕 Additional Appearances (Select players who played but had no goals/assists)</Label>
+                                                <div className="flex justify-between items-center pb-1">
+                                                    <Label className="text-xs font-bold text-slate-700">👕 Additional Appearances (Select players who played but had no goals/assists)</Label>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={handleAutofillFromMatchdayXI}
+                                                        className="h-7 text-[10px] font-semibold text-indigo-700 border-indigo-200 hover:bg-indigo-50"
+                                                    >
+                                                        📋 Load from Matchday XI
+                                                    </Button>
+                                                </div>
                                                 <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-lg border border-slate-200 max-h-[140px] overflow-y-auto">
                                                     {players.map(p => {
                                                         const isScorerOrAssister = selectedGoals.some(g => g.playerId === p.id) || selectedAssists.some(a => a.playerId === p.id);
