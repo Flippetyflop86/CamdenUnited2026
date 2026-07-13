@@ -31,6 +31,23 @@ export default function PlayerProfilePage() {
     const [seasonFilter, setSeasonFilter] = useState<string>("26/27");
     const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
     const [calculatedStats, setCalculatedStats] = useState({ apps: 0, goals: 0, assists: 0 });
+    const [includeFriendlies, setIncludeFriendlies] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            const val = localStorage.getItem("clubflow_include_friendlies_squad");
+            return val !== "false";
+        }
+        return true;
+    });
+
+    const toggleIncludeFriendlies = () => {
+        setIncludeFriendlies(prev => {
+            const next = !prev;
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("clubflow_include_friendlies_squad", String(next));
+            }
+            return next;
+        });
+    };
     const [recentActivity, setRecentActivity] = useState<any[]>([]);
 
     // Invite player portal states
@@ -127,11 +144,11 @@ export default function PlayerProfilePage() {
             
             const [playerRes, matchesRes, statsRes, sessionsRes] = await Promise.all([
                 supabase.from('players').select('*, email, mobile_number, status, trusted_devices').eq('id', id).single(),
-                supabase.from('matches').select('id, date'),
+                supabase.from('matches').select('id, date, competition'),
                 supabase.from('match_player_stats').select('*').eq('player_id', id),
                 supabase.from('training_sessions').select('id, date, topic, attendance').order('date', { ascending: false }).limit(10)
             ]);
-
+ 
             if (sessionsRes.data) {
                 const playerSessions = sessionsRes.data.map((session: any) => {
                     const attendanceList = session.attendance || [];
@@ -146,7 +163,7 @@ export default function PlayerProfilePage() {
                 });
                 setRecentActivity(playerSessions);
             }
-
+ 
             if (playerRes.data) {
                 const data = playerRes.data;
                 setPlayer({
@@ -177,12 +194,13 @@ export default function PlayerProfilePage() {
                     useNickname: data.use_nickname || false
                 } as any);
             }
-
+ 
             // Calculate dynamic stats
             const matches = matchesRes.data || [];
             const stats = statsRes.data || [];
-
+ 
             const matchSeasons = new Map<string, string>();
+            const matchCompetitions = new Map<string, string>();
             const seasonSet = new Set<string>();
             matches.forEach((m: any) => {
                 let seasonStr = "";
@@ -200,25 +218,31 @@ export default function PlayerProfilePage() {
                     }
                 }
                 matchSeasons.set(m.id, seasonStr);
+                matchCompetitions.set(m.id, m.competition || "");
                 seasonSet.add(seasonStr);
             });
             seasonSet.add(getCurrentSeasonStr());
             setAvailableSeasons(Array.from(seasonSet).sort().reverse());
-
+ 
             let apps = 0; let goals = 0; let assists = 0;
             stats.forEach((s: any) => {
                 const season = matchSeasons.get(s.match_id);
                 if (seasonFilter !== "All" && season !== seasonFilter) return;
+
+                const comp = matchCompetitions.get(s.match_id) || "";
+                const isFriendly = comp.toLowerCase().includes("friendly") || comp.toLowerCase().includes("trial");
+                if (!includeFriendlies && isFriendly) return;
+ 
                 apps += 1;
                 goals += (s.goals || 0);
                 assists += (s.assists || 0);
             });
             setCalculatedStats({ apps, goals, assists });
-
+ 
             setLoading(false);
         };
         fetchPlayer();
-    }, [id, seasonFilter]);
+    }, [id, seasonFilter, includeFriendlies]);
 
     if (loading) return <div className="p-8 text-center text-slate-500">Loading profile...</div>;
     if (!player) return notFound();
@@ -240,13 +264,22 @@ export default function PlayerProfilePage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" asChild>
-                    <Link href="/squad">
-                        <ArrowLeft className="h-4 w-4" />
-                    </Link>
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+                <div className="flex items-center gap-4">
+                    <Button variant="ghost" size="icon" asChild>
+                        <Link href="/squad">
+                            <ArrowLeft className="h-4 w-4" />
+                        </Link>
+                    </Button>
+                    <h1 className="text-lg font-medium text-slate-500">Back to Squad</h1>
+                </div>
+                <Button 
+                    variant={includeFriendlies ? "default" : "outline"} 
+                    onClick={toggleIncludeFriendlies}
+                    className={includeFriendlies ? "bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9" : "text-slate-500 font-semibold text-xs h-9"}
+                >
+                    {includeFriendlies ? "⚽ Including Friendlies" : "🏆 Competitive Only"}
                 </Button>
-                <h1 className="text-lg font-medium text-slate-500">Back to Squad</h1>
             </div>
 
             {/* Header Section */}

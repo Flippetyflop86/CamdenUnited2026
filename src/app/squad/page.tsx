@@ -223,6 +223,23 @@ export default function SquadPage() {
 
     const [seasonFilter, setSeasonFilter] = useState<string>(getCurrentSeasonStr());
     const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
+    const [includeFriendlies, setIncludeFriendlies] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            const val = localStorage.getItem("clubflow_include_friendlies_squad");
+            return val !== "false";
+        }
+        return true;
+    });
+
+    const toggleIncludeFriendlies = () => {
+        setIncludeFriendlies(prev => {
+            const next = !prev;
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("clubflow_include_friendlies_squad", String(next));
+            }
+            return next;
+        });
+    };
 
     const hasInitializedTab = useRef(false);
     useEffect(() => {
@@ -246,13 +263,13 @@ export default function SquadPage() {
             .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => fetchData())
             .subscribe();
         return () => { supabase.removeChannel(channel); };
-    }, [seasonFilter]);
+    }, [seasonFilter, includeFriendlies]);
 
     async function fetchData() {
         try {
             const [playersRes, matchesRes, statsRes] = await Promise.all([
                 supabase.from("players").select("*"),
-                supabase.from("matches").select("id, date"),
+                supabase.from("matches").select("id, date, competition"),
                 supabase.from("match_player_stats").select("*")
             ]);
 
@@ -262,6 +279,7 @@ export default function SquadPage() {
             const stats = statsRes.data || [];
 
             const matchSeasons = new Map<string, string>();
+            const matchCompetitions = new Map<string, string>();
             const seasonSet = new Set<string>();
             
             matches.forEach((m: any) => {
@@ -283,6 +301,7 @@ export default function SquadPage() {
                     }
                 }
                 matchSeasons.set(m.id, seasonStr);
+                matchCompetitions.set(m.id, m.competition || "");
                 seasonSet.add(seasonStr);
             });
             
@@ -296,6 +315,10 @@ export default function SquadPage() {
                 const season = matchSeasons.get(s.match_id);
                 if (seasonFilter !== "All" && season !== seasonFilter) return;
 
+                const comp = matchCompetitions.get(s.match_id) || "";
+                const isFriendly = comp.toLowerCase().includes("friendly") || comp.toLowerCase().includes("trial");
+                if (!includeFriendlies && isFriendly) return;
+
                 const p = playerStats.get(s.player_id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0 };
                 p.apps += 1;
                 p.goals += (s.goals || 0);
@@ -307,6 +330,10 @@ export default function SquadPage() {
             matches.forEach((m: any) => {
                 const season = matchSeasons.get(m.id);
                 if (seasonFilter !== "All" && season !== seasonFilter) return;
+
+                const comp = m.competition || "";
+                const isFriendly = comp.toLowerCase().includes("friendly") || comp.toLowerCase().includes("trial");
+                if (!includeFriendlies && isFriendly) return;
 
                 const parseCards = (cardStr: string, type: 'yellow' | 'red') => {
                     if (!cardStr) return;
@@ -609,11 +636,18 @@ export default function SquadPage() {
                     <h2 className="text-3xl font-bold tracking-tight text-slate-900">Squad</h2>
                     <p className="text-slate-500">View and manage player profiles, availability, and stats.</p>
                 </div>
-                <div className="flex gap-2">
-                    <Button onClick={() => setIsManageSquadsOpen(true)} variant="outline" size="icon">
+                <div className="flex gap-2 items-center flex-wrap">
+                    <Button 
+                        variant={includeFriendlies ? "default" : "outline"} 
+                        onClick={toggleIncludeFriendlies}
+                        className={includeFriendlies ? "bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9" : "text-slate-500 font-semibold text-xs h-9"}
+                    >
+                        {includeFriendlies ? "⚽ Including Friendlies" : "🏆 Competitive Only"}
+                    </Button>
+                    <Button onClick={() => setIsManageSquadsOpen(true)} variant="outline" size="icon" className="h-9 w-9">
                         <Settings className="w-4 h-4" />
                     </Button>
-                    <Button className="bg-red-600 hover:bg-red-700" onClick={() => setEditingPlayer({ id: "new", firstName: "", lastName: "", position: "GK", squadNumber: 0, age: 0, nationality: "English", squad: currentSquads[0], medicalStatus: "Available", availability: true, contractExpiry: "", appearances: 0, goals: 0, assists: 0, imageUrl: "", isInTrainingSquad: true, isInMatchdayTracker: false, isContracted: false, contractAmount: 0, contractFrequency: "Weekly", contractStartDate: "", contractEndDate: "", subsBillingModel: "Monthly", subsCustomAmount: 0, holidayStart: "", holidayEnd: "" })}>
+                    <Button className="bg-red-600 hover:bg-red-700 text-xs h-9" onClick={() => setEditingPlayer({ id: "new", firstName: "", lastName: "", position: "GK", squadNumber: 0, age: 0, nationality: "English", squad: currentSquads[0], medicalStatus: "Available", availability: true, contractExpiry: "", appearances: 0, goals: 0, assists: 0, imageUrl: "", isInTrainingSquad: true, isInMatchdayTracker: false, isContracted: false, contractAmount: 0, contractFrequency: "Weekly", contractStartDate: "", contractEndDate: "", subsBillingModel: "Monthly", subsCustomAmount: 0, holidayStart: "", holidayEnd: "" })}>
                         <Plus className="h-4 w-4 mr-2" /> Add Player
                     </Button>
                 </div>
