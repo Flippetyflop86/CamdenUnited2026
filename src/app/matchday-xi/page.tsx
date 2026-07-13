@@ -1221,7 +1221,8 @@ export default function MatchdayXIPage() {
                                         <span className="text-[10px] text-slate-400 font-bold uppercase">{activePlayer.position}</span>
                                     </div>
                                     <Button
-                                        onClick={() => {
+                                        onMouseDown={(e) => {
+                                            e.preventDefault();
                                             if (activeSlot.type === 'pitch') {
                                                 handleRemoveFromPitch(activeSlot.index);
                                             } else {
@@ -1258,7 +1259,8 @@ export default function MatchdayXIPage() {
                                     return (
                                         <button
                                             key={player.id}
-                                            onClick={() => {
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
                                                 if (activeSlot.type === 'pitch') {
                                                     handleStarterChange(activeSlot.index, player.id);
                                                 } else {
@@ -1306,7 +1308,7 @@ export default function MatchdayXIPage() {
                         {/* Modal Footer */}
                         <div className="p-3 bg-slate-950/60 border-t border-slate-800 flex justify-end shrink-0">
                             <Button 
-                                onClick={() => { setActiveSlot(null); setSearchQuery(""); }}
+                                onMouseDown={(e) => { e.preventDefault(); setActiveSlot(null); setSearchQuery(""); }}
                                 className="bg-slate-800 hover:bg-slate-750 text-white border-none font-bold text-xs"
                             >
                                 Cancel
