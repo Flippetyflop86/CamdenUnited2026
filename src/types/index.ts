@@ -131,6 +131,7 @@ export interface MatchdayXI {
         [key: string]: string; // position index -> playerId
     };
     substitutes: string[]; // array of playerIds
+    usedSubstitutes?: string[]; // array of used substitutes
     squad?: string;
     createdAt: string;
     updatedAt: string;

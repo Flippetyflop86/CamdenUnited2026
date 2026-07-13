@@ -535,29 +535,59 @@ export default function MatchesPage() {
         if (appearanceList.length > 0) {
             setSelectedAppearances(appearanceList);
         } else {
-            // Automatically pre-populate default appearances from the latest Matchday XI lineup
-            supabase
-                .from('matchday_xis')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(1)
-                .then(({ data }) => {
-                    if (data && data.length > 0) {
-                        const latestLineup = data[0];
-                        const playerIds = new Set<string>();
-                        if (latestLineup.starters) {
-                            Object.values(latestLineup.starters).forEach((id: any) => {
-                                if (id) playerIds.add(id);
-                            });
-                        }
-                        if (latestLineup.substitutes && Array.isArray(latestLineup.substitutes)) {
-                            latestLineup.substitutes.forEach((id: any) => {
-                                if (id) playerIds.add(id);
-                            });
-                        }
-                        setSelectedAppearances(Array.from(playerIds));
+            // Try to load lineup from match notes first
+            const lineupMatch = match.notes ? match.notes.match(/\[Lineup: (.*?)\]/) : null;
+            let loaded = false;
+            if (lineupMatch) {
+                try {
+                    const parsed = JSON.parse(lineupMatch[1]);
+                    const playerIds = new Set<string>();
+                    if (parsed.starters) {
+                        Object.values(parsed.starters).forEach((id: any) => {
+                            if (id) playerIds.add(id);
+                        });
                     }
-                });
+                    if (parsed.usedSubstitutes && Array.isArray(parsed.usedSubstitutes)) {
+                        parsed.usedSubstitutes.forEach((id: any) => {
+                            if (id) playerIds.add(id);
+                        });
+                    } else if (parsed.substitutes && Array.isArray(parsed.substitutes)) {
+                        parsed.substitutes.forEach((id: any) => {
+                            if (id) playerIds.add(id);
+                        });
+                    }
+                    setSelectedAppearances(Array.from(playerIds));
+                    loaded = true;
+                } catch (e) {
+                    console.error("Error parsing lineup from match notes during edit", e);
+                }
+            }
+
+            if (!loaded) {
+                // Automatically pre-populate default appearances from the latest Matchday XI lineup
+                supabase
+                    .from('matchday_xis')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(1)
+                    .then(({ data }) => {
+                        if (data && data.length > 0) {
+                            const latestLineup = data[0];
+                            const playerIds = new Set<string>();
+                            if (latestLineup.starters) {
+                                Object.values(latestLineup.starters).forEach((id: any) => {
+                                    if (id) playerIds.add(id);
+                                });
+                            }
+                            if (latestLineup.substitutes && Array.isArray(latestLineup.substitutes)) {
+                                latestLineup.substitutes.forEach((id: any) => {
+                                    if (id) playerIds.add(id);
+                                });
+                            }
+                            setSelectedAppearances(Array.from(playerIds));
+                        }
+                    });
+            }
         }
 
         setFormData({
@@ -592,20 +622,38 @@ export default function MatchesPage() {
 
     const handleAutofillFromMatchdayXI = async () => {
         try {
-            const { data: lineupData, error: lineupErr } = await supabase
-                .from('matchday_xis')
-                .select('*')
-                .order('created_at', { ascending: false })
-                .limit(1);
+            let latestLineup = null;
 
-            if (lineupErr) throw lineupErr;
+            if (editingId) {
+                const currentMatch = matches.find(m => m.id === editingId);
+                const lineupMatch = currentMatch?.notes ? currentMatch.notes.match(/\[Lineup: (.*?)\]/) : null;
+                if (lineupMatch) {
+                    try {
+                        latestLineup = JSON.parse(lineupMatch[1]);
+                    } catch (e) {
+                        console.error("Error parsing lineup from match notes", e);
+                    }
+                }
+            }
 
-            if (!lineupData || lineupData.length === 0) {
+            if (!latestLineup) {
+                const { data: lineupData, error: lineupErr } = await supabase
+                    .from('matchday_xis')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+
+                if (lineupErr) throw lineupErr;
+                if (lineupData && lineupData.length > 0) {
+                    latestLineup = lineupData[0];
+                }
+            }
+
+            if (!latestLineup) {
                 alert("No Matchday XI lineup found to load.");
                 return;
             }
 
-            const latestLineup = lineupData[0];
             const playerIds = new Set<string>();
 
             if (latestLineup.starters) {
@@ -614,14 +662,18 @@ export default function MatchesPage() {
                 });
             }
 
-            if (latestLineup.substitutes && Array.isArray(latestLineup.substitutes)) {
+            if (latestLineup.usedSubstitutes && Array.isArray(latestLineup.usedSubstitutes)) {
+                latestLineup.usedSubstitutes.forEach((id: any) => {
+                    if (id) playerIds.add(id);
+                });
+            } else if (latestLineup.substitutes && Array.isArray(latestLineup.substitutes)) {
                 latestLineup.substitutes.forEach((id: any) => {
                     if (id) playerIds.add(id);
                 });
             }
 
             if (playerIds.size === 0) {
-                alert("The latest Matchday XI lineup is empty.");
+                alert("The selected lineup is empty.");
                 return;
             }
 

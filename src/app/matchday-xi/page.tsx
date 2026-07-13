@@ -28,6 +28,8 @@ export default function MatchdayXIPage() {
     const [lineup, setLineup] = useState<MatchdayXI | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
     const [isEditing, setIsEditing] = useState(false);
+    const [matches, setMatches] = useState<Match[]>([]);
+    const [selectedMatchId, setSelectedMatchId] = useState<string>("");
     const [nextMatch, setNextMatch] = useState<Match | null>(null);
     const [draggedPlayer, setDraggedPlayer] = useState<string | null>(null);
     const [draggedSource, setDraggedSource] = useState<{type: 'squad' | 'pitch' | 'sub', index?: number} | null>(null);
@@ -192,27 +194,95 @@ export default function MatchdayXIPage() {
     };
 
     const fetchMatches = async () => {
-        const { data } = await supabase.from('matches').select('*').eq('result', 'Pending').order('date', { ascending: true });
+        const { data } = await supabase.from('matches').select('*').order('date', { ascending: false });
         if (data && data.length > 0) {
-            // Find next match relative to today (uses YYYY-MM-DD string comparison to persist through the whole match day until midnight)
+            const mapped = data.map((m: any) => ({
+                id: m.id,
+                opponent: m.opponent,
+                date: m.date,
+                time: m.time,
+                competition: m.competition || "League",
+                isHome: m.is_home,
+                result: m.result,
+                event_token: m.event_token,
+                notes: m.notes || ""
+            }));
+            setMatches(mapped);
+            
+            // Default to next upcoming match, or fallback to the latest match
             const today = new Date().toISOString().split('T')[0];
-            const upcoming = data.find((m: any) => m.date >= today);
+            const upcoming = [...mapped].reverse().find((m: any) => m.date >= today) || mapped[0];
             if (upcoming) {
-                setNextMatch({
-                    id: upcoming.id,
-                    opponent: upcoming.opponent,
-                    date: upcoming.date,
-                    time: upcoming.time,
-                    competition: upcoming.competition || "League",
-                    isHome: upcoming.is_home,
-                    result: upcoming.result,
-                    event_token: upcoming.event_token
-                });
+                setSelectedMatchId(upcoming.id);
+                setNextMatch(upcoming);
             }
         }
     };
 
-    const saveLineup = async (newLineup: MatchdayXI) => {
+    // Load lineup when selectedMatchId changes
+    useEffect(() => {
+        if (!selectedMatchId || matches.length === 0) return;
+        const currentMatch = matches.find(m => m.id === selectedMatchId);
+        if (!currentMatch) return;
+
+        setNextMatch(currentMatch);
+
+        // Parse lineup from match notes
+        const lineupMatch = currentMatch.notes ? currentMatch.notes.match(/\[Lineup: (.*?)\]/) : null;
+        if (lineupMatch) {
+            try {
+                const parsed = JSON.parse(lineupMatch[1]);
+                setLineup({
+                    id: `match-lineup-${currentMatch.id}`,
+                    formation: parsed.formation || "4-2-3-1",
+                    starters: parsed.starters || {},
+                    substitutes: parsed.substitutes || ["", "", "", "", ""],
+                    usedSubstitutes: parsed.usedSubstitutes || [],
+                    squad: activeSquadTab,
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                });
+                return;
+            } catch (e) {
+                console.error("Failed to parse lineup from match notes:", e);
+            }
+        }
+
+        // Fallback to fetch latest general lineup
+        fetchLineupOnly();
+    }, [selectedMatchId, matches, activeSquadTab]);
+
+    const saveLineup = async (newLineup: MatchdayXI & { usedSubstitutes?: string[] }) => {
+        if (!selectedMatchId) return;
+        const currentMatch = matches.find(m => m.id === selectedMatchId);
+        if (!currentMatch) return;
+
+        const serialized = {
+            formation: newLineup.formation,
+            starters: newLineup.starters,
+            substitutes: newLineup.substitutes,
+            usedSubstitutes: newLineup.usedSubstitutes || []
+        };
+
+        const tagPattern = /\[Lineup: .*?\]\n?/;
+        const cleanNotes = (currentMatch.notes || "").replace(tagPattern, "").trim();
+        const updatedNotes = `[Lineup: ${JSON.stringify(serialized)}]\n${cleanNotes}`.trim();
+
+        // Update local matches state so we don't trigger re-fetch loops
+        setMatches(prev => prev.map(m => m.id === selectedMatchId ? { ...m, notes: updatedNotes } : m));
+
+        // Update database match notes
+        const { error } = await supabase
+            .from('matches')
+            .update({ notes: updatedNotes })
+            .eq('id', selectedMatchId);
+
+        if (error) {
+            console.error("Save Match Lineup Error:", error);
+            alert("Database Error: " + error.message);
+        }
+
+        // Also save as fallback template to matchday_xis
         const payload = {
             formation: newLineup.formation,
             starters: newLineup.starters,
@@ -222,37 +292,12 @@ export default function MatchdayXIPage() {
         };
 
         if (newLineup.id === "default-xi") {
-            const { data, error } = await supabase.from('matchday_xis').insert([payload]).select();
-            if (error) {
-                console.error("Save Lineup Error:", error);
-                if (
-                    error.message.includes('column "squad" does not exist') || 
-                    error.message.includes("Could not find the 'squad' column") || 
-                    error.message.includes("squad")
-                ) {
-                    alert("Database Error: " + error.message + "\n\nPlease run this SQL query in your Supabase SQL Editor to support multiple squads:\n\nALTER TABLE matchday_xis ADD COLUMN IF NOT EXISTS squad text DEFAULT 'First Team';");
-                } else {
-                    alert("Database Error: " + error.message + " (Have you run the SQL script for matchday_xis?)");
-                }
-                return;
-            }
+            const { data } = await supabase.from('matchday_xis').insert([payload]).select();
             if (data && data.length > 0) {
-                setLineup({ ...newLineup, id: data[0].id });
+                newLineup.id = data[0].id;
             }
-        } else {
-            const { error } = await supabase.from('matchday_xis').update(payload).eq('id', newLineup.id);
-            if (error) {
-                console.error("Update Lineup Error:", error);
-                if (
-                    error.message.includes('column "squad" does not exist') || 
-                    error.message.includes("Could not find the 'squad' column") || 
-                    error.message.includes("squad")
-                ) {
-                    alert("Database Error: " + error.message + "\n\nPlease run this SQL query in your Supabase SQL Editor to support multiple squads:\n\nALTER TABLE matchday_xis ADD COLUMN IF NOT EXISTS squad text DEFAULT 'First Team';");
-                } else {
-                    alert("Database Error: " + error.message);
-                }
-            }
+        } else if (!newLineup.id.startsWith("match-lineup-")) {
+            await supabase.from('matchday_xis').update(payload).eq('id', newLineup.id);
         }
     };
 
@@ -773,10 +818,26 @@ export default function MatchdayXIPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="space-y-1.5 flex-1">
                     <h2 className="text-3xl font-bold tracking-tight text-slate-900">Matchday XI</h2>
-                    <p className="text-slate-500">Select your starting lineup and substitutes ({players.filter(p => isPlayerAvailable(p) && isPlayerInMatchdayTracker(p)).length} players available)</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fixture:</span>
+                        <select
+                            value={selectedMatchId}
+                            onChange={(e) => setSelectedMatchId(e.target.value)}
+                            className="flex h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 cursor-pointer text-slate-800 font-semibold outline-none max-w-full"
+                        >
+                            {matches.map(m => {
+                                const formattedDate = new Date(m.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                                return (
+                                    <option key={m.id} value={m.id}>
+                                        {m.isHome ? "🏠" : "🚌"} vs {m.opponent} ({formattedDate}) {m.result !== "Pending" ? `[${m.result}]` : ""}
+                                    </option>
+                                );
+                            })}
+                        </select>
+                    </div>
                 </div>
                 <div className="flex items-center gap-3">
                     <Button onClick={handleClearLineup} variant="outline" className="border-slate-300 hover:bg-slate-100 text-slate-700">
@@ -1068,6 +1129,33 @@ export default function MatchdayXIPage() {
                                             <span className="text-[10px] font-medium text-center w-full block">Drag here</span>
                                         )}
                                     </div>
+                                    
+                                    {subId && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => {
+                                                e.preventDefault();
+                                                e.stopPropagation();
+                                                const usedSubs = lineup.usedSubstitutes || [];
+                                                let nextUsed;
+                                                if (usedSubs.includes(subId)) {
+                                                    nextUsed = usedSubs.filter(id => id !== subId);
+                                                } else {
+                                                    nextUsed = [...usedSubs, subId];
+                                                }
+                                                const updated = { ...lineup, usedSubstitutes: nextUsed, updatedAt: new Date().toISOString() };
+                                                setLineup(updated);
+                                                saveLineup(updated);
+                                            }}
+                                            className={`px-2 py-1 rounded text-[9px] font-bold border transition-colors shrink-0 ${
+                                                lineup.usedSubstitutes?.includes(subId)
+                                                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 hover:bg-emerald-500/30"
+                                                    : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
+                                            }`}
+                                        >
+                                            {lineup.usedSubstitutes?.includes(subId) ? "Played" : "Unused"}
+                                        </button>
+                                    )}
                                     
                                     {lineup.substitutes.length > 1 && (
                                         <button
