@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Lock, CheckCircle2 } from "lucide-react";
+import { AlertCircle, Lock, CheckCircle2, LayoutDashboard, Users, Calendar, CreditCard, Activity, Trophy, Clock, Check, AlertTriangle, ArrowRight, DollarSign, Sparkles, TrendingUp } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 
@@ -16,8 +16,44 @@ export default function LoginPage() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [activeTab, setActiveTab] = useState(0);
     const [loading, setLoading] = useState(false);
     const router = useRouter();
+
+    const tourTabs = [
+        {
+            id: "dashboard",
+            label: "01 Dashboard",
+            title: "Dashboard Overview",
+            description: "Get a real-time health check of your club. Track active roster status, view the next match details, monitor monthly payments progress, and keep an eye on recent training attendance.",
+        },
+        {
+            id: "matchday",
+            label: "02 Matchday XI",
+            title: "Matchday XI & Tactics",
+            description: "Drag and drop your starting lineup, select from popular formations, and organize your substitutes bench. Automatically generate WhatsApp messages for squad availability polls and export professional matchday team sheets as PDF.",
+        },
+        {
+            id: "squad",
+            label: "03 Squad Management",
+            title: "Squad Management",
+            description: "Manage player registry, monitor individual statistics (appearances, goals, assists), track contract expiry dates, and update medical availability statuses so you always know who is match-fit.",
+        },
+        {
+            id: "finances",
+            label: "04 Club Finances",
+            title: "Finances & Payments",
+            description: "Keep your club out of the red. Track monthly membership subscriptions, match fees, and sponsorships. Check who has paid and send reminders in one tap.",
+        },
+        {
+            id: "training",
+            label: "05 Training Tracking",
+            title: "Training Tracker",
+            description: "Plan weekly training sessions, log player attendance, and track performance metrics. View detailed attendance heatmaps to see who's dedicated.",
+        }
+    ];
+
+
 
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -179,44 +215,360 @@ export default function LoginPage() {
                     <span className="text-xs text-slate-500 tracking-wide">Club Management Platform</span>
                 </div>
 
-                {/* HERO: Logo image centred, large, glowing */}
-                <div className="my-auto flex flex-col items-center text-center space-y-8">
-                    {/* Glow container */}
-                    <div className="relative">
-                        <div className="absolute inset-0 rounded-3xl bg-red-500/10 blur-3xl scale-110 pointer-events-none" />
-                        <div className="relative rounded-2xl overflow-hidden border border-slate-800/60 shadow-2xl shadow-red-950/30 bg-slate-950/60 backdrop-blur-sm">
-                            <Image
-                                src="/clubflow-logo.png"
-                                alt="ClubFlow — From Stadium to Spreadsheet"
-                                width={480}
-                                height={320}
-                                priority
-                                className="object-contain"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Supporting copy below the logo */}
-                    <div className="space-y-3 max-w-md">
-                        <p className="text-red-500 text-xs font-bold tracking-widest uppercase">
-                            from stadium to spreadsheet
-                        </p>
-                        <h1 className="text-2xl lg:text-3xl font-black tracking-tight text-white leading-snug">
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-red-400">Run Your Club.</span>{" "}
-                            In One Place.
-                        </h1>
-                        <p className="text-slate-400 text-sm leading-relaxed">
-                            Manage players, squad availability, matchday lineups, statistics, club finances, and equipment inventory from a single platform — built specifically for grassroots, amateur and semi-professional football clubs.
+                {/* HERO: Interactive Product Tour */}
+                <div className="my-auto flex flex-col items-start text-left space-y-6 w-full max-w-2xl mx-auto">
+                    
+                    <div className="space-y-2">
+                        <span className="text-[10px] font-bold tracking-widest text-red-500 uppercase">
+                            01 PRODUCT TOUR
+                        </span>
+                        <h2 className="text-2xl lg:text-3xl font-black tracking-tight text-white">
+                            This is what it looks like.
+                        </h2>
+                        <p className="text-slate-400 text-sm leading-relaxed max-w-xl">
+                            Five key screens that cover the daily running of a successful football club. Click a tab to preview.
                         </p>
                     </div>
 
-                    {/* Feature pills */}
-                    <div className="flex flex-wrap justify-center gap-2">
-                        {["⚽ Squad Management", "📅 Fixtures & Training", "👥 Availability", "🤝 Recruitment", "💷 Club Finances", "💬 Team Comms"].map((f) => (
-                            <span key={f} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-900/60 border border-slate-800/80 text-xs font-semibold text-slate-300 hover:border-red-500/40 hover:text-white transition-all cursor-default">
-                                {f}
-                            </span>
+                    {/* Pill Switcher */}
+                    <div className="flex flex-wrap gap-2 w-full">
+                        {tourTabs.map((tab, idx) => (
+                            <button
+                                key={tab.id}
+                                type="button"
+                                onClick={() => setActiveTab(idx)}
+                                className={`px-4 py-2 rounded-full text-xs font-semibold tracking-wide transition-all border ${
+                                    activeTab === idx
+                                        ? "bg-white text-slate-950 border-white shadow-lg font-bold"
+                                        : "bg-slate-900/60 text-slate-400 border-slate-800 hover:border-slate-700 hover:text-white"
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
                         ))}
+                    </div>
+
+                    {/* Tab description text */}
+                    <p className="text-slate-300 text-xs leading-relaxed max-w-xl min-h-[36px]">
+                        {tourTabs[activeTab].description}
+                    </p>
+
+                    {/* Web Browser Frame Container */}
+                    <div className="w-full relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl shadow-red-950/20 bg-slate-950/60 backdrop-blur-sm transition-all duration-300">
+                        {/* Browser Header Bar */}
+                        <div className="h-10 bg-slate-900/80 border-b border-slate-800/80 px-4 flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                                <span className="h-3 w-3 rounded-full bg-red-500/80 inline-block" />
+                                <span className="h-3 w-3 rounded-full bg-yellow-500/80 inline-block" />
+                                <span className="h-3 w-3 rounded-full bg-green-500/80 inline-block" />
+                            </div>
+                            <div className="bg-slate-950/60 px-3 py-1 rounded-md text-[10px] text-slate-500 font-mono tracking-wide w-48 text-center truncate">
+                                app.clubflow.org.uk/{tourTabs[activeTab].id}
+                            </div>
+                            <div className="w-10" /> {/* Spacer */}
+                        </div>
+
+                        {/* Browser Viewport Content Area */}
+                        <div className="p-4 bg-slate-950/80 min-h-[280px] text-white overflow-hidden flex flex-col justify-start">
+                            {activeTab === 0 && (
+                                <div className="space-y-4 animate-in fade-in duration-200">
+                                    {/* Dashboard Preview */}
+                                    <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
+                                        <div className="flex items-center gap-2">
+                                            <LayoutDashboard className="h-4 w-4 text-red-500" />
+                                            <span className="text-xs font-bold text-slate-200">Dashboard Hub</span>
+                                        </div>
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-950/50 text-red-400 border border-red-900/30">First Team</span>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-slate-900/60 border border-slate-800/50 p-3 rounded-xl space-y-1">
+                                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">Squad Roster</span>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-xl font-extrabold text-white">28</span>
+                                                <span className="text-[10px] text-green-500">24 Fit</span>
+                                            </div>
+                                            <span className="text-[9px] text-slate-500 block">4 on medical / holidays</span>
+                                        </div>
+                                        <div className="bg-slate-900/60 border border-slate-800/50 p-3 rounded-xl space-y-1">
+                                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">Avg Attendance</span>
+                                            <div className="flex items-baseline gap-2">
+                                                <span className="text-xl font-extrabold text-white">88%</span>
+                                                <span className="text-[10px] text-slate-400">Monthly</span>
+                                            </div>
+                                            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                                <div className="bg-red-500 h-full rounded-full" style={{ width: "88%" }} />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="bg-slate-900/60 border border-slate-800/50 p-3 rounded-xl space-y-2">
+                                        <div className="flex justify-between items-center text-[10px]">
+                                            <span className="text-slate-400 font-bold uppercase tracking-wider">Next Match</span>
+                                            <span className="text-red-400 font-semibold flex items-center gap-1"><Clock className="h-3 w-3" /> Meet: 18:30</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-6 w-6 rounded-full bg-red-700 flex items-center justify-center text-[10px] font-bold text-white border border-red-500">CU</div>
+                                                <span className="text-xs font-bold text-slate-200">Camden Utd</span>
+                                            </div>
+                                            <span className="text-[10px] font-bold text-slate-500">VS</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold text-slate-200">Hackney FC</span>
+                                                <div className="h-6 w-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">HF</div>
+                                            </div>
+                                        </div>
+                                        <div className="text-[9px] text-slate-400 text-center border-t border-slate-800/80 pt-2">
+                                            Saturday, 19:30 • Regent's Park Pitch 3 • League Match
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 1 && (
+                                <div className="space-y-3 animate-in fade-in duration-200 flex-1 flex flex-col">
+                                    {/* Matchday XI Tactics Preview */}
+                                    <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <Trophy className="h-4 w-4 text-red-500" />
+                                            <span className="text-xs font-bold text-slate-200">Matchday XI Tactics</span>
+                                        </div>
+                                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-900 text-slate-300 border border-slate-800">Formation: 4-3-3</span>
+                                    </div>
+                                    
+                                    {/* Pitch representation */}
+                                    <div className="relative bg-emerald-950/70 border border-emerald-800/50 rounded-xl flex-1 min-h-[190px] overflow-hidden flex flex-col justify-between p-2">
+                                        {/* Field markings */}
+                                        <div className="absolute inset-0 pointer-events-none opacity-20 flex flex-col justify-between border border-white">
+                                            <div className="h-8 border-b border-white w-24 mx-auto" />
+                                            <div className="w-full border-b border-white" />
+                                            <div className="h-8 border-t border-white w-24 mx-auto" />
+                                        </div>
+                                        
+                                        {/* Forwards (3) */}
+                                        <div className="flex justify-around w-full relative z-10 pt-2">
+                                            <div className="flex flex-col items-center">
+                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">11</div>
+                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">M. Lindholm</span>
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <div className="h-6 w-6 rounded-full bg-red-600 border border-white flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">9</div>
+                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">M. Abdalla</span>
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">7</div>
+                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">E. Sandell</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Midfielders (3) */}
+                                        <div className="flex justify-around w-full relative z-10 py-1">
+                                            <div className="flex flex-col items-center">
+                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">8</div>
+                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">D. Forsberg</span>
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">6</div>
+                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">S. Tahir</span>
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">10</div>
+                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">H. Norling</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Defenders (4) */}
+                                        <div className="flex justify-between w-full px-4 relative z-10 py-1">
+                                            <div className="flex flex-col items-center">
+                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">3</div>
+                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">L. Johnson</span>
+                                            </div>
+                                            <div className="flex justify-around w-1/2">
+                                                <div className="flex flex-col items-center">
+                                                    <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">4</div>
+                                                    <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">A. Bergström</span>
+                                                </div>
+                                                <div className="flex flex-col items-center">
+                                                    <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">5</div>
+                                                    <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">M. Evans</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">2</div>
+                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">J. Lindgren</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Goalkeeper (1) */}
+                                        <div className="flex justify-center w-full relative z-10 pb-1">
+                                            <div className="flex flex-col items-center">
+                                                <div className="h-6 w-6 rounded-full bg-yellow-500 border border-white flex items-center justify-center text-[9px] font-bold text-slate-950 shadow-md shadow-slate-950/50">1</div>
+                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">K. Nilsson</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 2 && (
+                                <div className="space-y-3 animate-in fade-in duration-200">
+                                    {/* Squad Registry Preview */}
+                                    <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <Users className="h-4 w-4 text-red-500" />
+                                            <span className="text-xs font-bold text-slate-200">Squad Registry</span>
+                                        </div>
+                                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-red-950/50 text-red-400 border border-red-900/30 font-mono">28 Rostered</span>
+                                    </div>
+                                    
+                                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                                        {/* Player Rows */}
+                                        <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800/50 p-2 rounded-xl text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-6 w-6 rounded-full bg-red-650 flex items-center justify-center text-[10px] font-bold text-white">MA</div>
+                                                <div>
+                                                    <p className="font-bold text-slate-200">Mohamed Abdalla</p>
+                                                    <span className="text-[9px] text-slate-400">Striker (ST)</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-right">
+                                                    <span className="text-[9px] text-slate-500 block uppercase font-mono">Goals</span>
+                                                    <span className="font-extrabold text-white">14</span>
+                                                </div>
+                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-green-950/50 text-green-400 border border-green-900/30">Available</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800/50 p-2 rounded-xl text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-6 w-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">ST</div>
+                                                <div>
+                                                    <p className="font-bold text-slate-200">Said Tahir</p>
+                                                    <span className="text-[9px] text-slate-400">Midfield (CM)</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-right">
+                                                    <span className="text-[9px] text-slate-500 block uppercase font-mono">Assists</span>
+                                                    <span className="font-extrabold text-white">11</span>
+                                                </div>
+                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-green-950/50 text-green-400 border border-green-900/30">Available</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800/50 p-2 rounded-xl text-xs">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-6 w-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">AB</div>
+                                                <div>
+                                                    <p className="font-bold text-slate-200">Alex Bergström</p>
+                                                    <span className="text-[9px] text-slate-400">Defender (CB)</span>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <div className="text-right">
+                                                    <span className="text-[9px] text-slate-500 block uppercase font-mono">Matches</span>
+                                                    <span className="font-extrabold text-white">18</span>
+                                                </div>
+                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-red-950/50 text-red-400 border border-red-900/30">Injured</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 3 && (
+                                <div className="space-y-4 animate-in fade-in duration-200">
+                                    {/* Club Finances Preview */}
+                                    <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
+                                        <div className="flex items-center gap-2">
+                                            <CreditCard className="h-4 w-4 text-red-500" />
+                                            <span className="text-xs font-bold text-slate-200">Club Finances &amp; Subscriptions</span>
+                                        </div>
+                                        <span className="text-[10px] text-emerald-400 font-bold font-mono">Active Season</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3 text-xs">
+                                        <div className="bg-slate-900/60 border border-slate-800/50 p-3 rounded-xl">
+                                            <span className="text-[9px] text-slate-500 uppercase block font-mono">Dues Collected</span>
+                                            <p className="text-lg font-black text-white">£4,820</p>
+                                            <span className="text-[8px] text-emerald-400">92% Target Reached</span>
+                                        </div>
+                                        <div className="bg-slate-900/60 border border-slate-800/50 p-3 rounded-xl">
+                                            <span className="text-[9px] text-slate-500 uppercase block font-mono">Outstanding Fees</span>
+                                            <p className="text-lg font-black text-red-400">£340</p>
+                                            <span className="text-[8px] text-slate-400">From 4 members</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl overflow-hidden text-[10px]">
+                                        <div className="bg-slate-900 px-3 py-1.5 font-bold text-slate-400 border-b border-slate-800/50 flex justify-between">
+                                            <span>Player Name</span>
+                                            <span>Amount</span>
+                                            <span>Status</span>
+                                        </div>
+                                        <div className="divide-y divide-slate-800/50">
+                                            <div className="px-3 py-2 flex justify-between items-center">
+                                                <span className="font-medium text-slate-300">Liam Johnson</span>
+                                                <span className="text-slate-400">£150</span>
+                                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-900/30">Paid</span>
+                                            </div>
+                                            <div className="px-3 py-2 flex justify-between items-center">
+                                                <span className="font-medium text-slate-300">Harry Norling</span>
+                                                <span className="text-slate-400">£150</span>
+                                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-900/30">Overdue</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {activeTab === 4 && (
+                                <div className="space-y-3 animate-in fade-in duration-200">
+                                    {/* Training Tracker Preview */}
+                                    <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
+                                        <div className="flex items-center gap-2">
+                                            <Activity className="h-4 w-4 text-red-500" />
+                                            <span className="text-xs font-bold text-slate-200">Training Attendance &amp; Log</span>
+                                        </div>
+                                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-900 text-slate-300 border border-slate-800">Weekly Drills</span>
+                                    </div>
+
+                                    <div className="bg-slate-900/60 border border-slate-800/50 p-3 rounded-xl space-y-2">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <div>
+                                                <p className="font-bold text-slate-200">Tuesday Night Tactical Drills</p>
+                                                <span className="text-[9px] text-slate-400">July 15 • Regent's Park Astro</span>
+                                            </div>
+                                            <div className="text-right">
+                                                <span className="text-lg font-black text-white">92%</span>
+                                                <span className="text-[8px] text-slate-500 block">Attendance</span>
+                                            </div>
+                                        </div>
+                                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                            <div className="bg-red-500 h-full rounded-full" style={{ width: "92%" }} />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 text-[10px]">
+                                        <div className="bg-slate-900/40 border border-slate-800/50 p-2.5 rounded-lg flex items-center justify-between">
+                                            <span className="text-slate-300">Mohamed Abdalla</span>
+                                            <div className="h-4 w-4 rounded-full bg-emerald-950/60 text-emerald-400 flex items-center justify-center font-bold text-[9px] border border-emerald-900/30">✔</div>
+                                        </div>
+                                        <div className="bg-slate-900/40 border border-slate-850 p-2.5 rounded-lg flex items-center justify-between">
+                                            <span className="text-slate-300">Said Tahir</span>
+                                            <div className="h-4 w-4 rounded-full bg-emerald-950/60 text-emerald-400 flex items-center justify-center font-bold text-[9px] border border-emerald-900/30">✔</div>
+                                        </div>
+                                        <div className="bg-slate-900/40 border border-slate-850 p-2.5 rounded-lg flex items-center justify-between">
+                                            <span className="text-slate-300">Alex Bergström</span>
+                                            <div className="h-4 w-4 rounded-full bg-amber-950/60 text-amber-400 flex items-center justify-center font-bold text-[9px] border border-amber-900/30">Exc</div>
+                                        </div>
+                                        <div className="bg-slate-900/40 border border-slate-850 p-2.5 rounded-lg flex items-center justify-between">
+                                            <span className="text-slate-300">E. Sandell</span>
+                                            <div className="h-4 w-4 rounded-full bg-emerald-950/60 text-emerald-400 flex items-center justify-center font-bold text-[9px] border border-emerald-900/30">✔</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
