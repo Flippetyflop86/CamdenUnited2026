@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { AlertCircle, Lock, CheckCircle2, LayoutDashboard, Users, Calendar, CreditCard, Activity, Trophy, Clock, Check, AlertTriangle, ArrowRight, DollarSign, Sparkles, TrendingUp } from "lucide-react";
+import { AlertCircle, Lock, CheckCircle2, LayoutDashboard, Users, Calendar, CreditCard, Activity, Trophy, Clock, Check, AlertTriangle, ArrowRight, DollarSign, Sparkles, TrendingUp, Wallet, MapPin, CalendarDays } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Link from "next/link";
 
@@ -253,155 +253,173 @@ export default function LoginPage() {
                         {tourTabs[activeTab].description}
                     </p>
 
-                    {/* Web Browser Frame Container */}
                     <div className="w-full relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl shadow-red-950/20 bg-slate-950/60 backdrop-blur-sm transition-all duration-300">
                         {/* Browser Header Bar */}
-                        <div className="h-10 bg-slate-900/80 border-b border-slate-800/80 px-4 flex items-center justify-between">
+                        <div className="h-10 bg-slate-100 border-b border-slate-200 px-4 flex items-center justify-between">
                             <div className="flex items-center gap-1.5">
-                                <span className="h-3 w-3 rounded-full bg-red-500/80 inline-block" />
-                                <span className="h-3 w-3 rounded-full bg-yellow-500/80 inline-block" />
-                                <span className="h-3 w-3 rounded-full bg-green-500/80 inline-block" />
+                                <span className="h-3 w-3 rounded-full bg-[#ff5f56] inline-block" />
+                                <span className="h-3 w-3 rounded-full bg-[#ffbd2e] inline-block" />
+                                <span className="h-3 w-3 rounded-full bg-[#27c93f] inline-block" />
                             </div>
-                            <div className="bg-slate-950/60 px-3 py-1 rounded-md text-[10px] text-slate-500 font-mono tracking-wide w-48 text-center truncate">
+                            <div className="bg-white border border-slate-200 px-3 py-1 rounded-md text-[10px] text-slate-400 font-mono tracking-wide w-48 text-center truncate">
                                 app.clubflow.org.uk/{tourTabs[activeTab].id}
                             </div>
                             <div className="w-10" /> {/* Spacer */}
                         </div>
 
                         {/* Browser Viewport Content Area */}
-                        <div className="p-4 bg-slate-950/80 min-h-[280px] text-white overflow-hidden flex flex-col justify-start">
+                        <div className="p-5 bg-slate-50 text-slate-950 min-h-[380px] overflow-hidden flex flex-col justify-start">
                             {activeTab === 0 && (
-                                <div className="space-y-4 animate-in fade-in duration-200">
-                                    {/* Dashboard Preview */}
-                                    <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
-                                        <div className="flex items-center gap-2">
-                                            <LayoutDashboard className="h-4 w-4 text-red-500" />
-                                            <span className="text-xs font-bold text-slate-200">Dashboard Hub</span>
+                                <div className="space-y-4 animate-in fade-in duration-200 text-slate-900 text-left">
+                                    {/* Dashboard Preview Header */}
+                                    <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                                        <div className="h-8 w-8 relative flex-shrink-0 bg-slate-200 rounded-full flex items-center justify-center font-bold text-xs text-red-600 border border-slate-350">
+                                            CU
                                         </div>
-                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-950/50 text-red-400 border border-red-900/30">First Team</span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div className="bg-slate-900/60 border border-slate-800/50 p-3 rounded-xl space-y-1">
-                                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">Squad Roster</span>
-                                            <div className="flex items-baseline gap-2">
-                                                <span className="text-xl font-extrabold text-white">28</span>
-                                                <span className="text-[10px] text-green-500">24 Fit</span>
-                                            </div>
-                                            <span className="text-[9px] text-slate-500 block">4 on medical / holidays</span>
-                                        </div>
-                                        <div className="bg-slate-900/60 border border-slate-800/50 p-3 rounded-xl space-y-1">
-                                            <span className="text-[10px] text-slate-400 font-medium uppercase tracking-wider block">Avg Attendance</span>
-                                            <div className="flex items-baseline gap-2">
-                                                <span className="text-xl font-extrabold text-white">88%</span>
-                                                <span className="text-[10px] text-slate-400">Monthly</span>
-                                            </div>
-                                            <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                                                <div className="bg-red-500 h-full rounded-full" style={{ width: "88%" }} />
-                                            </div>
+                                        <div>
+                                            <h3 className="text-sm font-black tracking-tight text-slate-900 leading-none">Camden United Dashboard</h3>
+                                            <span className="text-[10px] text-slate-500 font-medium">Welcome back, Coach. Here's what's happening.</span>
                                         </div>
                                     </div>
-                                    <div className="bg-slate-900/60 border border-slate-800/50 p-3 rounded-xl space-y-2">
-                                        <div className="flex justify-between items-center text-[10px]">
-                                            <span className="text-slate-400 font-bold uppercase tracking-wider">Next Match</span>
-                                            <span className="text-red-400 font-semibold flex items-center gap-1"><Clock className="h-3 w-3" /> Meet: 18:30</span>
+
+                                    {/* Quick Start Checklist Banner */}
+                                    <div className="bg-slate-900 text-white rounded-xl p-3 relative overflow-hidden border border-slate-800 shadow-sm flex flex-col gap-2">
+                                        <div className="flex items-center justify-between w-full">
+                                            <span className="bg-red-500 text-white text-[8px] uppercase font-black px-1.5 py-0.5 tracking-wider rounded">Quick Start</span>
+                                            <span className="text-[9px] font-bold text-slate-400">Club Setup Progress: 2/4 steps</span>
                                         </div>
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-6 w-6 rounded-full bg-red-700 flex items-center justify-center text-[10px] font-bold text-white border border-red-500">CU</div>
-                                                <span className="text-xs font-bold text-slate-200">Camden Utd</span>
+                                        <h4 className="text-xs font-black tracking-tight text-white leading-none">Get your Club Flowing</h4>
+                                        <div className="grid grid-cols-2 gap-1.5 text-[9px] mt-1">
+                                            <div className="flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold p-1 rounded">
+                                                <span className="h-3 w-3 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[8px]">✓</span> Add Players
                                             </div>
-                                            <span className="text-[10px] font-bold text-slate-500">VS</span>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-xs font-bold text-slate-200">Hackney FC</span>
-                                                <div className="h-6 w-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">HF</div>
+                                            <div className="flex items-center gap-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold p-1 rounded">
+                                                <span className="h-3 w-3 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[8px]">✓</span> Schedule Match
+                                            </div>
+                                            <div className="flex items-center gap-1 bg-white/5 border border-white/10 text-slate-300 p-1 rounded font-bold">
+                                                <span className="h-3 w-3 rounded-full border border-slate-500 inline-block shrink-0" /> Pick Lineup
+                                            </div>
+                                            <div className="flex items-center gap-1 bg-white/5 border border-white/10 text-slate-300 p-1 rounded font-bold">
+                                                <span className="h-3 w-3 rounded-full border border-slate-500 inline-block shrink-0" /> Link League Url
                                             </div>
                                         </div>
-                                        <div className="text-[9px] text-slate-400 text-center border-t border-slate-800/80 pt-2">
-                                            Saturday, 19:30 • Regent's Park Pitch 3 • League Match
+                                    </div>
+
+                                    {/* Stats Grid */}
+                                    <div className="grid grid-cols-2 gap-2.5">
+                                        <div className="bg-white border border-slate-200/80 hover:border-emerald-500/30 p-2.5 rounded-xl shadow-xs border-l-4 border-l-emerald-500 transition-all">
+                                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 block">First Team Squad</span>
+                                            <span className="text-lg font-black text-slate-900">28</span>
+                                            <span className="text-[9px] text-emerald-600 font-semibold block hover:underline cursor-pointer">View Squad →</span>
+                                        </div>
+                                        <div className="bg-white border border-slate-200/80 hover:border-amber-500/30 p-2.5 rounded-xl shadow-xs border-l-4 border-l-amber-500 transition-all">
+                                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 block">League Position</span>
+                                            <span className="text-lg font-black text-slate-900">4th</span>
+                                            <span className="text-[9px] text-slate-500 font-medium block">Configure table</span>
+                                        </div>
+                                        <div className="bg-white border border-slate-200/80 hover:border-red-500/30 p-2.5 rounded-xl shadow-xs border-l-4 border-l-red-500 transition-all">
+                                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 block">Next Match</span>
+                                            <span className="text-xs font-black text-slate-950 block truncate">vs Hackney FC</span>
+                                            <span className="text-[8px] text-slate-500 block">Sat 15 Jul • 19:30</span>
+                                        </div>
+                                        <div className="bg-white border border-slate-200/80 hover:border-blue-500/30 p-2.5 rounded-xl shadow-xs border-l-4 border-l-blue-500 transition-all">
+                                            <span className="text-[9px] font-bold uppercase tracking-wider text-slate-500 block">Last Result</span>
+                                            <span className="text-xs font-black text-emerald-600 block">3 - 1 Win</span>
+                                            <span className="text-[8px] text-slate-550 block">vs Hackney FC</span>
                                         </div>
                                     </div>
                                 </div>
                             )}
 
                             {activeTab === 1 && (
-                                <div className="space-y-3 animate-in fade-in duration-200 flex-1 flex flex-col">
-                                    {/* Matchday XI Tactics Preview */}
-                                    <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
-                                        <div className="flex items-center gap-2">
-                                            <Trophy className="h-4 w-4 text-red-500" />
-                                            <span className="text-xs font-bold text-slate-200">Matchday XI Tactics</span>
+                                <div className="space-y-3 animate-in fade-in duration-200 flex-1 flex flex-col text-slate-900 text-left">
+                                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
+                                        <div>
+                                            <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                                                <Trophy className="h-4 w-4 text-red-650" />
+                                                Matchday XI
+                                            </h3>
+                                            <p className="text-[10px] text-slate-500 leading-none mt-0.5">Design matches sheet &amp; lineup.</p>
                                         </div>
-                                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-900 text-slate-300 border border-slate-800">Formation: 4-3-3</span>
+                                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 border border-slate-300">Formation: 4-3-3</span>
                                     </div>
-                                    
-                                    {/* Pitch representation */}
-                                    <div className="relative bg-emerald-950/70 border border-emerald-800/50 rounded-xl flex-1 min-h-[190px] overflow-hidden flex flex-col justify-between p-2">
-                                        {/* Field markings */}
-                                        <div className="absolute inset-0 pointer-events-none opacity-20 flex flex-col justify-between border border-white">
-                                            <div className="h-8 border-b border-white w-24 mx-auto" />
-                                            <div className="w-full border-b border-white" />
-                                            <div className="h-8 border-t border-white w-24 mx-auto" />
+
+                                    {/* Green kit pitch exactly mirroring pages */}
+                                    <div className="relative bg-emerald-600 rounded-xl flex-1 min-h-[260px] overflow-hidden shadow border-2 border-emerald-500/40 p-2">
+                                        {/* Grass stripes */}
+                                        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
+                                            {Array.from({ length: 6 }).map((_, idx) => (
+                                                <div key={idx} className={`h-[40px] w-full ${idx % 2 === 0 ? 'bg-black' : 'bg-transparent'}`} />
+                                            ))}
                                         </div>
-                                        
-                                        {/* Forwards (3) */}
+
+                                        {/* Pitch markings */}
+                                        <div className="absolute inset-0 border border-white/20 m-1.5 pointer-events-none">
+                                            <div className="absolute top-1/2 left-1 right-1 border-t border-white/20" />
+                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 border border-white/20 rounded-full" />
+                                            <div className="absolute top-0.5 left-1/2 -translate-x-1/2 w-14 h-6 border border-white/20 border-t-0" />
+                                            <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-14 h-6 border border-white/20 border-b-0" />
+                                        </div>
+
+                                        {/* Forwards */}
                                         <div className="flex justify-around w-full relative z-10 pt-2">
                                             <div className="flex flex-col items-center">
-                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">11</div>
-                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">M. Lindholm</span>
+                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">11</div>
+                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Lindholm</span>
                                             </div>
                                             <div className="flex flex-col items-center">
-                                                <div className="h-6 w-6 rounded-full bg-red-600 border border-white flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">9</div>
-                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">M. Abdalla</span>
+                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">9</div>
+                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Abdalla</span>
                                             </div>
                                             <div className="flex flex-col items-center">
-                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">7</div>
-                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">E. Sandell</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Midfielders (3) */}
-                                        <div className="flex justify-around w-full relative z-10 py-1">
-                                            <div className="flex flex-col items-center">
-                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">8</div>
-                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">D. Forsberg</span>
-                                            </div>
-                                            <div className="flex flex-col items-center">
-                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">6</div>
-                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">S. Tahir</span>
-                                            </div>
-                                            <div className="flex flex-col items-center">
-                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">10</div>
-                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">H. Norling</span>
+                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">7</div>
+                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Sandell</span>
                                             </div>
                                         </div>
 
-                                        {/* Defenders (4) */}
-                                        <div className="flex justify-between w-full px-4 relative z-10 py-1">
+                                        {/* Midfielders */}
+                                        <div className="flex justify-around w-full relative z-10 py-2">
                                             <div className="flex flex-col items-center">
-                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">3</div>
-                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">L. Johnson</span>
+                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">8</div>
+                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Forsberg</span>
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">6</div>
+                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Tahir</span>
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">10</div>
+                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Norling</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Defenders */}
+                                        <div className="flex justify-between w-full px-3 relative z-10 py-1">
+                                            <div className="flex flex-col items-center">
+                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">3</div>
+                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Johnson</span>
                                             </div>
                                             <div className="flex justify-around w-1/2">
                                                 <div className="flex flex-col items-center">
-                                                    <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">4</div>
-                                                    <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">A. Bergström</span>
+                                                    <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">4</div>
+                                                    <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Bergström</span>
                                                 </div>
                                                 <div className="flex flex-col items-center">
-                                                    <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">5</div>
-                                                    <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">M. Evans</span>
+                                                    <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">5</div>
+                                                    <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Evans</span>
                                                 </div>
                                             </div>
                                             <div className="flex flex-col items-center">
-                                                <div className="h-6 w-6 rounded-full bg-slate-950 border border-red-500 flex items-center justify-center text-[9px] font-bold text-white shadow-md shadow-slate-950/50">2</div>
-                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">J. Lindgren</span>
+                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">2</div>
+                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Lindgren</span>
                                             </div>
                                         </div>
 
-                                        {/* Goalkeeper (1) */}
-                                        <div className="flex justify-center w-full relative z-10 pb-1">
+                                        {/* Goalkeeper */}
+                                        <div className="flex justify-center w-full relative z-10 pb-0.5">
                                             <div className="flex flex-col items-center">
-                                                <div className="h-6 w-6 rounded-full bg-yellow-500 border border-white flex items-center justify-center text-[9px] font-bold text-slate-950 shadow-md shadow-slate-950/50">1</div>
-                                                <span className="text-[8px] bg-slate-900/90 text-white px-1 py-0.5 rounded mt-1 font-bold">K. Nilsson</span>
+                                                <div className="w-5 h-5 rounded-full bg-orange-500 border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-white">1</div>
+                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Nilsson</span>
                                             </div>
                                         </div>
                                     </div>
@@ -409,66 +427,68 @@ export default function LoginPage() {
                             )}
 
                             {activeTab === 2 && (
-                                <div className="space-y-3 animate-in fade-in duration-200">
-                                    {/* Squad Registry Preview */}
-                                    <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
-                                        <div className="flex items-center gap-2">
-                                            <Users className="h-4 w-4 text-red-500" />
-                                            <span className="text-xs font-bold text-slate-200">Squad Registry</span>
+                                <div className="space-y-3 animate-in fade-in duration-200 text-slate-900 text-left">
+                                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                                        <div>
+                                            <h3 className="text-sm font-bold text-slate-900">Squad</h3>
+                                            <p className="text-[10px] text-slate-500">View and manage player profiles and stats.</p>
                                         </div>
-                                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-red-950/50 text-red-400 border border-red-900/30 font-mono">28 Rostered</span>
                                     </div>
-                                    
-                                    <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                                        {/* Player Rows */}
-                                        <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800/50 p-2 rounded-xl text-xs">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-6 w-6 rounded-full bg-red-650 flex items-center justify-center text-[10px] font-bold text-white">MA</div>
-                                                <div>
-                                                    <p className="font-bold text-slate-200">Mohamed Abdalla</p>
-                                                    <span className="text-[9px] text-slate-400">Striker (ST)</span>
-                                                </div>
+
+                                    {/* Squad Roster Tabs Filter */}
+                                    <div className="flex space-x-1 border-b border-slate-200 pb-1 text-[9px] font-semibold text-slate-500">
+                                        <span className="px-2 py-0.5 bg-red-50 text-red-700 rounded cursor-pointer">First Team</span>
+                                        <span className="px-2 py-0.5 hover:text-slate-900 cursor-pointer">Midweek</span>
+                                        <span className="px-2 py-0.5 hover:text-slate-900 cursor-pointer">Youth</span>
+                                    </div>
+
+                                    {/* Grid of styled Player Cards matching player-card.tsx */}
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {/* FWD Player Card */}
+                                        <div className="rounded-xl overflow-hidden shadow-sm border-2 bg-slate-950 border-rose-500 flex flex-col p-2.5 text-center text-white relative">
+                                            <span className="absolute top-1.5 right-1.5 text-[7px] font-black px-1 py-0.5 bg-green-500/20 text-green-400 border border-green-500/50 rounded">Available</span>
+                                            <div className="h-10 w-10 rounded-full bg-slate-200 text-slate-800 font-black text-xs flex items-center justify-center mx-auto mt-2">
+                                                MA
                                             </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="text-right">
-                                                    <span className="text-[9px] text-slate-500 block uppercase font-mono">Goals</span>
-                                                    <span className="font-extrabold text-white">14</span>
+                                            <h4 className="font-extrabold text-[10px] text-white mt-1.5 leading-none">M. Abdalla</h4>
+                                            <span className="text-[8px] text-slate-400 block mb-2">ST • First Team • 24 yo</span>
+                                            <div className="border-t border-slate-850 pt-1.5 flex justify-around text-[9px]">
+                                                <div>
+                                                    <span className="text-slate-500 text-[8px] block leading-none">Apps</span>
+                                                    <span className="font-bold text-white">18</span>
                                                 </div>
-                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-green-950/50 text-green-400 border border-green-900/30">Available</span>
+                                                <div>
+                                                    <span className="text-slate-500 text-[8px] block leading-none">Goals</span>
+                                                    <span className="font-bold text-white">14</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-slate-500 text-[8px] block leading-none">Assists</span>
+                                                    <span className="font-bold text-white">5</span>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800/50 p-2 rounded-xl text-xs">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-6 w-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">ST</div>
+                                        {/* MID Player Card */}
+                                        <div className="rounded-xl overflow-hidden shadow-sm border-2 bg-slate-950 border-emerald-500 flex flex-col p-2.5 text-center text-white relative">
+                                            <span className="absolute top-1.5 right-1.5 text-[7px] font-black px-1 py-0.5 bg-green-500/20 text-green-400 border border-green-500/50 rounded">Available</span>
+                                            <div className="h-10 w-10 rounded-full bg-slate-200 text-slate-800 font-black text-xs flex items-center justify-center mx-auto mt-2">
+                                                ST
+                                            </div>
+                                            <h4 className="font-extrabold text-[10px] text-white mt-1.5 leading-none">Said Tahir</h4>
+                                            <span className="text-[8px] text-slate-400 block mb-2">CM • First Team • 27 yo</span>
+                                            <div className="border-t border-slate-850 pt-1.5 flex justify-around text-[9px]">
                                                 <div>
-                                                    <p className="font-bold text-slate-200">Said Tahir</p>
-                                                    <span className="text-[9px] text-slate-400">Midfield (CM)</span>
+                                                    <span className="text-slate-500 text-[8px] block leading-none">Apps</span>
+                                                    <span className="font-bold text-white">18</span>
                                                 </div>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="text-right">
-                                                    <span className="text-[9px] text-slate-500 block uppercase font-mono">Assists</span>
-                                                    <span className="font-extrabold text-white">11</span>
-                                                </div>
-                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-green-950/50 text-green-400 border border-green-900/30">Available</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex items-center justify-between bg-slate-900/60 border border-slate-800/50 p-2 rounded-xl text-xs">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-6 w-6 rounded-full bg-slate-800 flex items-center justify-center text-[10px] font-bold text-slate-400">AB</div>
                                                 <div>
-                                                    <p className="font-bold text-slate-200">Alex Bergström</p>
-                                                    <span className="text-[9px] text-slate-400">Defender (CB)</span>
+                                                    <span className="text-slate-500 text-[8px] block leading-none">Goals</span>
+                                                    <span className="font-bold text-white">3</span>
                                                 </div>
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <div className="text-right">
-                                                    <span className="text-[9px] text-slate-500 block uppercase font-mono">Matches</span>
-                                                    <span className="font-extrabold text-white">18</span>
+                                                <div>
+                                                    <span className="text-slate-500 text-[8px] block leading-none">Assists</span>
+                                                    <span className="font-bold text-white">11</span>
                                                 </div>
-                                                <span className="text-[9px] px-2 py-0.5 rounded-full bg-red-950/50 text-red-400 border border-red-900/30">Injured</span>
                                             </div>
                                         </div>
                                     </div>
@@ -476,45 +496,45 @@ export default function LoginPage() {
                             )}
 
                             {activeTab === 3 && (
-                                <div className="space-y-4 animate-in fade-in duration-200">
-                                    {/* Club Finances Preview */}
-                                    <div className="flex items-center justify-between border-b border-slate-800/60 pb-3">
+                                <div className="space-y-3.5 animate-in fade-in duration-200 text-slate-900 text-left">
+                                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                                        <div>
+                                            <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                                                <Wallet className="h-4.5 w-4.5 text-indigo-600" />
+                                                Player Payments
+                                            </h3>
+                                            <p className="text-[10px] text-slate-500 leading-none mt-0.5">Manage subs, fees, and collect card payments.</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Stripe Connect Connected Banner */}
+                                    <div className="border border-emerald-100 bg-emerald-50/40 rounded-xl p-3 flex justify-between items-center text-[10px]">
                                         <div className="flex items-center gap-2">
-                                            <CreditCard className="h-4 w-4 text-red-500" />
-                                            <span className="text-xs font-bold text-slate-200">Club Finances &amp; Subscriptions</span>
-                                        </div>
-                                        <span className="text-[10px] text-emerald-400 font-bold font-mono">Active Season</span>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-3 text-xs">
-                                        <div className="bg-slate-900/60 border border-slate-800/50 p-3 rounded-xl">
-                                            <span className="text-[9px] text-slate-500 uppercase block font-mono">Dues Collected</span>
-                                            <p className="text-lg font-black text-white">£4,820</p>
-                                            <span className="text-[8px] text-emerald-400">92% Target Reached</span>
-                                        </div>
-                                        <div className="bg-slate-900/60 border border-slate-800/50 p-3 rounded-xl">
-                                            <span className="text-[9px] text-slate-500 uppercase block font-mono">Outstanding Fees</span>
-                                            <p className="text-lg font-black text-red-400">£340</p>
-                                            <span className="text-[8px] text-slate-400">From 4 members</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="bg-slate-900/60 border border-slate-800/50 rounded-xl overflow-hidden text-[10px]">
-                                        <div className="bg-slate-900 px-3 py-1.5 font-bold text-slate-400 border-b border-slate-800/50 flex justify-between">
-                                            <span>Player Name</span>
-                                            <span>Amount</span>
-                                            <span>Status</span>
-                                        </div>
-                                        <div className="divide-y divide-slate-800/50">
-                                            <div className="px-3 py-2 flex justify-between items-center">
-                                                <span className="font-medium text-slate-300">Liam Johnson</span>
-                                                <span className="text-slate-400">£150</span>
-                                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950/60 text-emerald-400 border border-emerald-900/30">Paid</span>
+                                            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                                            <div>
+                                                <p className="font-bold text-emerald-950">Stripe Connect Connected</p>
+                                                <p className="text-[8px] text-emerald-800/80">Active to collect secure credit card and mobile wallet payments.</p>
                                             </div>
-                                            <div className="px-3 py-2 flex justify-between items-center">
-                                                <span className="font-medium text-slate-300">Harry Norling</span>
-                                                <span className="text-slate-400">£150</span>
-                                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-red-950/60 text-red-400 border border-red-900/30">Overdue</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Invoices List Table */}
+                                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-xs text-[9px]">
+                                        <div className="bg-slate-50 px-2.5 py-1.5 font-bold text-slate-400 border-b border-slate-200 flex justify-between uppercase">
+                                            <span className="w-1/3">Player</span>
+                                            <span className="w-1/3 text-center">Amount</span>
+                                            <span className="w-1/3 text-right">Status</span>
+                                        </div>
+                                        <div className="divide-y divide-slate-100">
+                                            <div className="px-2.5 py-2 flex justify-between items-center">
+                                                <span className="w-1/3 font-semibold text-slate-700">Liam Johnson</span>
+                                                <span className="w-1/3 text-center font-bold text-slate-955">£150.00</span>
+                                                <span className="w-1/3 text-right"><span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-250">Paid</span></span>
+                                            </div>
+                                            <div className="px-2.5 py-2 flex justify-between items-center">
+                                                <span className="w-1/3 font-semibold text-slate-700">Harry Norling</span>
+                                                <span className="w-1/3 text-center font-bold text-slate-955">£150.00</span>
+                                                <span className="w-1/3 text-right"><span className="px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-amber-50 text-amber-700 border border-amber-250">Unpaid</span></span>
                                             </div>
                                         </div>
                                     </div>
@@ -522,49 +542,36 @@ export default function LoginPage() {
                             )}
 
                             {activeTab === 4 && (
-                                <div className="space-y-3 animate-in fade-in duration-200">
-                                    {/* Training Tracker Preview */}
-                                    <div className="flex items-center justify-between border-b border-slate-800/60 pb-2">
-                                        <div className="flex items-center gap-2">
-                                            <Activity className="h-4 w-4 text-red-500" />
-                                            <span className="text-xs font-bold text-slate-200">Training Attendance &amp; Log</span>
-                                        </div>
-                                        <span className="text-[9px] px-2 py-0.5 rounded-full bg-slate-900 text-slate-300 border border-slate-800">Weekly Drills</span>
-                                    </div>
-
-                                    <div className="bg-slate-900/60 border border-slate-800/50 p-3 rounded-xl space-y-2">
-                                        <div className="flex justify-between items-center text-xs">
-                                            <div>
-                                                <p className="font-bold text-slate-200">Tuesday Night Tactical Drills</p>
-                                                <span className="text-[9px] text-slate-400">July 15 • Regent's Park Astro</span>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className="text-lg font-black text-white">92%</span>
-                                                <span className="text-[8px] text-slate-500 block">Attendance</span>
-                                            </div>
-                                        </div>
-                                        <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-                                            <div className="bg-red-500 h-full rounded-full" style={{ width: "92%" }} />
+                                <div className="space-y-3 animate-in fade-in duration-200 text-slate-900 text-left">
+                                    <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+                                        <div>
+                                            <h3 className="text-sm font-bold text-slate-900">Training</h3>
+                                            <p className="text-[10px] text-slate-500">Manage sessions and track attendance.</p>
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-2 text-[10px]">
-                                        <div className="bg-slate-900/40 border border-slate-800/50 p-2.5 rounded-lg flex items-center justify-between">
-                                            <span className="text-slate-300">Mohamed Abdalla</span>
-                                            <div className="h-4 w-4 rounded-full bg-emerald-950/60 text-emerald-400 flex items-center justify-center font-bold text-[9px] border border-emerald-900/30">✔</div>
+                                    {/* Tabs Selector preview */}
+                                    <div className="flex bg-slate-100 p-0.5 rounded-lg text-[9px] w-max font-medium text-slate-500">
+                                        <span className="px-2.5 py-1 bg-white text-slate-900 rounded shadow-xs font-bold cursor-pointer">Sessions</span>
+                                        <span className="px-2.5 py-1 hover:text-slate-900 cursor-pointer">Training Attendance</span>
+                                    </div>
+
+                                    {/* Training Session Card matching training/page.tsx */}
+                                    <div className="bg-white hover:shadow-sm border border-slate-200 border-l-4 border-l-red-600 rounded-xl p-3.5 space-y-2">
+                                        <div className="flex justify-between items-start">
+                                            <span className="px-2 py-0.5 border border-slate-200 text-[8px] font-bold rounded bg-slate-50">First Team Squad</span>
                                         </div>
-                                        <div className="bg-slate-900/40 border border-slate-850 p-2.5 rounded-lg flex items-center justify-between">
-                                            <span className="text-slate-300">Said Tahir</span>
-                                            <div className="h-4 w-4 rounded-full bg-emerald-950/60 text-emerald-400 flex items-center justify-center font-bold text-[9px] border border-emerald-900/30">✔</div>
+                                        <h4 className="font-extrabold text-xs text-slate-950 leading-none">Tuesday Night Tactical Drills</h4>
+                                        <p className="text-[9px] text-slate-500 flex items-center gap-1">
+                                            <CalendarDays className="h-3 w-3 text-slate-400" /> Tue 15 Jul • 20:15 - 22:00
+                                        </p>
+                                        <div className="space-y-1 pt-1.5 border-t border-slate-100 text-[9px] text-slate-600">
+                                            <p className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5 text-slate-400" /> Regent's Park Astro</p>
+                                            <p className="flex items-center gap-1.5"><Users className="h-3.5 w-3.5 text-slate-400" /> 26 / 28 (92%) squad players</p>
                                         </div>
-                                        <div className="bg-slate-900/40 border border-slate-850 p-2.5 rounded-lg flex items-center justify-between">
-                                            <span className="text-slate-300">Alex Bergström</span>
-                                            <div className="h-4 w-4 rounded-full bg-amber-950/60 text-amber-400 flex items-center justify-center font-bold text-[9px] border border-amber-900/30">Exc</div>
-                                        </div>
-                                        <div className="bg-slate-900/40 border border-slate-850 p-2.5 rounded-lg flex items-center justify-between">
-                                            <span className="text-slate-300">E. Sandell</span>
-                                            <div className="h-4 w-4 rounded-full bg-emerald-950/60 text-emerald-400 flex items-center justify-center font-bold text-[9px] border border-emerald-900/30">✔</div>
-                                        </div>
+                                        <button type="button" className="w-full bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-[9px] py-1.5 rounded-lg mt-2 border border-slate-200">
+                                            Manage Session
+                                        </button>
                                     </div>
                                 </div>
                             )}
