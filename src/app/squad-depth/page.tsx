@@ -7,23 +7,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     Users,
-    Shield,
     Search,
     AlertTriangle,
     CheckCircle2,
     X,
-    Filter,
-    FileText,
-    TrendingUp,
-    Info,
-    CalendarDays,
     Trash2,
     AlertCircle,
-    UserCheck,
-    UserMinus
+    Info
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
@@ -34,6 +26,8 @@ const POSITION_FULL_NAMES: Record<string, string> = {
     "GK": "Goalkeeper",
     "LB": "Left Back",
     "CB": "Centre Back",
+    "LCB": "Left Centre Back",
+    "RCB": "Right Centre Back",
     "RB": "Right Back",
     "LWB": "Left Wing Back",
     "RWB": "Right Wing Back",
@@ -48,21 +42,39 @@ const POSITION_FULL_NAMES: Record<string, string> = {
     "CF": "Centre Forward"
 };
 
+const getShortPosition = (pos: string): string => {
+    const p = (pos || "").trim().toLowerCase();
+    if (p === "goalkeeper" || p === "gk") return "GK";
+    if (p === "centre back" || p === "center back" || p === "cb") return "CB";
+    if (p === "left centre back" || p === "lcb") return "LCB";
+    if (p === "right centre back" || p === "rcb") return "RCB";
+    if (p === "left back" || p === "lb") return "LB";
+    if (p === "right back" || p === "rb") return "RB";
+    if (p === "left wing back" || p === "lwb") return "LWB";
+    if (p === "right wing-back" || p === "rwb") return "RWB";
+    if (p === "defensive midfielder" || p === "cdm") return "CDM";
+    if (p === "central midfielder" || p === "cm") return "CM";
+    if (p === "attacking midfielder" || p === "cam") return "CAM";
+    if (p === "left midfielder" || p === "lm") return "LM";
+    if (p === "right midfielder" || p === "rm") return "RM";
+    if (p === "left winger" || p === "left wing" || p === "lw") return "LW";
+    if (p === "right winger" || p === "right wing" || p === "rw") return "RW";
+    if (p === "striker" || p === "forward" || p === "st") return "ST";
+    if (p === "centre forward" || p === "cf") return "CF";
+    return "CM"; // default fallback
+};
+
 const getPositionCategory = (pos: string): "GK" | "DEF" | "MID" | "FWD" => {
-    const p = pos.toUpperCase();
-    if (["GK"].includes(p)) return "GK";
-    if (["CB", "RB", "LB", "DEF", "RWB", "LWB", "RM", "LM"].includes(p)) {
-        if (["RM", "LM"].includes(p)) return "MID";
-        return "DEF";
-    }
-    if (["CM", "CDM", "CAM", "MID"].includes(p)) return "MID";
-    if (["ST", "CF", "RW", "LW", "FWD"].includes(p)) return "FWD";
+    const p = getShortPosition(pos);
+    if (p === "GK") return "GK";
+    if (["CB", "LCB", "RCB", "RB", "LB", "RWB", "LWB"].includes(p)) return "DEF";
+    if (["CM", "CDM", "CAM", "RM", "LM"].includes(p)) return "MID";
+    if (["ST", "CF", "RW", "LW"].includes(p)) return "FWD";
     return "MID";
 };
 
 export default function SquadDepthPage() {
     const { settings, isLoaded: isClubLoaded } = useClub();
-    const { user } = useAuth();
     
     const currentSquads = settings.squads || ["First Team"];
     const [activeSquadTab, setActiveSquadTab] = useState<string>(currentSquads[0] || "First Team");
@@ -92,7 +104,6 @@ export default function SquadDepthPage() {
     const fetchPlayers = async () => {
         setLoading(true);
         try {
-            // Fetch all players first to match squad/page.tsx sync behavior
             const { data, error } = await supabase.from("players").select("*");
 
             if (data) {
@@ -119,7 +130,6 @@ export default function SquadDepthPage() {
                     secondaryPositions: p.secondary_position ? p.secondary_position.split(",").map((s: string) => s.trim() as Position) : []
                 }));
 
-                // Filter matching squad tab using the flexible name comparison from squad/page.tsx
                 const filteredBySquad = mapped.filter(p => {
                     const playerSquads = Array.isArray(p.squad) 
                         ? p.squad 
@@ -209,6 +219,23 @@ export default function SquadDepthPage() {
         return parsed;
     };
 
+    // Calculate player age dynamically from DOB or fall back to age column
+    const getPlayerAge = (p: Player) => {
+        if (p.dateOfBirth) {
+            const birthDate = new Date(p.dateOfBirth);
+            const today = new Date();
+            if (!isNaN(birthDate.getTime())) {
+                let age = today.getFullYear() - birthDate.getFullYear();
+                const m = today.getMonth() - birthDate.getMonth();
+                if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                    age--;
+                }
+                return age;
+            }
+        }
+        return p.age || 25;
+    };
+
     const handleSavePlayerDetails = async (details: { coachNotes: string; preferredFoot: string; height: string; weight: string; developmentPlan: string; availability: boolean }) => {
         if (!selectedPlayer) return;
 
@@ -240,40 +267,95 @@ export default function SquadDepthPage() {
 
     const activePositions = FORMATIONS[formation] || FORMATIONS["4-3-3"];
 
+    // Find default visual zone for a player with round-robin distribution and LCB/RCB mapping
+    const getPlayerZone = (p: Player, squadPlayers: Player[]) => {
+        if (assignments[p.id]) return assignments[p.id];
+        
+        // Out-of-action default zones
+        if (p.medicalStatus === "Injured") return "Injured";
+        if (p.medicalStatus === "Suspended") return "Suspended";
+        if (p.medicalStatus === "Holiday" || p.medicalStatus === "Unavailable") return "Unavailable";
+
+        const shortPos = getShortPosition(p.position);
+
+        // Find matching zones in active formation
+        let matchingZones = activePositions.filter(pos => {
+            const zLabel = pos.label.toUpperCase();
+            if (shortPos === "LCB" || shortPos === "RCB" || shortPos === "CB") {
+                return zLabel === "CB";
+            }
+            if (shortPos === "ST" || shortPos === "CF") {
+                return zLabel === "ST" || zLabel === "CF";
+            }
+            if (shortPos === "CM" || shortPos === "CDM" || shortPos === "CAM") {
+                return zLabel === "CM" || zLabel === "CDM" || zLabel === "CAM";
+            }
+            return zLabel === shortPos;
+        });
+
+        if (matchingZones.length === 0) return null;
+
+        // Sort left-to-right (x ascending)
+        matchingZones = [...matchingZones].sort((a, b) => a.x - b.x);
+
+        // Map Left Centre Back directly to leftmost zone
+        if (shortPos === "LCB" && matchingZones.length > 1) {
+            const z = matchingZones[0];
+            return `${z.label}_${z.number}`;
+        }
+        // Map Right Centre Back directly to rightmost zone
+        if (shortPos === "RCB" && matchingZones.length > 1) {
+            const z = matchingZones[matchingZones.length - 1];
+            return `${z.label}_${z.number}`;
+        }
+
+        // Even distribution round-robin
+        const groupPlayers = squadPlayers
+            .filter(pl => {
+                if (assignments[pl.id]) return false;
+                if (pl.medicalStatus === "Injured" || pl.medicalStatus === "Suspended" || pl.medicalStatus === "Holiday" || pl.medicalStatus === "Unavailable") return false;
+                
+                const plShort = getShortPosition(pl.position);
+                if (shortPos === "CB" || shortPos === "LCB" || shortPos === "RCB") {
+                    return plShort === "CB" || plShort === "LCB" || plShort === "RCB";
+                }
+                if (shortPos === "ST" || shortPos === "CF") {
+                    return plShort === "ST" || plShort === "CF";
+                }
+                if (shortPos === "CM" || shortPos === "CDM" || shortPos === "CAM") {
+                    return plShort === "CM" || plShort === "CDM" || plShort === "CAM";
+                }
+                return plShort === shortPos;
+            })
+            .sort((a, b) => a.id.localeCompare(b.id));
+
+        const playerIdx = groupPlayers.findIndex(pl => pl.id === p.id);
+        if (playerIdx === -1) {
+            const z = matchingZones[0];
+            return `${z.label}_${z.number}`;
+        }
+
+        const targetZone = matchingZones[playerIdx % matchingZones.length];
+        return `${targetZone.label}_${targetZone.number}`;
+    };
+
     // Filter registry pool players based on UI filters
     const filteredPlayers = players.filter(p => {
         const notesObj = getParsedNotes(p.notes || "");
         const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
         if (searchQuery && !fullName.includes(searchQuery.toLowerCase())) return false;
         if (filterPosition !== "All" && getPositionCategory(p.position) !== filterPosition) return false;
-        if (filterAgeMax !== "All" && p.age > parseInt(filterAgeMax)) return false;
+        if (filterAgeMax !== "All" && getPlayerAge(p) > parseInt(filterAgeMax)) return false;
         if (filterAvailability !== "All" && p.availability !== (filterAvailability === "Available")) return false;
         if (filterFoot !== "All" && notesObj.preferredFoot !== filterFoot) return false;
-        if (filterYouth && p.age >= 21) return false;
+        if (filterYouth && getPlayerAge(p) >= 21) return false;
         if (filterTrialists && !p.notes?.toLowerCase().includes("trial")) return false;
         return true;
     });
 
-    // Helper to find default pitch zone key if a player has no drag override assignments.
-    // If no assignment exists, we match the player's position label (e.g. CB) to the first zone with that label.
-    const getPlayerZone = (p: Player) => {
-        if (assignments[p.id]) return assignments[p.id];
-        
-        // Find first zone in the active formation matching their primary position
-        const matchingZone = activePositions.find(pos => pos.label.toUpperCase() === p.position.toUpperCase());
-        if (matchingZone) {
-            return `${matchingZone.label}_${matchingZone.number}`;
-        }
-
-        // GK default to GK zone
-        if (p.position === "GK") return "GK_1";
-
-        return null;
-    };
-
-    // Stats calculations based on all squad members
+    // Stats calculations
     const totalPlayers = players.length;
-    const avgAge = totalPlayers > 0 ? (players.reduce((sum, p) => sum + p.age, 0) / totalPlayers).toFixed(1) : "0.0";
+    const avgAge = totalPlayers > 0 ? (players.reduce((sum, p) => sum + getPlayerAge(p), 0) / totalPlayers).toFixed(1) : "0.0";
     const gkCount = players.filter(p => getPositionCategory(p.position) === "GK").length;
     const defCount = players.filter(p => getPositionCategory(p.position) === "DEF").length;
     const midCount = players.filter(p => getPositionCategory(p.position) === "MID").length;
@@ -292,7 +374,7 @@ export default function SquadDepthPage() {
         });
 
         Object.keys(zoneRequired).forEach(label => {
-            const count = players.filter(p => getPlayerZone(p) && getPlayerZone(p)!.startsWith(label)).length;
+            const count = players.filter(p => getPlayerZone(p, players) && getPlayerZone(p, players)!.startsWith(label)).length;
             if (count === 0) {
                 insights.push({ type: "warning", text: `No depth cover at all for ${POSITION_FULL_NAMES[label] || label}.` });
             } else if (count < zoneRequired[label]) {
@@ -388,7 +470,7 @@ export default function SquadDepthPage() {
                         <span>Youth (&lt;21)</span>
                     </label>
 
-                    <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-650">
+                    <label className="flex items-center gap-1.5 cursor-pointer font-medium text-slate-655">
                         <input
                             type="checkbox"
                             checked={filterTrialists}
@@ -400,7 +482,7 @@ export default function SquadDepthPage() {
                 </div>
 
                 <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleResetAssignments} className="text-slate-500 hover:text-red-650 font-bold">
+                    <Button variant="outline" size="sm" onClick={handleResetAssignments} className="text-slate-500 hover:text-red-655 font-bold">
                         <Trash2 className="h-4 w-4 mr-1.5" /> Clear Drag Overrides
                     </Button>
                 </div>
@@ -411,12 +493,12 @@ export default function SquadDepthPage() {
                 
                 {/* Visual Pitch - Takes 3 cols on desktop */}
                 <div className="lg:col-span-3 space-y-4">
-                    <div className="relative bg-emerald-800 rounded-2xl border-4 border-emerald-600/40 p-6 min-h-[640px] shadow-2xl flex flex-col justify-between overflow-hidden select-none">
+                    <div className="relative bg-emerald-800 rounded-2xl border-4 border-emerald-600/40 p-6 min-h-[660px] shadow-2xl flex flex-col justify-between overflow-hidden select-none">
                         
                         {/* Grass Stripe Overlays */}
                         <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
                             {Array.from({ length: 8 }).map((_, idx) => (
-                                <div key={idx} className={`h-[80px] w-full ${idx % 2 === 0 ? 'bg-black' : 'bg-transparent'}`} />
+                                <div key={idx} className={`h-[85px] w-full ${idx % 2 === 0 ? 'bg-black' : 'bg-transparent'}`} />
                             ))}
                         </div>
 
@@ -424,18 +506,15 @@ export default function SquadDepthPage() {
                         <div className="absolute inset-6 border-2 border-white/20 pointer-events-none">
                             <div className="absolute top-1/2 left-0 right-0 border-t-2 border-white/20" />
                             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 border-2 border-white/20 rounded-full" />
-                            {/* Penalty box top */}
                             <div className="absolute top-0 left-1/2 -translate-x-1/2 w-64 h-28 border-2 border-white/20 border-t-0" />
-                            {/* Penalty box bottom */}
                             <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-64 h-28 border-2 border-white/20 border-b-0" />
                         </div>
 
-                        {/* Visual Position Zones - Scaled safely from top 12% to bottom 88% to keep GK fully on-pitch */}
+                        {/* Visual Position Zones - Scaled safely to keep GK fully on-pitch */}
                         <div className="absolute inset-0 p-10 flex flex-col justify-between">
                             {activePositions.map((pos) => {
                                 const zoneKey = `${pos.label}_${pos.number}`;
-                                // Filter players matching this zone (either overridden via drag or default matches primary position)
-                                const zonePlayers = filteredPlayers.filter(p => getPlayerZone(p) === zoneKey);
+                                const zonePlayers = filteredPlayers.filter(p => getPlayerZone(p, players) === zoneKey);
 
                                 // GK is at y: 5 originally. We scale y from 12% to 88% to prevent GK or ST getting cut off.
                                 const adjustedY = 12 + (pos.y * 0.76);
@@ -446,15 +525,14 @@ export default function SquadDepthPage() {
                                         key={zoneKey}
                                         onDragOver={(e) => e.preventDefault()}
                                         onDrop={() => handleDrop(zoneKey)}
-                                        className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center min-w-[130px] z-10"
+                                        className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center min-w-[135px] z-10"
                                         style={{ left: `${adjustedX}%`, top: `${adjustedY}%` }}
                                     >
-                                        {/* Zone Label Header */}
                                         <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-slate-700/80 text-[10px] font-black text-slate-200 shadow-md">
                                             {pos.label}
                                         </div>
 
-                                        {/* Placed players stack - Larger cards with clear font sizes */}
+                                        {/* Placed players stack - Text only player cards */}
                                         <div className="min-h-[64px] w-full mt-2 flex flex-col items-center justify-start rounded-xl border-2 border-dashed border-white/20 bg-slate-950/20 backdrop-blur-md p-1.5 gap-1.5 transition-all hover:bg-slate-950/30">
                                             {zonePlayers.length === 0 ? (
                                                 <span className="text-[9px] text-white/40 italic font-bold my-auto">Empty</span>
@@ -468,19 +546,13 @@ export default function SquadDepthPage() {
                                                             setSelectedPlayer(p);
                                                             setIsDrawerOpen(true);
                                                         }}
-                                                        className="flex items-center gap-2 bg-slate-950 hover:border-red-400 border border-slate-800 text-white rounded-lg p-2 text-xs font-bold shadow-md cursor-grab w-full transition-all"
+                                                        className="flex items-center justify-between gap-2 bg-slate-950 hover:border-red-400 border border-slate-800 text-white rounded-lg p-2.5 text-xs font-bold shadow-md cursor-grab w-full transition-all"
                                                     >
-                                                        <Avatar className="h-5 w-5 border border-slate-850">
-                                                            <AvatarImage src={p.imageUrl} />
-                                                            <AvatarFallback className="text-[8px] bg-red-650 text-white font-bold">
-                                                                {p.firstName[0]}{p.lastName[0]}
-                                                            </AvatarFallback>
-                                                        </Avatar>
                                                         <div className="overflow-hidden flex-1 leading-tight text-left">
-                                                            <p className="truncate text-white text-[11px] font-black">{p.firstName} {p.lastName}</p>
-                                                            {p.secondaryPositions && p.secondaryPositions.length > 0 && (
-                                                                <p className="text-[9px] text-slate-400 font-semibold truncate">{p.position} / {p.secondaryPositions.join(" / ")}</p>
-                                                            )}
+                                                            <p className="truncate text-white text-[12px] font-black">{p.firstName} {p.lastName}</p>
+                                                            <p className="text-[10px] text-slate-400 font-semibold truncate">
+                                                                {p.position} {p.secondaryPositions && p.secondaryPositions.length > 0 && `/ ${p.secondaryPositions.join(" / ")}`}
+                                                            </p>
                                                         </div>
                                                         <span className={`h-2 w-2 rounded-full shrink-0 ${p.availability ? 'bg-green-500' : 'bg-red-500'}`} />
                                                     </div>
@@ -555,7 +627,7 @@ export default function SquadDepthPage() {
                         <h3 className="text-xs font-black uppercase text-slate-500 tracking-wider">Out of Action</h3>
                         <div className="grid grid-cols-1 gap-2.5">
                             {["Injured", "Suspended", "Unavailable", "Loan", "Youth Players", "Trialists"].map((statusKey) => {
-                                const columnPlayers = filteredPlayers.filter(p => assignments[p.id] === statusKey);
+                                const columnPlayers = filteredPlayers.filter(p => getPlayerZone(p, players) === statusKey);
                                 return (
                                     <div
                                         key={statusKey}
@@ -569,7 +641,7 @@ export default function SquadDepthPage() {
                                         </div>
                                         <div className="flex flex-col gap-1.5 max-h-[160px] overflow-y-auto">
                                             {columnPlayers.length === 0 ? (
-                                                <span className="text-[9px] text-slate-405 italic mt-1">Drop player here</span>
+                                                <span className="text-[9px] text-slate-400 italic mt-1">Drop player here</span>
                                             ) : (
                                                 columnPlayers.map(p => (
                                                     <div
@@ -580,10 +652,10 @@ export default function SquadDepthPage() {
                                                             setSelectedPlayer(p);
                                                             setIsDrawerOpen(true);
                                                         }}
-                                                        className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold hover:border-slate-400 cursor-grab truncate shadow-xs"
+                                                        className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-2.5 text-xs font-bold hover:border-slate-400 cursor-grab truncate shadow-xs"
                                                     >
                                                         <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${p.availability ? "bg-green-500" : "bg-red-500"}`} />
-                                                        <span className="truncate flex-1 text-slate-800 text-[11px]">{p.firstName} {p.lastName}</span>
+                                                        <span className="truncate flex-1 text-slate-800 text-[11px] font-black">{p.firstName} {p.lastName}</span>
                                                     </div>
                                                 ))
                                             )}
@@ -604,12 +676,6 @@ export default function SquadDepthPage() {
                         <div className="space-y-6">
                             <div className="flex justify-between items-start border-b pb-4">
                                 <div className="flex items-center gap-3">
-                                    <Avatar className="h-12 w-12 border-2 border-slate-100">
-                                        <AvatarImage src={selectedPlayer.imageUrl} />
-                                        <AvatarFallback className="bg-slate-900 text-white font-bold text-sm">
-                                            {selectedPlayer.firstName[0]}{selectedPlayer.lastName[0]}
-                                        </AvatarFallback>
-                                    </Avatar>
                                     <div>
                                         <h2 className="text-lg font-black tracking-tight text-slate-900">{selectedPlayer.firstName} {selectedPlayer.lastName}</h2>
                                         <p className="text-xs text-slate-500 font-medium">Position: {selectedPlayer.position}</p>
@@ -623,7 +689,7 @@ export default function SquadDepthPage() {
                             <div className="grid grid-cols-2 gap-4 text-xs">
                                 <div>
                                     <span className="text-slate-400 font-bold uppercase block text-[9px]">Age</span>
-                                    <span className="font-bold text-slate-800">{selectedPlayer.age} years old</span>
+                                    <span className="font-bold text-slate-800">{getPlayerAge(selectedPlayer)} years old</span>
                                 </div>
                                 <div>
                                     <span className="text-slate-400 font-bold uppercase block text-[9px]">Nationality</span>

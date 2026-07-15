@@ -1,4 +1,4 @@
-export type Position = "GK" | "DEF" | "MID" | "FWD" | "CB" | "RB" | "LB" | "CM" | "CDM" | "CAM" | "RW" | "LW" | "CF" | "RWB" | "LWB" | "RM" | "LM" | "ST";
+export type Position = "GK" | "DEF" | "MID" | "FWD" | "CB" | "LCB" | "RCB" | "RB" | "LB" | "CM" | "CDM" | "CAM" | "RW" | "LW" | "CF" | "RWB" | "LWB" | "RM" | "LM" | "ST";
 
 export type SquadType = string;
 

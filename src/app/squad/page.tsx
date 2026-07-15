@@ -432,7 +432,7 @@ export default function SquadPage() {
     };
 
     const handleStatusToggle = async (player: Player) => {
-        const statuses: MedicalStatus[] = ["Available", "Holiday", "Injured"];
+        const statuses: MedicalStatus[] = ["Available", "Holiday", "Injured", "Suspended"];
         let nextIndex = 0;
         const currentIndex = statuses.indexOf(player.medicalStatus);
         if (currentIndex !== -1) {
@@ -489,7 +489,7 @@ export default function SquadPage() {
         return matchesSearch && matchesSquad && matchesPosition && matchesAvailability;
     });
 
-    const positionOrder: Record<string, number> = { "GK": 1, "DEF": 2, "LB": 3, "CB": 4, "RB": 5, "LWB": 6, "RWB": 7, "CDM": 8, "MID": 9, "CM": 10, "LM": 11, "RM": 12, "CAM": 13, "LW": 14, "RW": 15, "FWD": 16, "CF": 17, "ST": 18 };
+    const positionOrder: Record<string, number> = { "GK": 1, "DEF": 2, "LB": 3, "CB": 4, "LCB": 5, "RCB": 6, "RB": 7, "LWB": 8, "RWB": 9, "CDM": 10, "MID": 11, "CM": 12, "LM": 13, "RM": 14, "CAM": 15, "LW": 16, "RW": 17, "FWD": 18, "CF": 19, "ST": 20 };
     const sortedPlayers = [...filteredPlayers].sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));
 
     const handleEdit = (player: Player) => { 
@@ -843,6 +843,8 @@ export default function SquadPage() {
                                     <option value="LB">Left Back (LB)</option>
                                     <option value="LWB">Left Wing Back (LWB)</option>
                                     <option value="CB">Centre Back (CB)</option>
+                                    <option value="LCB">Left Centre Back (LCB)</option>
+                                    <option value="RCB">Right Centre Back (RCB)</option>
                                     <option value="RB">Right Back (RB)</option>
                                     <option value="RWB">Right Wing Back (RWB)</option>
                                     <option value="CDM">Defensive Mid (CDM)</option>
@@ -857,7 +859,7 @@ export default function SquadPage() {
                             <div className="space-y-1.5">
                                  <label className="block text-xs font-medium text-slate-500">Secondary Positions (Select Multiple)</label>
                                  <div className="flex flex-wrap gap-1.5 max-h-[160px] overflow-y-auto p-1 bg-slate-50 rounded border border-slate-200">
-                                     {(["GK", "LB", "LWB", "CB", "RB", "RWB", "CDM", "CM", "CAM", "LM", "RM", "LW", "RW", "CF", "ST"] as const)
+                                     {(["GK", "LB", "LWB", "CB", "LCB", "RCB", "RB", "RWB", "CDM", "CM", "CAM", "LM", "RM", "LW", "RW", "CF", "ST"] as const)
                                          .filter(pos => pos !== editingPlayer.position)
                                          .map(pos => {
                                              const isSelected = (editingPlayer.secondaryPositions || []).includes(pos);
