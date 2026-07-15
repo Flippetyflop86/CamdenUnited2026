@@ -16,6 +16,7 @@ export const ALL_PAGE_PERMISSIONS: PagePermission[] = [
     { key: "training",    label: "Training",       href: "/training",    description: "Training sessions and plans",     group: "On the Pitch" },
     { key: "matches",     label: "Fixtures",       href: "/matches",     description: "Fixtures and results",            group: "On the Pitch" },
     { key: "matchday-xi", label: "Matchday XI",    href: "/matchday-xi", description: "Lineup and tactics board",        group: "On the Pitch" },
+    { key: "squad-depth", label: "Squad Depth",    href: "/squad-depth", description: "Long-term squad depth planner",    group: "On the Pitch" },
     // Analysis
     { key: "analysis",   label: "Match Analysis",     href: "/analysis",   description: "Post-match video analysis",     group: "Analysis" },
     { key: "opposition", label: "Opposition Reports", href: "/opposition", description: "Scouting and opposition notes", group: "Analysis" },
