@@ -58,6 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const fetchClubMembership = async (userId: string) => {
+        setIsLoading(true);
         setGlobalClubId(null);
         try {
             const { data, error } = await supabase
@@ -135,12 +136,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (session?.user) {
                 // Clear any stored browser settings/states when switching user accounts to prevent leaks
                 if (typeof window !== 'undefined') {
-                    sessionStorage.clear();
-                    for (let i = localStorage.length - 1; i >= 0; i--) {
-                        const key = localStorage.key(i);
-                        if (key && key.startsWith('clubflow_')) {
-                            localStorage.removeItem(key);
+                    try {
+                        sessionStorage.clear();
+                        for (let i = localStorage.length - 1; i >= 0; i--) {
+                            const key = localStorage.key(i);
+                            if (key && key.startsWith('clubflow_')) {
+                                localStorage.removeItem(key);
+                            }
                         }
+                    } catch (e) {
+                        console.warn("Storage cleanup failed:", e);
                     }
                 }
                 fetchClubMembership(session.user.id);

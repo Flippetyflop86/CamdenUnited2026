@@ -6,13 +6,14 @@ import { Menu, LayoutDashboard, Users, Activity, CreditCard, Search, Plus, UserP
 import Link from "next/link";
 import { useClub } from "@/context/club-context";
 import { cn } from "@/lib/utils";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { PageGuard } from "@/components/layout/page-guard";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const { settings, isLoaded } = useClub();
     const pathname = usePathname();
+    const router = useRouter();
     const [isFabOpen, setIsFabOpen] = useState(false);
 
     const cleanPath = pathname?.endsWith("/") && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
@@ -23,11 +24,9 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         if (isLoaded && !settings.isOnboarded && !isNoShellPage) {
-            if (typeof window !== 'undefined') {
-                window.location.href = '/onboarding';
-            }
+            router.push('/onboarding');
         }
-    }, [isLoaded, settings.isOnboarded, isNoShellPage]);
+    }, [isLoaded, settings.isOnboarded, isNoShellPage, router]);
 
     if (isNoShellPage) {
         return <main className="min-h-screen bg-slate-50">{children}</main>;
