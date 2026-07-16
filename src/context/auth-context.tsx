@@ -167,14 +167,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const signOut = async () => {
-        await supabase.auth.signOut();
+        try {
+            await supabase.auth.signOut();
+        } catch (e) {
+            console.error("Supabase signOut error:", e);
+        }
         if (typeof window !== 'undefined') {
-            sessionStorage.clear();
-            for (let i = localStorage.length - 1; i >= 0; i--) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('clubflow_')) {
-                    localStorage.removeItem(key);
+            try {
+                sessionStorage.clear();
+                for (let i = localStorage.length - 1; i >= 0; i--) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('clubflow_')) {
+                        localStorage.removeItem(key);
+                    }
                 }
+            } catch (e) {
+                console.warn("Storage cleanup on sign out failed:", e);
             }
         }
         router.push("/login");
