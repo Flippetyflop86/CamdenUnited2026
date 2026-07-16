@@ -61,41 +61,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsLoading(true);
         setGlobalClubId(null);
         try {
-            let query = supabase
-                .from("club_members")
-                .select("id, club_id, role, page_permissions, display_name, user_id");
+            const { data: { session } } = await supabase.auth.getSession();
+            const token = session?.access_token;
 
-            if (userEmail) {
-                query = query.or(`user_id.eq.${userId},email.eq.${userEmail}`);
-            } else {
-                query = query.eq("user_id", userId);
+            if (!token) {
+                console.warn("No access token found for membership fetch");
+                setIsLoading(false);
+                return;
             }
 
-            const { data, error } = await query.maybeSingle();
-
-            console.log("fetchClubMembership resolved:", { userId, userEmail, data, error });
-
-            const isAbortError = 
-                error && (
-                    (error as any).name === 'AbortError' || 
-                    error.message?.includes('AbortError') || 
-                    error.message?.includes('signal is aborted')
-                );
-
-            if (error && error.code !== 'PGRST116' && !isAbortError) {
-                console.error("Error fetching club membership:", error.message, error.details, error.hint, error.code);
-            }
-
-            if (data) {
-                // Auto-heal / sync user_id in database if it mismatches
-                if (data.user_id !== userId) {
-                    console.log("Syncing user_id in club_members for email:", userEmail);
-                    await supabase
-                        .from("club_members")
-                        .update({ user_id: userId })
-                        .eq("id", data.id);
+            const res = await fetch("/api/auth/sync", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
                 }
+            });
 
+            if (!res.ok) {
+                throw new Error(`Sync API failed with status ${res.status}`);
+            }
+
+            const result = await res.json();
+            console.log("fetchClubMembership API resolved:", { userId, userEmail, result });
+
+            if (result.success && result.membership) {
+                const data = result.membership;
                 setClubId(data.club_id);
                 setGlobalClubId(data.club_id);
                 setRole(data.role ? data.role.toLowerCase() : null);
