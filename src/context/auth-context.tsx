@@ -75,7 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
-                }
+                },
+                keepalive: true
             });
 
             if (!res.ok) {
@@ -131,9 +132,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             } else {
                 console.warn("No membership found in club_members table for user_id:", userId, "email:", userEmail);
             }
-        } catch (error) {
+            setIsLoading(false);
+        } catch (error: any) {
+            const isAbort = error.name === 'AbortError' || error.message?.includes('aborted') || error.message?.includes('signal is aborted');
+            if (isAbort) {
+                console.log("fetchClubMembership request was aborted, ignoring...");
+                return;
+            }
             console.error("Failed to load club membership:", error);
-        } finally {
             setIsLoading(false);
         }
     };
