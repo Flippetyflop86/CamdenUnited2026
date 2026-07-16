@@ -25,10 +25,20 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const isNoShellPage = isAuthPage || isOnboardingPage || isPublicCheckin;
 
     useEffect(() => {
+        console.warn("AppShell redirect check:", {
+            authLoading,
+            isLoaded,
+            isLoggingOut,
+            userId: user?.id,
+            role,
+            isOnboarded: settings?.isOnboarded,
+            isNoShellPage
+        });
         if (authLoading || !isLoaded || isLoggingOut) return;
         
         const needsOnboarding = !!user && ((role && !settings.isOnboarded) || !role);
         if (needsOnboarding && !isNoShellPage) {
+            console.warn("AppShell redirect check passed! Redirecting to /onboarding...");
             router.push('/onboarding');
         }
     }, [isLoaded, settings.isOnboarded, isNoShellPage, router, authLoading, role, user, isLoggingOut]);
