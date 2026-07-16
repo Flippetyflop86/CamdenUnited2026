@@ -94,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const { data: fallbackData, error: fallbackError } = await supabase
                     .from("club_members")
                     .select("id, club_id, role, page_permissions, display_name, user_id")
-                    .or(`user_id.eq.${userId},email.eq.${userEmail}`)
+                    .or(`user_id.eq.${userId},email.ilike.${userEmail}`)
                     .maybeSingle();
 
                 if (fallbackError) {

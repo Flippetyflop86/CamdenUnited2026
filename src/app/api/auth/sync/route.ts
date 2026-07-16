@@ -35,7 +35,7 @@ export async function POST(request: Request) {
         const { data: member, error: memberError } = await supabase
             .from("club_members")
             .select("id, club_id, role, page_permissions, display_name, user_id")
-            .or(`user_id.eq.${user.id},email.eq.${user.email}`)
+            .or(`user_id.eq.${user.id},email.ilike.${user.email}`)
             .maybeSingle();
 
         if (memberError) {
