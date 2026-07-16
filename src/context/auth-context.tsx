@@ -85,8 +85,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const result = await res.json();
             console.log("fetchClubMembership API resolved:", { userId, userEmail, result });
 
-            if (result.success && result.membership) {
-                const data = result.membership;
+            let finalMember = result.success ? result.membership : null;
+
+            // Client-side fallback if backend API didn't resolve a membership (e.g. Service Role Key not set on host)
+            if (!finalMember) {
+                console.log("Sync API did not return membership, attempting client-side fallback query...");
+                const { data: fallbackData, error: fallbackError } = await supabase
+                    .from("club_members")
+                    .select("id, club_id, role, page_permissions, display_name, user_id")
+                    .or(`user_id.eq.${userId},email.eq.${userEmail}`)
+                    .maybeSingle();
+
+                if (fallbackError) {
+                    console.error("Client-side fallback query failed:", fallbackError);
+                }
+
+                if (fallbackData) {
+                    console.log("Client-side fallback query succeeded:", fallbackData);
+                    
+                    // Client-side auto-heal update (allowed if RLS email policy is active)
+                    if (fallbackData.user_id !== userId) {
+                        console.log("Auto-healing user_id on client for email:", userEmail);
+                        await supabase
+                            .from("club_members")
+                            .update({ user_id: userId })
+                            .eq("id", fallbackData.id);
+                    }
+
+                    finalMember = {
+                        club_id: fallbackData.club_id,
+                        role: fallbackData.role,
+                        page_permissions: fallbackData.page_permissions || [],
+                        display_name: fallbackData.display_name || null
+                    };
+                }
+            }
+
+            if (finalMember) {
+                const data = finalMember;
                 setClubId(data.club_id);
                 setGlobalClubId(data.club_id);
                 setRole(data.role ? data.role.toLowerCase() : null);
