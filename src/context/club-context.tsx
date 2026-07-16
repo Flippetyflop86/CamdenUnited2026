@@ -175,6 +175,12 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                     .eq("id", clubId)
                     .maybeSingle();
 
+                console.log("fetchSettings resolved:", { clubId, data, error });
+
+                if (error) {
+                    console.error("Postgres error fetching club settings:", error);
+                }
+
                 if (data) {
                     setSettings({
                         name: data.name || "My Club",

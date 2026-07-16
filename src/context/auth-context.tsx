@@ -67,6 +67,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 .eq("user_id", userId)
                 .single();
 
+            console.log("fetchClubMembership resolved:", { userId, data, error });
+
             const isAbortError = 
                 error && (
                     (error as any).name === 'AbortError' || 
@@ -84,6 +86,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setRole(data.role ? data.role.toLowerCase() : null);
                 setPagePermissions(data.page_permissions || []);
                 setDisplayName(data.display_name || null);
+            } else {
+                console.warn("No membership found in club_members table for user_id:", userId);
             }
         } catch (error) {
             console.error("Failed to load club membership:", error);
