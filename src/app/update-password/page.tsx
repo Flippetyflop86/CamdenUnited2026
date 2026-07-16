@@ -55,27 +55,17 @@ export default function UpdatePasswordPage() {
             });
 
             if (error) {
-                const isAbort = error.message?.includes("aborted") || error.name === "AbortError";
-                if (!isAbort) {
-                    throw error;
-                }
+                throw error;
             }
 
-            setMessage("Your password has been updated successfully.");
+            setMessage("Your password has been updated successfully. Redirecting to login...");
             
             setTimeout(() => {
                 router.push("/login");
             }, 3000);
         } catch (err: any) {
-            const isAbort = err.message?.includes("aborted") || err.name === "AbortError" || err.message?.includes("signal is aborted");
-            if (isAbort) {
-                setMessage("Your password has been updated successfully.");
-                setTimeout(() => {
-                    router.push("/login");
-                }, 3000);
-            } else {
-                setError(err.message || "Failed to update password.");
-            }
+            console.error("Password update error:", err);
+            setError(err.message || "Failed to update password. Please request a new recovery link.");
         } finally {
             setLoading(false);
         }
