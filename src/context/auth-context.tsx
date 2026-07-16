@@ -84,13 +84,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             const result = await res.json();
-            console.log("fetchClubMembership API resolved:", { userId, userEmail, result });
+            console.warn("fetchClubMembership API resolved:", { userId, userEmail, result });
 
             let finalMember = result.success ? result.membership : null;
 
             // Client-side fallback if backend API didn't resolve a membership (e.g. Service Role Key not set on host)
             if (!finalMember) {
-                console.log("Sync API did not return membership, attempting client-side fallback query...");
+                console.warn("Sync API did not return membership, attempting client-side fallback query...");
                 const { data: fallbackData, error: fallbackError } = await supabase
                     .from("club_members")
                     .select("id, club_id, role, page_permissions, display_name, user_id")
@@ -102,11 +102,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
 
                 if (fallbackData) {
-                    console.log("Client-side fallback query succeeded:", fallbackData);
+                    console.warn("Client-side fallback query succeeded:", fallbackData);
                     
                     // Client-side auto-heal update (allowed if RLS email policy is active)
                     if (fallbackData.user_id !== userId) {
-                        console.log("Auto-healing user_id on client for email:", userEmail);
+                        console.warn("Auto-healing user_id on client for email:", userEmail);
                         await supabase
                             .from("club_members")
                             .update({ user_id: userId })
