@@ -27,7 +27,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (authLoading || !isLoaded || isLoggingOut) return;
         
-        const needsOnboarding = (role && !settings.isOnboarded) || (user && !role);
+        const needsOnboarding = !!user && ((role && !settings.isOnboarded) || !role);
         if (needsOnboarding && !isNoShellPage) {
             router.push('/onboarding');
         }
