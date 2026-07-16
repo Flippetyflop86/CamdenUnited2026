@@ -149,29 +149,29 @@ export default function LoginPage() {
                 {/* Grid pattern overlay */}
                 <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e293b_1px,transparent_1px),linear-gradient(to_bottom,#1e293b_1px,transparent_1px)] bg-[size:5rem_5rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_50%,#000_70%,transparent_100%)] opacity-[0.12]" />
                 
-                <svg className="absolute w-full h-full text-slate-700 stroke-current opacity-[0.04]" fill="none" strokeWidth="1.5">
+                <svg viewBox="0 0 1000 1000" className="absolute w-full h-full text-slate-700 stroke-current opacity-[0.04]" fill="none" strokeWidth="1.5">
                     {/* Center circle */}
-                    <circle cx="50%" cy="50%" r="150" strokeDasharray="6 6" />
-                    <circle cx="50%" cy="50%" r="5" fill="currentColor" />
+                    <circle cx="500" cy="500" r="150" strokeDasharray="6 6" />
+                    <circle cx="500" cy="500" r="5" fill="currentColor" />
                     
                     {/* Halfway line */}
-                    <line x1="0" y1="50%" x2="100%" y2="50%" />
+                    <line x1="0" y1="500" x2="1000" y2="500" />
                     
                     {/* Penalty box at top */}
-                    <rect x="calc(50% - 250px)" y="0" width="500" height="200" />
-                    <rect x="calc(50% - 100px)" y="0" width="200" height="70" />
-                    <path d="M calc(50% - 80px) 200 A 80 80 0 0 0 calc(50% + 80px) 200" strokeDasharray="4 4" />
+                    <rect x="250" y="0" width="500" height="200" />
+                    <rect x="400" y="0" width="200" height="70" />
+                    <path d="M 420 200 A 80 80 0 0 0 580 200" strokeDasharray="4 4" />
                     
                     {/* Penalty box at bottom */}
-                    <rect x="calc(50% - 250px)" y="calc(100% - 200px)" width="500" height="200" />
-                    <rect x="calc(50% - 100px)" y="calc(100% - 70px)" width="200" height="70" />
-                    <path d="M calc(50% - 80px) calc(100% - 200px) A 80 80 0 0 1 calc(50% + 80px) calc(100% - 200px)" strokeDasharray="4 4" />
+                    <rect x="250" y="800" width="500" height="200" />
+                    <rect x="400" y="930" width="200" height="70" />
+                    <path d="M 420 800 A 80 80 0 0 1 580 800" strokeDasharray="4 4" />
                     
                     {/* Tactical arrows / paths with animating classes */}
-                    <path d="M 20% 30% Q 30% 20% 45% 35%" className="tactical-flow-1" markerEnd="url(#arrow)" />
-                    <path d="M 80% 40% Q 65% 30% 55% 45%" className="tactical-flow-2" markerEnd="url(#arrow)" />
-                    <path d="M 30% 70% Q 40% 60% 50% 52%" className="tactical-flow-3" markerEnd="url(#arrow)" stroke="#ef4444" strokeWidth="2" />
-                    <path d="M 60% 80% Q 75% 75% 85% 60%" className="tactical-flow-1" markerEnd="url(#arrow)" />
+                    <path d="M 200 300 Q 300 200 450 355" className="tactical-flow-1" markerEnd="url(#arrow)" />
+                    <path d="M 800 400 Q 650 300 550 455" className="tactical-flow-2" markerEnd="url(#arrow)" />
+                    <path d="M 300 700 Q 400 600 500 520" className="tactical-flow-3" markerEnd="url(#arrow)" stroke="#ef4444" strokeWidth="2" />
+                    <path d="M 600 800 Q 750 755 850 600" className="tactical-flow-1" markerEnd="url(#arrow)" />
 
                     {/* Tactical Player Nodes with floating and pulse animations */}
                     <g className="float-node-1">
