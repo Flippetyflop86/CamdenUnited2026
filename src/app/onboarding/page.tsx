@@ -235,7 +235,9 @@ export default function OnboardingWizard() {
     ]);
 
     useEffect(() => {
+        console.warn("Onboarding redirect check:", { isLoaded, isOnboarded: settings?.isOnboarded, step });
         if (isLoaded && settings?.isOnboarded && step !== 8) {
+            console.warn("Onboarding redirect check passed! Redirecting to /dashboard...");
             router.push('/dashboard');
         }
     }, [isLoaded, settings, step, router]);
