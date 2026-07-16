@@ -57,17 +57,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                cleanPath.startsWith("/respond");
     };
 
-    const fetchClubMembership = async (userId: string) => {
+    const fetchClubMembership = async (userId: string, userEmail?: string) => {
         setIsLoading(true);
         setGlobalClubId(null);
         try {
-            const { data, error } = await supabase
+            let query = supabase
                 .from("club_members")
-                .select("club_id, role, page_permissions, display_name")
-                .eq("user_id", userId)
-                .single();
+                .select("id, club_id, role, page_permissions, display_name, user_id");
 
-            console.log("fetchClubMembership resolved:", { userId, data, error });
+            if (userEmail) {
+                query = query.or(`user_id.eq.${userId},email.eq.${userEmail}`);
+            } else {
+                query = query.eq("user_id", userId);
+            }
+
+            const { data, error } = await query.maybeSingle();
+
+            console.log("fetchClubMembership resolved:", { userId, userEmail, data, error });
 
             const isAbortError = 
                 error && (
@@ -81,13 +87,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             if (data) {
+                // Auto-heal / sync user_id in database if it mismatches
+                if (data.user_id !== userId) {
+                    console.log("Syncing user_id in club_members for email:", userEmail);
+                    await supabase
+                        .from("club_members")
+                        .update({ user_id: userId })
+                        .eq("id", data.id);
+                }
+
                 setClubId(data.club_id);
                 setGlobalClubId(data.club_id);
                 setRole(data.role ? data.role.toLowerCase() : null);
                 setPagePermissions(data.page_permissions || []);
                 setDisplayName(data.display_name || null);
             } else {
-                console.warn("No membership found in club_members table for user_id:", userId);
+                console.warn("No membership found in club_members table for user_id:", userId, "email:", userEmail);
             }
         } catch (error) {
             console.error("Failed to load club membership:", error);
@@ -98,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Exposed so the admin panel can trigger a re-fetch after changing permissions
     const refreshPermissions = async () => {
-        if (user) await fetchClubMembership(user.id);
+        if (user) await fetchClubMembership(user.id, user.email);
     };
 
     useEffect(() => {
@@ -116,7 +131,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSession(session);
             setUser(session?.user ?? null);
             if (session?.user) {
-                fetchClubMembership(session.user.id);
+                fetchClubMembership(session.user.id, session.user.email);
             } else {
                 setIsLoading(false);
                 if (!isPublicPage(pathnameRef.current)) {
@@ -152,7 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         console.warn("Storage cleanup failed:", e);
                     }
                 }
-                fetchClubMembership(session.user.id);
+                fetchClubMembership(session.user.id, session.user.email);
             } else {
                 setClubId(null);
                 setGlobalClubId(null);
