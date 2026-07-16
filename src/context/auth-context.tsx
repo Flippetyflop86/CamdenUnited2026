@@ -14,6 +14,7 @@ interface AuthContextType {
     isManager: boolean;        // Shorthand: true if role === 'manager'
     displayName: string | null;
     isLoading: boolean;
+    isLoggingOut: boolean;
     signOut: () => Promise<void>;
     refreshPermissions: () => Promise<void>; // Call after admin changes permissions
 }
@@ -28,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [pagePermissions, setPagePermissions] = useState<string[]>([]);
     const [displayName, setDisplayName] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     const router = useRouter();
     const pathname = usePathname();
@@ -186,6 +188,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSession(session);
             setUser(session?.user ?? null);
             if (session?.user) {
+                setIsLoggingOut(false);
                 // Clear any stored browser settings/states when switching user accounts to prevent leaks
                 if (typeof window !== 'undefined') {
                     try {
@@ -219,6 +222,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, []);
 
     const signOut = async () => {
+        setIsLoggingOut(true);
         try {
             await supabase.auth.signOut();
         } catch (e) {
@@ -245,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return (
         <AuthContext.Provider value={{
             user, session, clubId, role, pagePermissions, isManager,
-            displayName, isLoading, signOut, refreshPermissions
+            displayName, isLoading, isLoggingOut, signOut, refreshPermissions
         }}>
             {children}
         </AuthContext.Provider>

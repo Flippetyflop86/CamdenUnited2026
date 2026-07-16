@@ -15,7 +15,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const { settings, isLoaded } = useClub();
     const pathname = usePathname();
     const router = useRouter();
-    const { role, isLoading: authLoading } = useAuth();
+    const { user, role, isLoading: authLoading, isLoggingOut } = useAuth();
     const [isFabOpen, setIsFabOpen] = useState(false);
 
     const cleanPath = pathname?.endsWith("/") && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
@@ -25,11 +25,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const isNoShellPage = isAuthPage || isOnboardingPage || isPublicCheckin;
 
     useEffect(() => {
-        if (authLoading) return;
-        if (isLoaded && !settings.isOnboarded && !isNoShellPage) {
+        if (authLoading || !isLoaded || isLoggingOut) return;
+        
+        const needsOnboarding = (role && !settings.isOnboarded) || (user && !role);
+        if (needsOnboarding && !isNoShellPage) {
             router.push('/onboarding');
         }
-    }, [isLoaded, settings.isOnboarded, isNoShellPage, router, authLoading]);
+    }, [isLoaded, settings.isOnboarded, isNoShellPage, router, authLoading, role, user, isLoggingOut]);
 
     if (isNoShellPage) {
         return <main className="min-h-screen bg-slate-50">{children}</main>;
