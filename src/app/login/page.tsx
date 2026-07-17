@@ -251,7 +251,7 @@ export default function LoginPage() {
                                 className={`px-5 py-2.5 rounded-full text-xs font-semibold tracking-wide transition-all duration-200 border ${
                                     activeTab === idx
                                         ? "bg-white text-slate-950 border-white shadow-lg font-bold scale-[1.02]"
-                                        : "bg-slate-900/60 text-slate-450 border-slate-800 hover:border-slate-700 hover:text-white hover:bg-slate-800/40"
+                                        : "bg-slate-900/60 text-slate-300 border-slate-800 hover:border-slate-700 hover:text-white hover:bg-slate-800/40"
                                 }`}
                             >
                                 {tab.label}
@@ -260,9 +260,10 @@ export default function LoginPage() {
                     </div>
 
                     {/* Tab description text */}
-                    <p className="text-slate-350 text-xs leading-relaxed max-w-xl min-h-[36px]">
+                    <p className="text-slate-300 text-xs leading-relaxed max-w-xl min-h-[36px]">
                         {tourTabs[activeTab].description}
-                    </p>                    <div className="w-full relative rounded-xl overflow-hidden border border-[#1f293d]/55 bg-[#0b0f19] backdrop-blur-sm transition-all duration-300 shadow-2xl shadow-black/90">
+                    </p>
+                    <div className="w-full relative rounded-xl overflow-hidden border border-[#1f293d]/55 bg-[#0b0f19] backdrop-blur-sm transition-all duration-300 shadow-2xl shadow-black/90">
                         {/* Subtle Browser Header Bar */}
                         <div className="h-8 bg-[#121824] border-b border-[#1f293d]/40 px-4 flex items-center justify-between">
                             <div className="flex items-center gap-1.5">
@@ -276,204 +277,380 @@ export default function LoginPage() {
                             <div className="w-10" /> {/* Spacer */}
                         </div>
 
-                        {/* Browser Viewport Content Area */}
-                        <div className={`bg-[#0b0f19] text-slate-100 min-h-[460px] overflow-hidden flex flex-col justify-start text-left relative ${(activeTab === 3 || activeTab === 0) ? 'p-6' : 'p-0'}`}>
-                            {activeTab === 0 && (
-                                <div className="space-y-4 animate-in fade-in duration-200 text-gray-200 text-left text-[9px] bg-[#030712] p-5 rounded-xl border border-gray-800 w-full">
-                                    {/* Mockup Header */}
-                                    <div className="flex justify-between items-center border-b border-gray-800 pb-2.5">
-                                        <div className="flex items-center gap-2">
-                                            <div className="h-6 w-6 rounded-lg bg-gray-950 border border-gray-800 flex items-center justify-center font-bold text-red-500 text-[10px]">
-                                                CU
-                                            </div>
+                        {/* Browser Layout with Sidebar and Content Viewport */}
+                        <div className="flex h-[460px] text-slate-100 overflow-hidden bg-[#070a13]">
+                            
+                            {/* Left Sidebar */}
+                            <div className="w-44 flex-shrink-0 bg-[#0b0f19] border-r border-[#1f293d]/40 p-3 flex flex-col justify-between text-[11px] font-sans antialiased subpixel-antialiased">
+                                <div className="space-y-4">
+                                    {/* Logo */}
+                                    <div className="flex items-center gap-1.5 px-1 pb-2 border-b border-[#1f293d]/30">
+                                        <div className="h-5 w-5 rounded bg-red-650 flex items-center justify-center font-bold text-white text-[10px]">CF</div>
+                                        <span className="font-extrabold text-[12px] text-white tracking-wider">ClubFlow</span>
+                                    </div>
+                                    
+                                    {/* Dropdowns Mockup */}
+                                    <div className="space-y-1">
+                                        <div className="bg-[#121824] px-2 py-1 rounded border border-[#1f293d]/50 text-slate-300 font-bold flex justify-between items-center text-[9px]">
+                                            <span>First Team</span>
+                                            <span className="text-[7px] text-slate-500">▼</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Links */}
+                                    <div className="space-y-0.5">
+                                        <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest block px-1.5 pb-1">Operations</span>
+                                        {[
+                                            { id: 0, label: "Dashboard", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
+                                            { id: 1, label: "Matchday XI", icon: <Calendar className="h-3.5 w-3.5" /> },
+                                            { id: 2, label: "Squad", icon: <Users className="h-3.5 w-3.5" /> },
+                                            { id: 3, label: "Club Finances", icon: <CreditCard className="h-3.5 w-3.5" /> },
+                                            { id: 4, label: "Training", icon: <Activity className="h-3.5 w-3.5" /> }
+                                        ].map((item) => (
+                                            <button
+                                                key={item.id}
+                                                type="button"
+                                                onClick={() => setActiveTab(item.id)}
+                                                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded font-bold transition-all text-left ${
+                                                    activeTab === item.id 
+                                                        ? "bg-red-500/10 text-red-400 border border-red-500/20" 
+                                                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-900/60"
+                                                }`}
+                                            >
+                                                {item.icon}
+                                                <span>{item.label}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="text-slate-500 text-[8px] px-1 font-bold">
+                                    Camden United FC
+                                </div>
+                            </div>
+
+                            {/* Main Content Area */}
+                            <div className="flex-1 overflow-y-auto p-5 bg-[#030712] relative font-sans antialiased subpixel-antialiased text-left">
+                                {activeTab === 0 && (
+                                    <div className="space-y-4 animate-in fade-in duration-200 w-full text-slate-200">
+                                        {/* Mockup Header */}
+                                        <div className="flex justify-between items-center border-b border-gray-800 pb-3">
                                             <div>
-                                                <div className="flex items-center gap-1.5">
-                                                    <h3 className="text-[10px] font-black text-white leading-none">ClubFlow United</h3>
-                                                    <span className="bg-red-500/10 text-red-400 border border-red-500/20 text-[7px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded">
+                                                <div className="flex items-center gap-2">
+                                                    <h3 className="text-sm font-black text-white">Camden United</h3>
+                                                    <span className="bg-red-500/10 text-red-400 border border-red-500/20 text-[8px] uppercase tracking-wider font-extrabold px-2 py-0.5 rounded">
                                                         Operations Command Centre
                                                     </span>
                                                 </div>
-                                                <p className="text-gray-400 text-[8px] mt-0.5">Squad Management &amp; Operational Analytics</p>
+                                                <p className="text-gray-450 text-[10px] mt-0.5">Squad Management &amp; Operational Analytics</p>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    {/* Three Mini Cards */}
-                                    <div className="grid gap-2 grid-cols-3">
-                                        <div className="bg-[#0b0f19] border border-gray-800 p-2 rounded-lg space-y-1">
-                                            <span className="text-[7px] font-bold uppercase text-gray-400">Squad Availability</span>
-                                            <div className="text-[9px] font-black text-white">33 / 36 Available (92%)</div>
+                                        {/* Three Mini Cards */}
+                                        <div className="grid gap-3 grid-cols-3">
+                                            <div className="bg-[#0b0f19] border border-gray-800 p-3 rounded-xl space-y-1">
+                                                <span className="text-[9px] font-bold uppercase text-gray-400 block">Squad Availability</span>
+                                                <div className="text-xs font-black text-white">33 / 36 Available (92%)</div>
+                                            </div>
+                                            <div className="bg-[#0b0f19] border border-gray-800 p-3 rounded-xl space-y-1">
+                                                <span className="text-[9px] font-bold uppercase text-gray-400 block">Registration Alerts</span>
+                                                <div className="text-xs font-black text-amber-400">2 Outstanding</div>
+                                            </div>
+                                            <div className="bg-[#0b0f19] border border-gray-800 p-3 rounded-xl space-y-1">
+                                                <span className="text-[9px] font-bold uppercase text-gray-400 block">Unpaid Invoices</span>
+                                                <div className="text-xs font-black text-red-450 text-red-400">£450.00</div>
+                                            </div>
                                         </div>
-                                        <div className="bg-[#0b0f19] border border-gray-800 p-2 rounded-lg space-y-1">
-                                            <span className="text-[7px] font-bold uppercase text-gray-400">Registration Alerts</span>
-                                            <div className="text-[9px] font-black text-amber-400">2 Outstanding</div>
-                                        </div>
-                                        <div className="bg-[#0b0f19] border border-gray-800 p-2 rounded-lg space-y-1">
-                                            <span className="text-[7px] font-bold uppercase text-gray-400">Unpaid Invoices</span>
-                                            <div className="text-[9px] font-black text-red-400">£450.00</div>
-                                        </div>
-                                    </div>
 
-                                    {/* Core Layout Grid */}
-                                    <div className="grid gap-3 grid-cols-7">
-                                        {/* Left Side: Next Fixture & Starting XI (4 spans) */}
-                                        <div className="col-span-4 space-y-3">
-                                            <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-2">
-                                                <span className="text-[8px] font-bold uppercase text-white">Next Fixture</span>
-                                                <div className="bg-slate-950 p-2 rounded-lg border border-gray-850 flex justify-between items-center text-[8px]">
-                                                    <div>
-                                                        <span className="font-bold text-white">vs Western Athletic</span>
-                                                        <div className="text-[7px] text-gray-400 mt-0.5">Isthmian League • 🌱 Natural Grass</div>
+                                        {/* Core Layout Grid */}
+                                        <div className="grid gap-4 grid-cols-1 lg:grid-cols-5">
+                                            {/* Left Side: Next Fixture & Starting XI */}
+                                            <div className="lg:col-span-3 space-y-4">
+                                                <div className="bg-[#0b0f19] border border-gray-800 p-3 rounded-xl space-y-2">
+                                                    <span className="text-[10px] font-bold uppercase text-white tracking-wider block">Next Fixture</span>
+                                                    <div className="bg-slate-950 p-2.5 rounded-lg border border-gray-800 flex justify-between items-center text-xs">
+                                                        <div>
+                                                            <span className="font-bold text-white text-sm">vs Western Athletic</span>
+                                                            <div className="text-[10px] text-gray-400 mt-0.5">Isthmian League • 🌱 Natural Grass</div>
+                                                        </div>
+                                                        <span className="text-white font-bold bg-slate-900 px-2 py-1 rounded">16 Jul • 14:00</span>
                                                     </div>
-                                                    <span className="text-white font-bold">16 Jul • 14:00</span>
+                                                </div>
+
+                                                <div className="bg-[#0b0f19] border border-gray-800 p-3 rounded-xl space-y-2">
+                                                    <span className="text-[10px] font-bold uppercase text-white tracking-wider block">Starting Selection XI</span>
+                                                    
+                                                    {/* Pitch mock map */}
+                                                    <div className="relative bg-emerald-950/80 rounded-xl h-[160px] border border-emerald-900/60 overflow-hidden p-1">
+                                                        {/* GK */}
+                                                        <div className="absolute top-1 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                                                            <div className="w-4 h-4 rounded-full bg-orange-600 border border-white/20 flex items-center justify-center text-[7px] text-white font-bold">1</div>
+                                                            <span className="text-[7px] text-white bg-slate-950/85 px-1 rounded mt-0.5">David</span>
+                                                        </div>
+                                                        {/* DEF */}
+                                                        <div className="absolute top-[35%] left-0 right-0 flex justify-around px-4">
+                                                            <div className="flex flex-col items-center">
+                                                                <div className="w-4 h-4 rounded-full bg-red-650 border border-white/20 flex items-center justify-center text-[7px] text-white font-bold">2</div>
+                                                                <span className="text-[7px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Fidel</span>
+                                                            </div>
+                                                            <div className="flex flex-col items-center">
+                                                                <div className="w-4 h-4 rounded-full bg-red-650 border border-white/20 flex items-center justify-center text-[7px] text-white font-bold">5</div>
+                                                                <span className="text-[7px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Ahmad</span>
+                                                            </div>
+                                                            <div className="flex flex-col items-center">
+                                                                <div className="w-4 h-4 rounded-full bg-red-650 border border-white/20 flex items-center justify-center text-[7px] text-white font-bold">3</div>
+                                                                <span className="text-[7px] text-white bg-slate-950/85 px-1 rounded mt-0.5">John</span>
+                                                            </div>
+                                                        </div>
+                                                        {/* MID */}
+                                                        <div className="absolute top-[60%] left-0 right-0 flex justify-around px-6">
+                                                            <div className="flex flex-col items-center">
+                                                                <div className="w-4 h-4 rounded-full bg-red-650 border border-white/20 flex items-center justify-center text-[7px] text-white font-bold">8</div>
+                                                                <span className="text-[7px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Chris</span>
+                                                            </div>
+                                                            <div className="flex flex-col items-center">
+                                                                <div className="w-4 h-4 rounded-full bg-red-650 border border-white/20 flex items-center justify-center text-[7px] text-white font-bold">7</div>
+                                                                <span className="text-[7px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Oliver</span>
+                                                            </div>
+                                                        </div>
+                                                        {/* FWD */}
+                                                        <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                                                            <div className="w-4 h-4 rounded-full bg-red-650 border border-white/20 flex items-center justify-center text-[7px] text-white font-bold">9</div>
+                                                            <span className="text-[7px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Shoaib</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
 
-                                            <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-2">
-                                                <span className="text-[8px] font-bold uppercase text-white font-semibold">Starting Selection XI</span>
-                                                
-                                                {/* Pitch mock map */}
-                                                <div className="relative bg-emerald-950/80 rounded-lg h-[160px] border border-emerald-900/60 overflow-hidden p-1">
-                                                    {/* GK */}
-                                                    <div className="absolute top-1 left-1/2 -translate-x-1/2 flex flex-col items-center">
-                                                        <div className="w-3.5 h-3.5 rounded-full bg-orange-600 border border-white/20 flex items-center justify-center text-[6px] text-white">1</div>
-                                                        <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">David</span>
-                                                    </div>
-                                                    {/* DEF */}
-                                                    <div className="absolute top-[35%] left-0 right-0 flex justify-around px-4">
-                                                        <div className="flex flex-col items-center">
-                                                            <div className="w-3.5 h-3.5 rounded-full bg-red-600 border border-white/20 flex items-center justify-center text-[6px] text-white">2</div>
-                                                            <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Fidel</span>
-                                                        </div>
-                                                        <div className="flex flex-col items-center">
-                                                            <div className="w-3.5 h-3.5 rounded-full bg-red-600 border border-white/20 flex items-center justify-center text-[6px] text-white">5</div>
-                                                            <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Ahmad</span>
-                                                        </div>
-                                                        <div className="flex flex-col items-center">
-                                                            <div className="w-3.5 h-3.5 rounded-full bg-red-600 border border-white/20 flex items-center justify-center text-[6px] text-white">3</div>
-                                                            <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">John</span>
-                                                        </div>
-                                                    </div>
-                                                    {/* MID */}
-                                                    <div className="absolute top-[60%] left-0 right-0 flex justify-around px-6">
-                                                        <div className="flex flex-col items-center">
-                                                            <div className="w-3.5 h-3.5 rounded-full bg-red-650 border border-white/20 flex items-center justify-center text-[6px] text-white">8</div>
-                                                            <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Chris</span>
-                                                        </div>
-                                                        <div className="flex flex-col items-center">
-                                                            <div className="w-3.5 h-3.5 rounded-full bg-red-650 border border-white/20 flex items-center justify-center text-[6px] text-white">7</div>
-                                                            <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Oliver</span>
-                                                        </div>
-                                                    </div>
-                                                    {/* FWD */}
-                                                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex flex-col items-center">
-                                                        <div className="w-3.5 h-3.5 rounded-full bg-red-650 border border-white/20 flex items-center justify-center text-[6px] text-white">9</div>
-                                                        <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Shoaib</span>
+                                            {/* Right Side: Performance Metrics & Contributors */}
+                                            <div className="lg:col-span-2 space-y-4">
+                                                <div className="bg-[#0b0f19] border border-gray-800 p-3 rounded-xl space-y-2">
+                                                    <span className="text-[10px] font-bold uppercase text-white tracking-wider block">Performance Metrics</span>
+                                                    <div className="bg-slate-955 p-3 rounded-lg border border-gray-800 space-y-1">
+                                                        <span className="text-[9px] text-gray-400 block uppercase font-bold">Training Attendance</span>
+                                                        <div className="text-lg font-black text-white leading-none">92%</div>
+                                                        <span className="text-[9px] text-gray-400 block mt-1">Last session: 15 Jul • Tactical Drills</span>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </div>
 
-                                        {/* Right Side: Performance Metrics & Contributors (3 spans) */}
-                                        <div className="col-span-3 space-y-3">
-                                            <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-2">
-                                                <span className="text-[8px] font-bold uppercase text-white">Performance Metrics</span>
-                                                <div className="bg-slate-950 p-2 rounded-lg border border-gray-850 space-y-1">
-                                                    <span className="text-[8px] text-gray-400 block uppercase font-bold">Training Attendance Tracking</span>
-                                                    <div className="text-[11px] font-black text-white leading-none">92%</div>
-                                                    <span className="text-[7px] text-gray-400 block mt-0.5">Last session: 15 Jul • Tactical Drills</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-2">
-                                                <span className="text-[8px] font-bold uppercase text-white font-semibold">Squad Contributors</span>
-                                                <div className="space-y-1">
-                                                    <span className="text-[7px] font-bold text-gray-400 block">⚽ Top Goalscorers</span>
-                                                    <div className="bg-slate-950 px-2 py-1 rounded border border-gray-850 flex justify-between text-[7px] font-semibold text-gray-200">
-                                                        <span>Liam Johnson</span>
-                                                        <span className="text-red-500 font-bold">12 Goals</span>
-                                                    </div>
-                                                    <div className="bg-slate-950 px-2 py-1 rounded border border-gray-850 flex justify-between text-[7px] font-semibold text-gray-200">
-                                                        <span>Harry Norling</span>
-                                                        <span className="text-red-500 font-bold">8 Goals</span>
+                                                <div className="bg-[#0b0f19] border border-gray-800 p-3 rounded-xl space-y-2">
+                                                    <span className="text-[10px] font-bold uppercase text-white tracking-wider block">Squad Contributors</span>
+                                                    <div className="space-y-1.5">
+                                                        <span className="text-[8px] font-bold text-gray-400 block">⚽ Top Goalscorers</span>
+                                                        <div className="bg-slate-950 px-2.5 py-1.5 rounded-lg border border-gray-800 flex justify-between text-xs font-semibold text-gray-200">
+                                                            <span>Liam Johnson</span>
+                                                            <span className="text-red-500 font-bold">12 Goals</span>
+                                                        </div>
+                                                        <div className="bg-slate-950 px-2.5 py-1.5 rounded-lg border border-gray-800 flex justify-between text-xs font-semibold text-gray-200">
+                                                            <span>Harry Norling</span>
+                                                            <span className="text-red-500 font-bold">8 Goals</span>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
-                            {activeTab === 1 && (
-                                <img 
-                                    src="/matchday-xi-screenshot.png" 
-                                    alt="Matchday XI & Tactics" 
-                                    className="w-full h-auto select-none object-contain animate-in fade-in duration-200"
-                                    style={{ imageRendering: "-webkit-optimize-contrast" }}
-                                />
-                            )}
-                            {activeTab === 2 && (
-                                <img 
-                                    src="/squad-management-screenshot.png" 
-                                    alt="Squad Management" 
-                                    className="w-full h-auto select-none object-contain animate-in fade-in duration-200"
-                                    style={{ imageRendering: "-webkit-optimize-contrast" }}
-                                />
-                            )}
-                            {activeTab === 3 && (
-                                <div className="space-y-4 animate-in fade-in duration-200 text-slate-200 text-left text-[10px]">
-                                    <div className="flex justify-between items-center border-b border-[#1f293d] pb-2">
-                                        <div>
-                                            <h3 className="text-xs font-black text-white tracking-tight flex items-center gap-1.5">
-                                                <Wallet className="h-4 w-4 text-red-500" />
-                                                Player Payments
-                                            </h3>
-                                            <p className="text-[9px] text-slate-450 leading-none mt-0.5">Manage subscriptions, match fees, and collect card payments.</p>
-                                        </div>
-                                    </div>
+                                )}
 
-                                    {/* Stripe Connect Connected Banner */}
-                                    <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-xl p-2.5 flex justify-between items-center text-[9px] text-emerald-300">
-                                        <div className="flex items-center gap-2">
-                                            <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                                {activeTab === 1 && (
+                                    <div className="space-y-4 animate-in fade-in duration-200 w-full text-slate-200">
+                                        <div className="flex justify-between items-center border-b border-gray-800 pb-3">
                                             <div>
-                                                <p className="font-bold text-white leading-none">Stripe Connect Connected</p>
-                                                <p className="text-[8px] text-emerald-400/80 mt-1">Active to collect secure credit card and mobile wallet payments.</p>
+                                                <h3 className="text-sm font-black text-white">Matchday XI Setup</h3>
+                                                <p className="text-gray-450 text-[10px] mt-0.5">Drag and drop starting lineups &amp; assign positions</p>
                                             </div>
+                                            <span className="bg-slate-900 border border-slate-800 text-[10px] font-bold px-2 py-1 rounded">Formation: 4-3-3</span>
                                         </div>
-                                    </div>
 
-                                    {/* Invoices List Table */}
-                                    <div className="bg-[#121824] border border-slate-850 rounded-xl overflow-hidden shadow-sm text-[9px]">
-                                        <div className="bg-slate-900 px-3 py-2 font-bold text-slate-500 border-b border-[#1f293d] flex justify-between uppercase tracking-wider text-[8px]">
-                                            <span className="w-1/3">Player</span>
-                                            <span className="w-1/3 text-center">Amount</span>
-                                            <span className="w-1/3 text-right">Status</span>
-                                        </div>
-                                        <div className="divide-y divide-slate-850">
-                                            <div className="px-3 py-2 flex justify-between items-center bg-[#0b0f19]/30">
-                                                <span className="w-1/3 font-semibold text-slate-300">Liam Johnson</span>
-                                                <span className="w-1/3 text-center font-bold text-white">£150.00</span>
-                                                <span className="w-1/3 text-right"><span className="px-2 py-0.5 rounded-full text-[8px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Paid</span></span>
+                                        <div className="grid gap-4 grid-cols-1 lg:grid-cols-5">
+                                            {/* Pitch Board */}
+                                            <div className="lg:col-span-3 bg-emerald-950/40 rounded-xl p-3 border border-emerald-900/60 relative h-[280px]">
+                                                {/* Pitch Lines mock */}
+                                                <div className="absolute inset-2 border border-white/5 pointer-events-none rounded-lg">
+                                                    <div className="absolute top-1/2 left-0 right-0 border-t border-white/5" />
+                                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 border border-white/5 rounded-full" />
+                                                </div>
+                                                {/* Player Dots */}
+                                                <div className="absolute top-2 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                                                    <span className="w-5 h-5 rounded-full bg-slate-900 text-white border-2 border-red-500 flex items-center justify-center font-bold text-[9px]">GK</span>
+                                                    <span className="text-[8px] font-bold text-white mt-0.5">David</span>
+                                                </div>
+                                                <div className="absolute top-1/4 left-0 right-0 flex justify-around px-2">
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white border-2 border-slate-500 flex items-center justify-center font-bold text-[9px]">LB</span>
+                                                        <span className="text-[8px] font-bold text-white mt-0.5">Fidel</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white border-2 border-slate-500 flex items-center justify-center font-bold text-[9px]">CB</span>
+                                                        <span className="text-[8px] font-bold text-white mt-0.5">Ahmad</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white border-2 border-slate-500 flex items-center justify-center font-bold text-[9px]">CB</span>
+                                                        <span className="text-[8px] font-bold text-white mt-0.5">John</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white border-2 border-slate-500 flex items-center justify-center font-bold text-[9px]">RB</span>
+                                                        <span className="text-[8px] font-bold text-white mt-0.5">Amine</span>
+                                                    </div>
+                                                </div>
+                                                <div className="absolute top-1/2 left-0 right-0 flex justify-around px-6">
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white border-2 border-slate-500 flex items-center justify-center font-bold text-[9px]">CM</span>
+                                                        <span className="text-[8px] font-bold text-white mt-0.5">Chris</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white border-2 border-slate-500 flex items-center justify-center font-bold text-[9px]">CM</span>
+                                                        <span className="text-[8px] font-bold text-white mt-0.5">Oliver</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white border-2 border-slate-500 flex items-center justify-center font-bold text-[9px]">CM</span>
+                                                        <span className="text-[8px] font-bold text-white mt-0.5">M.J.</span>
+                                                    </div>
+                                                </div>
+                                                <div className="absolute bottom-2 left-0 right-0 flex justify-around px-8">
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white border-2 border-slate-500 flex items-center justify-center font-bold text-[9px]">LW</span>
+                                                        <span className="text-[8px] font-bold text-white mt-0.5">Morgan</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white border-2 border-red-500 flex items-center justify-center font-bold text-[9px]">ST</span>
+                                                        <span className="text-[8px] font-bold text-white mt-0.5">Liam</span>
+                                                    </div>
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="w-5 h-5 rounded-full bg-slate-900 text-white border-2 border-slate-500 flex items-center justify-center font-bold text-[9px]">RW</span>
+                                                        <span className="text-[8px] font-bold text-white mt-0.5">Sufi</span>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="px-3 py-2 flex justify-between items-center bg-[#0b0f19]/30">
-                                                <span className="w-1/3 font-semibold text-slate-300">Harry Norling</span>
-                                                <span className="w-1/3 text-center font-bold text-white">£150.00</span>
-                                                <span className="w-1/3 text-right"><span className="px-2 py-0.5 rounded-full text-[8px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">Unpaid</span></span>
+
+                                            {/* substitutes panel */}
+                                            <div className="lg:col-span-2 space-y-2">
+                                                <span className="text-[10px] font-bold uppercase text-white tracking-wider block">Substitutes Bench</span>
+                                                <div className="space-y-1">
+                                                    {['Harry Norling', 'James Cooper', 'Mohamed Abdalla', 'Said Tahir'].map((sub, i) => (
+                                                        <div key={i} className="bg-[#0b0f19] border border-gray-800 p-2 rounded-lg flex items-center justify-between text-xs font-semibold text-gray-250">
+                                                            <span>{sub}</span>
+                                                            <span className="text-[9px] uppercase text-slate-500 font-bold">Sub</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
-                            {activeTab === 4 && (
-                                <img 
-                                    src="/training-tracking-screenshot.png" 
-                                    alt="Training Tracker" 
-                                    className="w-full h-auto select-none object-contain animate-in fade-in duration-200"
-                                    style={{ imageRendering: "-webkit-optimize-contrast" }}
-                                />
-                            )}
+                                )}
+
+                                {activeTab === 2 && (
+                                    <div className="space-y-4 animate-in fade-in duration-200 w-full text-slate-200">
+                                        <div className="flex justify-between items-center border-b border-gray-800 pb-3">
+                                            <div>
+                                                <h3 className="text-sm font-black text-white">Squad Directory</h3>
+                                                <p className="text-gray-450 text-[10px] mt-0.5">Active player registration database &amp; statistics</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-[#0b0f19] border border-gray-800 rounded-xl overflow-hidden shadow-sm text-xs">
+                                            <div className="bg-slate-900/50 px-3 py-2.5 font-bold text-slate-400 border-b border-gray-800 flex justify-between uppercase tracking-wider text-[9px]">
+                                                <span className="w-1/3">Name</span>
+                                                <span className="w-1/4 text-center">Position</span>
+                                                <span className="w-1/4 text-center">Foot</span>
+                                                <span className="w-1/4 text-right">Status</span>
+                                            </div>
+                                            <div className="divide-y divide-gray-800">
+                                                {[
+                                                    { name: "Liam Johnson", pos: "Striker (ST)", foot: "Right", status: "Available", col: "text-green-400 bg-green-500/10 border-green-500/20" },
+                                                    { name: "Sufi Ali", pos: "Left Back (LB)", foot: "Left", status: "Injured", col: "text-red-400 bg-red-500/10 border-red-500/20" },
+                                                    { name: "Morgan Whittick", pos: "Winger (LW)", foot: "Both", status: "On Holiday", col: "text-amber-400 bg-amber-500/10 border-amber-500/20" },
+                                                    { name: "Amine Elkoumachi", pos: "Right Back (RB)", foot: "Right", status: "Suspended", col: "text-red-400 bg-red-550/10 border-red-550/20" }
+                                                ].map((p, i) => (
+                                                    <div key={i} className="px-3 py-2.5 flex justify-between items-center hover:bg-slate-900/20">
+                                                        <span className="w-1/3 font-bold text-white">{p.name}</span>
+                                                        <span className="w-1/4 text-center text-slate-400">{p.pos}</span>
+                                                        <span className="w-1/4 text-center text-slate-400">{p.foot}</span>
+                                                        <span className="w-1/4 text-right">
+                                                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold border ${p.col}`}>{p.status}</span>
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 3 && (
+                                    <div className="space-y-4 animate-in fade-in duration-200 text-slate-200 w-full text-left text-xs">
+                                        <div className="flex justify-between items-center border-b border-gray-800 pb-3">
+                                            <div>
+                                                <h3 className="text-sm font-black text-white">Finances &amp; Payments</h3>
+                                                <p className="text-[10px] text-gray-450 mt-0.5">Collect subscription dues and track team expenses.</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Stripe Connect Connected Banner */}
+                                        <div className="border border-emerald-500/20 bg-emerald-500/5 rounded-xl p-2.5 flex justify-between items-center text-[10px] text-emerald-300">
+                                            <div className="flex items-center gap-2">
+                                                <CheckCircle2 className="h-4.5 w-4.5 text-emerald-500 shrink-0" />
+                                                <div>
+                                                    <p className="font-bold text-white">Stripe Connect Active</p>
+                                                    <p className="text-[9px] text-emerald-400/80 mt-0.5">Collect secure credit card &amp; Apple Pay dues instantly.</p>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Invoices List Table */}
+                                        <div className="bg-[#0b0f19] border border-gray-800 rounded-xl overflow-hidden shadow-sm text-xs">
+                                            <div className="bg-slate-900/50 px-3 py-2 font-bold text-slate-400 border-b border-gray-800 flex justify-between uppercase tracking-wider text-[9px]">
+                                                <span className="w-1/3">Player</span>
+                                                <span className="w-1/3 text-center">Amount</span>
+                                                <span className="w-1/3 text-right">Status</span>
+                                            </div>
+                                            <div className="divide-y divide-gray-800">
+                                                <div className="px-3 py-2.5 flex justify-between items-center">
+                                                    <span className="w-1/3 font-bold text-slate-300">Liam Johnson</span>
+                                                    <span className="w-1/3 text-center font-bold text-white">£150.00</span>
+                                                    <span className="w-1/3 text-right"><span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Paid</span></span>
+                                                </div>
+                                                <div className="px-3 py-2.5 flex justify-between items-center">
+                                                    <span className="w-1/3 font-bold text-slate-300">Harry Norling</span>
+                                                    <span className="w-1/3 text-center font-bold text-white">£150.00</span>
+                                                    <span className="w-1/3 text-right"><span className="px-2.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">Unpaid</span></span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 4 && (
+                                    <div className="space-y-4 animate-in fade-in duration-200 text-slate-200 w-full text-left text-xs">
+                                        <div className="flex justify-between items-center border-b border-gray-800 pb-3">
+                                            <div>
+                                                <h3 className="text-sm font-black text-white">Training Logs</h3>
+                                                <p className="text-[10px] text-gray-450 mt-0.5">Log attendance statistics and plan tactical sessions</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            {[
+                                                { session: "Tactical Transitions", date: "15 Jul", attendance: "92%" },
+                                                { session: "Set Piece Routines", date: "12 Jul", attendance: "88%" },
+                                                { session: "Conditioning & Agility", date: "08 Jul", attendance: "95%" }
+                                            ].map((s, i) => (
+                                                <div key={i} className="bg-[#0b0f19] border border-gray-800 p-3 rounded-xl flex items-center justify-between">
+                                                    <div>
+                                                        <span className="font-bold text-white block text-sm">{s.session}</span>
+                                                        <span className="text-[9px] text-slate-400">{s.date} • Training Session</span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="text-xs font-bold text-white block">Attendance</span>
+                                                        <span className="text-[10px] text-emerald-400 font-extrabold">{s.attendance} present</span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>                 </div>
+                    </div>
+                </div>
 
                 {/* Footer */}
                 <div className="flex items-center gap-4 text-xs text-slate-500 border-t border-slate-900 pt-6">
