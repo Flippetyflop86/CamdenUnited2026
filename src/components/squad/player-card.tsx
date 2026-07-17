@@ -86,7 +86,7 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
     return (
         <Card className={`overflow-hidden hover:shadow-lg transition-all duration-200 group relative border-2 bg-slate-950 ${positionBorderClass} flex flex-col h-full`}>
             <CardHeader className="p-0 flex-1 flex flex-col">
-                <div className="bg-slate-900 p-3 sm:p-6 flex flex-col items-center justify-center flex-1 relative border-b border-slate-800">
+                <div className="bg-slate-900 p-3 sm:p-6 pt-9 sm:pt-12 flex flex-col items-center justify-center flex-1 relative border-b border-slate-800">
                     {onDelete && (
                         <button
                             onClick={(e) => {

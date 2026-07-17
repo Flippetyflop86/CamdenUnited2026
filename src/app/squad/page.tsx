@@ -399,6 +399,8 @@ export default function SquadPage() {
                     holidayStart: p.holiday_start,
                     holidayEnd: p.holiday_end,
                     notes: p.notes,
+                    weight: p.weight,
+                    height: p.height,
                     isInTrainingSquad: p.is_in_training_squad,
                     isInMatchdayTracker: p.is_in_matchday_tracker,
                     secondaryPositions: p.secondary_position ? p.secondary_position.split(",").map((s: string) => s.trim() as Position) : [],
@@ -532,7 +534,9 @@ export default function SquadPage() {
             subs_billing_model: updatedPlayer.subsBillingModel || "Monthly",
             subs_custom_amount: updatedPlayer.subsCustomAmount !== undefined && updatedPlayer.subsCustomAmount !== null ? updatedPlayer.subsCustomAmount : 0,
             nickname: updatedPlayer.nickname || null,
-            use_nickname: updatedPlayer.useNickname || false
+            use_nickname: updatedPlayer.useNickname || false,
+            weight: updatedPlayer.weight !== undefined && updatedPlayer.weight !== null ? Number(updatedPlayer.weight) : null,
+            height: updatedPlayer.height !== undefined && updatedPlayer.height !== null ? Number(updatedPlayer.height) : null
         };
         try {
             let error;
@@ -743,6 +747,29 @@ export default function SquadPage() {
                                         className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500 cursor-pointer"
                                     />
                                     <label htmlFor="useNickname" className="text-xs font-semibold text-slate-700 cursor-pointer">Use Nickname across site</label>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-medium text-slate-500">Height (cm)</label>
+                                    <Input 
+                                        type="number" 
+                                        value={editingPlayer.height !== undefined && editingPlayer.height !== null ? editingPlayer.height : ""} 
+                                        onChange={(e) => setEditingPlayer({ ...editingPlayer, height: e.target.value === "" ? undefined : Number(e.target.value) })} 
+                                        placeholder="e.g. 182" 
+                                        className="h-8 text-sm" 
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="block text-xs font-medium text-slate-500">Weight (kg)</label>
+                                    <Input 
+                                        type="number" 
+                                        value={editingPlayer.weight !== undefined && editingPlayer.weight !== null ? editingPlayer.weight : ""} 
+                                        onChange={(e) => setEditingPlayer({ ...editingPlayer, weight: e.target.value === "" ? undefined : Number(e.target.value) })} 
+                                        placeholder="e.g. 78" 
+                                        className="h-8 text-sm" 
+                                    />
                                 </div>
                             </div>
 
