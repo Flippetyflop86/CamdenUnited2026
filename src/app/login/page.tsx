@@ -223,10 +223,10 @@ export default function LoginPage() {
                             01 PRODUCT TOUR
                         </span>
                         <h2 className="text-2xl lg:text-3xl font-black tracking-tight text-white">
-                            This is what it looks like.
+                            Take a Tour of ClubFlow
                         </h2>
                         <p className="text-slate-400 text-sm leading-relaxed max-w-xl">
-                            Five key screens that cover the daily running of a successful football club. Click a tab to preview.
+                            ClubFlow is the complete digital headquarters for football clubs. Explore the five core workspaces built to manage players, matches, statistics, and club finances in one place. Click a tab to preview.
                         </p>
                     </div>
 
@@ -332,94 +332,159 @@ export default function LoginPage() {
                             )}
 
                             {activeTab === 1 && (
-                                <div className="space-y-3 animate-in fade-in duration-200 flex-1 flex flex-col text-slate-900 text-left">
-                                    <div className="flex items-center justify-between border-b border-slate-200 pb-2">
-                                        <div>
-                                            <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-                                                <Trophy className="h-4 w-4 text-red-650" />
-                                                Matchday XI
-                                            </h3>
-                                            <p className="text-[10px] text-slate-500 leading-none mt-0.5">Design matches sheet &amp; lineup.</p>
+                                <div className="space-y-2 animate-in fade-in duration-200 flex-grow flex flex-col text-slate-900 text-left text-[9px]">
+                                    {/* Match Info Bar */}
+                                    <div className="bg-slate-950 text-white rounded-lg p-2 flex items-center justify-between font-bold text-[8px] tracking-wide shrink-0">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="text-red-500 font-extrabold uppercase">Upcoming Match</span>
+                                            <span className="text-slate-400">|</span>
+                                            <span>Camden United vs Western Athletic</span>
                                         </div>
-                                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-slate-200 text-slate-700 border border-slate-300">Formation: 4-3-3</span>
+                                        <div className="flex items-center gap-2 text-slate-400">
+                                            <span className="bg-slate-800 px-1 py-0.5 rounded text-white text-[7px]">Friendly</span>
+                                            <span>16/07/2026</span>
+                                            <span>14:00</span>
+                                            <span className="text-emerald-400 font-extrabold">Home</span>
+                                        </div>
                                     </div>
 
-                                    {/* Green kit pitch exactly mirroring pages */}
-                                    <div className="relative bg-emerald-600 rounded-xl flex-1 min-h-[260px] overflow-hidden shadow border-2 border-emerald-500/40 p-2">
-                                        {/* Grass stripes */}
-                                        <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
-                                            {Array.from({ length: 6 }).map((_, idx) => (
-                                                <div key={idx} className={`h-[40px] w-full ${idx % 2 === 0 ? 'bg-black' : 'bg-transparent'}`} />
-                                            ))}
-                                        </div>
-
-                                        {/* Pitch markings */}
-                                        <div className="absolute inset-0 border border-white/20 m-1.5 pointer-events-none">
-                                            <div className="absolute top-1/2 left-1 right-1 border-t border-white/20" />
-                                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 border border-white/20 rounded-full" />
-                                            <div className="absolute top-0.5 left-1/2 -translate-x-1/2 w-14 h-6 border border-white/20 border-t-0" />
-                                            <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-14 h-6 border border-white/20 border-b-0" />
-                                        </div>
-
-                                        {/* Forwards */}
-                                        <div className="flex justify-around w-full relative z-10 pt-2">
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">11</div>
-                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Lindholm</span>
+                                    {/* Main Columns Container */}
+                                    <div className="grid grid-cols-12 gap-2 flex-grow overflow-hidden min-h-[300px]">
+                                        {/* Left Column: Available Squad */}
+                                        <div className="col-span-3 bg-white border border-slate-200 rounded-xl p-1.5 flex flex-col overflow-hidden">
+                                            <div className="flex items-center justify-between border-b border-slate-100 pb-1 mb-1 shrink-0">
+                                                <span className="font-extrabold text-[8px] uppercase tracking-wider text-slate-600">Available Squad (17)</span>
                                             </div>
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">9</div>
-                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Abdalla</span>
+                                            <div className="flex gap-0.5 mb-1 text-[7px] font-bold shrink-0">
+                                                <span className="px-1.5 py-0.5 bg-slate-950 text-white rounded">All</span>
+                                                <span className="px-1.5 py-0.5 bg-slate-150 text-slate-600 rounded">GK</span>
+                                                <span className="px-1.5 py-0.5 bg-slate-150 text-slate-600 rounded">DEF</span>
+                                                <span className="px-1.5 py-0.5 bg-slate-150 text-slate-600 rounded">MID</span>
                                             </div>
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">7</div>
-                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Sandell</span>
+                                            <div className="space-y-1 overflow-y-auto flex-grow pr-0.5">
+                                                {[
+                                                    { name: "Nataly Allport", pos: "GK" },
+                                                    { name: "Mohammed Khan", pos: "GK" },
+                                                    { name: "Bobby Eden-Cheltenham", pos: "CB" },
+                                                    { name: "Ryan King", pos: "RB" },
+                                                    { name: "Steven Robinson", pos: "RB" }
+                                                ].map((p, idx) => (
+                                                    <div key={idx} className="flex flex-col p-1 border border-slate-200 rounded bg-slate-50 leading-tight">
+                                                        <span className="font-bold text-slate-800 truncate">{p.name}</span>
+                                                        <span className="text-[7px] text-slate-400 font-semibold">{p.pos}</span>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
 
-                                        {/* Midfielders */}
-                                        <div className="flex justify-around w-full relative z-10 py-2">
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">8</div>
-                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Forsberg</span>
-                                            </div>
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">6</div>
-                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Tahir</span>
-                                            </div>
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">10</div>
-                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Norling</span>
-                                            </div>
-                                        </div>
-
-                                        {/* Defenders */}
-                                        <div className="flex justify-between w-full px-3 relative z-10 py-1">
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">3</div>
-                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Johnson</span>
-                                            </div>
-                                            <div className="flex justify-around w-1/2">
-                                                <div className="flex flex-col items-center">
-                                                    <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">4</div>
-                                                    <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Bergström</span>
-                                                </div>
-                                                <div className="flex flex-col items-center">
-                                                    <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">5</div>
-                                                    <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Evans</span>
+                                        {/* Center Column: Pitch View */}
+                                        <div className="col-span-6 bg-white border border-slate-200 rounded-xl p-1.5 flex flex-col overflow-hidden">
+                                            <div className="flex items-center justify-between border-b border-slate-100 pb-1 mb-1 shrink-0">
+                                                <span className="font-extrabold text-[8px] uppercase tracking-wider text-slate-600">Starting XI</span>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-[7px] text-slate-400 font-medium">Formation</span>
+                                                    <span className="border border-slate-200 rounded px-1 py-0.5 text-[7px] font-bold bg-slate-50">4-2-3-1</span>
                                                 </div>
                                             </div>
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-5 h-5 rounded-full bg-white border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-slate-900">2</div>
-                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Lindgren</span>
+                                            
+                                            {/* Field Map */}
+                                            <div className="relative bg-emerald-600 rounded-lg flex-grow overflow-hidden shadow-inner border border-emerald-500/40 p-1 flex flex-col justify-between min-h-[250px]">
+                                                {/* Grass stripes */}
+                                                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
+                                                    {Array.from({ length: 8 }).map((_, idx) => (
+                                                        <div key={idx} className={`h-[35px] w-full ${idx % 2 === 0 ? 'bg-black' : 'bg-transparent'}`} />
+                                                    ))}
+                                                </div>
+
+                                                {/* Pitch markings */}
+                                                <div className="absolute inset-0 border border-white/20 m-1 pointer-events-none">
+                                                    <div className="absolute top-1/2 left-0.5 right-0.5 border-t border-white/20" />
+                                                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 border border-white/20 rounded-full" />
+                                                    <div className="absolute top-0.5 left-1/2 -translate-x-1/2 w-12 h-5 border border-white/20 border-t-0" />
+                                                    <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-12 h-5 border border-white/20 border-b-0" />
+                                                </div>
+
+                                                {/* Goalkeeper (at top) */}
+                                                <div className="flex justify-center w-full relative z-10 pt-1 shrink-0">
+                                                    <div className="flex flex-col items-center">
+                                                        <div className="w-4 h-4 rounded-full bg-blue-600 border border-white/40 shadow flex items-center justify-center text-[7px] font-bold text-white">1</div>
+                                                        <span className="text-[6px] font-bold text-white bg-slate-950/80 px-1 rounded mt-0.5">David</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Defenders */}
+                                                <div className="flex justify-around w-full relative z-10 px-1 shrink-0">
+                                                    {[
+                                                        { num: 2, name: "Fidel" },
+                                                        { num: 5, name: "Ahmad" },
+                                                        { num: 4, name: "Junior" },
+                                                        { num: 3, name: "John" }
+                                                    ].map((p, idx) => (
+                                                        <div key={idx} className="flex flex-col items-center">
+                                                            <div className="w-4 h-4 rounded-full bg-blue-600 border border-white/40 shadow flex items-center justify-center text-[7px] font-bold text-white">{p.num}</div>
+                                                            <span className="text-[6px] font-bold text-white bg-slate-950/80 px-1 rounded mt-0.5">{p.name}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Defensive Midfielders */}
+                                                <div className="flex justify-center gap-6 w-full relative z-10 px-1 shrink-0">
+                                                    {[
+                                                        { num: 8, name: "Chris" },
+                                                        { num: 6, name: "Matthew" }
+                                                    ].map((p, idx) => (
+                                                        <div key={idx} className="flex flex-col items-center">
+                                                            <div className="w-4 h-4 rounded-full bg-blue-650 border border-white/40 shadow flex items-center justify-center text-[7px] font-bold text-white">{p.num}</div>
+                                                            <span className="text-[6px] font-bold text-white bg-slate-950/80 px-1 rounded mt-0.5">{p.name}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Attacking Midfielders */}
+                                                <div className="flex justify-around w-full relative z-10 px-1 shrink-0">
+                                                    {[
+                                                        { num: 7, name: "Oliver" },
+                                                        { num: 10, name: "John" },
+                                                        { num: 11, name: "Delano" }
+                                                    ].map((p, idx) => (
+                                                        <div key={idx} className="flex flex-col items-center">
+                                                            <div className="w-4 h-4 rounded-full bg-blue-650 border border-white/40 shadow flex items-center justify-center text-[7px] font-bold text-white">{p.num}</div>
+                                                            <span className="text-[6px] font-bold text-white bg-slate-950/80 px-1 rounded mt-0.5">{p.name}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {/* Forward (at bottom) */}
+                                                <div className="flex justify-center w-full relative z-10 pb-1 shrink-0">
+                                                    <div className="flex flex-col items-center">
+                                                        <div className="w-4 h-4 rounded-full bg-blue-650 border border-white/40 shadow flex items-center justify-center text-[7px] font-bold text-white">9</div>
+                                                        <span className="text-[6px] font-bold text-white bg-slate-950/80 px-1 rounded mt-0.5">Shoaib</span>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
 
-                                        {/* Goalkeeper */}
-                                        <div className="flex justify-center w-full relative z-10 pb-0.5">
-                                            <div className="flex flex-col items-center">
-                                                <div className="w-5 h-5 rounded-full bg-orange-500 border border-black/35 shadow flex items-center justify-center text-[7px] font-black text-white">1</div>
-                                                <span className="text-[7px] font-bold text-white bg-slate-950/80 px-1 py-0.5 rounded mt-0.5">Nilsson</span>
+                                        {/* Right Column: Bench */}
+                                        <div className="col-span-3 bg-white border border-slate-200 rounded-xl p-1.5 flex flex-col overflow-hidden">
+                                            <div className="flex items-center justify-between border-b border-slate-100 pb-1 mb-1 shrink-0 font-extrabold text-[8px] uppercase tracking-wider text-slate-600">
+                                                <span>Bench (5)</span>
+                                                <span className="text-red-500 font-bold text-[7px]">+ Add Slot</span>
+                                            </div>
+                                            <div className="space-y-1 overflow-y-auto flex-grow pr-0.5">
+                                                {[
+                                                    "Sebastian Senna",
+                                                    "Lloyd Hucknall",
+                                                    "Chris Hall",
+                                                    "Sam Ward",
+                                                    "Kieran Wood"
+                                                ].map((name, idx) => (
+                                                    <div key={idx} className="flex items-center justify-between p-1 border border-slate-200 rounded bg-slate-50 leading-tight">
+                                                        <div className="flex flex-col overflow-hidden">
+                                                            <span className="font-bold text-slate-800 truncate">{idx + 1}. {name}</span>
+                                                        </div>
+                                                        <span className="text-[6px] bg-slate-200 border border-slate-300 font-bold px-1 rounded text-slate-600 scale-90">Unused</span>
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     </div>
