@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
@@ -18,7 +18,18 @@ export default function LoginPage() {
     const [error, setError] = useState("");
     const [activeTab, setActiveTab] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [isLightboxOpen, setIsLightboxOpen] = useState(false);
     const router = useRouter();
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === "Escape") {
+                setIsLightboxOpen(false);
+            }
+        };
+        window.addEventListener("keydown", handleKeyDown);
+        return () => window.removeEventListener("keydown", handleKeyDown);
+    }, []);
 
     const tourTabs = [
         {
@@ -258,17 +269,23 @@ export default function LoginPage() {
                     </p>
 
                     {tourTabs[activeTab].hideBrowserWrapper ? (
-                        <div className="w-full relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl shadow-red-950/20 bg-slate-950/60 backdrop-blur-sm transition-all duration-300">
+                        <div 
+                            className="w-full relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl shadow-red-950/20 bg-slate-950/60 backdrop-blur-sm transition-all duration-300 cursor-zoom-in group/image"
+                            onClick={() => setIsLightboxOpen(true)}
+                        >
                             <img 
                                 src={activeTab === 0 ? "/dashboard-screenshot.png" : activeTab === 1 ? "/matchday-xi-screenshot.png" : activeTab === 2 ? "/squad-management-screenshot.png" : "/training-tracking-screenshot.png"} 
                                 alt={tourTabs[activeTab].title} 
-                                className="w-full h-auto select-none"
+                                className="w-full h-auto select-none transition-transform duration-300 group-hover/image:scale-[1.06]"
                                 style={{ 
                                     imageRendering: "-webkit-optimize-contrast",
                                     transform: "scale(1.045) translateX(-0.6%)",
                                     transformOrigin: "center center"
                                 }}
                             />
+                            <div className="absolute bottom-3 right-3 bg-black/75 backdrop-blur-sm text-[10px] text-white/90 font-bold px-2.5 py-1 rounded-md border border-white/10 opacity-0 group-hover/image:opacity-100 transition-opacity duration-300 pointer-events-none flex items-center gap-1 shadow-md">
+                                🔍 Click to Zoom
+                            </div>
                         </div>
                     ) : (
                         <div className="w-full relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl shadow-red-950/20 bg-slate-950/60 backdrop-blur-sm transition-all duration-300">
@@ -765,6 +782,28 @@ export default function LoginPage() {
                     </form>
                 </Card>
             </div>
+
+            {isLightboxOpen && (
+                <div 
+                    className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 md:p-8 cursor-zoom-out animate-in fade-in duration-200"
+                    onClick={() => setIsLightboxOpen(false)}
+                >
+                    <button 
+                        onClick={() => setIsLightboxOpen(false)} 
+                        className="absolute top-4 right-4 text-white hover:text-slate-300 p-3 text-lg bg-white/10 hover:bg-white/20 rounded-full transition-all"
+                    >
+                        ✕
+                    </button>
+                    <div className="relative max-w-7xl w-full max-h-[90vh] overflow-hidden rounded-xl border border-slate-800 shadow-2xl bg-slate-950">
+                        <img 
+                            src={activeTab === 0 ? "/dashboard-screenshot.png" : activeTab === 1 ? "/matchday-xi-screenshot.png" : activeTab === 2 ? "/squad-management-screenshot.png" : "/training-tracking-screenshot.png"} 
+                            alt={tourTabs[activeTab].title} 
+                            className="w-full h-auto max-h-[90vh] object-contain select-none mx-auto"
+                            style={{ imageRendering: "-webkit-optimize-contrast" }}
+                        />
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
