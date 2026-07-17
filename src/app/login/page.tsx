@@ -221,7 +221,7 @@ export default function LoginPage() {
             </div>
 
             {/* Left Column — Hero Logo + Supporting Copy */}
-            <div className="hidden md:flex md:w-[50%] lg:w-[55%] flex-col justify-between p-10 lg:p-14 relative z-10 border-r border-slate-900/60 bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900/40">
+            <div className="hidden md:flex md:w-[65%] lg:w-[72%] xl:w-[75%] flex-col justify-between p-10 lg:p-14 relative z-10 bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900/40">
 
                 {/* Top spacer / top-left wordmark (text only — logo image carries the brand) */}
                 <div className="flex items-center gap-2">
@@ -231,7 +231,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* HERO: Interactive Product Tour */}
-                <div className="my-auto flex flex-col items-start text-left space-y-6 w-full max-w-2xl mx-auto">
+                <div className="my-auto flex flex-col items-start text-left space-y-6 w-full max-w-5xl mx-auto">
                     
                     <div className="space-y-2">
                         <span className="text-[10px] font-bold tracking-widest text-red-500 uppercase">
@@ -689,7 +689,7 @@ export default function LoginPage() {
             </div>
 
             {/* Right Column (Auth Panel) */}
-            <div className="flex-1 flex flex-col justify-center items-center p-6 md:p-12 relative z-10 bg-slate-950/20">
+            <div className="w-full md:w-[35%] lg:w-[28%] xl:w-[25%] flex flex-col justify-center items-center p-6 md:p-12 relative z-10 bg-slate-950 border-l border-slate-900/60 shrink-0">
                 {/* Mobile Header Branding */}
                 <div className="flex flex-col items-center mb-8 text-center md:hidden">
                     <Image src="/clubflow-logo.png" alt="ClubFlow" width={240} height={160} className="object-contain mb-2" />
