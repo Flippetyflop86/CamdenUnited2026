@@ -277,14 +277,131 @@ export default function LoginPage() {
                         </div>
 
                         {/* Browser Viewport Content Area */}
-                        <div className={`bg-[#0b0f19] text-slate-100 min-h-[460px] overflow-hidden flex flex-col justify-start text-left relative ${activeTab === 3 ? 'p-6' : 'p-0'}`}>
+                        <div className={`bg-[#0b0f19] text-slate-100 min-h-[460px] overflow-hidden flex flex-col justify-start text-left relative ${(activeTab === 3 || activeTab === 0) ? 'p-6' : 'p-0'}`}>
                             {activeTab === 0 && (
-                                <img 
-                                    src="/dashboard-screenshot.png" 
-                                    alt="Dashboard Overview" 
-                                    className="w-full h-auto select-none object-contain animate-in fade-in duration-200"
-                                    style={{ imageRendering: "-webkit-optimize-contrast" }}
-                                />
+                                <div className="space-y-4 animate-in fade-in duration-200 text-gray-200 text-left text-[9px] bg-[#030712] p-5 rounded-xl border border-gray-900 w-full">
+                                    {/* Mockup Header */}
+                                    <div className="flex justify-between items-center border-b border-gray-800 pb-2.5">
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-6 w-6 rounded-lg bg-slate-950 border border-gray-850 flex items-center justify-center font-bold text-red-500 text-[10px]">
+                                                CU
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <h3 className="text-[10px] font-black text-white leading-none">ClubFlow United</h3>
+                                                    <span className="bg-red-550/15 text-red-400 border border-red-500/20 text-[7px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded">
+                                                        Operations Command Centre
+                                                    </span>
+                                                </div>
+                                                <p className="text-gray-405 text-[8px] mt-0.5">Squad Management &amp; Operational Analytics</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Three Mini Cards */}
+                                    <div className="grid gap-2 grid-cols-3">
+                                        <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-1">
+                                            <span className="text-[7px] font-bold uppercase text-gray-400">Squad Availability</span>
+                                            <div className="text-[9px] font-black text-white">33 / 36 Available (92%)</div>
+                                        </div>
+                                        <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-1">
+                                            <span className="text-[7px] font-bold uppercase text-gray-400">Registration Alerts</span>
+                                            <div className="text-[9px] font-black text-amber-400">2 Outstanding</div>
+                                        </div>
+                                        <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-1">
+                                            <span className="text-[7px] font-bold uppercase text-gray-400">Unpaid Invoices</span>
+                                            <div className="text-[9px] font-black text-red-405">£450.00</div>
+                                        </div>
+                                    </div>
+
+                                    {/* Core Layout Grid */}
+                                    <div className="grid gap-3 grid-cols-7">
+                                        {/* Left Side: Next Fixture & Starting XI (4 spans) */}
+                                        <div className="col-span-4 space-y-3">
+                                            <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-2">
+                                                <span className="text-[8px] font-bold uppercase text-white">Next Fixture</span>
+                                                <div className="bg-slate-950 p-2 rounded-lg border border-gray-850 flex justify-between items-center text-[8px]">
+                                                    <div>
+                                                        <span className="font-bold text-white">vs Western Athletic</span>
+                                                        <div className="text-[7px] text-gray-400 mt-0.5">Isthmian League • 🌱 Natural Grass</div>
+                                                    </div>
+                                                    <span className="text-white font-bold">16 Jul • 14:00</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-2">
+                                                <span className="text-[8px] font-bold uppercase text-white font-semibold">Starting Selection XI</span>
+                                                
+                                                {/* Pitch mock map */}
+                                                <div className="relative bg-emerald-950/80 rounded-lg h-[160px] border border-emerald-900/60 overflow-hidden p-1">
+                                                    {/* GK */}
+                                                    <div className="absolute top-1 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                                                        <div className="w-3.5 h-3.5 rounded-full bg-orange-600 border border-white/20 flex items-center justify-center text-[6px] text-white">1</div>
+                                                        <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">David</span>
+                                                    </div>
+                                                    {/* DEF */}
+                                                    <div className="absolute top-[35%] left-0 right-0 flex justify-around px-4">
+                                                        <div className="flex flex-col items-center">
+                                                            <div className="w-3.5 h-3.5 rounded-full bg-red-600 border border-white/20 flex items-center justify-center text-[6px] text-white">2</div>
+                                                            <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Fidel</span>
+                                                        </div>
+                                                        <div className="flex flex-col items-center">
+                                                            <div className="w-3.5 h-3.5 rounded-full bg-red-600 border border-white/20 flex items-center justify-center text-[6px] text-white">5</div>
+                                                            <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Ahmad</span>
+                                                        </div>
+                                                        <div className="flex flex-col items-center">
+                                                            <div className="w-3.5 h-3.5 rounded-full bg-red-600 border border-white/20 flex items-center justify-center text-[6px] text-white">3</div>
+                                                            <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">John</span>
+                                                        </div>
+                                                    </div>
+                                                    {/* MID */}
+                                                    <div className="absolute top-[60%] left-0 right-0 flex justify-around px-6">
+                                                        <div className="flex flex-col items-center">
+                                                            <div className="w-3.5 h-3.5 rounded-full bg-red-650 border border-white/20 flex items-center justify-center text-[6px] text-white">8</div>
+                                                            <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Chris</span>
+                                                        </div>
+                                                        <div className="flex flex-col items-center">
+                                                            <div className="w-3.5 h-3.5 rounded-full bg-red-650 border border-white/20 flex items-center justify-center text-[6px] text-white">7</div>
+                                                            <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Oliver</span>
+                                                        </div>
+                                                    </div>
+                                                    {/* FWD */}
+                                                    <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                                                        <div className="w-3.5 h-3.5 rounded-full bg-red-650 border border-white/20 flex items-center justify-center text-[6px] text-white">9</div>
+                                                        <span className="text-[5px] text-white bg-slate-950/85 px-1 rounded mt-0.5">Shoaib</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Right Side: Performance Metrics & Contributors (3 spans) */}
+                                        <div className="col-span-3 space-y-3">
+                                            <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-2">
+                                                <span className="text-[8px] font-bold uppercase text-white">Performance Metrics</span>
+                                                <div className="bg-slate-950 p-2 rounded-lg border border-gray-850 space-y-1">
+                                                    <span className="text-[8px] text-gray-400 block uppercase font-bold">Training Attendance Tracking</span>
+                                                    <div className="text-[11px] font-black text-white leading-none">92%</div>
+                                                    <span className="text-[7px] text-gray-400 block mt-0.5">Last session: 15 Jul • Tactical Drills</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-2">
+                                                <span className="text-[8px] font-bold uppercase text-white font-semibold">Squad Contributors</span>
+                                                <div className="space-y-1">
+                                                    <span className="text-[7px] font-bold text-gray-400 block">⚽ Top Goalscorers</span>
+                                                    <div className="bg-slate-950 px-2 py-1 rounded border border-gray-850 flex justify-between text-[7px] font-semibold text-gray-200">
+                                                        <span>Liam Johnson</span>
+                                                        <span className="text-red-500 font-bold">12 Goals</span>
+                                                    </div>
+                                                    <div className="bg-slate-950 px-2 py-1 rounded border border-gray-850 flex justify-between text-[7px] font-semibold text-gray-200">
+                                                        <span>Harry Norling</span>
+                                                        <span className="text-red-500 font-bold">8 Goals</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                             )}
                             {activeTab === 1 && (
                                 <img 
