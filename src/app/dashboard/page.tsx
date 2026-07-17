@@ -48,6 +48,9 @@ export default function DashboardPage() {
     const [trainingSessions, setTrainingSessions] = useState<any[]>([]);
     const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
     const [injuryFilter, setInjuryFilter] = useState<'All' | 'Injured' | 'Suspended' | 'On Holiday'>('All');
+    const [leagueNameState, setLeagueNameState] = useState("");
+    const [isEditingLeagueName, setIsEditingLeagueName] = useState(false);
+    const [tempLeagueName, setTempLeagueName] = useState("");
 
     useEffect(() => {
         fetchData();
@@ -441,6 +444,10 @@ export default function DashboardPage() {
         }
     };
 
+    useEffect(() => {
+        setLeagueNameState(getLeagueName());
+    }, [settings.leagueUrl, players]);
+
     const renderMiniPitch = () => {
         if (!lineup || !players.length || Object.keys(lineup.starters || {}).length === 0) return (
             <div className="h-[360px] flex flex-col items-center justify-center border border-gray-800 rounded-xl border-dashed text-gray-400 text-xs p-4 text-center bg-slate-950/20">
@@ -513,14 +520,57 @@ export default function DashboardPage() {
                             Football Operations Command Centre
                         </Badge>
                     </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-300 mt-1.5 font-medium">
-                        <span>League: <span className="text-white">{getLeagueName()}</span></span>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-300 mt-1.5 font-medium">
+                        <span className="flex items-center gap-1">
+                            League:{" "}
+                            {isEditingLeagueName ? (
+                                <span className="flex items-center gap-1.5">
+                                    <input
+                                        type="text"
+                                        value={tempLeagueName}
+                                        onChange={(e) => setTempLeagueName(e.target.value)}
+                                        className="bg-slate-900 text-white border border-gray-700 px-2 py-0.5 rounded text-xs w-48 font-semibold focus:outline-none focus:border-red-500"
+                                        placeholder="Enter league name..."
+                                        autoFocus
+                                    />
+                                    <button
+                                        onClick={() => {
+                                            localStorage.setItem("clubflow_league_name", tempLeagueName);
+                                            setLeagueNameState(tempLeagueName);
+                                            setIsEditingLeagueName(false);
+                                        }}
+                                        className="text-emerald-400 hover:text-emerald-300 text-[10px] font-bold uppercase bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20"
+                                    >
+                                        Save
+                                    </button>
+                                    <button
+                                        onClick={() => setIsEditingLeagueName(false)}
+                                        className="text-gray-400 hover:text-white text-[10px] font-bold uppercase bg-slate-800 px-1.5 py-0.5 rounded"
+                                    >
+                                        Cancel
+                                    </button>
+                                </span>
+                            ) : (
+                                <span className="flex items-center gap-1">
+                                    <span className="text-white font-bold">{leagueNameState || "No League Configured"}</span>
+                                    <button
+                                        onClick={() => {
+                                            setTempLeagueName(leagueNameState);
+                                            setIsEditingLeagueName(true);
+                                        }}
+                                        className="text-red-450 hover:text-red-400 text-[9px] uppercase tracking-wider font-extrabold ml-1 hover:underline bg-red-500/10 px-1 py-0.5 rounded border border-red-500/20"
+                                    >
+                                        Edit
+                                    </button>
+                                </span>
+                            )}
+                        </span>
                         <span>•</span>
                         <span>Season: <span className="text-white">2026/27</span></span>
                         <span>•</span>
                         <span>Standings: <span className="text-amber-500 font-bold">{displayLeaguePosition}</span></span>
                         <span>•</span>
-                        <span>Match Readiness: <span className="text-emerald-400 font-bold">{squadAvailabilityRate}%</span></span>
+                        <span>Squad Availability: <span className="text-emerald-400 font-bold">{squadAvailabilityRate}%</span></span>
                     </div>
                 </div>
 
@@ -576,15 +626,15 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                {/* Match Readiness Analytics Card */}
+                {/* Squad Availability Analytics Card */}
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-gray-300">Match Readiness</CardTitle>
+                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-gray-300">Squad Availability</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                         <div className="flex justify-between items-center text-xs font-bold">
-                            <span className="text-gray-200">Operational Readiness Index</span>
-                            <span className="text-emerald-400">{squadAvailabilityRate}% Ready</span>
+                            <span className="text-gray-200">Available Squad Ratio</span>
+                            <span className="text-emerald-400">{squadAvailabilityRate}% Available</span>
                         </div>
                         <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden">
                             <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${squadAvailabilityRate}%` }} />
