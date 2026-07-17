@@ -401,7 +401,11 @@ export default function SquadPage() {
                     notes: p.notes,
                     weight: p.weight,
                     height: p.height,
-                    preferredFoot: p.notes && p.notes.includes("[FOOT:Left]") ? "Left" : "Right",
+                    preferredFoot: p.notes && p.notes.includes("[FOOT:Left]") ? "Left" : (p.notes && p.notes.includes("[FOOT:Right]") ? "Right" : undefined),
+                    registrationType: p.notes && p.notes.includes("[REG:Dual]") ? "Dual" : (p.notes && (p.notes.includes("[REG:LoanParent]") || p.notes.includes("[REG:LoanSub]")) ? "Loan" : "Standard"),
+                    isParentClub: p.notes && p.notes.includes("[REG:LoanParent]") ? true : false,
+                    injuryType: p.notes && p.notes.match(/\[INJURY:(.*?)\]/) ? p.notes.match(/\[INJURY:(.*?)\]/)![1] : undefined,
+                    injuryDuration: p.notes && p.notes.match(/\[OUT_DURATION:(.*?)\]/) ? p.notes.match(/\[OUT_DURATION:(.*?)\]/)![1] : undefined,
                     isInTrainingSquad: p.is_in_training_squad,
                     isInMatchdayTracker: p.is_in_matchday_tracker,
                     secondaryPositions: p.secondary_position ? p.secondary_position.split(",").map((s: string) => s.trim() as Position) : [],
@@ -496,9 +500,14 @@ export default function SquadPage() {
     const sortedPlayers = [...filteredPlayers].sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));
 
     const handleEdit = (player: Player) => { 
-        // Strip PIN and FOOT from notes before showing edit dialog
-        let cleanedNotes = player.notes ? player.notes.replace(/\[PIN:\d{4}\]/, "").trim() : "";
+        // Strip PIN and custom V3 tags from notes before showing edit dialog
+        let cleanedNotes = player.notes ? player.notes : "";
+        cleanedNotes = cleanedNotes.replace(/\[PIN:\d{4}\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[FOOT:(Left|Right)\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[REG:(Standard|Dual|LoanParent|LoanSub)\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[INJURY:.*?\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[OUT_DURATION:.*?\]/, "").trim();
+
         setEditingPlayer({ ...player, notes: cleanedNotes }); 
         setPreviewImage(player.imageUrl || null); 
     };
@@ -508,12 +517,30 @@ export default function SquadPage() {
         const originalPlayer = players.find(p => p.id === updatedPlayer.id);
         const matchPin = originalPlayer?.notes?.match(/\[PIN:(\d{4})\]/);
         const pinVal = matchPin ? matchPin[1] : null;
-        let cleanedNotes = updatedPlayer.notes ? updatedPlayer.notes.replace(/\[PIN:\d{4}\]/, "").trim() : "";
+        let cleanedNotes = updatedPlayer.notes ? updatedPlayer.notes : "";
+        cleanedNotes = cleanedNotes.replace(/\[PIN:\d{4}\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[FOOT:(Left|Right)\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[REG:(Standard|Dual|LoanParent|LoanSub)\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[INJURY:.*?\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[OUT_DURATION:.*?\]/, "").trim();
         
         let finalNotes = cleanedNotes;
         if (pinVal) finalNotes = `${finalNotes} [PIN:${pinVal}]`.trim();
-        finalNotes = `${finalNotes} [FOOT:${updatedPlayer.preferredFoot || "Right"}]`.trim();
+        if (updatedPlayer.preferredFoot) {
+            finalNotes = `${finalNotes} [FOOT:${updatedPlayer.preferredFoot}]`.trim();
+        }
+        
+        let regTag = "Standard";
+        if (updatedPlayer.registrationType === "Dual") regTag = "Dual";
+        else if (updatedPlayer.registrationType === "Loan") {
+            regTag = updatedPlayer.isParentClub ? "LoanParent" : "LoanSub";
+        }
+        finalNotes = `${finalNotes} [REG:${regTag}]`.trim();
+
+        if (updatedPlayer.medicalStatus === "Injured" || updatedPlayer.medicalStatus === "Doubtful") {
+            if (updatedPlayer.injuryType) finalNotes = `${finalNotes} [INJURY:${updatedPlayer.injuryType}]`.trim();
+            if (updatedPlayer.injuryDuration) finalNotes = `${finalNotes} [OUT_DURATION:${updatedPlayer.injuryDuration}]`.trim();
+        }
 
         const payload: any = {
             first_name: updatedPlayer.firstName,
@@ -780,32 +807,105 @@ export default function SquadPage() {
                             </div>
 
                             <div className="space-y-1">
-                                <label className="block text-xs font-medium text-slate-500">Preferred Foot</label>
-                                <div className="flex gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setEditingPlayer({ ...editingPlayer, preferredFoot: "Left" })}
-                                        className={`flex-1 py-1.5 text-xs font-bold border rounded-lg transition-all ${
-                                            editingPlayer.preferredFoot === "Left"
-                                                ? "bg-slate-900 border-slate-900 text-white"
-                                                : "bg-white border-slate-205 text-slate-700 hover:bg-slate-50"
-                                        }`}
-                                    >
-                                        Left Foot
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setEditingPlayer({ ...editingPlayer, preferredFoot: "Right" })}
-                                        className={`flex-1 py-1.5 text-xs font-bold border rounded-lg transition-all ${
-                                            editingPlayer.preferredFoot !== "Left"
-                                                ? "bg-slate-900 border-slate-900 text-white"
-                                                : "bg-white border-slate-205 text-slate-700 hover:bg-slate-50"
-                                        }`}
-                                    >
-                                        Right Foot
-                                    </button>
-                                </div>
-                            </div>
+                                 <label className="block text-xs font-medium text-slate-500">Preferred Foot</label>
+                                 <div className="flex gap-2">
+                                     <button
+                                         type="button"
+                                         onClick={() => setEditingPlayer({ ...editingPlayer, preferredFoot: editingPlayer.preferredFoot === "Left" ? undefined : "Left" })}
+                                         className={`flex-1 py-1.5 text-xs font-bold border rounded-lg transition-all ${
+                                             editingPlayer.preferredFoot === "Left"
+                                                 ? "bg-slate-900 border-slate-900 text-white"
+                                                 : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                                         }`}
+                                     >
+                                         Left Foot
+                                     </button>
+                                     <button
+                                         type="button"
+                                         onClick={() => setEditingPlayer({ ...editingPlayer, preferredFoot: editingPlayer.preferredFoot === "Right" ? undefined : "Right" })}
+                                         className={`flex-1 py-1.5 text-xs font-bold border rounded-lg transition-all ${
+                                             editingPlayer.preferredFoot === "Right"
+                                                 ? "bg-slate-900 border-slate-900 text-white"
+                                                 : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                                         }`}
+                                     >
+                                         Right Foot
+                                     </button>
+                                 </div>
+                             </div>
+
+                             <div className="space-y-1">
+                                 <label className="block text-xs font-medium text-slate-500">Registration Status</label>
+                                 <div className="flex gap-2">
+                                     {(["Standard", "Dual", "Loan"] as const).map(type => (
+                                         <button
+                                             type="button"
+                                             key={type}
+                                             onClick={() => setEditingPlayer({ ...editingPlayer, registrationType: type })}
+                                             className={`flex-1 py-1.5 text-xs font-bold border rounded-lg transition-all ${
+                                                 (editingPlayer.registrationType || "Standard") === type
+                                                     ? "bg-slate-900 border-slate-900 text-white"
+                                                     : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                                             }`}
+                                         >
+                                             {type === "Standard" ? "Standard" : type === "Dual" ? "Dual Reg" : "On Loan"}
+                                         </button>
+                                     ))}
+                                 </div>
+                             </div>
+
+                             {editingPlayer.registrationType === "Loan" && (
+                                 <div className="space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
+                                     <label className="block text-xs font-medium text-slate-650 mb-1">Loan Direction</label>
+                                     <div className="flex gap-2">
+                                         <button
+                                             type="button"
+                                             onClick={() => setEditingPlayer({ ...editingPlayer, isParentClub: true })}
+                                             className={`flex-1 py-1 text-xs font-bold border rounded transition-all ${
+                                                 editingPlayer.isParentClub
+                                                     ? "bg-slate-900 border-slate-900 text-white"
+                                                     : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                                             }`}
+                                         >
+                                             We are Parent Club
+                                         </button>
+                                         <button
+                                             type="button"
+                                             onClick={() => setEditingPlayer({ ...editingPlayer, isParentClub: false })}
+                                             className={`flex-1 py-1 text-xs font-bold border rounded transition-all ${
+                                                 !editingPlayer.isParentClub
+                                                     ? "bg-slate-900 border-slate-900 text-white"
+                                                     : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                                             }`}
+                                         >
+                                             Parent Club (Lender)
+                                         </button>
+                                     </div>
+                                 </div>
+                             )}
+
+                             {(editingPlayer.medicalStatus === "Injured" || editingPlayer.medicalStatus === "Doubtful") && (
+                                 <div className="space-y-3 bg-red-50/50 p-3 rounded-lg border border-red-100">
+                                     <div className="space-y-1">
+                                         <label className="block text-xs font-medium text-slate-600">Injury Description</label>
+                                         <Input
+                                             value={editingPlayer.injuryType || ""}
+                                             onChange={(e) => setEditingPlayer({ ...editingPlayer, injuryType: e.target.value })}
+                                             placeholder="e.g. Hamstring Tear"
+                                             className="h-8 text-sm bg-white"
+                                         />
+                                     </div>
+                                     <div className="space-y-1">
+                                         <label className="block text-xs font-medium text-slate-600">Estimated Out Timeline</label>
+                                         <Input
+                                             value={editingPlayer.injuryDuration || ""}
+                                             onChange={(e) => setEditingPlayer({ ...editingPlayer, injuryDuration: e.target.value })}
+                                             placeholder="e.g. 3-4 weeks"
+                                             className="h-8 text-sm bg-white"
+                                         />
+                                     </div>
+                                 </div>
+                             )}
 
                             <div className="space-y-4">
                                 <div className="space-y-1">

@@ -191,7 +191,14 @@ export default function DashboardPage() {
 
             const mapped: Player[] = filteredPlayers.map((p: any) => {
                 const matchFoot = p.notes ? p.notes.match(/\[FOOT:(Left|Right)\]/) : null;
-                const preferredFoot = matchFoot ? (matchFoot[1] as "Left" | "Right") : "Right";
+                const preferredFoot = matchFoot ? (matchFoot[1] as "Left" | "Right") : undefined;
+
+                const matchInjury = p.notes ? p.notes.match(/\[INJURY:(.*?)\]/) : null;
+                const injuryType = matchInjury ? matchInjury[1] : undefined;
+
+                const matchDuration = p.notes ? p.notes.match(/\[OUT_DURATION:(.*?)\]/) : null;
+                const injuryDuration = matchDuration ? matchDuration[1] : undefined;
+
                 return {
                     id: p.id,
                     firstName: p.first_name,
@@ -214,7 +221,9 @@ export default function DashboardPage() {
                     contractEndDate: p.contract_end_date,
                     weight: p.weight,
                     height: p.height,
-                    preferredFoot: preferredFoot
+                    preferredFoot: preferredFoot,
+                    injuryType: injuryType,
+                    injuryDuration: injuryDuration
                 };
             });
             setPlayers(mapped);
@@ -668,7 +677,11 @@ export default function DashboardPage() {
                             </div>
                             <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
                                 <span className="text-gray-300 font-bold">Footedness Breakdown</span>
-                                <span className="font-black text-white">Left {leftFootedCount} • Right {rightFootedCount}</span>
+                                <span className="font-black text-white">
+                                    {leftFootedCount === 0 && rightFootedCount === 0 
+                                        ? "Unspecified" 
+                                        : `Left ${leftFootedCount} • Right ${rightFootedCount}`}
+                                </span>
                             </div>
                         </CardContent>
                     </Card>
@@ -742,7 +755,11 @@ export default function DashboardPage() {
                                     <div>
                                         <span className="font-semibold text-white">{formatPlayerName(p)}</span>
                                         <span className="text-[10px] text-gray-300 ml-2">({p.position})</span>
-                                        <p className="text-[9px] text-gray-400 mt-1">Medical Review: Bi-weekly • Treatment: active physical therapy</p>
+                                        <p className="text-[9px] text-gray-400 mt-1">
+                                            {p.medicalStatus === "Suspended" ? "Disciplinary Suspension" : 
+                                             p.injuryType ? `Injury: ${p.injuryType} ${p.injuryDuration ? `• Est. Return: ${p.injuryDuration}` : ""}` : 
+                                             "Medical Review: Active physical therapy"}
+                                        </p>
                                     </div>
                                     <div className="text-right">
                                         <Badge className={`text-[8px] uppercase tracking-wide ${

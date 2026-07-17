@@ -51,6 +51,10 @@ export interface Player {
     weight?: number;
     height?: number;
     preferredFoot?: "Left" | "Right";
+    registrationType?: "Standard" | "Dual" | "Loan";
+    isParentClub?: boolean;
+    injuryType?: string;
+    injuryDuration?: string;
 }
 
 export interface Staff {
