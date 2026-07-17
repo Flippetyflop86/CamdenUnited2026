@@ -264,7 +264,7 @@ export default function LoginPage() {
                                 className="w-full h-auto select-none"
                                 style={{ 
                                     imageRendering: "-webkit-optimize-contrast",
-                                    transform: "scale(1.025)",
+                                    transform: "scale(1.045) translateX(-0.6%)",
                                     transformOrigin: "center center"
                                 }}
                             />
