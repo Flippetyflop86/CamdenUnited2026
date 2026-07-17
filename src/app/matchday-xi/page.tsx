@@ -1186,17 +1186,17 @@ export default function MatchdayXIPage() {
                             return (
                                 <div 
                                     key={idx} 
-                                    className="flex items-center gap-2"
+                                    className="flex items-center gap-2 w-full"
                                     onDragOver={handleDragOver}
                                     onDrop={(e) => handleDropOnSub(e, idx)}
                                 >
-                                    <span className="text-[10px] font-bold text-slate-400 w-3">{idx + 1}.</span>
+                                    <span className="text-[10px] font-bold text-slate-400 w-3 shrink-0">{idx + 1}.</span>
                                     
                                     <div 
                                         draggable={!!subId}
                                         onDragStart={(e) => subId && handleDragStart(e, subId, {type: 'sub', index: idx})}
                                         onClick={() => setActiveSlot({ type: 'sub', index: idx, label: `Bench Slot ${idx + 1}` })}
-                                        className={`flex-1 flex items-center justify-between p-2 border rounded-lg shadow-sm transition-all cursor-pointer hover:border-slate-400
+                                        className={`flex-1 min-w-0 flex items-center justify-between p-2 border rounded-lg shadow-sm transition-all cursor-pointer hover:border-slate-400
                                             ${subId ? 'bg-white hover:border-red-400 border-slate-200 group' : 'bg-slate-100 border-dashed border-slate-300 text-slate-400 hover:bg-slate-200'}`}
                                     >
                                         {subId ? (
