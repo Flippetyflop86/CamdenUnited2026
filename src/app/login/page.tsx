@@ -26,6 +26,7 @@ export default function LoginPage() {
             label: "01 Dashboard",
             title: "Dashboard Overview",
             description: "Get a real-time health check of your club. Track active roster status, view the next match details, monitor monthly payments progress, and keep an eye on recent training attendance.",
+            hideBrowserWrapper: true,
         },
         {
             id: "matchday",
@@ -259,7 +260,7 @@ export default function LoginPage() {
                     {tourTabs[activeTab].hideBrowserWrapper ? (
                         <div className="w-full relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl shadow-red-950/20 bg-slate-950/60 backdrop-blur-sm transition-all duration-300">
                             <img 
-                                src={activeTab === 1 ? "/matchday-xi-screenshot.png" : activeTab === 2 ? "/squad-management-screenshot.png" : "/training-tracking-screenshot.png"} 
+                                src={activeTab === 0 ? "/dashboard-screenshot.png" : activeTab === 1 ? "/matchday-xi-screenshot.png" : activeTab === 2 ? "/squad-management-screenshot.png" : "/training-tracking-screenshot.png"} 
                                 alt={tourTabs[activeTab].title} 
                                 className="w-full h-auto select-none"
                                 style={{ 
