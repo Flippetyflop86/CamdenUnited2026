@@ -745,27 +745,7 @@ export default function SquadPage() {
                                     <label htmlFor="useNickname" className="text-xs font-semibold text-slate-700 cursor-pointer">Use Nickname across site</label>
                                 </div>
                             </div>
-                            
-                            <div className="space-y-1">
-                                <label className="block text-xs font-medium text-slate-500">Player Photo</label>
-                                <div className="flex items-center gap-4">
-                                    {editingPlayer.imageUrl ? (
-                                        <div className="relative h-12 w-12 rounded-full overflow-hidden border-2 border-slate-200 shrink-0 bg-slate-100">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img src={editingPlayer.imageUrl} alt="Avatar" className="object-cover h-full w-full" />
-                                        </div>
-                                    ) : (
-                                        <div className="h-12 w-12 rounded-full bg-slate-100 flex items-center justify-center shrink-0 border-2 border-slate-200">
-                                            <span className="text-slate-400 font-bold text-xs">{editingPlayer.firstName?.[0]}{editingPlayer.lastName?.[0]}</span>
-                                        </div>
-                                    )}
-                                    <label className="flex items-center justify-center px-4 py-2 border border-slate-200 rounded-md shadow-sm text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 cursor-pointer flex-1 transition-colors">
-                                        {isUploadingImage ? <Loader2 className="h-4 w-4 mr-2 animate-spin text-slate-500" /> : <UploadCloud className="h-4 w-4 mr-2 text-slate-500" />}
-                                        {isUploadingImage ? "Uploading..." : "Upload Photo"}
-                                        <input type="file" className="hidden" accept="image/*" onChange={handleImageUpload} disabled={isUploadingImage} />
-                                    </label>
-                                </div>
-                            </div>
+
 
                             <div className="space-y-4">
                                 <div className="space-y-1">

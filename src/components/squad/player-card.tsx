@@ -123,13 +123,7 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                     >
                         {player.medicalStatus}
                     </Badge>
-                    <Avatar className="h-16 w-16 sm:h-24 sm:w-24 border-2 sm:border-4 border-slate-700 shadow-xl mt-6 sm:mt-0">
-                        <AvatarImage src={displayImage} />
-                        <AvatarFallback className="text-xl sm:text-2xl font-bold bg-slate-200 text-slate-800">
-                            {player.firstName[0]}{player.lastName[0]}
-                        </AvatarFallback>
-                    </Avatar>
-                    <div className="mt-2 sm:mt-4 text-center">
+                    <div className="mt-1 text-center">
                         <CardTitle className="text-white text-sm sm:text-lg truncate max-w-[140px] sm:max-w-none">{formatPlayerName(player)}</CardTitle>
                         <p className="text-slate-400 text-xs sm:text-sm font-medium">{player.position} • {squadLabel} • {displayAge} yo</p>
 
