@@ -39,6 +39,7 @@ export default function LoginPage() {
             label: "03 Squad Management",
             title: "Squad Management",
             description: "Manage player registry, monitor individual statistics (appearances, goals, assists), track contract expiry dates, and update medical availability statuses so you always know who is match-fit.",
+            hideBrowserWrapper: true,
         },
         {
             id: "finances",
@@ -257,8 +258,8 @@ export default function LoginPage() {
                     {tourTabs[activeTab].hideBrowserWrapper ? (
                         <div className="w-full relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl shadow-red-950/20 bg-slate-950/60 backdrop-blur-sm transition-all duration-300">
                             <img 
-                                src="/matchday-xi-screenshot.png" 
-                                alt="Matchday XI Layout" 
+                                src={activeTab === 1 ? "/matchday-xi-screenshot.png" : "/squad-management-screenshot.png"} 
+                                alt={tourTabs[activeTab].title} 
                                 className="w-full h-auto object-cover select-none"
                             />
                         </div>
