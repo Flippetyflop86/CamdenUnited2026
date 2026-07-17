@@ -279,7 +279,8 @@ export default function LoginPage() {
                         </div>
 
                         {/* Browser Viewport Content Area (High-Contrast Dark Theme) */}
-                        <div className="p-4 bg-[#0b0f19] text-slate-100 min-h-[480px] overflow-hidden flex flex-col justify-start text-left                                {activeTab === 0 && (
+                        <div className="p-4 bg-[#0b0f19] text-slate-100 min-h-[480px] overflow-hidden flex flex-col justify-start text-left">
+                            {activeTab === 0 && (
                                     <div className="space-y-4 animate-in fade-in duration-200 text-slate-200 text-left text-[10px]">
                                         {/* Dashboard Preview Header */}
                                         <div className="flex items-center gap-2 pb-2 border-b border-slate-850">
