@@ -50,6 +50,7 @@ export interface Player {
     status?: string;
     weight?: number;
     height?: number;
+    preferredFoot?: "Left" | "Right";
 }
 
 export interface Staff {

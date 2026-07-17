@@ -189,29 +189,34 @@ export default function DashboardPage() {
                 return sClean === mainSquadClean;
             });
 
-            const mapped: Player[] = filteredPlayers.map((p: any) => ({
-                id: p.id,
-                firstName: p.first_name,
-                lastName: p.last_name,
-                position: p.position,
-                squad: p.squad,
-                squadNumber: 0,
-                age: 0,
-                nationality: "",
-                dateOfBirth: p.date_of_birth,
-                medicalStatus: p.medical_status || "Available",
-                contractExpiry: p.contract_end_date || "",
-                availability: p.medical_status === "Available",
-                appearances: p.appearances || 0,
-                goals: p.goals || 0,
-                assists: p.assists || 0,
-                nickname: p.nickname || "",
-                useNickname: p.use_nickname || false,
-                isContracted: p.is_contracted,
-                contractEndDate: p.contract_end_date,
-                weight: p.weight,
-                height: p.height
-            }));
+            const mapped: Player[] = filteredPlayers.map((p: any) => {
+                const matchFoot = p.notes ? p.notes.match(/\[FOOT:(Left|Right)\]/) : null;
+                const preferredFoot = matchFoot ? (matchFoot[1] as "Left" | "Right") : "Right";
+                return {
+                    id: p.id,
+                    firstName: p.first_name,
+                    lastName: p.last_name,
+                    position: p.position,
+                    squad: p.squad,
+                    squadNumber: 0,
+                    age: 0,
+                    nationality: "",
+                    dateOfBirth: p.date_of_birth,
+                    medicalStatus: p.medical_status || "Available",
+                    contractExpiry: p.contract_end_date || "",
+                    availability: p.medical_status === "Available",
+                    appearances: p.appearances || 0,
+                    goals: p.goals || 0,
+                    assists: p.assists || 0,
+                    nickname: p.nickname || "",
+                    useNickname: p.use_nickname || false,
+                    isContracted: p.is_contracted,
+                    contractEndDate: p.contract_end_date,
+                    weight: p.weight,
+                    height: p.height,
+                    preferredFoot: preferredFoot
+                };
+            });
             setPlayers(mapped);
 
             const counts: Record<string, number> = {};
@@ -299,8 +304,8 @@ export default function DashboardPage() {
     const homegrownCount = Math.round(players.length * 0.7) || 0; // Mock homegrown rule logic
 
     // Left & Right Footed Distributions
-    const leftFootedCount = players.filter((p, i) => i % 3 === 0).length;
-    const rightFootedCount = players.length - leftFootedCount;
+    const leftFootedCount = players.filter(p => p.preferredFoot === "Left").length;
+    const rightFootedCount = players.filter(p => p.preferredFoot === "Right").length;
 
     // Average starting XI age & heights
     const getAverageAge = (roster: Player[]) => {

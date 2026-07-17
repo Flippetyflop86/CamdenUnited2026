@@ -401,6 +401,7 @@ export default function SquadPage() {
                     notes: p.notes,
                     weight: p.weight,
                     height: p.height,
+                    preferredFoot: p.notes && p.notes.includes("[FOOT:Left]") ? "Left" : "Right",
                     isInTrainingSquad: p.is_in_training_squad,
                     isInMatchdayTracker: p.is_in_matchday_tracker,
                     secondaryPositions: p.secondary_position ? p.secondary_position.split(",").map((s: string) => s.trim() as Position) : [],
@@ -495,8 +496,9 @@ export default function SquadPage() {
     const sortedPlayers = [...filteredPlayers].sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));
 
     const handleEdit = (player: Player) => { 
-        // Strip PIN from notes before showing edit dialog
-        const cleanedNotes = player.notes ? player.notes.replace(/\[PIN:\d{4}\]/, "").trim() : "";
+        // Strip PIN and FOOT from notes before showing edit dialog
+        let cleanedNotes = player.notes ? player.notes.replace(/\[PIN:\d{4}\]/, "").trim() : "";
+        cleanedNotes = cleanedNotes.replace(/\[FOOT:(Left|Right)\]/, "").trim();
         setEditingPlayer({ ...player, notes: cleanedNotes }); 
         setPreviewImage(player.imageUrl || null); 
     };
@@ -506,8 +508,12 @@ export default function SquadPage() {
         const originalPlayer = players.find(p => p.id === updatedPlayer.id);
         const matchPin = originalPlayer?.notes?.match(/\[PIN:(\d{4})\]/);
         const pinVal = matchPin ? matchPin[1] : null;
-        const cleanedNotes = updatedPlayer.notes ? updatedPlayer.notes.replace(/\[PIN:\d{4}\]/, "").trim() : "";
-        const finalNotes = pinVal ? `${cleanedNotes} [PIN:${pinVal}]`.trim() : cleanedNotes;
+        let cleanedNotes = updatedPlayer.notes ? updatedPlayer.notes.replace(/\[PIN:\d{4}\]/, "").trim() : "";
+        cleanedNotes = cleanedNotes.replace(/\[FOOT:(Left|Right)\]/, "").trim();
+        
+        let finalNotes = cleanedNotes;
+        if (pinVal) finalNotes = `${finalNotes} [PIN:${pinVal}]`.trim();
+        finalNotes = `${finalNotes} [FOOT:${updatedPlayer.preferredFoot || "Right"}]`.trim();
 
         const payload: any = {
             first_name: updatedPlayer.firstName,
@@ -773,6 +779,33 @@ export default function SquadPage() {
                                 </div>
                             </div>
 
+                            <div className="space-y-1">
+                                <label className="block text-xs font-medium text-slate-500">Preferred Foot</label>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingPlayer({ ...editingPlayer, preferredFoot: "Left" })}
+                                        className={`flex-1 py-1.5 text-xs font-bold border rounded-lg transition-all ${
+                                            editingPlayer.preferredFoot === "Left"
+                                                ? "bg-slate-900 border-slate-900 text-white"
+                                                : "bg-white border-slate-205 text-slate-700 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        Left Foot
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setEditingPlayer({ ...editingPlayer, preferredFoot: "Right" })}
+                                        className={`flex-1 py-1.5 text-xs font-bold border rounded-lg transition-all ${
+                                            editingPlayer.preferredFoot !== "Left"
+                                                ? "bg-slate-900 border-slate-900 text-white"
+                                                : "bg-white border-slate-205 text-slate-700 hover:bg-slate-50"
+                                        }`}
+                                    >
+                                        Right Foot
+                                    </button>
+                                </div>
+                            </div>
 
                             <div className="space-y-4">
                                 <div className="space-y-1">
