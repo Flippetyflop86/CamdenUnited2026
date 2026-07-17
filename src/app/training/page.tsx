@@ -135,19 +135,22 @@ export default function TrainingPage() {
         const { data, error } = await supabase.from("players").select("*");
         if (!error && data) {
             // Map simple fields needed for stats
-            setPlayers(data.map((p: any) => ({
-                id: p.id,
-                firstName: p.first_name,
-                lastName: p.last_name,
-                squad: p.squad,
-                isInTrainingSquad: p.is_in_training_squad,
-                isInMatchdayTracker: p.is_in_matchday_tracker,
-                imageUrl: p.image_url,
-                // ... other fields not strictly needed for this page but good for types
-                position: p.position,
-                squadNumber: p.squad_number,
-                medicalStatus: p.medical_status
-            } as any)));
+            setPlayers(data.map((p: any) => {
+                const pSquadClean = p.squad?.toLowerCase().replace(/[\s-_]+/g, '') || '';
+                const activeSquadMatch = currentSquads.find(s => s.toLowerCase().replace(/[\s-_]+/g, '') === pSquadClean);
+                return {
+                    id: p.id,
+                    firstName: p.first_name,
+                    lastName: p.last_name,
+                    squad: activeSquadMatch || currentSquads[0] || "First Team",
+                    isInTrainingSquad: p.is_in_training_squad,
+                    isInMatchdayTracker: p.is_in_matchday_tracker,
+                    imageUrl: p.image_url,
+                    position: p.position,
+                    squadNumber: p.squad_number,
+                    medicalStatus: p.medical_status
+                } as any;
+            }));
         }
     };
 
