@@ -783,28 +783,74 @@ export default function SquadPage() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="space-y-1">
-                                    <label className="block text-xs font-medium text-slate-500">Height (cm)</label>
-                                    <Input 
-                                        type="number" 
-                                        value={editingPlayer.height !== undefined && editingPlayer.height !== null ? editingPlayer.height : ""} 
-                                        onChange={(e) => setEditingPlayer({ ...editingPlayer, height: e.target.value === "" ? undefined : Number(e.target.value) })} 
-                                        placeholder="e.g. 182" 
-                                        className="h-8 text-sm" 
-                                    />
+                            {settings.measurementUnit === "imperial" ? (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-medium text-slate-500">Height (ft & in)</label>
+                                        <div className="flex gap-1.5">
+                                            <Input
+                                                type="number"
+                                                placeholder="Ft"
+                                                value={editingPlayer.height ? Math.floor((editingPlayer.height / 2.54) / 12) : ""}
+                                                onChange={(e) => {
+                                                    const ft = e.target.value === "" ? 0 : Number(e.target.value);
+                                                    const curInches = editingPlayer.height ? Math.round((editingPlayer.height / 2.54) % 12) : 0;
+                                                    const totalInch = (ft * 12) + curInches;
+                                                    const newCm = Math.round(totalInch * 2.54 * 10) / 10;
+                                                    setEditingPlayer({ ...editingPlayer, height: newCm || undefined });
+                                                }}
+                                                className="h-8 text-sm w-1/2 text-center"
+                                            />
+                                            <Input
+                                                type="number"
+                                                placeholder="In"
+                                                value={editingPlayer.height ? Math.round((editingPlayer.height / 2.54) % 12) : ""}
+                                                onChange={(e) => {
+                                                    const inch = e.target.value === "" ? 0 : Number(e.target.value);
+                                                    const curFeet = editingPlayer.height ? Math.floor((editingPlayer.height / 2.54) / 12) : 5;
+                                                    const totalInch = (curFeet * 12) + inch;
+                                                    const newCm = Math.round(totalInch * 2.54 * 10) / 10;
+                                                    setEditingPlayer({ ...editingPlayer, height: newCm || undefined });
+                                                }}
+                                                className="h-8 text-sm w-1/2 text-center"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-medium text-slate-500">Weight (lbs)</label>
+                                        <Input
+                                            type="number"
+                                            value={editingPlayer.weight ? Math.round(editingPlayer.weight * 2.20462) : ""}
+                                            onChange={(e) => setEditingPlayer({ ...editingPlayer, weight: e.target.value === "" ? undefined : Math.round(Number(e.target.value) / 2.20462 * 10) / 10 })}
+                                            placeholder="e.g. 170"
+                                            className="h-8 text-sm"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="block text-xs font-medium text-slate-500">Weight (kg)</label>
-                                    <Input 
-                                        type="number" 
-                                        value={editingPlayer.weight !== undefined && editingPlayer.weight !== null ? editingPlayer.weight : ""} 
-                                        onChange={(e) => setEditingPlayer({ ...editingPlayer, weight: e.target.value === "" ? undefined : Number(e.target.value) })} 
-                                        placeholder="e.g. 78" 
-                                        className="h-8 text-sm" 
-                                    />
+                            ) : (
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-medium text-slate-500">Height (cm)</label>
+                                        <Input 
+                                            type="number" 
+                                            value={editingPlayer.height !== undefined && editingPlayer.height !== null ? editingPlayer.height : ""} 
+                                            onChange={(e) => setEditingPlayer({ ...editingPlayer, height: e.target.value === "" ? undefined : Number(e.target.value) })} 
+                                            placeholder="e.g. 182" 
+                                            className="h-8 text-sm" 
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-medium text-slate-500">Weight (kg)</label>
+                                        <Input 
+                                            type="number" 
+                                            value={editingPlayer.weight !== undefined && editingPlayer.weight !== null ? editingPlayer.weight : ""} 
+                                            onChange={(e) => setEditingPlayer({ ...editingPlayer, weight: e.target.value === "" ? undefined : Number(e.target.value) })} 
+                                            placeholder="e.g. 78" 
+                                            className="h-8 text-sm" 
+                                        />
+                                    </div>
                                 </div>
-                            </div>
+                            )}
 
                             <div className="space-y-1">
                                  <label className="block text-xs font-medium text-slate-500">Preferred Foot</label>

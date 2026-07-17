@@ -794,10 +794,10 @@ export default function SquadDepthPage() {
 
                             <div className="grid grid-cols-2 gap-4 text-xs pt-4 border-t">
                                 <div>
-                                    <span className="text-slate-400 font-bold uppercase block text-[9px]">Height (optional)</span>
+                                    <span className="text-slate-400 font-bold uppercase block text-[9px]">Height ({settings.measurementUnit === 'imperial' ? 'ft & in' : 'cm'})</span>
                                     <input
                                         type="text"
-                                        placeholder="e.g. 182cm"
+                                        placeholder={settings.measurementUnit === 'imperial' ? "e.g. 5'11\"" : "e.g. 182cm"}
                                         value={getParsedNotes(selectedPlayer.notes || "").height}
                                         onChange={(e) => handleSavePlayerDetails({
                                             ...getParsedNotes(selectedPlayer.notes || ""),
@@ -808,10 +808,10 @@ export default function SquadDepthPage() {
                                     />
                                 </div>
                                 <div>
-                                    <span className="text-slate-400 font-bold uppercase block text-[9px]">Weight (optional)</span>
+                                    <span className="text-slate-400 font-bold uppercase block text-[9px]">Weight ({settings.measurementUnit === 'imperial' ? 'lbs' : 'kg'})</span>
                                     <input
                                         type="text"
-                                        placeholder="e.g. 78kg"
+                                        placeholder={settings.measurementUnit === 'imperial' ? "e.g. 170lbs" : "e.g. 78kg"}
                                         value={getParsedNotes(selectedPlayer.notes || "").weight}
                                         onChange={(e) => handleSavePlayerDetails({
                                             ...getParsedNotes(selectedPlayer.notes || ""),

@@ -346,7 +346,7 @@ export default function DashboardPage() {
     // Finance and registration updates
     const outstandingInvoices = paymentRequests.filter(r => r.status === "Unpaid" || r.status === "unpaid" || r.status === "Overdue");
     const totalOutstandingAmount = outstandingInvoices.reduce((sum, r) => sum + (r.amount || 0), 0);
-    const registrationIssues = players.filter(p => !p.dateOfBirth || (p.isContracted && !p.contractEndDate));
+    const registrationIssues = players.filter(p => p.status === "Pending Registration" || p.status === "Pending Invitation" || p.status === "Draft");
 
     // Dynamic priorities list
     const getPriorities = () => {
@@ -354,17 +354,20 @@ export default function DashboardPage() {
         if (registrationIssues.length > 0) list.push({ label: `Submit ${registrationIssues.length} Missing Player Registrations`, category: "Registration" });
         if (totalOutstandingAmount > 0) list.push({ label: `Collect Outstanding Player Dues (£${totalOutstandingAmount})`, category: "Finance" });
         if (nextMatch) list.push({ label: `Confirm Matchday Squad vs ${nextMatch.opponent}`, category: "Matchday" });
-        if (injuredPlayers.length > 0) list.push({ label: `Update Injury Recovery Status for ${injuredPlayers.length} Roster Members`, category: "Medical" });
-        if (recruits.filter(r => r.on_trial).length > 0) list.push({ label: `Approve Active Trialist Profiles`, category: "Recruitment" });
+        if (injuredPlayers.length > 0) list.push({ label: `Update Injury Recovery Status for ${injuredPlayers.length} Squad Members`, category: "Medical" });
         if (settings.leagueUrl && !settings.leaguePosition) list.push({ label: "Sync League Table Standings", category: "Operations" });
         return list.slice(0, 5);
     };
     const priorities = getPriorities();
 
-    // V3 Team Performance calculations from actual matches
-    const completedMatches = matches.filter(m => m.result && m.result !== "Pending");
-    const winsCount = matches.filter(m => m.result === "Win").length;
-    const drawsCount = matches.filter(m => m.result === "Draw").length;
+    // V3 Team Performance calculations from actual matches (excluding friendlies)
+    const completedMatches = matches.filter(m => {
+        if (!m.result || m.result === "Pending") return false;
+        const comp = (m.competition || "").toLowerCase();
+        return !comp.includes("friendly") && !comp.includes("pre-season") && !comp.includes("trial");
+    });
+    const winsCount = completedMatches.filter(m => m.result === "Win").length;
+    const drawsCount = completedMatches.filter(m => m.result === "Draw").length;
     const winRate = completedMatches.length > 0 ? Math.round((winsCount / completedMatches.length) * 100) : 0;
     const ppg = completedMatches.length > 0 ? ((winsCount * 3 + drawsCount) / completedMatches.length).toFixed(2) : "0.00";
 
@@ -669,7 +672,7 @@ export default function DashboardPage() {
                                 <span className="font-black text-white">{avgSquadAge} years</span>
                             </div>
                             <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
-                                <span className="text-gray-300 font-bold">Homegrown Roster Members</span>
+                                <span className="text-gray-300 font-bold">Homegrown Squad Members</span>
                                 <span className="font-black text-white">{homegrownCount}</span>
                             </div>
                             <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
@@ -714,7 +717,7 @@ export default function DashboardPage() {
 
                             <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between items-center">
                                 <div>
-                                    <span className="text-[10px] text-gray-350 uppercase font-bold">Training Attendance Tracking</span>
+                                    <span className="text-[10px] text-gray-200 uppercase font-bold">Training Attendance Tracking</span>
                                     <div className="text-sm font-black text-white mt-0.5">{lastSessionAttendanceRate}%</div>
                                     <p className="text-[8px] text-gray-400 mt-1 leading-none">
                                         {lastSession ? `Last session: ${formatDate(lastSession.date)} ${lastSession.topic ? `• ${lastSession.topic}` : ''}` : 'No sessions logged'}
@@ -731,7 +734,7 @@ export default function DashboardPage() {
                 <CardHeader className="pb-3 border-b border-gray-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Injury &amp; Suspension Log</CardTitle>
-                        <CardDescription className="text-xs text-gray-300">Roster health and physical therapy recovery parameters</CardDescription>
+                        <CardDescription className="text-xs text-gray-300">Squad health and physical therapy recovery parameters</CardDescription>
                     </div>
                     {/* Log Filter Header */}
                     <div className="flex flex-wrap bg-slate-950 p-0.5 rounded-lg border border-gray-800">
@@ -826,7 +829,7 @@ export default function DashboardPage() {
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
                     <CardHeader className="pb-3 border-b border-gray-800/80">
                         <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Recruitment Pipeline</CardTitle>
-                        <CardDescription className="text-xs text-gray-300">Roster acquisition pipeline progress indicators</CardDescription>
+                        <CardDescription className="text-xs text-gray-300">Squad acquisition pipeline progress indicators</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4 text-xs space-y-3.5">
                         <div className="space-y-1">
@@ -884,16 +887,8 @@ export default function DashboardPage() {
                                 <span className="font-bold text-white">{lineup?.formation || "4-2-3-1"}</span>
                             </div>
                             <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between">
-                                <span> Roster Average Age</span>
+                                <span>Squad Average Age</span>
                                 <span className="font-bold text-white">{avgSquadAge} yrs</span>
-                            </div>
-                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between">
-                                <span>Average Height</span>
-                                <span className="font-bold text-white">182.4 cm</span>
-                            </div>
-                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between">
-                                <span>xG Rating</span>
-                                <span className="font-bold text-emerald-400">1.82</span>
                             </div>
                         </div>
                         <div className="flex justify-center">

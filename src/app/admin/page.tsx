@@ -84,6 +84,7 @@ export default function AdminPage() {
         return settings.notificationsEnabled || false;
     });
     const [notificationEmail, setNotificationEmail] = useState(() => getCached("notificationEmail") ?? settings.notificationEmail ?? "");
+    const [measurementUnit, setMeasurementUnit] = useState<"metric" | "imperial">(() => (getCached("measurementUnit") ?? settings.measurementUnit ?? "metric") as "metric" | "imperial");
 
     const [isMigrating, setIsMigrating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -245,6 +246,8 @@ export default function AdminPage() {
             setNotificationsEnabled(cachedNotifications !== null ? cachedNotifications === "true" : (settings.notificationsEnabled || false));
             
             setNotificationEmail(getCached("notificationEmail") ?? settings.notificationEmail ?? "");
+            const cachedUnit = getCached("measurementUnit");
+            setMeasurementUnit((cachedUnit ?? settings.measurementUnit ?? "metric") as "metric" | "imperial");
 
             const cachedTraining = getCached("trainingTemplate");
             const cachedMatch = getCached("matchTemplate");
@@ -300,7 +303,8 @@ export default function AdminPage() {
             notificationEmail,
             managerName,
             trainingTemplate,
-            matchTemplate
+            matchTemplate,
+            measurementUnit
         };
 
         Object.entries(cache).forEach(([key, val]) => {
@@ -310,7 +314,7 @@ export default function AdminPage() {
         name, squads, homeGround, foundingYear, twitterUrl, instagramUrl, primaryColor,
         homeKitShirt, homeKitShorts, homeKitSocks, awayKitShirt, awayKitShorts, awayKitSocks,
         leagueUrl, leaguePosition, monthlySubs, subsEnabled, contractsEnabled, finesEnabled,
-        fineCategories, notificationsEnabled, notificationEmail, managerName, trainingTemplate, matchTemplate
+        fineCategories, notificationsEnabled, notificationEmail, managerName, trainingTemplate, matchTemplate, measurementUnit
     ]);
 
     const fetchTeamAccess = async () => {
@@ -666,6 +670,7 @@ export default function AdminPage() {
                 notificationsEnabled,
                 notificationEmail,
                 sponsorLogo: finalSponsor,
+                measurementUnit,
                 whatsappPollMessage: JSON.stringify({
                     training: trainingTemplate,
                     match: matchTemplate
@@ -679,7 +684,7 @@ export default function AdminPage() {
                 "name", "squads", "homeGround", "foundingYear", "twitterUrl", "instagramUrl", "primaryColor",
                 "homeKitShirt", "homeKitShorts", "homeKitSocks", "awayKitShirt", "awayKitShorts", "awayKitSocks",
                 "leagueUrl", "leaguePosition", "monthlySubs", "subsEnabled", "contractsEnabled", "finesEnabled",
-                "fineCategories", "notificationsEnabled", "notificationEmail", "managerName", "trainingTemplate", "matchTemplate"
+                "fineCategories", "notificationsEnabled", "notificationEmail", "managerName", "trainingTemplate", "matchTemplate", "measurementUnit"
             ];
             ADMIN_CACHE_KEYS.forEach(key => sessionStorage.removeItem(`clubflow_admin_${key}`));
         } catch (error) {
@@ -844,6 +849,19 @@ export default function AdminPage() {
                                     onChange={(e) => setManagerName(e.target.value)}
                                     placeholder="e.g. Ted Lasso"
                                 />
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label htmlFor="measurementUnit">Preferred Units (Height & Weight)</Label>
+                                <select
+                                    id="measurementUnit"
+                                    value={measurementUnit}
+                                    onChange={(e) => setMeasurementUnit(e.target.value as "metric" | "imperial")}
+                                    className="w-full h-10 border rounded-md px-3 text-sm bg-white focus:ring-2 focus:ring-slate-400 focus:outline-none border-slate-205"
+                                >
+                                    <option value="metric">Metric (kg / cm)</option>
+                                    <option value="imperial">Imperial (lbs / ft & in)</option>
+                                </select>
                             </div>
 
                             <div className="space-y-2">

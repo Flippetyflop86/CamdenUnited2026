@@ -35,6 +35,7 @@ interface ClubSettings {
     trainingFeePerSession?: number;
     contractsEnabled: boolean;
     subsEnabled: boolean;
+    measurementUnit?: "metric" | "imperial";
 }
 
 interface ClubContextType {
@@ -78,7 +79,8 @@ const defaultSettings: ClubSettings = {
     registrationFee: 0,
     trainingFeePerSession: 0,
     contractsEnabled: false,
-    subsEnabled: true
+    subsEnabled: true,
+    measurementUnit: "metric"
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -213,7 +215,8 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         registrationFee: Number(data.registration_fee) || 0,
                         trainingFeePerSession: Number(data.training_fee_per_session) || 0,
                         contractsEnabled: data.contracts_enabled !== undefined ? !!data.contracts_enabled : false,
-                        subsEnabled: data.subs_enabled !== undefined ? !!data.subs_enabled : true
+                        subsEnabled: data.subs_enabled !== undefined ? !!data.subs_enabled : true,
+                        measurementUnit: (typeof window !== "undefined" ? localStorage.getItem("clubflow_measurement_unit") : "metric") as any || "metric"
                     });
                 }
             } catch (err) {
@@ -227,6 +230,9 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
     }, [user, clubId, authLoading]);
 
     const updateSettings = async (newSettings: Partial<ClubSettings>, pagePermissions?: string[]) => {
+        if (newSettings.measurementUnit && typeof window !== "undefined") {
+            localStorage.setItem("clubflow_measurement_unit", newSettings.measurementUnit);
+        }
         let finalSecondaryColor = newSettings.secondaryColor ?? settings.secondaryColor;
         if (newSettings.primaryColor && !newSettings.secondaryColor) {
             finalSecondaryColor = generateSecondaryColor(newSettings.primaryColor);
