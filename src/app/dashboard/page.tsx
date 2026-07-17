@@ -145,7 +145,8 @@ export default function DashboardPage() {
                 
                 let cleanNotes = m.notes || "";
                 cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/, "");
-                cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "").trim();
+                cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "");
+                cleanNotes = cleanNotes.replace(/\[Lineup: \{.*\}\]\n?/, "").trim();
                 
                 return {
                     id: m.id,
