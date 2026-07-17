@@ -52,6 +52,7 @@ export default function LoginPage() {
             label: "05 Training Tracking",
             title: "Training Tracker",
             description: "Plan weekly training sessions, log player attendance, and track performance metrics. View detailed attendance heatmaps to see who's dedicated.",
+            hideBrowserWrapper: true,
         }
     ];
 
@@ -258,7 +259,7 @@ export default function LoginPage() {
                     {tourTabs[activeTab].hideBrowserWrapper ? (
                         <div className="w-full relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl shadow-red-950/20 bg-slate-950/60 backdrop-blur-sm transition-all duration-300">
                             <img 
-                                src={activeTab === 1 ? "/matchday-xi-screenshot.png" : "/squad-management-screenshot.png"} 
+                                src={activeTab === 1 ? "/matchday-xi-screenshot.png" : activeTab === 2 ? "/squad-management-screenshot.png" : "/training-tracking-screenshot.png"} 
                                 alt={tourTabs[activeTab].title} 
                                 className="w-full h-auto object-cover select-none"
                             />
