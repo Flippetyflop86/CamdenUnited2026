@@ -68,8 +68,18 @@ export async function POST(request: Request) {
             }
         });
 
+        let leagueName = $('title').text().trim() || $('.league-title').text().trim() || "";
+        if (leagueName.toLowerCase().includes("fa full-time")) {
+            leagueName = leagueName.replace(/-\s*fa\s*full-time/i, "").trim();
+        }
+        if (leagueName.includes("|")) {
+            leagueName = leagueName.split("|")[0].trim();
+        } else if (leagueName.includes("-")) {
+            leagueName = leagueName.split("-")[0].trim();
+        }
+
         if (position !== null) {
-            return NextResponse.json({ success: true, position, foundName });
+            return NextResponse.json({ success: true, position, foundName, leagueName });
         } else {
             return NextResponse.json({ 
                 success: false, 

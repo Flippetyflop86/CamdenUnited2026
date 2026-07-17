@@ -921,7 +921,16 @@ export default function MatchdayXIPage() {
                         </select>
                     </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                    <Button onClick={async () => {
+                        if (!selectedMatchId) return;
+                        await saveLineup(lineup);
+                        localStorage.setItem("matchday_squad_confirmed_" + selectedMatchId, "true");
+                        alert("Matchday squad confirmed! This task will be removed from your dashboard priorities.");
+                    }} className="bg-red-650 hover:bg-red-700 text-white font-bold">
+                        <Save className="h-4 w-4 mr-2" />
+                        Save &amp; Confirm Lineup
+                    </Button>
                     <Button onClick={handleClearLineup} variant="outline" className="border-slate-300 hover:bg-slate-100 text-slate-700">
                         <Trash2 className="h-4 w-4 mr-2" />
                         Clear Pitch

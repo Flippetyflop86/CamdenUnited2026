@@ -47,7 +47,7 @@ export default function DashboardPage() {
     const [recruits, setRecruits] = useState<any[]>([]);
     const [trainingSessions, setTrainingSessions] = useState<any[]>([]);
     const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
-    const [injuryFilter, setInjuryFilter] = useState<'All' | 'Injured' | 'Suspended' | 'Recovering' | 'Available'>('All');
+    const [injuryFilter, setInjuryFilter] = useState<'All' | 'Injured' | 'Suspended' | 'On Holiday'>('All');
 
     useEffect(() => {
         fetchData();
@@ -259,6 +259,9 @@ export default function DashboardPage() {
 
             if (data.success && data.position) {
                 await updateSettings({ leaguePosition: data.position });
+                if (data.leagueName) {
+                    localStorage.setItem("clubflow_league_name", data.leagueName);
+                }
                 setSyncSuccess(true);
                 setTimeout(() => setSyncSuccess(false), 3000);
             } else {
@@ -353,7 +356,12 @@ export default function DashboardPage() {
         const list = [];
         if (registrationIssues.length > 0) list.push({ label: `Submit ${registrationIssues.length} Missing Player Registrations`, category: "Registration" });
         if (totalOutstandingAmount > 0) list.push({ label: `Collect Outstanding Player Dues (£${totalOutstandingAmount})`, category: "Finance" });
-        if (nextMatch) list.push({ label: `Confirm Matchday Squad vs ${nextMatch.opponent}`, category: "Matchday" });
+        
+        const isMatchConfirmed = typeof window !== "undefined" && nextMatch
+            ? localStorage.getItem("matchday_squad_confirmed_" + nextMatch.id) === "true"
+            : false;
+        if (nextMatch && !isMatchConfirmed) list.push({ label: `Confirm Matchday Squad vs ${nextMatch.opponent}`, category: "Matchday" });
+        
         if (injuredPlayers.length > 0) list.push({ label: `Update Injury Recovery Status for ${injuredPlayers.length} Squad Members`, category: "Medical" });
         if (settings.leagueUrl && !settings.leaguePosition) list.push({ label: "Sync League Table Standings", category: "Operations" });
         return list.slice(0, 5);
@@ -406,13 +414,32 @@ export default function DashboardPage() {
 
     // Injury table list filtering
     const getFilteredInjuryList = () => {
-        if (injuryFilter === "Injured") return injuredPlayers.filter(p => p.medicalStatus === "Injured" || p.medicalStatus === "Doubtful");
+        const holidayPlayers = players.filter(p => p.medicalStatus === "Holiday");
+        if (injuryFilter === "Injured") return injuredPlayers;
         if (injuryFilter === "Suspended") return suspendedPlayers;
-        if (injuryFilter === "Recovering") return recoveringPlayers;
-        if (injuryFilter === "Available") return availablePlayers;
-        return [...injuredPlayers, ...suspendedPlayers, ...recoveringPlayers];
+        if (injuryFilter === "On Holiday") return holidayPlayers;
+        return [...injuredPlayers, ...suspendedPlayers, ...holidayPlayers];
     };
     const filteredInjuryList = getFilteredInjuryList();
+
+    const getLeagueName = () => {
+        if (!settings.leagueUrl) return "No League Configured";
+        const stored = typeof window !== "undefined" ? localStorage.getItem("clubflow_league_name") : null;
+        if (stored) return stored;
+        try {
+            const url = new URL(settings.leagueUrl);
+            if (url.hostname.includes("thefa.com")) {
+                return "FA Full-Time League";
+            }
+            if (url.hostname.includes("mitoo")) {
+                return "Mitoo League";
+            }
+            const parts = url.hostname.replace("www.", "").split(".");
+            return parts[0].charAt(0).toUpperCase() + parts[0].slice(1) + " League";
+        } catch (e) {
+            return "League";
+        }
+    };
 
     const renderMiniPitch = () => {
         if (!lineup || !players.length || Object.keys(lineup.starters || {}).length === 0) return (
@@ -487,7 +514,7 @@ export default function DashboardPage() {
                         </Badge>
                     </div>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-300 mt-1.5 font-medium">
-                        <span>League: <span className="text-white">{settings.leagueUrl ? "Isthmian League" : "Southern League"}</span></span>
+                        <span>League: <span className="text-white">{getLeagueName()}</span></span>
                         <span>•</span>
                         <span>Season: <span className="text-white">2026/27</span></span>
                         <span>•</span>
@@ -738,7 +765,7 @@ export default function DashboardPage() {
                     </div>
                     {/* Log Filter Header */}
                     <div className="flex flex-wrap bg-slate-950 p-0.5 rounded-lg border border-gray-800">
-                        {(['All', 'Injured', 'Suspended', 'Recovering', 'Available'] as const).map(tab => (
+                        {(['All', 'Injured', 'Suspended', 'On Holiday'] as const).map(tab => (
                             <button
                                 key={tab}
                                 onClick={() => setInjuryFilter(tab)}
@@ -761,17 +788,18 @@ export default function DashboardPage() {
                                         <span className="text-[10px] text-gray-300 ml-2">({p.position})</span>
                                         <p className="text-[9px] text-gray-400 mt-1">
                                             {p.medicalStatus === "Suspended" ? "Disciplinary Suspension" : 
+                                             p.medicalStatus === "Holiday" ? "Away on Holiday" :
                                              p.injuryType ? `Injury: ${p.injuryType} ${p.injuryDuration ? `• Est. Return: ${p.injuryDuration}` : ""}` : 
-                                             "Medical Review: Active physical therapy"}
+                                             "Injured - notes pending"}
                                         </p>
                                     </div>
                                     <div className="text-right">
                                         <Badge className={`text-[8px] uppercase tracking-wide ${
-                                            p.medicalStatus === "Available" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
+                                            p.medicalStatus === "Holiday" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
                                             p.medicalStatus === "Suspended" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
-                                            "bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                            "bg-red-650/10 text-red-400 border border-red-650/20"
                                         }`}>
-                                            {p.medicalStatus}
+                                            {p.medicalStatus === "Holiday" ? "Holiday" : p.medicalStatus}
                                         </Badge>
                                     </div>
                                 </div>

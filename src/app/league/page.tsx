@@ -44,6 +44,9 @@ export default function LeagueTablePage() {
                 
                 if (data.success && data.position) {
                     scrapedPosition = data.position;
+                    if (data.leagueName) {
+                        localStorage.setItem("clubflow_league_name", data.leagueName);
+                    }
                 } else if (!data.success && data.error) {
                     setErrorMsg(data.error);
                     setIsSaving(false);
