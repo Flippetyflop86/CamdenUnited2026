@@ -190,8 +190,8 @@ export default function DashboardPage() {
             });
 
             const mapped: Player[] = filteredPlayers.map((p: any) => {
-                const matchFoot = p.notes ? p.notes.match(/\[FOOT:(Left|Right)\]/) : null;
-                const preferredFoot = matchFoot ? (matchFoot[1] as "Left" | "Right") : undefined;
+                const matchFoot = p.notes ? p.notes.match(/\[FOOT:(Left|Right|Both)\]/) : null;
+                const preferredFoot = matchFoot ? (matchFoot[1] as "Left" | "Right" | "Both") : undefined;
 
                 const matchInjury = p.notes ? p.notes.match(/\[INJURY:(.*?)\]/) : null;
                 const injuryType = matchInjury ? matchInjury[1] : undefined;
@@ -312,9 +312,10 @@ export default function DashboardPage() {
     }).length;
     const homegrownCount = Math.round(players.length * 0.7) || 0; // Mock homegrown rule logic
 
-    // Left & Right Footed Distributions
+    // Left, Right & Both Footed Distributions
     const leftFootedCount = players.filter(p => p.preferredFoot === "Left").length;
     const rightFootedCount = players.filter(p => p.preferredFoot === "Right").length;
+    const bothFootedCount = players.filter(p => p.preferredFoot === "Both").length;
 
     // Average starting XI age & heights
     const getAverageAge = (roster: Player[]) => {
@@ -678,9 +679,9 @@ export default function DashboardPage() {
                             <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
                                 <span className="text-gray-300 font-bold">Footedness Breakdown</span>
                                 <span className="font-black text-white">
-                                    {leftFootedCount === 0 && rightFootedCount === 0 
+                                    {leftFootedCount === 0 && rightFootedCount === 0 && bothFootedCount === 0
                                         ? "Unspecified" 
-                                        : `Left ${leftFootedCount} • Right ${rightFootedCount}`}
+                                        : `Left ${leftFootedCount} • Right ${rightFootedCount} • Both ${bothFootedCount}`}
                                 </span>
                             </div>
                         </CardContent>

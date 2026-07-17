@@ -401,7 +401,7 @@ export default function SquadPage() {
                     notes: p.notes,
                     weight: p.weight,
                     height: p.height,
-                    preferredFoot: p.notes && p.notes.includes("[FOOT:Left]") ? "Left" : (p.notes && p.notes.includes("[FOOT:Right]") ? "Right" : undefined),
+                    preferredFoot: p.notes && p.notes.includes("[FOOT:Left]") ? "Left" : (p.notes && p.notes.includes("[FOOT:Right]") ? "Right" : (p.notes && p.notes.includes("[FOOT:Both]") ? "Both" : undefined)),
                     registrationType: p.notes && p.notes.includes("[REG:Dual]") ? "Dual" : (p.notes && (p.notes.includes("[REG:LoanParent]") || p.notes.includes("[REG:LoanSub]")) ? "Loan" : "Standard"),
                     isParentClub: p.notes && p.notes.includes("[REG:LoanParent]") ? true : false,
                     injuryType: p.notes && p.notes.match(/\[INJURY:(.*?)\]/) ? p.notes.match(/\[INJURY:(.*?)\]/)![1] : undefined,
@@ -503,7 +503,7 @@ export default function SquadPage() {
         // Strip PIN and custom V3 tags from notes before showing edit dialog
         let cleanedNotes = player.notes ? player.notes : "";
         cleanedNotes = cleanedNotes.replace(/\[PIN:\d{4}\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[FOOT:(Left|Right)\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[FOOT:(Left|Right|Both)\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[REG:(Standard|Dual|LoanParent|LoanSub)\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[INJURY:.*?\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[OUT_DURATION:.*?\]/, "").trim();
@@ -519,7 +519,7 @@ export default function SquadPage() {
         const pinVal = matchPin ? matchPin[1] : null;
         let cleanedNotes = updatedPlayer.notes ? updatedPlayer.notes : "";
         cleanedNotes = cleanedNotes.replace(/\[PIN:\d{4}\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[FOOT:(Left|Right)\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[FOOT:(Left|Right|Both)\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[REG:(Standard|Dual|LoanParent|LoanSub)\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[INJURY:.*?\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[OUT_DURATION:.*?\]/, "").trim();
@@ -818,7 +818,7 @@ export default function SquadPage() {
                                                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                                          }`}
                                      >
-                                         Left Foot
+                                         Left
                                      </button>
                                      <button
                                          type="button"
@@ -829,7 +829,18 @@ export default function SquadPage() {
                                                  : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
                                          }`}
                                      >
-                                         Right Foot
+                                         Right
+                                     </button>
+                                     <button
+                                         type="button"
+                                         onClick={() => setEditingPlayer({ ...editingPlayer, preferredFoot: editingPlayer.preferredFoot === "Both" ? undefined : "Both" })}
+                                         className={`flex-1 py-1.5 text-xs font-bold border rounded-lg transition-all ${
+                                             editingPlayer.preferredFoot === "Both"
+                                                 ? "bg-slate-900 border-slate-900 text-white"
+                                                 : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50"
+                                         }`}
+                                     >
+                                         Both
                                      </button>
                                  </div>
                              </div>
@@ -880,29 +891,6 @@ export default function SquadPage() {
                                          >
                                              Parent Club (Lender)
                                          </button>
-                                     </div>
-                                 </div>
-                             )}
-
-                             {(editingPlayer.medicalStatus === "Injured" || editingPlayer.medicalStatus === "Doubtful") && (
-                                 <div className="space-y-3 bg-red-50/50 p-3 rounded-lg border border-red-100">
-                                     <div className="space-y-1">
-                                         <label className="block text-xs font-medium text-slate-600">Injury Description</label>
-                                         <Input
-                                             value={editingPlayer.injuryType || ""}
-                                             onChange={(e) => setEditingPlayer({ ...editingPlayer, injuryType: e.target.value })}
-                                             placeholder="e.g. Hamstring Tear"
-                                             className="h-8 text-sm bg-white"
-                                         />
-                                     </div>
-                                     <div className="space-y-1">
-                                         <label className="block text-xs font-medium text-slate-600">Estimated Out Timeline</label>
-                                         <Input
-                                             value={editingPlayer.injuryDuration || ""}
-                                             onChange={(e) => setEditingPlayer({ ...editingPlayer, injuryDuration: e.target.value })}
-                                             placeholder="e.g. 3-4 weeks"
-                                             className="h-8 text-sm bg-white"
-                                         />
                                      </div>
                                  </div>
                              )}
@@ -1042,6 +1030,29 @@ export default function SquadPage() {
                                     <option value="Suspended">Suspended</option>
                                 </select>
                             </div>
+
+                            {(editingPlayer.medicalStatus === "Injured" || editingPlayer.medicalStatus === "Doubtful") && (
+                                <div className="space-y-3 bg-red-50/50 p-3 rounded-lg border border-red-100">
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-medium text-slate-600">Injury Description</label>
+                                        <Input
+                                            value={editingPlayer.injuryType || ""}
+                                            onChange={(e) => setEditingPlayer({ ...editingPlayer, injuryType: e.target.value })}
+                                            placeholder="e.g. Hamstring Tear"
+                                            className="h-8 text-sm bg-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-medium text-slate-600">Estimated Out Timeline</label>
+                                        <Input
+                                            value={editingPlayer.injuryDuration || ""}
+                                            onChange={(e) => setEditingPlayer({ ...editingPlayer, injuryDuration: e.target.value })}
+                                            placeholder="e.g. 3-4 weeks"
+                                            className="h-8 text-sm bg-white"
+                                        />
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="space-y-1">
     <label className="block text-xs font-medium text-slate-500">Date of Birth</label>

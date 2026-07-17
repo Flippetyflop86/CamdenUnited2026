@@ -50,7 +50,7 @@ export interface Player {
     status?: string;
     weight?: number;
     height?: number;
-    preferredFoot?: "Left" | "Right";
+    preferredFoot?: "Left" | "Right" | "Both";
     registrationType?: "Standard" | "Dual" | "Loan";
     isParentClub?: boolean;
     injuryType?: string;
