@@ -177,7 +177,7 @@ export default function DashboardPage() {
     const fetchSquad = async () => {
         const { data } = await supabase
             .from('players')
-            .select('id, first_name, last_name, position, squad, image_url, date_of_birth, appearances, goals, assists, nickname, use_nickname, medical_status, is_contracted, contract_end_date, weight, height');
+            .select('id, first_name, last_name, position, squad, image_url, date_of_birth, appearances, goals, assists, nickname, use_nickname, medical_status, is_contracted, contract_end_date, weight, height, notes');
         
         if (data) {
             const mainSquad = settings.squads?.[0] || "First Team";
