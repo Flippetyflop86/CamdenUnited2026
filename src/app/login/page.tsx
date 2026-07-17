@@ -279,38 +279,38 @@ export default function LoginPage() {
                         {/* Browser Viewport Content Area */}
                         <div className={`bg-[#0b0f19] text-slate-100 min-h-[460px] overflow-hidden flex flex-col justify-start text-left relative ${(activeTab === 3 || activeTab === 0) ? 'p-6' : 'p-0'}`}>
                             {activeTab === 0 && (
-                                <div className="space-y-4 animate-in fade-in duration-200 text-gray-200 text-left text-[9px] bg-[#030712] p-5 rounded-xl border border-gray-900 w-full">
+                                <div className="space-y-4 animate-in fade-in duration-200 text-gray-200 text-left text-[9px] bg-[#030712] p-5 rounded-xl border border-gray-800 w-full">
                                     {/* Mockup Header */}
                                     <div className="flex justify-between items-center border-b border-gray-800 pb-2.5">
                                         <div className="flex items-center gap-2">
-                                            <div className="h-6 w-6 rounded-lg bg-slate-950 border border-gray-850 flex items-center justify-center font-bold text-red-500 text-[10px]">
+                                            <div className="h-6 w-6 rounded-lg bg-gray-950 border border-gray-800 flex items-center justify-center font-bold text-red-500 text-[10px]">
                                                 CU
                                             </div>
                                             <div>
                                                 <div className="flex items-center gap-1.5">
                                                     <h3 className="text-[10px] font-black text-white leading-none">ClubFlow United</h3>
-                                                    <span className="bg-red-550/15 text-red-400 border border-red-500/20 text-[7px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded">
+                                                    <span className="bg-red-500/10 text-red-400 border border-red-500/20 text-[7px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded">
                                                         Operations Command Centre
                                                     </span>
                                                 </div>
-                                                <p className="text-gray-405 text-[8px] mt-0.5">Squad Management &amp; Operational Analytics</p>
+                                                <p className="text-gray-400 text-[8px] mt-0.5">Squad Management &amp; Operational Analytics</p>
                                             </div>
                                         </div>
                                     </div>
 
                                     {/* Three Mini Cards */}
                                     <div className="grid gap-2 grid-cols-3">
-                                        <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-1">
+                                        <div className="bg-[#0b0f19] border border-gray-800 p-2 rounded-lg space-y-1">
                                             <span className="text-[7px] font-bold uppercase text-gray-400">Squad Availability</span>
                                             <div className="text-[9px] font-black text-white">33 / 36 Available (92%)</div>
                                         </div>
-                                        <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-1">
+                                        <div className="bg-[#0b0f19] border border-gray-800 p-2 rounded-lg space-y-1">
                                             <span className="text-[7px] font-bold uppercase text-gray-400">Registration Alerts</span>
                                             <div className="text-[9px] font-black text-amber-400">2 Outstanding</div>
                                         </div>
-                                        <div className="bg-[#0b0f19] border border-gray-850 p-2 rounded-lg space-y-1">
+                                        <div className="bg-[#0b0f19] border border-gray-800 p-2 rounded-lg space-y-1">
                                             <span className="text-[7px] font-bold uppercase text-gray-400">Unpaid Invoices</span>
-                                            <div className="text-[9px] font-black text-red-405">£450.00</div>
+                                            <div className="text-[9px] font-black text-red-400">£450.00</div>
                                         </div>
                                     </div>
 

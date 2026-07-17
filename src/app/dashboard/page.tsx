@@ -386,6 +386,7 @@ export default function DashboardPage() {
     };
     const depth = getDepthMetrics();
 
+    // Injury table list filtering
     const getFilteredInjuryList = () => {
         if (injuryFilter === "Injured") return injuredPlayers.filter(p => p.medicalStatus === "Injured" || p.medicalStatus === "Doubtful");
         if (injuryFilter === "Suspended") return suspendedPlayers;
@@ -397,10 +398,10 @@ export default function DashboardPage() {
 
     const renderMiniPitch = () => {
         if (!lineup || !players.length || Object.keys(lineup.starters || {}).length === 0) return (
-            <div className="h-[360px] flex flex-col items-center justify-center border border-gray-800 rounded-xl border-dashed text-gray-500 text-xs p-4 text-center bg-slate-950/20">
+            <div className="h-[360px] flex flex-col items-center justify-center border border-gray-800 rounded-xl border-dashed text-gray-400 text-xs p-4 text-center bg-slate-950/20">
                 <span className="text-2xl mb-2">📋</span>
-                <p className="font-bold text-gray-300">No starting XI pinned</p>
-                <p className="text-[10px] text-gray-500 mt-1 leading-tight">Design tactical lineups inside Matchday XI.</p>
+                <p className="font-bold text-gray-200">No starting XI pinned</p>
+                <p className="text-[10px] text-gray-400 mt-1 leading-tight">Design tactical lineups inside Matchday XI.</p>
             </div>
         );
 
@@ -463,11 +464,11 @@ export default function DashboardPage() {
                 <div>
                     <div className="flex items-center gap-2">
                         <h2 className="text-2xl font-black tracking-tight text-white">{settings.name}</h2>
-                        <Badge className="bg-red-550/15 hover:bg-red-550/15 text-red-450 border border-red-500/20 text-[9px] uppercase tracking-wider font-extrabold px-2 py-0.5">
+                        <Badge className="bg-red-500/10 hover:bg-red-500/15 text-red-400 border border-red-500/20 text-[9px] uppercase tracking-wider font-extrabold px-2 py-0.5">
                             Football Operations Command Centre
                         </Badge>
                     </div>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-400 mt-1.5 font-medium">
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-300 mt-1.5 font-medium">
                         <span>League: <span className="text-white">{settings.leagueUrl ? "Isthmian League" : "Southern League"}</span></span>
                         <span>•</span>
                         <span>Season: <span className="text-white">2026/27</span></span>
@@ -480,16 +481,16 @@ export default function DashboardPage() {
 
                 {/* Operations Toolbar */}
                 <div className="flex flex-wrap gap-2">
-                    <a href="/matches" className="px-3 py-1.5 rounded-lg border border-gray-800 bg-slate-950 text-gray-300 text-xs font-bold hover:border-gray-700 hover:text-white transition-all">
+                    <a href="/matches" className="px-3 py-1.5 rounded-lg border border-gray-850 bg-slate-950 text-gray-200 text-xs font-bold hover:border-gray-700 hover:text-white transition-all">
                         + New Fixture
                     </a>
-                    <a href="/training" className="px-3 py-1.5 rounded-lg border border-gray-800 bg-slate-950 text-gray-300 text-xs font-bold hover:border-gray-700 hover:text-white transition-all">
+                    <a href="/training" className="px-3 py-1.5 rounded-lg border border-gray-855 bg-slate-950 text-gray-200 text-xs font-bold hover:border-gray-700 hover:text-white transition-all">
                         + New Session
                     </a>
-                    <a href="/squad" className="px-3 py-1.5 rounded-lg border border-gray-800 bg-slate-950 text-gray-300 text-xs font-bold hover:border-gray-700 hover:text-white transition-all">
+                    <a href="/squad" className="px-3 py-1.5 rounded-lg border border-gray-855 bg-slate-955 text-gray-200 text-xs font-bold hover:border-gray-700 hover:text-white transition-all">
                         + Add Player
                     </a>
-                    <a href="/recruitment" className="px-3 py-1.5 rounded-lg border border-gray-800 bg-slate-950 text-gray-300 text-xs font-bold hover:border-gray-700 hover:text-white transition-all">
+                    <a href="/recruitment" className="px-3 py-1.5 rounded-lg border border-gray-855 bg-slate-955 text-gray-200 text-xs font-bold hover:border-gray-700 hover:text-white transition-all">
                         + Create Scout Report
                     </a>
                     <button onClick={syncLeague} className="px-3 py-1.5 rounded-lg bg-red-650 text-white text-xs font-bold hover:bg-red-700 transition-all shadow-md">
@@ -503,29 +504,29 @@ export default function DashboardPage() {
                 {/* Football Department Alerts (Registration / Compliance Issues) */}
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5">
+                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
                             <ShieldAlert className="h-4 w-4 text-red-500" />
                             Football Department Alerts
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2">
                         {registrationIssues.length > 0 || totalOutstandingAmount > 0 ? (
-                            <div className="space-y-1.5 text-xs text-gray-300">
+                            <div className="space-y-1.5 text-xs text-gray-200">
                                 {registrationIssues.length > 0 && (
-                                    <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-lg text-amber-400">
+                                    <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-lg text-amber-450">
                                         <AlertCircle className="h-4 w-4 shrink-0" />
                                         <span>{registrationIssues.length} squad member(s) awaiting registration profile completion.</span>
                                     </div>
                                 )}
                                 {totalOutstandingAmount > 0 && (
-                                    <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 rounded-lg text-red-400">
+                                    <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 rounded-lg text-red-400 font-bold">
                                         <AlertCircle className="h-4 w-4 shrink-0" />
                                         <span>Outstanding payment requests found: £{totalOutstandingAmount.toFixed(2)} unpaid.</span>
                                     </div>
                                 )}
                             </div>
                         ) : (
-                            <p className="text-xs text-gray-500 italic">No football department alerts.</p>
+                            <p className="text-xs text-gray-400 italic">No football department alerts.</p>
                         )}
                     </CardContent>
                 </Card>
@@ -533,17 +534,17 @@ export default function DashboardPage() {
                 {/* Match Readiness Analytics Card */}
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
                     <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-gray-400">Match Readiness</CardTitle>
+                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-gray-300">Match Readiness</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
                         <div className="flex justify-between items-center text-xs font-bold">
-                            <span className="text-gray-300">Operational Readiness Index</span>
+                            <span className="text-gray-200">Operational Readiness Index</span>
                             <span className="text-emerald-400">{squadAvailabilityRate}% Ready</span>
                         </div>
                         <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden">
                             <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${squadAvailabilityRate}%` }} />
                         </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px] text-gray-400">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px] text-gray-300">
                             <div className="flex justify-between"><span>Players Available:</span> <span className="font-semibold text-white">{availablePlayers.length}</span></div>
                             <div className="flex justify-between"><span>Players Unavailable:</span> <span className="font-semibold text-red-400">{injuredPlayers.length}</span></div>
                             <div className="flex justify-between"><span>Players Suspended:</span> <span className="font-semibold text-red-400">{suspendedPlayers.length}</span></div>
@@ -561,20 +562,20 @@ export default function DashboardPage() {
                     <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
                         <CardHeader className="pb-3 border-b border-gray-800/80">
                             <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Today's Priorities</CardTitle>
-                            <CardDescription className="text-xs text-gray-400">Generated workflow priorities requiring action</CardDescription>
+                            <CardDescription className="text-xs text-gray-300">Generated workflow priorities requiring action</CardDescription>
                         </CardHeader>
                         <CardContent className="pt-4">
                             <div className="space-y-2">
                                 {priorities.map((task, i) => (
-                                    <div key={i} className="flex items-center justify-between p-2.5 bg-slate-950 border border-gray-850 rounded-xl text-xs">
-                                        <span className="font-semibold text-gray-200">{task.label}</span>
-                                        <Badge className="bg-red-500/10 text-red-450 border border-red-500/20 text-[8px] uppercase tracking-wide">
+                                    <div key={i} className="flex items-center justify-between p-2.5 bg-slate-950 border border-gray-800 rounded-xl text-xs">
+                                        <span className="font-semibold text-gray-100">{task.label}</span>
+                                        <Badge className="bg-red-500/10 text-red-400 border border-red-500/20 text-[8px] uppercase tracking-wide">
                                             {task.category}
                                         </Badge>
                                     </div>
                                 ))}
                                 {priorities.length === 0 && (
-                                    <p className="text-xs text-gray-500 italic text-center py-4">All operations priorities completed.</p>
+                                    <p className="text-xs text-gray-400 italic text-center py-4">All operations priorities completed.</p>
                                 )}
                             </div>
                         </CardContent>
@@ -588,35 +589,35 @@ export default function DashboardPage() {
                         <CardContent className="pt-4 space-y-4">
                             {nextMatch ? (
                                 <div className="space-y-3 text-xs">
-                                    <div className="bg-slate-950 p-3 rounded-xl border border-gray-850 flex justify-between items-center">
+                                    <div className="bg-slate-950 p-3 rounded-xl border border-gray-800 flex justify-between items-center">
                                         <div>
-                                            <div className="text-[10px] text-gray-400 uppercase font-bold">Opponent</div>
+                                            <div className="text-[10px] text-gray-350 uppercase font-bold">Opponent</div>
                                             <div className="text-base font-black text-white mt-0.5">{nextMatch.opponent}</div>
-                                            <div className="text-[9px] text-gray-400 mt-1 flex items-center gap-1.5">
+                                            <div className="text-[9px] text-gray-300 mt-1 flex items-center gap-1.5">
                                                 <span className="text-white font-bold">{nextMatch.competition}</span>
                                                 <span>•</span>
                                                 <span>{nextMatch.isHome ? "🏠 Home Venue" : "🚌 Away Venue"}</span>
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <div className="text-[10px] text-gray-400 uppercase font-bold">Date &amp; Kickoff</div>
+                                            <div className="text-[10px] text-gray-350 uppercase font-bold">Date &amp; Kickoff</div>
                                             <div className="font-black text-white mt-0.5">{formatDate(nextMatch.date)} • {nextMatch.time || "TBC"}</div>
-                                            {nextMatch.location && <div className="text-[9px] text-gray-400 mt-1 max-w-[140px] truncate">{nextMatch.location}</div>}
+                                            {nextMatch.location && <div className="text-[9px] text-gray-300 mt-1 max-w-[140px] truncate">{nextMatch.location}</div>}
                                         </div>
                                     </div>
 
                                     {timeLeft && (
                                         <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-3 flex justify-between items-center">
-                                            <span className="font-bold text-gray-300">Days to Kickoff:</span>
+                                            <span className="font-bold text-gray-200">Days to Kickoff:</span>
                                             <div className="flex gap-2 text-white font-black">
-                                                <div className="bg-slate-950 px-2.5 py-1 rounded-lg border border-gray-850">{timeLeft.days}d</div>
-                                                <div className="bg-slate-950 px-2.5 py-1 rounded-lg border border-gray-850">{timeLeft.hours}h</div>
-                                                <div className="bg-slate-950 px-2.5 py-1 rounded-lg border border-gray-850">{timeLeft.minutes}m</div>
+                                                <div className="bg-slate-950 px-2.5 py-1 rounded-lg border border-gray-800">{timeLeft.days}d</div>
+                                                <div className="bg-slate-950 px-2.5 py-1 rounded-lg border border-gray-800">{timeLeft.hours}h</div>
+                                                <div className="bg-slate-950 px-2.5 py-1 rounded-lg border border-gray-800">{timeLeft.minutes}m</div>
                                             </div>
                                         </div>
                                     )}
 
-                                    <div className="grid grid-cols-2 gap-3 text-[10px] text-gray-400 bg-slate-950 p-3 rounded-xl border border-gray-850">
+                                    <div className="grid grid-cols-2 gap-3 text-[10px] text-gray-300 bg-slate-950 p-3 rounded-xl border border-gray-800">
                                         <div className="flex justify-between"><span>Pitch surface:</span> <span className="font-bold text-white">{nextMatch.surface || "4G"}</span></div>
                                         <div className="flex justify-between"><span>Expected Squad Size:</span> <span className="font-bold text-white">{availablePlayers.length} Selectable</span></div>
                                         <div className="flex justify-between"><span>Formations Analyzed:</span> <span className="font-bold text-white">4-2-3-1</span></div>
@@ -624,9 +625,9 @@ export default function DashboardPage() {
                                     </div>
                                 </div>
                             ) : (
-                                <div className="text-center py-6 text-gray-500">
+                                <div className="text-center py-6 text-gray-400">
                                     <p className="mb-3">No fixture currently scheduled.</p>
-                                    <a href="/matches" className="px-3 py-1.5 rounded-lg bg-red-650 text-white font-bold hover:bg-red-750 transition-all text-xs">
+                                    <a href="/matches" className="px-3 py-1.5 rounded-lg bg-red-650 text-white font-bold hover:bg-red-755 transition-all text-xs">
                                         Schedule Fixture
                                     </a>
                                 </div>
@@ -641,27 +642,27 @@ export default function DashboardPage() {
                     <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
                         <CardHeader className="pb-3 border-b border-gray-800/80">
                             <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Squad Health</CardTitle>
-                            <CardDescription className="text-xs text-gray-400">Operational demographic summaries</CardDescription>
+                            <CardDescription className="text-xs text-gray-300">Operational demographic summaries</CardDescription>
                         </CardHeader>
                         <CardContent className="pt-4 text-xs space-y-2">
-                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                                <span className="text-gray-450 font-bold">Registered Players</span>
+                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
+                                <span className="text-gray-300 font-bold">Registered Players</span>
                                 <span className="font-black text-white">{players.length}</span>
                             </div>
-                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                                <span className="text-gray-450 font-bold">Average Squad Age</span>
+                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
+                                <span className="text-gray-300 font-bold">Average Squad Age</span>
                                 <span className="font-black text-white">{avgSquadAge} years</span>
                             </div>
-                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                                <span className="text-gray-450 font-bold">Homegrown Roster Members</span>
+                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
+                                <span className="text-gray-300 font-bold">Homegrown Roster Members</span>
                                 <span className="font-black text-white">{homegrownCount}</span>
                             </div>
-                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                                <span className="text-gray-450 font-bold">U23 Players</span>
+                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
+                                <span className="text-gray-300 font-bold">U23 Players</span>
                                 <span className="font-black text-white">{u23Count}</span>
                             </div>
-                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                                <span className="text-gray-450 font-bold">Footedness Breakdown</span>
+                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
+                                <span className="text-gray-300 font-bold">Footedness Breakdown</span>
                                 <span className="font-black text-white">Left {leftFootedCount} • Right {rightFootedCount}</span>
                             </div>
                         </CardContent>
@@ -671,30 +672,30 @@ export default function DashboardPage() {
                     <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
                         <CardHeader className="pb-3 border-b border-gray-800/80">
                             <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Season Performance</CardTitle>
-                            <CardDescription className="text-xs text-gray-400">KPI summaries</CardDescription>
+                            <CardDescription className="text-xs text-gray-300">KPI summaries</CardDescription>
                         </CardHeader>
                         <CardContent className="pt-4 text-xs space-y-3">
                             <div className="grid grid-cols-2 gap-3 text-center">
-                                <div className="bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                                    <div className="text-[10px] text-gray-450 font-bold uppercase">Points Per Game</div>
+                                <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                                    <div className="text-[10px] text-gray-300 font-bold uppercase">Points Per Game</div>
                                     <div className="text-base font-black text-white mt-0.5">{ppg}</div>
                                 </div>
-                                <div className="bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                                    <div className="text-[10px] text-gray-450 font-bold uppercase">Win Percentage</div>
+                                <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                                    <div className="text-[10px] text-gray-300 font-bold uppercase">Win Percentage</div>
                                     <div className="text-base font-black text-white mt-0.5">{winRate}%</div>
                                 </div>
                             </div>
 
-                            <div className="bg-slate-950 p-2.5 rounded-xl border border-gray-850 space-y-2">
-                                <div className="flex justify-between text-gray-450 font-bold">
+                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 space-y-2">
+                                <div className="flex justify-between text-gray-300 font-bold">
                                     <span>Goals Scored / Conceded</span>
                                     <span className="text-white font-black">{goalsScored} / {goalsConceded} (GD: {goalDifference})</span>
                                 </div>
                             </div>
 
-                            <div className="bg-slate-950 p-2.5 rounded-xl border border-gray-850 flex justify-between items-center">
+                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between items-center">
                                 <div>
-                                    <span className="text-[10px] text-gray-450 uppercase font-bold">Training Attendance Tracking</span>
+                                    <span className="text-[10px] text-gray-350 uppercase font-bold">Training Attendance Tracking</span>
                                     <div className="text-sm font-black text-white mt-0.5">{lastSessionAttendanceRate}%</div>
                                     <p className="text-[8px] text-gray-400 mt-1 leading-none">
                                         {lastSession ? `Last session: ${formatDate(lastSession.date)} ${lastSession.topic ? `• ${lastSession.topic}` : ''}` : 'No sessions logged'}
@@ -711,10 +712,10 @@ export default function DashboardPage() {
                 <CardHeader className="pb-3 border-b border-gray-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
                     <div>
                         <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Injury &amp; Suspension Log</CardTitle>
-                        <CardDescription className="text-xs text-gray-400">Roster health and physical therapy recovery parameters</CardDescription>
+                        <CardDescription className="text-xs text-gray-300">Roster health and physical therapy recovery parameters</CardDescription>
                     </div>
                     {/* Log Filter Header */}
-                    <div className="flex flex-wrap bg-slate-950 p-0.5 rounded-lg border border-gray-850">
+                    <div className="flex flex-wrap bg-slate-950 p-0.5 rounded-lg border border-gray-800">
                         {(['All', 'Injured', 'Suspended', 'Recovering', 'Available'] as const).map(tab => (
                             <button
                                 key={tab}
@@ -729,14 +730,14 @@ export default function DashboardPage() {
                 <CardContent className="pt-4 max-h-[300px] overflow-y-auto">
                     <div className="space-y-2">
                         {filteredInjuryList.length === 0 ? (
-                            <p className="text-xs text-gray-500 italic text-center py-4">No records found matching filter criteria.</p>
+                            <p className="text-xs text-gray-405 italic text-center py-4">No records found matching filter criteria.</p>
                         ) : (
                             filteredInjuryList.map(p => (
-                                <div key={p.id} className="flex justify-between items-center text-xs bg-slate-950 p-2.5 rounded-xl border border-gray-800/80">
+                                <div key={p.id} className="flex justify-between items-center text-xs bg-slate-955 p-2.5 rounded-xl border border-gray-800/85">
                                     <div>
                                         <span className="font-semibold text-white">{formatPlayerName(p)}</span>
-                                        <span className="text-[10px] text-gray-405 ml-2">({p.position})</span>
-                                        <p className="text-[9px] text-gray-450 mt-1">Medical Review: Bi-weekly • Treatment: active physical therapy</p>
+                                        <span className="text-[10px] text-gray-300 ml-2">({p.position})</span>
+                                        <p className="text-[9px] text-gray-400 mt-1">Medical Review: Bi-weekly • Treatment: active physical therapy</p>
                                     </div>
                                     <div className="text-right">
                                         <Badge className={`text-[8px] uppercase tracking-wide ${
@@ -760,37 +761,37 @@ export default function DashboardPage() {
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
                     <CardHeader className="pb-3 border-b border-gray-800/80">
                         <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Squad Depth Overview</CardTitle>
-                        <CardDescription className="text-xs text-gray-400">Position coverage review</CardDescription>
+                        <CardDescription className="text-xs text-gray-300">Position coverage review</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4 text-xs space-y-3">
-                        <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                            <span>Goalkeepers ({depth.gks})</span>
+                        <div className="flex justify-between items-center bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                            <span className="text-gray-200">Goalkeepers ({depth.gks})</span>
                             <Badge className={`text-[8px] uppercase ${depth.gks < 2 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
                                 {depth.gks < 2 ? 'Needs Reinforcement' : 'Strong'}
                             </Badge>
                         </div>
-                        <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                            <span>Centre Backs ({depth.cbs})</span>
+                        <div className="flex justify-between items-center bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                            <span className="text-gray-200">Centre Backs ({depth.cbs})</span>
                             <Badge className={`text-[8px] uppercase ${depth.cbs < 3 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
                                 {depth.cbs < 3 ? 'Monitor' : 'Strong'}
                             </Badge>
                         </div>
-                        <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                            <span>Full Backs ({depth.fbs})</span>
+                        <div className="flex justify-between items-center bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                            <span className="text-gray-200">Full Backs ({depth.fbs})</span>
                             <Badge className={`text-[8px] uppercase ${depth.fbs < 2 ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
                                 {depth.fbs < 2 ? 'Needs Reinforcement' : 'Strong'}
                             </Badge>
                         </div>
-                        <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                            <span>Midfielders ({depth.mids})</span>
+                        <div className="flex justify-between items-center bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                            <span className="text-gray-200">Midfielders ({depth.mids})</span>
                             <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8px] uppercase">Strong</Badge>
                         </div>
-                        <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                            <span>Wingers ({depth.wingers})</span>
+                        <div className="flex justify-between items-center bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                            <span className="text-gray-200">Wingers ({depth.wingers})</span>
                             <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8px] uppercase">Strong</Badge>
                         </div>
-                        <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                            <span>Forwards ({depth.strikers})</span>
+                        <div className="flex justify-between items-center bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                            <span className="text-gray-200">Forwards ({depth.strikers})</span>
                             <Badge className={`text-[8px] uppercase ${depth.strikers < 2 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
                                 {depth.strikers < 2 ? 'Monitor' : 'Strong'}
                             </Badge>
@@ -802,11 +803,11 @@ export default function DashboardPage() {
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
                     <CardHeader className="pb-3 border-b border-gray-800/80">
                         <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Recruitment Pipeline</CardTitle>
-                        <CardDescription className="text-xs text-gray-400">Roster acquisition pipeline progress indicators</CardDescription>
+                        <CardDescription className="text-xs text-gray-300">Roster acquisition pipeline progress indicators</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4 text-xs space-y-3.5">
                         <div className="space-y-1">
-                            <div className="flex justify-between text-gray-300 font-bold">
+                            <div className="flex justify-between text-gray-200 font-bold">
                                 <span>Applications Awaiting Review</span>
                                 <span>3</span>
                             </div>
@@ -815,7 +816,7 @@ export default function DashboardPage() {
                             </div>
                         </div>
                         <div className="space-y-1">
-                            <div className="flex justify-between text-gray-300 font-bold">
+                            <div className="flex justify-between text-gray-200 font-bold">
                                 <span>Active Trialists</span>
                                 <span>{activeTrialistsCount}</span>
                             </div>
@@ -824,7 +825,7 @@ export default function DashboardPage() {
                             </div>
                         </div>
                         <div className="space-y-1">
-                            <div className="flex justify-between text-gray-300 font-bold">
+                            <div className="flex justify-between text-gray-200 font-bold">
                                 <span>Shortlisted Recruits</span>
                                 <span>{recruits.length}</span>
                             </div>
@@ -833,7 +834,7 @@ export default function DashboardPage() {
                             </div>
                         </div>
                         <div className="space-y-1">
-                            <div className="flex justify-between text-gray-300 font-bold">
+                            <div className="flex justify-between text-gray-200 font-bold">
                                 <span>Contract Negotiations</span>
                                 <span>2</span>
                             </div>
@@ -851,23 +852,23 @@ export default function DashboardPage() {
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md md:col-span-3">
                     <CardHeader className="pb-3 border-b border-gray-800/80">
                         <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Starting selection</CardTitle>
-                        <CardDescription className="text-xs text-gray-400">Selection variables</CardDescription>
+                        <CardDescription className="text-xs text-gray-300">Selection variables</CardDescription>
                     </CardHeader>
                     <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center pt-4">
-                        <div className="space-y-3.5 text-xs text-gray-300">
-                            <div className="bg-slate-950 p-2.5 rounded-xl border border-gray-850 flex justify-between">
+                        <div className="space-y-3.5 text-xs text-gray-200">
+                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between">
                                 <span>Expected Formation</span>
                                 <span className="font-bold text-white">{lineup?.formation || "4-2-3-1"}</span>
                             </div>
-                            <div className="bg-slate-950 p-2.5 rounded-xl border border-gray-850 flex justify-between">
+                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between">
                                 <span> Roster Average Age</span>
                                 <span className="font-bold text-white">{avgSquadAge} yrs</span>
                             </div>
-                            <div className="bg-slate-950 p-2.5 rounded-xl border border-gray-850 flex justify-between">
+                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between">
                                 <span>Average Height</span>
                                 <span className="font-bold text-white">182.4 cm</span>
                             </div>
-                            <div className="bg-slate-950 p-2.5 rounded-xl border border-gray-850 flex justify-between">
+                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between">
                                 <span>xG Rating</span>
                                 <span className="font-bold text-emerald-400">1.82</span>
                             </div>
@@ -882,43 +883,43 @@ export default function DashboardPage() {
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md md:col-span-2">
                     <CardHeader className="pb-3 border-b border-gray-800/80">
                         <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Squad Contributors</CardTitle>
-                        <CardDescription className="text-xs text-gray-450">Leading contributors</CardDescription>
+                        <CardDescription className="text-xs text-gray-300">Leading contributors</CardDescription>
                     </CardHeader>
                     <CardContent className="pt-4 space-y-4">
                         <div>
-                            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">⚽ Top Goalscorers</h4>
+                            <h4 className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mb-2.5">⚽ Top Goalscorers</h4>
                             <div className="space-y-2">
                                 {players
                                     .filter(p => p.goals > 0)
                                     .sort((a, b) => b.goals - a.goals)
                                     .slice(0, 2)
                                     .map((p, idx) => (
-                                        <div key={p.id} className="flex justify-between text-xs bg-slate-950 p-2.5 rounded-xl border border-gray-800/80">
-                                            <span className="text-gray-350 font-semibold">{idx + 1}. {formatPlayerName(p)}</span>
+                                        <div key={p.id} className="flex justify-between text-xs bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                                            <span className="text-gray-250 font-semibold">{idx + 1}. {formatPlayerName(p)}</span>
                                             <span className="font-black text-red-500">{p.goals} Goals</span>
                                         </div>
                                     ))}
                                 {players.filter(p => p.goals > 0).length === 0 && (
-                                    <p className="text-[10px] text-gray-500 italic">No goals registered.</p>
+                                    <p className="text-[10px] text-gray-400 italic">No goals registered.</p>
                                 )}
                             </div>
                         </div>
 
                         <div className="border-t border-slate-900 pt-3">
-                            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2.5">🅰️ Assist Leaders</h4>
+                            <h4 className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mb-2.5">🅰️ Assist Leaders</h4>
                             <div className="space-y-2">
                                 {players
                                     .filter(p => p.assists > 0)
                                     .sort((a, b) => b.assists - a.assists)
                                     .slice(0, 2)
                                     .map((p, idx) => (
-                                        <div key={p.id} className="flex justify-between text-xs bg-slate-950 p-2.5 rounded-xl border border-gray-800/80">
-                                            <span className="text-gray-350 font-semibold">{idx + 1}. {formatPlayerName(p)}</span>
+                                        <div key={p.id} className="flex justify-between text-xs bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                                            <span className="text-gray-250 font-semibold">{idx + 1}. {formatPlayerName(p)}</span>
                                             <span className="font-black text-blue-500">{p.assists} Assists</span>
                                         </div>
                                     ))}
                                 {players.filter(p => p.assists > 0).length === 0 && (
-                                    <p className="text-[10px] text-gray-500 italic">No assists registered.</p>
+                                    <p className="text-[10px] text-gray-400 italic">No assists registered.</p>
                                 )}
                             </div>
                         </div>
