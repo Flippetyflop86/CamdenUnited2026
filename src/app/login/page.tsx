@@ -619,31 +619,53 @@ export default function LoginPage() {
                                 )}
 
                                 {activeTab === 4 && (
-                                    <div className="space-y-4 animate-in fade-in duration-200 text-slate-200 w-full text-left text-xs">
-                                        <div className="flex justify-between items-center border-b border-gray-800 pb-3">
+                                    <div className="space-y-4 animate-in fade-in duration-200 w-full text-slate-200 text-left text-xs">
+                                        <div className="flex justify-between items-start border-b border-gray-800 pb-3">
                                             <div>
-                                                <h3 className="text-sm font-black text-white">Training Logs</h3>
-                                                <p className="text-[10px] text-gray-450 mt-0.5">Log attendance statistics and plan tactical sessions</p>
+                                                <h3 className="text-base font-black text-white">Training Attendance</h3>
+                                                <p className="text-[10px] text-gray-450 mt-0.5">Tracking Season 26/27 (Tracking from June 1st)</p>
+                                            </div>
+                                            <div className="bg-[#0b0f19] border border-gray-800 px-3 py-1.5 rounded-lg text-right">
+                                                <span className="text-[8px] uppercase tracking-wider text-gray-400 font-bold block">Total Sessions</span>
+                                                <span className="text-sm font-black text-white">5</span>
                                             </div>
                                         </div>
 
-                                        <div className="space-y-2">
-                                            {[
-                                                { session: "Tactical Transitions", date: "15 Jul", attendance: "92%" },
-                                                { session: "Set Piece Routines", date: "12 Jul", attendance: "88%" },
-                                                { session: "Conditioning & Agility", date: "08 Jul", attendance: "95%" }
-                                            ].map((s, i) => (
-                                                <div key={i} className="bg-[#0b0f19] border border-gray-800 p-3 rounded-xl flex items-center justify-between">
-                                                    <div>
-                                                        <span className="font-bold text-white block text-sm">{s.session}</span>
-                                                        <span className="text-[9px] text-slate-400">{s.date} • Training Session</span>
+                                        <div className="bg-[#0b0f19] border border-gray-800 rounded-xl overflow-hidden shadow-sm text-[10px]">
+                                            <div className="bg-slate-900/50 px-3 py-2.5 font-bold text-slate-400 border-b border-gray-800 flex justify-between uppercase tracking-wider text-[8px]">
+                                                <span className="w-1/4">Player</span>
+                                                <span className="w-1/6 text-center">Squad</span>
+                                                <span className="w-1/6 text-center">Attended</span>
+                                                <span className="w-1/6 text-center">Attendance %</span>
+                                                <span className="w-1/4 text-right">Progress</span>
+                                            </div>
+                                            <div className="divide-y divide-gray-800">
+                                                {[
+                                                    { name: "Sufi Ali", squad: "First Team", attend: "5/5", rate: "100%", progress: "w-full bg-green-500" },
+                                                    { name: "Matheus Santana", squad: "First Team", attend: "5/5", rate: "100%", progress: "w-full bg-green-500" },
+                                                    { name: "Michael Desta", squad: "First Team", attend: "5/5", rate: "100%", progress: "w-full bg-green-500" },
+                                                    { name: "Henry Clark", squad: "First Team", attend: "5/5", rate: "100%", progress: "w-full bg-green-500" },
+                                                    { name: "Mohammed Jahazi", squad: "First Team", attend: "4/5", rate: "80%", progress: "w-[80%] bg-green-500" },
+                                                    { name: "Warren McCreeth", squad: "First Team", attend: "4/5", rate: "80%", progress: "w-[80%] bg-green-500" }
+                                                ].map((p, i) => (
+                                                    <div key={i} className="px-3 py-2 flex justify-between items-center hover:bg-slate-900/20">
+                                                        <span className="w-1/4 font-bold text-white">{p.name}</span>
+                                                        <span className="w-1/6 text-center text-slate-400">{p.squad}</span>
+                                                        <span className="w-1/6 text-center text-slate-400">
+                                                            <span className="font-bold text-white block">{p.attend}</span>
+                                                            <span className="text-[8px] text-slate-500 block leading-none">{p.rate}</span>
+                                                        </span>
+                                                        <span className="w-1/6 flex justify-center">
+                                                            <span className="px-2.5 py-1 rounded bg-[#030712] border border-gray-800 text-white font-extrabold text-[9px]">{p.rate}</span>
+                                                        </span>
+                                                        <span className="w-1/4 flex items-center justify-end">
+                                                            <div className="h-1.5 w-16 bg-slate-950 rounded-full overflow-hidden">
+                                                                <div className={`h-full rounded-full ${p.progress}`} />
+                                                            </div>
+                                                        </span>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <span className="text-xs font-bold text-white block">Attendance</span>
-                                                        <span className="text-[10px] text-emerald-400 font-extrabold">{s.attendance} present</span>
-                                                    </div>
-                                                </div>
-                                            ))}
+                                                ))}
+                                            </div>
                                         </div>
                                     </div>
                                 )}
