@@ -262,7 +262,11 @@ export default function LoginPage() {
                                 src={activeTab === 1 ? "/matchday-xi-screenshot.png" : activeTab === 2 ? "/squad-management-screenshot.png" : "/training-tracking-screenshot.png"} 
                                 alt={tourTabs[activeTab].title} 
                                 className="w-full h-auto select-none"
-                                style={{ imageRendering: "-webkit-optimize-contrast" }}
+                                style={{ 
+                                    imageRendering: "-webkit-optimize-contrast",
+                                    transform: "scale(1.025)",
+                                    transformOrigin: "center center"
+                                }}
                             />
                         </div>
                     ) : (
