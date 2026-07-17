@@ -32,6 +32,7 @@ export default function LoginPage() {
             label: "02 Matchday XI",
             title: "Matchday XI & Tactics",
             description: "Drag and drop your starting lineup, select from popular formations, and organize your substitutes bench. Automatically generate WhatsApp messages for squad availability polls and export professional matchday team sheets as PDF.",
+            hideBrowserWrapper: true,
         },
         {
             id: "squad",
@@ -253,23 +254,32 @@ export default function LoginPage() {
                         {tourTabs[activeTab].description}
                     </p>
 
-                    <div className="w-full relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl shadow-red-950/20 bg-slate-950/60 backdrop-blur-sm transition-all duration-300">
-                        {/* Browser Header Bar */}
-                        <div className="h-10 bg-slate-100 border-b border-slate-200 px-4 flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                                <span className="h-3 w-3 rounded-full bg-[#ff5f56] inline-block" />
-                                <span className="h-3 w-3 rounded-full bg-[#ffbd2e] inline-block" />
-                                <span className="h-3 w-3 rounded-full bg-[#27c93f] inline-block" />
-                            </div>
-                            <div className="bg-white border border-slate-200 px-3 py-1 rounded-md text-[10px] text-slate-400 font-mono tracking-wide w-48 text-center truncate">
-                                app.clubflow.org.uk/{tourTabs[activeTab].id}
-                            </div>
-                            <div className="w-10" /> {/* Spacer */}
+                    {tourTabs[activeTab].hideBrowserWrapper ? (
+                        <div className="w-full relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl shadow-red-950/20 bg-slate-950/60 backdrop-blur-sm transition-all duration-300">
+                            <img 
+                                src="/matchday-xi-screenshot.png" 
+                                alt="Matchday XI Layout" 
+                                className="w-full h-auto object-cover select-none"
+                            />
                         </div>
+                    ) : (
+                        <div className="w-full relative rounded-2xl overflow-hidden border border-slate-800/80 shadow-2xl shadow-red-950/20 bg-slate-950/60 backdrop-blur-sm transition-all duration-300">
+                            {/* Browser Header Bar */}
+                            <div className="h-10 bg-slate-100 border-b border-slate-200 px-4 flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="h-3 w-3 rounded-full bg-[#ff5f56] inline-block" />
+                                    <span className="h-3 w-3 rounded-full bg-[#ffbd2e] inline-block" />
+                                    <span className="h-3 w-3 rounded-full bg-[#27c93f] inline-block" />
+                                </div>
+                                <div className="bg-white border border-slate-200 px-3 py-1 rounded-md text-[10px] text-slate-400 font-mono tracking-wide w-48 text-center truncate">
+                                    app.clubflow.org.uk/{tourTabs[activeTab].id}
+                                </div>
+                                <div className="w-10" /> {/* Spacer */}
+                            </div>
 
-                        {/* Browser Viewport Content Area */}
-                        <div className="p-5 bg-slate-50 text-slate-950 min-h-[380px] overflow-hidden flex flex-col justify-start">
-                            {activeTab === 0 && (
+                            {/* Browser Viewport Content Area */}
+                            <div className="p-5 bg-slate-50 text-slate-950 min-h-[380px] overflow-hidden flex flex-col justify-start">
+                                {activeTab === 0 && (
                                 <div className="space-y-4 animate-in fade-in duration-200 text-slate-900 text-left">
                                     {/* Dashboard Preview Header */}
                                     <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
@@ -642,6 +652,7 @@ export default function LoginPage() {
                             )}
                         </div>
                     </div>
+                )}
                 </div>
 
                 {/* Footer */}
