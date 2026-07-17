@@ -1201,11 +1201,11 @@ export default function MatchdayXIPage() {
                                     >
                                         {subId ? (
                                             <>
-                                                <div className="flex items-center gap-2">
-                                                    <GripVertical className="h-4 w-4 text-slate-300 group-hover:text-red-400 transition-colors" />
-                                                    <span className="text-xs font-bold text-slate-800">{displayName}</span>
+                                                <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                    <GripVertical className="h-4 w-4 text-slate-300 group-hover:text-red-400 transition-colors shrink-0" />
+                                                    <span className="text-xs font-bold text-slate-800 truncate" title={displayName}>{displayName}</span>
                                                 </div>
-                                                <span className="text-[9px] uppercase text-slate-500 font-bold mr-1">{player?.position}</span>
+                                                <span className="text-[9px] uppercase text-slate-500 font-bold mr-1 shrink-0 ml-2">{player?.position}</span>
                                             </>
                                         ) : (
                                             <span className="text-[10px] font-medium text-center w-full block">Drag here</span>
