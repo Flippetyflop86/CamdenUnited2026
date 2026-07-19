@@ -112,6 +112,12 @@ export interface Match {
     event_token?: string;
     lock_type?: string;
     lock_time?: string;
+    lineup?: {
+        formation: string;
+        starters: Record<string, string>;
+        substitutes: string[];
+        usedSubstitutes?: string[];
+    } | null;
 }
 
 export interface OppositionTeam {

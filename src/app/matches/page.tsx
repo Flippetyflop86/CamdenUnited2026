@@ -370,10 +370,18 @@ export default function MatchesPage() {
             const meetTime = meetTimeMatch ? meetTimeMatch[1] : "";
 
             let cleanNotes = m.notes || "";
+            let parsedLineup = null;
             if (cleanNotes.includes("[Lineup: ")) {
                 const endIdx = cleanNotes.indexOf("}]");
                 if (endIdx !== -1) {
-                    cleanNotes = cleanNotes.substring(endIdx + 2);
+                    const tagStartIdx = cleanNotes.indexOf("[Lineup: ");
+                    const lineupStr = cleanNotes.substring(tagStartIdx + "[Lineup: ".length, endIdx + 1);
+                    try {
+                        parsedLineup = JSON.parse(lineupStr);
+                    } catch (e) {
+                        console.error("Error parsing lineup in mapping", e);
+                    }
+                    cleanNotes = cleanNotes.substring(0, tagStartIdx) + cleanNotes.substring(endIdx + 2);
                 }
             }
             cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/, "");
@@ -396,7 +404,8 @@ export default function MatchesPage() {
                 red_cards: m.red_cards,
                 notes: cleanNotes,
                 surface: surface,
-                location: location
+                location: location,
+                lineup: parsedLineup
             } as any;
         });
 
@@ -1083,6 +1092,7 @@ export default function MatchesPage() {
     });
 
     const MatchCard = ({ match, isPast }: { match: Match, isPast?: boolean }) => {
+        const [showLineup, setShowLineup] = useState(false);
         const teamInfo = leagueTeams.find(t => t.name.toLowerCase() === match.opponent.toLowerCase());
         
         const localDate = getLocalDateString(match.date);
@@ -1259,8 +1269,8 @@ export default function MatchesPage() {
                     </div>
 
                 {/* Details */}
-                {(match.goalscorers || match.assists || match.notes) && (
-                    <div className="mt-4 pt-4 border-t flex flex-col items-center text-center space-y-2">
+                {(match.goalscorers || match.assists || match.notes || match.lineup) && (
+                    <div className="mt-4 pt-4 border-t flex flex-col items-center text-center space-y-2 w-full">
                         {(match.goalscorers || match.assists) && (
                             <div className="space-y-1">
                                 {match.goalscorers && (
@@ -1282,6 +1292,59 @@ export default function MatchesPage() {
                                 Note: {match.notes}
                             </div>
                         )}
+                        {match.lineup && (
+                            <div className="w-full mt-3 pt-3 border-t border-slate-100 flex flex-col items-center">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setShowLineup(!showLineup)}
+                                    className="text-xs font-bold text-slate-500 hover:text-slate-900 flex items-center gap-1.5 h-7"
+                                >
+                                    <span>📋</span> {showLineup ? "Hide Saved Lineup" : `Show Saved Lineup (${match.lineup.formation})`}
+                                </Button>
+                                
+                                {showLineup && (
+                                    <div className="w-full mt-2.5 p-3 rounded-xl bg-slate-50/80 border border-slate-100 text-left space-y-2.5">
+                                        <div>
+                                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Starting XI</span>
+                                            <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                {Object.entries(match.lineup.starters || {})
+                                                    .filter(([pos, id]) => id)
+                                                    .map(([pos, id]) => {
+                                                        const p = players.find(x => x.id === id);
+                                                        const name = p ? `${p.first_name[0]}.${p.last_name}` : "Unknown";
+                                                        return (
+                                                            <span key={pos} className="inline-flex items-center bg-white border border-slate-200 px-2 py-0.5 rounded-full shadow-sm text-[11px]">
+                                                                <span className="text-[9px] uppercase font-extrabold text-slate-400 mr-1">{pos}:</span>
+                                                                <span className="font-semibold text-slate-800">{name}</span>
+                                                            </span>
+                                                        );
+                                                    })}
+                                            </div>
+                                        </div>
+                                        
+                                        {match.lineup.substitutes && match.lineup.substitutes.filter(id => id).length > 0 && (
+                                            <div className="border-t border-slate-200/60 pt-2.5">
+                                                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Substitutes</span>
+                                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                    {match.lineup.substitutes
+                                                        .filter(id => id)
+                                                        .map((id, index) => {
+                                                            const p = players.find(x => x.id === id);
+                                                            const name = p ? `${p.first_name[0]}.${p.last_name}` : "Unknown";
+                                                            return (
+                                                                <span key={index} className="inline-flex items-center bg-white border border-slate-200 px-2 py-0.5 rounded-full shadow-sm text-[11px]">
+                                                                    <span className="font-semibold text-slate-750 text-slate-800">{name}</span>
+                                                                </span>
+                                                            );
+                                                        })}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
                 {/* Weather Warning Banner */}
@@ -1293,15 +1356,21 @@ export default function MatchesPage() {
                 )}
             </CardContent>
             {isPast && (
-                <div className="p-4 bg-slate-50 border-t">
+                <div className="p-4 bg-slate-50 border-t grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Button 
                         variant="outline" 
                         onClick={() => router.push(`/analysis?matchId=${match.id}`)}
-                        className="w-full font-bold border-red-200 text-red-700 bg-red-50 hover:bg-red-100 flex items-center justify-center gap-2"
+                        className="w-full text-xs font-bold border-slate-200 text-slate-755 text-slate-700 hover:bg-slate-100 flex items-center justify-center gap-1.5"
                     >
-                        <BarChart3 className="h-4 w-4" /> 
-                        Log Match Stats & Analysis
+                        <BarChart3 className="h-3.5 w-3.5" /> 
+                        Visual Board Analysis
                     </Button>
+                    <MatchStatsDialog 
+                        matchId={match.id} 
+                        matchDate={match.date} 
+                        opponent={match.opponent} 
+                        variant="full" 
+                    />
                 </div>
             )}
         </Card>

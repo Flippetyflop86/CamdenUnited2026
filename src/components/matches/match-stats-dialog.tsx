@@ -94,6 +94,7 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
             alert(`Successfully imported statistics!\n\nAdded/matched ${matchedCount} players.\nGoals logged: ${goalsAdded}.`);
             setPasteText("");
             setShowPasteInput(false);
+            await syncMatchesTable(matchId);
             fetchData();
         } catch (e: any) {
             alert("Parsing failed: " + e.message);
@@ -120,6 +121,44 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
         setIsLoading(false);
     };
 
+    const syncMatchesTable = async (mId: string) => {
+        const { data: updatedStats } = await supabase
+            .from('match_player_stats')
+            .select('*')
+            .eq('match_id', mId);
+
+        const { data: allPlayers } = await supabase
+            .from('players')
+            .select('id, first_name, last_name');
+
+        if (updatedStats && allPlayers) {
+            const getFormattedName = (pId: string) => {
+                const p = allPlayers.find(x => x.id === pId);
+                if (!p) return "Unknown";
+                const firstInitial = p.first_name ? p.first_name[0] : "";
+                return `${firstInitial}.${p.last_name}`;
+            };
+
+            const goalsList = updatedStats
+                .filter(s => s.goals > 0)
+                .map(s => `${getFormattedName(s.player_id)}${s.goals > 1 ? ` (${s.goals})` : ''}`)
+                .join(', ');
+
+            const assistsList = updatedStats
+                .filter(s => s.assists > 0)
+                .map(s => `${getFormattedName(s.player_id)}${s.assists > 1 ? ` (${s.assists})` : ''}`)
+                .join(', ');
+
+            await supabase
+                .from('matches')
+                .update({
+                    goalscorers: goalsList || null,
+                    assists: assistsList || null
+                })
+                .eq('id', mId);
+        }
+    };
+
     const addPlayerToMatch = async (playerId: string) => {
         if (stats.find(s => s.player_id === playerId)) return;
         
@@ -131,6 +170,7 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
             alert("Error adding player: " + error.message);
         } else if (data) {
             setStats(prev => [...prev, data]);
+            await syncMatchesTable(matchId);
         }
     };
 
@@ -147,6 +187,8 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
         if (error) {
             alert("Error updating stat: " + error.message);
             fetchData(); // Revert
+        } else {
+            await syncMatchesTable(matchId);
         }
     };
 
@@ -159,6 +201,8 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
         if (error) {
             alert("Error removing player: " + error.message);
             fetchData();
+        } else {
+            await syncMatchesTable(matchId);
         }
     };
 
@@ -187,6 +231,7 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                 else {
                     alert(`Successfully synced ${data.stats.length} players from the link!`);
                     setShowSyncInput(false);
+                    await syncMatchesTable(matchId);
                     fetchData();
                 }
             } else {
