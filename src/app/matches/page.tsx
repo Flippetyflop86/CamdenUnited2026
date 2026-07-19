@@ -1360,7 +1360,7 @@ export default function MatchesPage() {
                                 )}
                             </div>
                         )}
-                        {match.notes && (
+                        {match.notes && match.notes.trim().length > 0 && (
                             <div className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded">
                                 Note: {match.notes}
                             </div>
