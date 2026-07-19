@@ -168,6 +168,21 @@ export default function SquadDepthPage() {
         }
     };
 
+    const playerCanPlayPosition = (p: Player, posLabel: string): boolean => {
+        let primaryShort = getShortPosition(p.position);
+        if (primaryShort === "LCB" || primaryShort === "RCB") primaryShort = "CB";
+        if (primaryShort === posLabel) return true;
+
+        if (p.secondaryPositions && p.secondaryPositions.length > 0) {
+            return p.secondaryPositions.some(secPos => {
+                let secShort = getShortPosition(secPos);
+                if (secShort === "LCB" || secShort === "RCB") secShort = "CB";
+                return secShort === posLabel;
+            });
+        }
+        return false;
+    };
+
     // Initialize depth chart by merging saved config and natural/default positions
     const initializeDepthChart = (squadPlayers: Player[]) => {
         const saved = localStorage.getItem(`clubflow_squad_depth_chart_${activeSquadTab}`);
@@ -186,26 +201,19 @@ export default function SquadDepthPage() {
             loadedChart[pos] = (loadedChart[pos] || []).filter(id => currentIds.has(id));
         });
 
-        // Ensure all active players are assigned somewhere
-        const assignedIds = new Set<string>();
-        Object.values(loadedChart).forEach(arr => arr.forEach(id => assignedIds.add(id)));
+        const allPossibleLabels = ["GK", "LB", "CB", "RB", "LWB", "RWB", "CDM", "CM", "CAM", "LM", "RM", "LW", "RW", "ST", "CF"];
 
         squadPlayers.forEach(p => {
-            if (!assignedIds.has(p.id)) {
-                // Determine their short position key (e.g. GK, LCB, CB)
-                let posKey = getShortPosition(p.position);
-                
-                // If they are LCB/RCB, default them to "CB" zone list
-                if (posKey === "LCB" || posKey === "RCB") {
-                    posKey = "CB";
+            allPossibleLabels.forEach(label => {
+                if (playerCanPlayPosition(p, label)) {
+                    if (!loadedChart[label]) {
+                        loadedChart[label] = [];
+                    }
+                    if (!loadedChart[label].includes(p.id)) {
+                        loadedChart[label].push(p.id);
+                    }
                 }
-
-                if (!loadedChart[posKey]) {
-                    loadedChart[posKey] = [];
-                }
-                loadedChart[posKey].push(p.id);
-                assignedIds.add(p.id);
-            }
+            });
         });
 
         setDepthChart(loadedChart);
