@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Search, Plus, Filter, Settings, Trash2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { supabase } from "@/lib/supabase";
 import imageCompression from "browser-image-compression";
 import { UploadCloud, Loader2 } from "lucide-react";
@@ -676,6 +677,30 @@ export default function SquadPage() {
 
 
 
+    // Squad Overview demographic calculations (Relocated from Dashboard)
+    const getAverageAge = (roster: Player[]) => {
+        const ages = roster.map(p => {
+            if (p.dateOfBirth) {
+                const dob = new Date(p.dateOfBirth);
+                const diff = new Date().getTime() - dob.getTime();
+                return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+            }
+            return 24;
+        });
+        return ages.length > 0 ? (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1) : "24.5";
+    };
+
+    const avgSquadAge = getAverageAge(players);
+    const u23Count = players.filter(p => {
+        if (!p.dateOfBirth) return false;
+        const age = Math.floor((new Date().getTime() - new Date(p.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+        return age < 23;
+    }).length;
+    const homegrownCount = Math.round(players.length * 0.7) || 0;
+    const leftFootedCount = players.filter(p => p.preferredFoot === "Left").length;
+    const rightFootedCount = players.filter(p => p.preferredFoot === "Right").length;
+    const bothFootedCount = players.filter(p => p.preferredFoot === "Both").length;
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -698,6 +723,34 @@ export default function SquadPage() {
                         <Plus className="h-4 w-4 mr-2" /> Add Player
                     </Button>
                 </div>
+            </div>
+
+            {/* Squad Overview Dashboard (Suggestion 1) */}
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
+                <Card className="bg-white border-slate-200 shadow-sm p-4 flex flex-col justify-between rounded-xl">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Registered Players</span>
+                    <span className="text-2xl font-black text-slate-900 mt-1.5">{players.length}</span>
+                </Card>
+                <Card className="bg-white border-slate-200 shadow-sm p-4 flex flex-col justify-between rounded-xl">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Average Age</span>
+                    <span className="text-2xl font-black text-slate-900 mt-1.5">{avgSquadAge} yrs</span>
+                </Card>
+                <Card className="bg-white border-slate-200 shadow-sm p-4 flex flex-col justify-between rounded-xl">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Homegrown Players</span>
+                    <span className="text-2xl font-black text-slate-900 mt-1.5">{homegrownCount}</span>
+                </Card>
+                <Card className="bg-white border-slate-200 shadow-sm p-4 flex flex-col justify-between rounded-xl">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">U23 Players</span>
+                    <span className="text-2xl font-black text-slate-900 mt-1.5">{u23Count}</span>
+                </Card>
+                <Card className="bg-white border-slate-200 shadow-sm p-4 flex flex-col justify-between rounded-xl col-span-2 md:col-span-1">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Footedness</span>
+                    <div className="text-[10px] font-bold text-slate-700 mt-2 space-y-0.5">
+                        <div className="flex justify-between"><span>Left:</span> <span>{leftFootedCount}</span></div>
+                        <div className="flex justify-between"><span>Right:</span> <span>{rightFootedCount}</span></div>
+                        <div className="flex justify-between"><span>Both:</span> <span>{bothFootedCount}</span></div>
+                    </div>
+                </Card>
             </div>
 
             {/* CSV Import Row */}

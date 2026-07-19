@@ -456,6 +456,16 @@ export default function DashboardPage() {
     };
     const recentResults = getRecentResults();
 
+    // Recent form of last 5 completed competitive matches
+    const getRecentForm = () => {
+        const completedComp = matches
+            .filter((m: Match) => m.result && m.result !== "Pending" && !m.competition?.toLowerCase().includes("friendly"))
+            .sort((a, b) => b.date.localeCompare(a.date))
+            .slice(0, 5);
+        return completedComp.reverse(); // chronological order left-to-right
+    };
+    const recentForm = getRecentForm();
+
     // Injury table list filtering
     const getFilteredInjuryList = () => {
         const holidayPlayers = players.filter(p => p.medicalStatus === "Holiday");
@@ -646,37 +656,62 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* V3 Control Cards Row */}
-            <div className="grid gap-4 md:grid-cols-2 relative z-10">
-                {/* V3 Quick Actions Control Panel (Suggestion 10) */}
+            {/* V3 High Priority Operational Alerts Strip (Suggestion 2) */}
+            <div className="relative z-10">
+                {registrationIssues.length > 0 || totalOutstandingAmount > 0 || suspendedPlayers.length > 0 ? (
+                    <div className="flex flex-col gap-2">
+                        {registrationIssues.length > 0 && (
+                            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 px-3 py-2 rounded-lg text-amber-400 text-xs font-semibold">
+                                <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+                                <span>{registrationIssues.length} squad member(s) awaiting registration profile completion.</span>
+                            </div>
+                        )}
+                        {totalOutstandingAmount > 0 && (
+                            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/25 px-3 py-2 rounded-lg text-red-400 text-xs font-bold">
+                                <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
+                                <span>Outstanding payment requests found: £{totalOutstandingAmount.toFixed(2)} unpaid.</span>
+                            </div>
+                        )}
+                        {suspendedPlayers.length > 0 && (
+                            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 px-3 py-2 rounded-lg text-amber-405 text-xs font-semibold">
+                                <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+                                <span>{suspendedPlayers.length} player(s) currently suspended.</span>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-lg text-emerald-400 text-xs font-semibold">
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+                        <span>🟢 No active football department alerts</span>
+                    </div>
+                )}
+            </div>
+
+            {/* Main Command Centre Grid Layout */}
+            <div className="grid gap-6 md:grid-cols-2 relative z-10">
+                {/* Row 1: Today's Priorities & Squad Availability */}
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
-                            <Plus className="h-4 w-4 text-red-500" />
-                            Quick Actions Control Panel
-                        </CardTitle>
+                    <CardHeader className="pb-3 border-b border-gray-800/80">
+                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Today's Priorities</CardTitle>
+                        <CardDescription className="text-xs text-gray-300">Generated workflow priorities requiring action</CardDescription>
                     </CardHeader>
-                    <CardContent className="grid grid-cols-2 gap-2 pt-1">
-                        <a href="/matches" className="flex items-center gap-2 p-2 bg-slate-950 hover:bg-slate-900 border border-gray-800 rounded-lg text-xs text-gray-250 transition-colors">
-                            <Calendar className="h-4 w-4 text-red-500 shrink-0" />
-                            <span>Add / Schedule Fixture</span>
-                        </a>
-                        <a href="/matchday-xi" className="flex items-center gap-2 p-2 bg-slate-950 hover:bg-slate-900 border border-gray-800 rounded-lg text-xs text-gray-250 transition-colors">
-                            <Users className="h-4 w-4 text-emerald-500 shrink-0" />
-                            <span>Matchday XI Board</span>
-                        </a>
-                        <a href="/squad" className="flex items-center gap-2 p-2 bg-slate-950 hover:bg-slate-900 border border-gray-800 rounded-lg text-xs text-gray-250 transition-colors">
-                            <UserCheck className="h-4 w-4 text-sky-500 shrink-0" />
-                            <span>Invite / Add Player</span>
-                        </a>
-                        <a href="/watcher" className="flex items-center gap-2 p-2 bg-slate-950 hover:bg-slate-900 border border-gray-800 rounded-lg text-xs text-gray-250 transition-colors">
-                            <Activity className="h-4 w-4 text-amber-500 shrink-0" />
-                            <span>Match Watcher</span>
-                        </a>
+                    <CardContent className="pt-4">
+                        <div className="space-y-2">
+                            {priorities.map((task, i) => (
+                                <div key={i} className="flex items-center justify-between p-2.5 bg-slate-950 border border-gray-800 rounded-xl text-xs">
+                                    <span className="font-semibold text-gray-100">{task.label}</span>
+                                    <Badge className="bg-red-500/10 text-red-400 border border-red-500/20 text-[8px] uppercase tracking-wide">
+                                        {task.category}
+                                    </Badge>
+                                </div>
+                            ))}
+                            {priorities.length === 0 && (
+                                <p className="text-xs text-gray-400 italic text-center py-4">All operations priorities completed.</p>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
 
-                {/* Squad Availability Analytics Card */}
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-xs font-bold uppercase tracking-wider text-gray-300">Squad Availability</CardTitle>
@@ -697,451 +732,139 @@ export default function DashboardPage() {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
 
-            {/* Priorities & Next Fixture Layout Row */}
-            <div className="grid gap-6 lg:grid-cols-7 relative z-10">
-                {/* Left Side: Priorities & Next Match (4 spans) */}
-                <div className="lg:col-span-4 space-y-6">
-                    {/* Today's Priorities list */}
-                    <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                        <CardHeader className="pb-3 border-b border-gray-800/80">
-                            <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Today's Priorities</CardTitle>
-                            <CardDescription className="text-xs text-gray-300">Generated workflow priorities requiring action</CardDescription>
-                        </CardHeader>
-                        <CardContent className="pt-4">
-                            <div className="space-y-2">
-                                {priorities.map((task, i) => (
-                                    <div key={i} className="flex items-center justify-between p-2.5 bg-slate-950 border border-gray-800 rounded-xl text-xs">
-                                        <span className="font-semibold text-gray-100">{task.label}</span>
-                                        <Badge className="bg-red-500/10 text-red-400 border border-red-500/20 text-[8px] uppercase tracking-wide">
-                                            {task.category}
-                                        </Badge>
-                                    </div>
-                                ))}
-                                {priorities.length === 0 && (
-                                    <p className="text-xs text-gray-400 italic text-center py-4">All operations priorities completed.</p>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Next Fixture Details */}
-                    <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                        <CardHeader className="pb-3 border-b border-gray-800/80">
-                            <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Fixture Details</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-4 space-y-4">
-                            {nextMatch ? (
-                                <div className="space-y-3 text-xs">
-                                    <div className="bg-slate-950 p-3 rounded-xl border border-gray-800 flex justify-between items-center">
-                                        <div>
-                                            <div className="text-[10px] text-gray-350 uppercase font-bold">Opponent</div>
-                                            <div className="text-base font-black text-white mt-0.5">{nextMatch.opponent}</div>
-                                            <div className="text-[9px] text-gray-300 mt-1 flex items-center gap-1.5">
-                                                <span className="text-white font-bold">{nextMatch.competition}</span>
-                                                <span>•</span>
-                                                <span>{nextMatch.isHome ? "🏠 Home Venue" : "🚌 Away Venue"}</span>
-                                            </div>
-                                        </div>
-                                        <div className="text-right">
-                                            <div className="text-[10px] text-gray-350 uppercase font-bold">Date &amp; Kickoff</div>
-                                            <div className="font-black text-white mt-0.5">{formatDate(nextMatch.date)} • {nextMatch.time || "TBC"}</div>
-                                            {nextMatch.location && <div className="text-[9px] text-gray-300 mt-1 max-w-[140px] truncate">{nextMatch.location}</div>}
-                                        </div>
-                                    </div>
-
-                                    {timeLeft && (
-                                        <div className="space-y-2">
-                                            <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-3 flex justify-between items-center">
-                                                <span className="font-bold text-gray-200">Days to Kickoff:</span>
-                                                <div className="flex gap-2 text-white font-black">
-                                                    <div className="bg-slate-955 px-2.5 py-1 rounded-lg border border-gray-800">{timeLeft.days}d</div>
-                                                    <div className="bg-slate-955 px-2.5 py-1 rounded-lg border border-gray-800">{timeLeft.hours}h</div>
-                                                    <div className="bg-slate-955 px-2.5 py-1 rounded-lg border border-gray-800">{timeLeft.minutes}m</div>
-                                                </div>
-                                            </div>
-                                            
-                                            {/* Roster Status (Suggestion 5) */}
-                                            <div className="bg-slate-950 p-3 rounded-xl border border-gray-800 flex justify-between items-center text-[10px] text-gray-300">
-                                                <span>Roster Status:</span>
-                                                <Badge className={`text-[8px] uppercase tracking-wide ${nextMatch.notes?.includes("[Lineup: ") 
-                                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
-                                                    : "bg-amber-500/10 text-amber-400 border border-amber-500/20"}`}>
-                                                    {nextMatch.notes?.includes("[Lineup: ") ? "Lineup Configured" : "Roster Blank"}
-                                                </Badge>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    <div className="grid grid-cols-2 gap-3 text-[10px] text-gray-300 bg-slate-950 p-3 rounded-xl border border-gray-800">
-                                        <div className="flex justify-between"><span>Pitch surface:</span> <span className="font-bold text-white">{nextMatch.surface || "4G"}</span></div>
-                                        <div className="flex justify-between"><span>Expected Squad Size:</span> <span className="font-bold text-white">{availablePlayers.length} Selectable</span></div>
-                                        <div className="flex justify-between"><span>Kickoff Time:</span> <span className="font-bold text-white">{nextMatch.time || "TBC"}</span></div>
-                                        <div className="flex justify-between"><span>Venue / Location:</span> <span className="font-bold text-white truncate max-w-[100px]" title={nextMatch.location || "TBC"}>{nextMatch.location || "TBC"}</span></div>
-                                    </div>
-                                </div>
-                            ) : (
-                                <div className="text-center py-6 text-gray-400">
-                                    <p className="mb-3">No fixture currently scheduled.</p>
-                                    <a href="/matches" className="px-3 py-1.5 rounded-lg bg-red-650 text-white font-bold hover:bg-red-755 transition-all text-xs">
-                                        Schedule Fixture
-                                    </a>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Next Training Session Details (Suggestion 7) */}
-                    <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                        <CardHeader className="pb-3 border-b border-gray-800/80">
-                            <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Next Training Session</CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-4">
-                            {nextTrainingSession ? (
-                                <div className="space-y-3 text-xs bg-slate-950 p-3 rounded-xl border border-gray-800">
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-400 font-medium">Date:</span>
-                                        <span className="font-bold text-white">{formatDate(nextTrainingSession.date)}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-400 font-medium">Time &amp; Location:</span>
-                                        <span className="font-bold text-white">{nextTrainingSession.time || "TBC"} • {nextTrainingSession.location || "TBC"}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                        <span className="text-gray-400 font-medium">Topic / Focus:</span>
-                                        <span className="font-bold text-emerald-400">{nextTrainingSession.topic || "General Squad Session"}</span>
-                                    </div>
-                                </div>
-                            ) : (
-                                <p className="text-xs text-gray-400 italic text-center py-2">No upcoming training sessions scheduled.</p>
-                            )}
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Right Side: Squad Health & Season Performance (3 spans) */}
-                <div className="lg:col-span-3 space-y-6">
-                    {/* Squad Health overview */}
-                    <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                        <CardHeader className="pb-3 border-b border-gray-800/80">
-                            <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Squad Health</CardTitle>
-                            <CardDescription className="text-xs text-gray-300">Operational demographic summaries</CardDescription>
-                        </CardHeader>
-                        <CardContent className="pt-4 text-xs space-y-2">
-                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
-                                <span className="text-gray-300 font-bold">Registered Players</span>
-                                <span className="font-black text-white">{players.length}</span>
-                            </div>
-                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
-                                <span className="text-gray-300 font-bold">Average Squad Age</span>
-                                <span className="font-black text-white">{avgSquadAge} years</span>
-                            </div>
-
-                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
-                                <span className="text-gray-300 font-bold">U23 Players</span>
-                                <span className="font-black text-white">{u23Count}</span>
-                            </div>
-                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
-                                <span className="text-gray-300 font-bold">Footedness Breakdown</span>
-                                <span className="font-black text-white">
-                                    {leftFootedCount === 0 && rightFootedCount === 0 && bothFootedCount === 0
-                                        ? "Unspecified" 
-                                        : `Left ${leftFootedCount} • Right ${rightFootedCount} • Both ${bothFootedCount}`}
-                                </span>
-                            </div>
-
-                            {/* Active Injury Feed (Suggestion 6) */}
-                            <div className="border-t border-gray-800 pt-2 mt-2 space-y-1.5">
-                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Active Injury Feed</span>
-                                {injuredPlayers.length === 0 ? (
-                                    <p className="text-[10px] text-gray-500 italic">No current injuries logged.</p>
-                                ) : (
-                                    <div className="space-y-1 max-h-[100px] overflow-y-auto pr-1">
-                                        {injuredPlayers.map(p => (
-                                            <div key={p.id} className="flex justify-between items-center text-[10px] bg-red-950/20 border border-red-900/30 px-2 py-1 rounded text-red-300">
-                                                <span className="font-bold">{formatPlayerName(p)}</span>
-                                                <span className="text-[9px] opacity-80">{p.injuryType || "Injured"}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Season Performance */}
-                    <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                        <CardHeader className="pb-3 border-b border-gray-800/80">
-                            <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Season Performance</CardTitle>
-                            <CardDescription className="text-xs text-gray-300">KPI & results summary</CardDescription>
-                        </CardHeader>
-                        <CardContent className="pt-4 text-xs space-y-3">
-                            {/* Streamlined Stats Layout (Suggestion 3) */}
-                            <div className="grid grid-cols-3 gap-2 text-center">
-                                <div className="bg-slate-950 p-2 rounded-lg border border-gray-850">
-                                    <div className="text-[8px] text-gray-400 font-bold uppercase">Record</div>
-                                    <div className="text-xs font-black text-white mt-0.5">{winsCount}W - {drawsCount}D - {completedMatches.length - winsCount - drawsCount}L</div>
-                                </div>
-                                <div className="bg-slate-950 p-2 rounded-lg border border-gray-850">
-                                    <div className="text-[8px] text-gray-400 font-bold uppercase">Goal Diff</div>
-                                    <div className="text-xs font-black text-white mt-0.5">{goalDifference > 0 ? `+${goalDifference}` : goalDifference}</div>
-                                </div>
-                                <div className="bg-slate-950 p-2 rounded-lg border border-gray-850">
-                                    <div className="text-[8px] text-gray-400 font-bold uppercase">Win Rate</div>
-                                    <div className="text-xs font-black text-white mt-0.5">{winRate}%</div>
-                                </div>
-                            </div>
-
-                            {/* Training Attendance rate (Suggestion 4) */}
-                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between items-center">
-                                <div>
-                                    <span className="text-[9px] text-gray-400 uppercase font-bold tracking-wider block">Average Training Attendance</span>
-                                    <div className="text-sm font-black text-white mt-0.5">{averageTrainingAttendance}%</div>
-                                    <p className="text-[8px] text-gray-500 mt-0.5">Overall average attendance across all logged sessions</p>
-                                </div>
-                            </div>
-
-                            {/* Recent Results Ticker (Suggestion 9) */}
-                            <div className="border-t border-gray-800 pt-2 mt-2 space-y-1.5">
-                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Recent Results</span>
-                                {recentResults.length === 0 ? (
-                                    <p className="text-[10px] text-gray-500 italic text-center py-2">No matches completed yet.</p>
-                                ) : (
-                                    <div className="space-y-1">
-                                        {recentResults.map(m => (
-                                            <div key={m.id} className="flex justify-between items-center text-[10px] bg-slate-950 border border-gray-850 px-2 py-1 rounded">
-                                                <span className="text-gray-350 font-medium">vs {m.opponent}</span>
-                                                <Badge className={`text-[8px] font-bold uppercase ${
-                                                    m.result === "Win" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
-                                                    m.result === "Loss" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
-                                                    "bg-slate-500/10 text-slate-400 border border-slate-500/20"
-                                                }`}>
-                                                    {m.scoreline ? `${m.scoreline} (${m.result})` : m.result}
-                                                </Badge>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </div>
-
-            {/* V3 Advanced Injury & Suspension medical dashboard */}
-            <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md relative z-10">
-                <CardHeader className="pb-3 border-b border-gray-800/80 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div>
-                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Injury &amp; Suspension Log</CardTitle>
-                        <CardDescription className="text-xs text-gray-300">Squad health and physical therapy recovery parameters</CardDescription>
-                    </div>
-                    {/* Log Filter Header */}
-                    <div className="flex flex-wrap bg-slate-950 p-0.5 rounded-lg border border-gray-800">
-                        {(['All', 'Injured', 'Suspended', 'On Holiday'] as const).map(tab => (
-                            <button
-                                key={tab}
-                                onClick={() => setInjuryFilter(tab)}
-                                className={`px-2.5 py-1 text-[10px] font-extrabold rounded transition-all ${injuryFilter === tab ? 'bg-slate-800 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                            >
-                                {tab}
-                            </button>
-                        ))}
-                    </div>
-                </CardHeader>
-                <CardContent className="pt-4 max-h-[300px] overflow-y-auto">
-                    <div className="space-y-2">
-                        {filteredInjuryList.length === 0 ? (
-                            <p className="text-xs text-gray-405 italic text-center py-4">No records found matching filter criteria.</p>
-                        ) : (
-                            filteredInjuryList.map(p => (
-                                <div key={p.id} className="flex justify-between items-center text-xs bg-slate-955 p-2.5 rounded-xl border border-gray-800/85">
+                {/* Row 2: Next Fixture Details & Injury Summary */}
+                <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
+                    <CardHeader className="pb-2 border-b border-gray-800/80">
+                        <CardTitle className="text-xs font-bold text-gray-300 uppercase tracking-wider">Next Fixture</CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-3 space-y-3">
+                        {nextMatch ? (
+                            <div className="space-y-2.5 text-xs">
+                                <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between items-center">
                                     <div>
-                                        <span className="font-semibold text-white">{formatPlayerName(p)}</span>
-                                        <span className="text-[10px] text-gray-300 ml-2">({p.position})</span>
-                                        <p className="text-[9px] text-gray-400 mt-1">
-                                            {p.medicalStatus === "Suspended" ? "Disciplinary Suspension" : 
-                                             p.medicalStatus === "Holiday" ? "Away on Holiday" :
-                                             p.injuryType ? `Injury: ${p.injuryType} ${p.injuryDuration ? `• Est. Return: ${p.injuryDuration}` : ""}` : 
-                                             "Injured - notes pending"}
-                                        </p>
+                                        <div className="text-[9px] text-gray-400 uppercase font-bold">{nextMatch.competition} • {nextMatch.isHome ? "Home" : "Away"}</div>
+                                        <div className="text-sm font-extrabold text-white mt-0.5">vs {nextMatch.opponent}</div>
                                     </div>
                                     <div className="text-right">
-                                        <Badge className={`text-[8px] uppercase tracking-wide ${
-                                            p.medicalStatus === "Holiday" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
-                                            p.medicalStatus === "Suspended" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
-                                            "bg-red-650/10 text-red-400 border border-red-650/20"
-                                        }`}>
-                                            {p.medicalStatus === "Holiday" ? "Holiday" : p.medicalStatus}
-                                        </Badge>
+                                        <div className="text-[9px] text-gray-400 uppercase font-bold">Kickoff</div>
+                                        <div className="font-extrabold text-white mt-0.5">{formatDate(nextMatch.date)} @ {nextMatch.time || "TBC"}</div>
                                     </div>
                                 </div>
-                            ))
+
+                                {timeLeft && (
+                                    <div className="flex justify-between items-center bg-slate-955 px-2.5 py-1.5 rounded-xl border border-gray-800 text-[10px]">
+                                        <span className="font-bold text-gray-300">Countdown:</span>
+                                        <span className="font-black text-red-400">{timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m remaining</span>
+                                    </div>
+                                )}
+
+                                <div className="flex justify-between items-center bg-slate-955 px-2.5 py-1.5 rounded-xl border border-gray-800 text-[10px]">
+                                    <span className="font-bold text-gray-300">Expected Availability:</span>
+                                    <span className="font-black text-emerald-400">{availablePlayers.length} Selectable</span>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center py-4 text-gray-400 text-xs">
+                                <p>No fixture scheduled.</p>
+                            </div>
                         )}
-                    </div>
-                </CardContent>
-            </Card>
+                    </CardContent>
+                </Card>
 
-            {/* Squad Depth Overview & Recruitment Row */}
-            <div className="grid gap-6 md:grid-cols-2 relative z-10">
-                {/* Squad Depth Analysis */}
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                    <CardHeader className="pb-3 border-b border-gray-800/80">
-                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Squad Depth Overview</CardTitle>
-                        <CardDescription className="text-xs text-gray-300">Position coverage review</CardDescription>
+                    <CardHeader className="pb-2 border-b border-gray-800/80">
+                        <CardTitle className="text-xs font-bold text-gray-300 uppercase tracking-wider">Injury &amp; Suspension Summary</CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-4 text-xs space-y-3">
-                        <div className="flex justify-between items-center bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                            <span className="text-gray-200">Goalkeepers ({depth.gks})</span>
-                            <Badge className={`text-[8px] uppercase ${depth.gks < 2 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                                {depth.gks < 2 ? 'Needs Reinforcement' : 'Strong'}
-                            </Badge>
+                    <CardContent className="pt-3 text-xs space-y-2">
+                        <div className="space-y-1.5">
+                            {filteredInjuryList.slice(0, 3).map(p => (
+                                <div key={p.id} className="flex justify-between items-center bg-slate-955 px-2.5 py-1.5 rounded-lg border border-gray-800">
+                                    <span className="font-bold text-white">{formatPlayerName(p)}</span>
+                                    <Badge className={`text-[8px] uppercase tracking-wide ${
+                                        p.medicalStatus === "Holiday" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
+                                        p.medicalStatus === "Suspended" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
+                                        "bg-red-650/10 text-red-400 border border-red-650/20"
+                                    }`}>
+                                        {p.medicalStatus === "Holiday" ? "Holiday" : p.injuryType || p.medicalStatus}
+                                    </Badge>
+                                </div>
+                            ))}
+                            {filteredInjuryList.length === 0 && (
+                                <p className="text-[10px] text-gray-500 italic text-center py-2">No unavailable players.</p>
+                            )}
                         </div>
-                        <div className="flex justify-between items-center bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                            <span className="text-gray-200">Centre Backs ({depth.cbs})</span>
-                            <Badge className={`text-[8px] uppercase ${depth.cbs < 3 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                                {depth.cbs < 3 ? 'Monitor' : 'Strong'}
-                            </Badge>
-                        </div>
-                        <div className="flex justify-between items-center bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                            <span className="text-gray-200">Full Backs ({depth.fbs})</span>
-                            <Badge className={`text-[8px] uppercase ${depth.fbs < 2 ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                                {depth.fbs < 2 ? 'Needs Reinforcement' : 'Strong'}
-                            </Badge>
-                        </div>
-                        <div className="flex justify-between items-center bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                            <span className="text-gray-200">Midfielders ({depth.mids})</span>
-                            <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8px] uppercase">Strong</Badge>
-                        </div>
-                        <div className="flex justify-between items-center bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                            <span className="text-gray-200">Wingers ({depth.wingers})</span>
-                            <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8px] uppercase">Strong</Badge>
-                        </div>
-                        <div className="flex justify-between items-center bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                            <span className="text-gray-200">Forwards ({depth.strikers})</span>
-                            <Badge className={`text-[8px] uppercase ${depth.strikers < 2 ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' : 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'}`}>
-                                {depth.strikers < 2 ? 'Monitor' : 'Strong'}
-                            </Badge>
+                        <div className="pt-1.5 flex justify-end">
+                            <a href="/squad" className="text-[9px] font-bold text-red-400 hover:text-red-300 hover:underline flex items-center gap-1">
+                                View Full Injury Log &rarr;
+                            </a>
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* Recruitment Pipeline */}
+                {/* Row 3: Season Performance & Preferred Starting XI */}
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                    <CardHeader className="pb-3 border-b border-gray-800/80">
-                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Recruitment Pipeline</CardTitle>
-                        <CardDescription className="text-xs text-gray-300">Squad acquisition pipeline progress indicators</CardDescription>
+                    <CardHeader className="pb-2 border-b border-gray-800/80">
+                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Season Performance</CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-4 text-xs space-y-3.5">
-                        <div className="space-y-1">
-                            <div className="flex justify-between text-gray-200 font-bold">
-                                <span>Applications Awaiting Review</span>
-                                <span>3</span>
+                    <CardContent className="pt-4 text-xs space-y-4">
+                        <div className="grid grid-cols-3 gap-3 text-center">
+                            <div className="bg-slate-950 p-2.5 rounded-xl border border-gray-850">
+                                <div className="text-[9px] text-gray-400 font-bold uppercase">League Standings</div>
+                                <div className="text-sm font-black text-amber-500 mt-0.5">{displayLeaguePosition}</div>
                             </div>
-                            <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
-                                <div className="h-full bg-red-500 rounded-full" style={{ width: '45%' }} />
+                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                                <div className="text-[9px] text-gray-400 font-bold uppercase">Points Per Game</div>
+                                <div className="text-sm font-black text-white mt-0.5">{ppg}</div>
                             </div>
-                        </div>
-                        <div className="space-y-1">
-                            <div className="flex justify-between text-gray-200 font-bold">
-                                <span>Active Trialists</span>
-                                <span>{activeTrialistsCount}</span>
+                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                                <div className="text-[9px] text-gray-400 font-bold uppercase">Win Percentage</div>
+                                <div className="text-sm font-black text-white mt-0.5">{winRate}%</div>
                             </div>
-                            <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-500 rounded-full" style={{ width: `${(activeTrialistsCount / 6) * 100}%` }} />
+                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                                <div className="text-[9px] text-gray-400 font-bold uppercase">Goals Scored</div>
+                                <div className="text-sm font-black text-emerald-400 mt-0.5">{goalsScored}</div>
                             </div>
-                        </div>
-                        <div className="space-y-1">
-                            <div className="flex justify-between text-gray-200 font-bold">
-                                <span>Shortlisted Recruits</span>
-                                <span>{recruits.length}</span>
+                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                                <div className="text-[9px] text-gray-400 font-bold uppercase">Goals Conceded</div>
+                                <div className="text-sm font-black text-red-400 mt-0.5">{goalsConceded}</div>
                             </div>
-                            <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
-                                <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${(recruits.length / 10) * 100}%` }} />
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <div className="flex justify-between text-gray-200 font-bold">
-                                <span>Contract Negotiations</span>
-                                <span>2</span>
-                            </div>
-                            <div className="h-1.5 w-full bg-slate-950 rounded-full overflow-hidden">
-                                <div className="h-full bg-emerald-500 rounded-full" style={{ width: '25%' }} />
+                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
+                                <div className="text-[9px] text-gray-400 font-bold uppercase">Goal Difference</div>
+                                <div className="text-sm font-black text-sky-400 mt-0.5">{goalDifference > 0 ? `+${goalDifference}` : goalDifference}</div>
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
-            </div>
 
-            {/* Lineup & Contributors (Bottom Row) */}
-            <div className="grid gap-6 md:grid-cols-5 relative z-10">
-                {/* Starting Selection (3 spans) */}
-                <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md md:col-span-3">
-                    <CardHeader className="pb-3 border-b border-gray-800/80">
-                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Starting selection</CardTitle>
-                        <CardDescription className="text-xs text-gray-300">Selection variables</CardDescription>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-center pt-4">
-                        <div className="space-y-3.5 text-xs text-gray-200">
-                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between">
-                                <span>Expected Formation</span>
-                                <span className="font-bold text-white">{lineup?.formation || "4-2-3-1"}</span>
-                            </div>
-                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between">
-                                <span>Squad Average Age</span>
-                                <span className="font-bold text-white">{avgSquadAge} yrs</span>
-                            </div>
-                        </div>
-                        <div className="flex justify-center">
-                            {renderMiniPitch()}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Squad Contributors (2 spans) */}
-                <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md md:col-span-2">
-                    <CardHeader className="pb-3 border-b border-gray-800/80">
-                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Squad Contributors</CardTitle>
-                        <CardDescription className="text-xs text-gray-300">Leading contributors</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-4 space-y-4">
-                        <div>
-                            <h4 className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mb-2.5">⚽ Top Goalscorers</h4>
-                            <div className="space-y-2">
-                                {players
-                                    .filter(p => p.goals > 0)
-                                    .sort((a, b) => b.goals - a.goals)
-                                    .slice(0, 2)
-                                    .map((p, idx) => (
-                                        <div key={p.id} className="flex justify-between text-xs bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                                            <span className="text-gray-250 font-semibold">{idx + 1}. {formatPlayerName(p)}</span>
-                                            <span className="font-black text-red-500">{p.goals} Goals</span>
-                                        </div>
-                                    ))}
-                                {players.filter(p => p.goals > 0).length === 0 && (
-                                    <p className="text-[10px] text-gray-400 italic">No goals registered.</p>
+                        <div className="bg-slate-955 p-3 rounded-xl border border-gray-800 flex items-center justify-between">
+                            <span className="text-[10px] text-gray-300 font-bold uppercase tracking-wider">Recent Form</span>
+                            <div className="flex gap-1.5">
+                                {recentForm.map(m => (
+                                    <div 
+                                        key={m.id}
+                                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black ${
+                                            m.result === "Win" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
+                                            m.result === "Loss" ? "bg-red-500/20 text-red-400 border border-red-500/30" :
+                                            "bg-slate-500/20 text-slate-400 border border-slate-500/30"
+                                        }`}
+                                        title={`vs ${m.opponent} (${m.result})`}
+                                    >
+                                        {m.result?.[0] || "-"}
+                                    </div>
+                                ))}
+                                {recentForm.length === 0 && (
+                                    <span className="text-[10px] text-gray-500 italic">No matches played</span>
                                 )}
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
 
-                        <div className="border-t border-slate-900 pt-3">
-                            <h4 className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mb-2.5">🅰️ Assist Leaders</h4>
-                            <div className="space-y-2">
-                                {players
-                                    .filter(p => p.assists > 0)
-                                    .sort((a, b) => b.assists - a.assists)
-                                    .slice(0, 2)
-                                    .map((p, idx) => (
-                                        <div key={p.id} className="flex justify-between text-xs bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                                            <span className="text-gray-250 font-semibold">{idx + 1}. {formatPlayerName(p)}</span>
-                                            <span className="font-black text-blue-500">{p.assists} Assists</span>
-                                        </div>
-                                    ))}
-                                {players.filter(p => p.assists > 0).length === 0 && (
-                                    <p className="text-[10px] text-gray-400 italic">No assists registered.</p>
-                                )}
-                            </div>
-                        </div>
+                <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
+                    <CardHeader className="pb-3 border-b border-gray-800/80">
+                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Preferred Starting XI</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex flex-col items-center pt-4 justify-center h-full">
+                        {renderMiniPitch()}
                     </CardContent>
                 </Card>
             </div>
