@@ -51,9 +51,20 @@ export default function DashboardPage() {
     const [leagueNameState, setLeagueNameState] = useState("");
     const [isEditingLeagueName, setIsEditingLeagueName] = useState(false);
     const [tempLeagueName, setTempLeagueName] = useState("");
+    const [dismissedPriorities, setDismissedPriorities] = useState<string[]>([]);
 
     useEffect(() => {
         fetchData();
+
+        if (typeof window !== "undefined") {
+            const today = new Date().toISOString().split("T")[0];
+            const saved = localStorage.getItem(`clubflow_dismissed_priorities_${today}`);
+            if (saved) {
+                try {
+                    setDismissedPriorities(JSON.parse(saved));
+                } catch (e) {}
+            }
+        }
 
         // Subscriptions
         const channels = [
@@ -360,6 +371,13 @@ export default function DashboardPage() {
     const totalOutstandingAmount = outstandingInvoices.reduce((sum, r) => sum + (r.amount || 0), 0);
     const registrationIssues = players.filter(p => p.status === "Pending Registration" || p.status === "Pending Invitation" || p.status === "Draft");
 
+    const handleDismissPriority = (label: string) => {
+        const today = new Date().toISOString().split("T")[0];
+        const updated = [...dismissedPriorities, label];
+        setDismissedPriorities(updated);
+        localStorage.setItem(`clubflow_dismissed_priorities_${today}`, JSON.stringify(updated));
+    };
+
     // Dynamic priorities list
     const getPriorities = () => {
         const list = [];
@@ -373,7 +391,8 @@ export default function DashboardPage() {
         
         if (injuredPlayers.length > 0) list.push({ label: `Update Injury Recovery Status for ${injuredPlayers.length} Squad Members`, category: "Medical" });
         if (settings.leagueUrl && !settings.leaguePosition) list.push({ label: "Sync League Table Standings", category: "Operations" });
-        return list.slice(0, 5);
+        
+        return list.filter(task => !dismissedPriorities.includes(task.label)).slice(0, 5);
     };
     const priorities = getPriorities();
 
@@ -699,7 +718,16 @@ export default function DashboardPage() {
                         <div className="space-y-2">
                             {priorities.map((task, i) => (
                                 <div key={i} className="flex items-center justify-between p-2.5 bg-slate-950 border border-gray-800 rounded-xl text-xs">
-                                    <span className="font-semibold text-gray-100">{task.label}</span>
+                                    <div className="flex items-center gap-2">
+                                        <button
+                                            onClick={() => handleDismissPriority(task.label)}
+                                            className="p-1 rounded bg-slate-900 border border-gray-800 hover:bg-emerald-950 hover:border-emerald-500 text-gray-400 hover:text-emerald-400 transition-colors"
+                                            title="Mark as Resolved"
+                                        >
+                                            <Check className="h-3.5 w-3.5" />
+                                        </button>
+                                        <span className="font-semibold text-gray-100">{task.label}</span>
+                                    </div>
                                     <Badge className="bg-red-500/10 text-red-400 border border-red-500/20 text-[8px] uppercase tracking-wide">
                                         {task.category}
                                     </Badge>
