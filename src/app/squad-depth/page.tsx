@@ -34,12 +34,20 @@ const POSITION_FULL_NAMES: Record<string, string> = {
     "GK": "Goalkeeper",
     "LB": "Left Back",
     "CB": "Centre Back",
+    "LCB": "Left Centre Back",
+    "RCB": "Right Centre Back",
     "RB": "Right Back",
     "LWB": "Left Wing Back",
     "RWB": "Right Wing Back",
     "CDM": "Defensive Midfielder",
+    "LDM": "Left Defensive Midfielder",
+    "RDM": "Right Defensive Midfielder",
     "CM": "Central Midfielder",
+    "LCM": "Left Central Midfielder",
+    "RCM": "Right Central Midfielder",
     "CAM": "Attacking Midfielder",
+    "LAM": "Advanced Left 8",
+    "RAM": "Advanced Right 8",
     "LM": "Left Midfielder",
     "RM": "Right Midfielder",
     "LW": "Left Winger",
@@ -59,8 +67,14 @@ const getShortPosition = (pos: string): string => {
     if (p === "left wing back" || p === "lwb") return "LWB";
     if (p === "right wing-back" || p === "rwb") return "RWB";
     if (p === "defensive midfielder" || p === "cdm") return "CDM";
+    if (p === "left defensive midfielder" || p === "ldm") return "LDM";
+    if (p === "right defensive midfielder" || p === "rdm") return "RDM";
     if (p === "central midfielder" || p === "cm") return "CM";
+    if (p === "left central midfielder" || p === "lcm") return "LCM";
+    if (p === "right central midfielder" || p === "rcm") return "RCM";
     if (p === "attacking midfielder" || p === "cam") return "CAM";
+    if (p === "left attacking midfielder" || p === "lam") return "LAM";
+    if (p === "right attacking midfielder" || p === "ram") return "RAM";
     if (p === "left midfielder" || p === "lm") return "LM";
     if (p === "right midfielder" || p === "rm") return "RM";
     if (p === "left winger" || p === "left wing" || p === "lw") return "LW";
@@ -73,9 +87,8 @@ const getPositionCategory = (pos: string): "GK" | "DEF" | "MID" | "FWD" => {
     const p = getShortPosition(pos);
     if (p === "GK") return "GK";
     if (["CB", "LCB", "RCB", "RB", "LB", "RWB", "LWB"].includes(p)) return "DEF";
-    if (["CM", "CDM", "CAM", "RM", "LM"].includes(p)) return "MID";
-    if (["ST", "CF", "RW", "LW"].includes(p)) return "FWD";
-    return "MID";
+    if (["CM", "LCM", "RCM", "CDM", "LDM", "RDM", "CAM", "LAM", "RAM", "RM", "LM"].includes(p)) return "MID";
+    return "FWD";
 };
 
 export default function SquadDepthPage() {
@@ -168,16 +181,29 @@ export default function SquadDepthPage() {
     };
 
     const playerCanPlayPosition = (p: Player, posLabel: string): boolean => {
-        let primaryShort = getShortPosition(p.position);
-        if (primaryShort === "LCB" || primaryShort === "RCB") primaryShort = "CB";
-        if (primaryShort === posLabel) return true;
+        const checkMatch = (pos: string, targetLabel: string): boolean => {
+            const pShort = getShortPosition(pos);
+            if (pShort === targetLabel) return true;
+            
+            // Map generic to specific side-based positions
+            if (pShort === "CB" && (targetLabel === "LCB" || targetLabel === "RCB")) return true;
+            if (pShort === "CM" && (targetLabel === "LCM" || targetLabel === "RCM")) return true;
+            if (pShort === "CAM" && (targetLabel === "LAM" || targetLabel === "RAM")) return true;
+            if (pShort === "CDM" && (targetLabel === "LDM" || targetLabel === "RDM")) return true;
+            
+            // Map specific side-based back to generic
+            if ((pShort === "LCB" || pShort === "RCB") && targetLabel === "CB") return true;
+            if ((pShort === "LCM" || pShort === "RCM") && targetLabel === "CM") return true;
+            if ((pShort === "LAM" || pShort === "RAM") && targetLabel === "CAM") return true;
+            if ((pShort === "LDM" || pShort === "RDM") && targetLabel === "CDM") return true;
+            
+            return false;
+        };
+
+        if (checkMatch(p.position, posLabel)) return true;
 
         if (p.secondaryPositions && p.secondaryPositions.length > 0) {
-            return p.secondaryPositions.some(secPos => {
-                let secShort = getShortPosition(secPos);
-                if (secShort === "LCB" || secShort === "RCB") secShort = "CB";
-                return secShort === posLabel;
-            });
+            return p.secondaryPositions.some(secPos => checkMatch(secPos, posLabel));
         }
         return false;
     };
@@ -200,7 +226,7 @@ export default function SquadDepthPage() {
             loadedChart[pos] = (loadedChart[pos] || []).filter(id => currentIds.has(id));
         });
 
-        const allPossibleLabels = ["GK", "LB", "CB", "RB", "LWB", "RWB", "CDM", "CM", "CAM", "LM", "RM", "LW", "RW", "ST", "CF"];
+        const allPossibleLabels = ["GK", "LB", "CB", "LCB", "RCB", "RB", "LWB", "RWB", "CDM", "LDM", "RDM", "CM", "LCM", "RCM", "CAM", "LAM", "RAM", "LM", "RM", "LW", "RW", "ST", "CF"];
 
         squadPlayers.forEach(p => {
             allPossibleLabels.forEach(label => {
