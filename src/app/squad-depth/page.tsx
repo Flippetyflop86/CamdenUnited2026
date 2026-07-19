@@ -65,8 +65,7 @@ const getShortPosition = (pos: string): string => {
     if (p === "right midfielder" || p === "rm") return "RM";
     if (p === "left winger" || p === "left wing" || p === "lw") return "LW";
     if (p === "right winger" || p === "right wing" || p === "rw") return "RW";
-    if (p === "striker" || p === "forward" || p === "st") return "ST";
-    if (p === "centre forward" || p === "cf") return "CF";
+    if (p === "striker" || p === "forward" || p === "st" || p === "centre forward" || p === "cf") return "ST";
     return "CM"; // default fallback
 };
 
