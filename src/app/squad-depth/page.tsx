@@ -21,7 +21,9 @@ import {
     GripVertical,
     Plus,
     UserCheck,
-    Lock
+    Lock,
+    Star,
+    ShieldAlert
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
@@ -285,7 +287,7 @@ export default function SquadDepthPage() {
         }
     };
 
-    const getParsedNotes = (notesStr: string) => {
+    const getParsedNotes = (notesStr: string | undefined) => {
         let parsed = { coachNotes: "", preferredFoot: "Right", height: "", weight: "", developmentPlan: "" };
         try {
             if (notesStr && notesStr.trim().startsWith("{")) {
@@ -371,38 +373,121 @@ export default function SquadDepthPage() {
     // Stats calculations
     const totalPlayers = players.length;
     const avgAge = totalPlayers > 0 ? (players.reduce((sum, p) => sum + getPlayerAge(p), 0) / totalPlayers).toFixed(1) : "0.0";
-    const gkCount = players.filter(p => getPositionCategory(p.position) === "GK").length;
-    const defCount = players.filter(p => getPositionCategory(p.position) === "DEF").length;
-    const midCount = players.filter(p => getPositionCategory(p.position) === "MID").length;
-    const fwdCount = players.filter(p => getPositionCategory(p.position) === "FWD").length;
+    const unavailableCount = players.filter(p => !p.availability).length;
 
-    // Positional analysis insights generator based on rankings depth chart
-    const getInsights = () => {
-        const insights: { type: "warning" | "success" | "info"; text: string }[] = [];
+    // Get position strength rating
+    const getPositionStrength = (posLabel: string) => {
+        const pList = getActivePosPlayers(posLabel);
+        const availableCount = pList.filter(p => p.availability).length;
+        if (availableCount === 0) return { rating: "Critical" as const, colorClass: "text-red-500 bg-red-500/10 border-red-500/25", score: 1 };
+        if (pList.length >= 5) return { rating: "Excellent" as const, colorClass: "text-emerald-550 bg-emerald-500/10 border-emerald-500/25", score: 5 };
+        if (pList.length >= 3) return { rating: "Strong" as const, colorClass: "text-emerald-450 bg-emerald-500/10 border-emerald-500/25", score: 4 };
+        if (pList.length === 2) return { rating: "Adequate" as const, colorClass: "text-amber-500 bg-amber-500/10 border-amber-500/25", score: 3 };
+        return { rating: "Weak" as const, colorClass: "text-orange-500 bg-orange-500/10 border-orange-500/25", score: 2 };
+    };
 
-        // GK Check
-        const gkDepth = getActivePosPlayers("GK").filter(p => p.availability);
-        if (gkDepth.length === 0) insights.push({ type: "warning", text: "No active Goalkeeper." });
-        else if (gkDepth.length === 1) insights.push({ type: "warning", text: "No backup GK cover (Only 1 GK available)." });
+    // Count weak positions
+    const uniqueFormationLabels = Array.from(new Set(activePositions.map(pos => pos.label)));
+    const weakPositionsCount = uniqueFormationLabels.filter(label => {
+        const strength = getPositionStrength(label).rating;
+        return strength === "Weak" || strength === "Critical";
+    }).length;
 
-        // Check each position in formation
-        const uniqueFormationLabels = Array.from(new Set(activePositions.map(pos => pos.label)));
+    // Count natural positions covered
+    const naturalCoveredCount = uniqueFormationLabels.filter(label => {
+        const pList = getActivePosPlayers(label);
+        return pList.some(p => getShortPosition(p.position) === label);
+    }).length;
+
+    // Formation Suitability Star Rating
+    const getFormationRating = () => {
+        let totalScore = 0;
         uniqueFormationLabels.forEach(label => {
-            const labelDepth = getActivePosPlayers(label).filter(p => p.availability);
-            const count = labelDepth.length;
-            if (count === 0) {
-                insights.push({ type: "warning", text: `Position completely empty: ${POSITION_FULL_NAMES[label] || label}.` });
-            } else if (count === 1) {
-                insights.push({ type: "warning", text: `Positional shortage: ${POSITION_FULL_NAMES[label] || label} has no active backups.` });
-            } else if (count >= 5) {
-                insights.push({ type: "success", text: `Strong positional depth at ${POSITION_FULL_NAMES[label] || label} (${count} options).` });
+            totalScore += getPositionStrength(label).score;
+        });
+        const average = uniqueFormationLabels.length > 0 ? totalScore / uniqueFormationLabels.length : 0;
+        return Math.min(5, Math.max(1, Math.round(average)));
+    };
+    const formationRating = getFormationRating();
+
+    // Sporting Director Position Insights
+    const getSquadPlanningInsights = () => {
+        const list: string[] = [];
+        
+        // GK checks
+        const gks = getActivePosPlayers("GK");
+        const availableGks = gks.filter(p => p.availability).length;
+        if (availableGks === 0) {
+            list.push("🔴 GK: No available goalkeeper registered. Critical recruitment priority.");
+        } else if (gks.length === 1) {
+            list.push("🟠 GK: No active backup goalkeeper available.");
+        } else {
+            const avgGkAge = gks.reduce((a, b) => a + getPlayerAge(b), 0) / gks.length;
+            if (avgGkAge > 31) {
+                list.push(`🟠 GK: Average age of goalkeepers exceeds 31 (${avgGkAge.toFixed(1)}). Future recruitment recommended.`);
+            }
+        }
+
+        // Natural player counts check
+        uniqueFormationLabels.forEach(label => {
+            if (label === "GK") return;
+            const pList = getActivePosPlayers(label);
+            const naturalCount = pList.filter(p => getShortPosition(p.position) === label).length;
+            const availableCount = pList.filter(p => p.availability).length;
+            
+            if (pList.length === 0) {
+                list.push(`🔴 ${label}: Position completely empty.`);
+            } else if (availableCount === 0) {
+                list.push(`🔴 ${label}: All assigned players are currently unavailable.`);
+            } else if (naturalCount === 0) {
+                list.push(`🟠 ${label}: Lacks natural options (playing out of position or utility players).`);
+            } else if (pList.length === 1) {
+                list.push(`🟠 ${label}: Lacks backup depth (1 option only).`);
+            } else if (pList.length >= 5) {
+                list.push(`🟢 ${label}: Excellent depth with ${pList.length} options.`);
             }
         });
 
-        return insights;
-    };
+        // Left-footed check in defense
+        const lbs = getActivePosPlayers("LB");
+        const hasLeftFootedLb = lbs.some(p => getParsedNotes(p.notes).preferredFoot === "Left" || getParsedNotes(p.notes).preferredFoot === "Both");
+        if (lbs.length > 0 && !hasLeftFootedLb) {
+            list.push("🟠 Defense: LB lacks a natural left-footed specialist.");
+        }
 
-    const insights = getInsights();
+        return list;
+    };
+    const squadPlanningInsights = getSquadPlanningInsights();
+
+    // Recruitment priorities generator
+    const getRecruitmentPriorities = () => {
+        const priorities: { title: string; reason: string; severity: "Critical" | "Weak" | "Adequate" }[] = [];
+
+        uniqueFormationLabels.forEach(label => {
+            const pList = getActivePosPlayers(label);
+            const availableCount = pList.filter(p => p.availability).length;
+            
+            if (pList.length === 0 || availableCount === 0) {
+                priorities.push({
+                    title: `Natural ${POSITION_FULL_NAMES[label] || label}`,
+                    reason: `No active or available coverage for this role.`,
+                    severity: "Critical"
+                });
+            } else if (pList.length === 1) {
+                priorities.push({
+                    title: `Backup ${POSITION_FULL_NAMES[label] || label}`,
+                    reason: `Only one recognized player currently covers this position.`,
+                    severity: "Weak"
+                });
+            }
+        });
+        
+        return priorities.sort((a, b) => {
+            const severityOrder = { Critical: 3, Weak: 2, Adequate: 1 };
+            return severityOrder[b.severity] - severityOrder[a.severity];
+        }).slice(0, 3);
+    };
+    const recruitmentPriorities = getRecruitmentPriorities();
 
     // Toggle expand/collapse for a position accordion
     const toggleAccordion = (posLabel: string) => {
@@ -417,7 +502,7 @@ export default function SquadDepthPage() {
             {/* Header & Tabs */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b pb-5">
                 <div>
-                    <h1 className="text-2xl font-black tracking-tight">Squad Depth Planner</h1>
+                    <h1 className="text-2xl font-black tracking-tight">Squad Planning Centre</h1>
                     <p className="text-xs text-slate-500 mt-1">Visualize full squad coverage, analyze positional depth, and manage backups.</p>
                 </div>
                 
@@ -427,7 +512,7 @@ export default function SquadDepthPage() {
                             key={sq}
                             onClick={() => setActiveSquadTab(sq)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                activeSquadTab === sq ? "bg-white text-slate-950 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                                activeSquadTab === sq ? "bg-white text-slate-955 shadow-sm" : "text-slate-500 hover:text-slate-850"
                             }`}
                         >
                             {sq}
@@ -488,7 +573,7 @@ export default function SquadDepthPage() {
                             type="checkbox"
                             checked={filterYouth}
                             onChange={(e) => setFilterYouth(e.target.checked)}
-                            className="rounded border-slate-300 text-red-600 focus:ring-red-500"
+                            className="rounded border-slate-300 text-red-650 focus:ring-red-500"
                         />
                         <span>Youth (&lt;21)</span>
                     </label>
@@ -498,16 +583,48 @@ export default function SquadDepthPage() {
                             type="checkbox"
                             checked={filterTrialists}
                             onChange={(e) => setFilterTrialists(e.target.checked)}
-                            className="rounded border-slate-300 text-red-600 focus:ring-red-500"
+                            className="rounded border-slate-300 text-red-650 focus:ring-red-500"
                         />
                         <span>Trialists</span>
                     </label>
                 </div>
 
                 <div className="flex gap-2">
-                    <Button variant="outline" size="sm" onClick={handleResetChart} className="text-slate-500 hover:text-red-600 font-bold">
-                        <Trash2 className="h-4 w-4 mr-1.5" /> Reset Custom Depth Chart
+                    <Button variant="outline" size="sm" onClick={handleResetChart} className="text-slate-500 hover:text-red-600 font-bold text-xs h-9">
+                        <Trash2 className="h-4 w-4 mr-1.5" /> Reset Custom Planner
                     </Button>
+                </div>
+            </div>
+
+            {/* Top Tactical Dashboard Cards (Suggestion 10) */}
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-6 relative z-10">
+                <div className="bg-white border p-3.5 rounded-xl shadow-xs">
+                    <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider block">Registered Players</span>
+                    <span className="text-xl font-black text-slate-900 mt-1 block">{totalPlayers}</span>
+                </div>
+                <div className="bg-white border p-3.5 rounded-xl shadow-xs">
+                    <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider block">Average Age</span>
+                    <span className="text-xl font-black text-slate-900 mt-1 block">{avgAge} yrs</span>
+                </div>
+                <div className="bg-white border p-3.5 rounded-xl shadow-xs">
+                    <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider block">Positions Covered</span>
+                    <span className="text-xl font-black text-slate-900 mt-1 block">{naturalCoveredCount} / {uniqueFormationLabels.length}</span>
+                </div>
+                <div className="bg-white border p-3.5 rounded-xl shadow-xs">
+                    <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider block">Unavailable Players</span>
+                    <span className="text-xl font-black text-red-500 mt-1 block">{unavailableCount}</span>
+                </div>
+                <div className="bg-white border p-3.5 rounded-xl shadow-xs">
+                    <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider block">Weak Positions</span>
+                    <span className="text-xl font-black text-orange-500 mt-1 block">{weakPositionsCount}</span>
+                </div>
+                <div className="bg-white border p-3.5 rounded-xl shadow-xs flex flex-col justify-between">
+                    <span className="text-[9px] text-slate-400 uppercase font-black tracking-wider block">Formation Rating</span>
+                    <div className="flex gap-0.5 text-amber-500 mt-1">
+                        {Array.from({ length: 5 }).map((_, idx) => (
+                            <Star key={idx} className={`h-4.5 w-4.5 ${idx < formationRating ? "fill-amber-500 text-amber-500" : "text-slate-200"}`} />
+                        ))}
+                    </div>
                 </div>
             </div>
 
@@ -539,11 +656,9 @@ export default function SquadDepthPage() {
                                 const zoneKey = `${pos.label}_${pos.number}`;
                                 const positionPlayers = getActivePosPlayers(pos.label);
                                 
-                                // 1st Choice (starter) is the first player in the ranked list
-                                const firstChoice = positionPlayers[0];
-                                const backupsCount = Math.max(0, positionPlayers.length - 1);
+                                // Starter is the first choice in depth list
+                                const starter = positionPlayers[0];
 
-                                // GK is at y: 5 originally. We scale y from 12% to 88% to prevent GK or ST getting cut off.
                                 const adjustedY = 12 + (pos.y * 0.76);
                                 const adjustedX = pos.x;
 
@@ -553,7 +668,6 @@ export default function SquadDepthPage() {
                                         onDragOver={(e) => e.preventDefault()}
                                         onDrop={() => handleDropOnPosition(pos.label)}
                                         onClick={() => {
-                                            // Focus and expand this position in the right accordion
                                             toggleAccordion(pos.label);
                                             const element = document.getElementById(`depth-accordion-${pos.label}`);
                                             if (element) {
@@ -568,23 +682,21 @@ export default function SquadDepthPage() {
                                             {pos.label}
                                         </div>
 
-                                        {/* Placed 1st Choice Card */}
-                                        <div className="w-full mt-2 bg-slate-950/80 border border-slate-800 text-white rounded-xl p-2.5 text-center shadow-lg transition-all group-hover:scale-105 group-hover:border-slate-500">
-                                            {firstChoice ? (
-                                                <div className="space-y-1 text-left">
+                                        {/* Placed 1st Choice Card (Simplified: No backup counts, Suggestion 1 & 2) */}
+                                        <div className="w-full mt-2 bg-slate-950/85 border border-slate-800 text-white rounded-xl p-2.5 text-center shadow-lg transition-all group-hover:scale-105 group-hover:border-slate-500">
+                                            {starter ? (
+                                                <div className="space-y-1.5 text-left">
                                                     <div className="flex items-center justify-between gap-1">
-                                                        <span className="truncate text-white text-[11px] font-black">{firstChoice.firstName[0]}. {firstChoice.lastName}</span>
-                                                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${firstChoice.availability ? 'bg-green-500' : 'bg-red-500'}`} />
+                                                        <span className="truncate text-white text-[11px] font-bold">
+                                                            {starter.notes?.includes("[CAPTAIN]") && "👑 "}
+                                                            {starter.firstName[0]}. {starter.lastName}
+                                                        </span>
+                                                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${starter.availability ? 'bg-green-500' : 'bg-red-500'}`} />
                                                     </div>
                                                     
-                                                    {/* Backups Badge count */}
                                                     <div className="flex items-center justify-between text-[9px] text-slate-400 font-semibold pt-1 border-t border-slate-850">
-                                                        <span>1st Choice</span>
-                                                        {backupsCount > 0 && (
-                                                            <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1 rounded">
-                                                                +{backupsCount} backups
-                                                            </span>
-                                                        )}
+                                                        <span>Starter</span>
+                                                        {starter.squadNumber > 0 && <span>#{starter.squadNumber}</span>}
                                                     </div>
                                                 </div>
                                             ) : (
@@ -601,58 +713,96 @@ export default function SquadDepthPage() {
                     </div>
                 </div>
 
-                {/* Right Panel: Ranked Depth Chart Accordions - Takes 2/5 width (40%) */}
+                {/* Right Panel: Squad Summary & Rankings - Takes 2/5 width (40%) */}
                 <div className="xl:col-span-2 space-y-6">
-                    {/* Stats & Insights Overview */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-1 gap-4">
-                        {/* Stats Summary */}
-                        <div className="bg-white border rounded-xl p-4 shadow-sm text-xs grid grid-cols-2 gap-4">
-                            <div className="bg-slate-50 p-2.5 rounded-lg border">
-                                <span className="text-[10px] text-slate-400 uppercase font-black block">Total Players</span>
-                                <span className="text-lg font-black text-slate-850">{totalPlayers}</span>
+                    {/* Squad Summary Card (Suggestion 9) */}
+                    <Card className="bg-white border rounded-xl shadow-xs">
+                        <CardHeader className="pb-3 border-b">
+                            <CardTitle className="text-xs font-black uppercase text-slate-500 tracking-wider">Squad Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-3.5 space-y-3.5 text-xs text-slate-700">
+                            <div className="flex justify-between items-center bg-slate-50 p-2.5 rounded-lg border">
+                                <span className="font-bold text-slate-650">Current Formation Suitability</span>
+                                <div className="flex items-center gap-2">
+                                    <span className="font-black text-slate-900">{formation}</span>
+                                    <Badge className="bg-slate-200 text-slate-800 text-[9px] font-bold">
+                                        {formationRating >= 4 ? "Excellent Match" : formationRating >= 3 ? "Adequate Match" : "Lacks Depth"}
+                                    </Badge>
+                                </div>
                             </div>
-                            <div className="bg-slate-50 p-2.5 rounded-lg border">
-                                <span className="text-[10px] text-slate-400 uppercase font-black block">Average Age</span>
-                                <span className="text-lg font-black text-slate-850">{avgAge} yrs</span>
-                            </div>
-                        </div>
+                            <p className="text-[11px] text-slate-500 leading-normal">
+                                This planner calculates positional strength, backup hierarchies, and recruitment recommendations dynamically based on the current selection of first-choice starters and tactical parameters.
+                            </p>
+                        </CardContent>
+                    </Card>
 
-                        {/* Positional Insights */}
-                        <div className="bg-white border rounded-xl p-4 shadow-sm space-y-2 text-xs font-semibold">
-                            <h3 className="text-xs font-black uppercase text-slate-500 tracking-wider mb-2">Squad Insights</h3>
-                            <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
-                                {insights.length === 0 ? (
-                                    <p className="text-slate-400 italic">No alarms triggered. Squad is well balanced.</p>
+                    {/* Squad Insights (Suggestion 9 & 5) */}
+                    <Card className="bg-white border rounded-xl shadow-xs">
+                        <CardHeader className="pb-3 border-b">
+                            <CardTitle className="text-xs font-black uppercase text-slate-500 tracking-wider">Squad Insights</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-3.5 text-xs font-semibold space-y-2">
+                            <div className="space-y-2.5 max-h-[160px] overflow-y-auto pr-1">
+                                {squadPlanningInsights.length === 0 ? (
+                                    <p className="text-slate-400 italic font-normal">No operational warnings. Squad balance is currently stable.</p>
                                 ) : (
-                                    insights.map((insight, idx) => (
+                                    squadPlanningInsights.map((text, idx) => (
                                         <div key={idx} className="flex items-start gap-2 leading-tight">
-                                            {insight.type === "warning" ? (
-                                                <AlertTriangle className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
-                                            ) : insight.type === "success" ? (
-                                                <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
-                                            ) : (
-                                                <Info className="h-4 w-4 text-slate-500 shrink-0 mt-0.5" />
-                                            )}
-                                            <span className="text-slate-700">{insight.text}</span>
+                                            <span className="text-slate-700">{text}</span>
                                         </div>
                                     ))
                                 )}
                             </div>
-                        </div>
-                    </div>
+                        </CardContent>
+                    </Card>
 
-                    {/* Accordion List for Positional Depth Chart */}
-                    <div className="space-y-3 bg-white p-4 rounded-2xl border shadow-sm">
+                    {/* Recruitment Priorities (Suggestion 9 & 6) */}
+                    <Card className="bg-white border rounded-xl shadow-xs">
+                        <CardHeader className="pb-3 border-b">
+                            <CardTitle className="text-xs font-black uppercase text-slate-500 tracking-wider">Recruitment Priorities</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-3.5 text-xs space-y-3">
+                            {recruitmentPriorities.length === 0 ? (
+                                <p className="text-slate-400 italic text-center py-2">No outstanding positional coverage warnings.</p>
+                            ) : (
+                                recruitmentPriorities.map((item, idx) => (
+                                    <div key={idx} className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex justify-between items-start">
+                                        <div className="space-y-1">
+                                            <span className="font-black text-slate-900 block text-xs">Priority {idx + 1}: {item.title}</span>
+                                            <span className="text-[10px] text-slate-500 leading-normal block">{item.reason}</span>
+                                        </div>
+                                        <Badge className={`text-[8px] font-black uppercase shrink-0 ${
+                                            item.severity === "Critical" ? "bg-red-500/10 text-red-500 border border-red-500/20" : "bg-orange-500/10 text-orange-500 border border-orange-500/20"
+                                        }`}>
+                                            {item.severity}
+                                        </Badge>
+                                    </div>
+                                ))
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Accordion List for Positional Depth Chart (Rankings, Suggestion 9, 3 & 11) */}
+                    <div className="space-y-3 bg-white p-4 rounded-xl border shadow-sm">
                         <div className="flex items-center justify-between border-b pb-3">
-                            <h3 className="text-xs font-black uppercase text-slate-500 tracking-wider">Depth Chart Rankings</h3>
-                            <span className="text-[9px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded">Drag cards to rank</span>
+                            <h3 className="text-xs font-black uppercase text-slate-500 tracking-wider">Position Rankings</h3>
+                            <span className="text-[9px] bg-slate-100 text-slate-500 font-bold px-2 py-0.5 rounded">Drag to reorder rankings</span>
                         </div>
 
                         <div className="space-y-2.5 max-h-[500px] overflow-y-auto pr-1">
-                            {/* Unique position keys configured in the active formation */}
                             {Array.from(new Set(activePositions.map(pos => pos.label))).map((posLabel) => {
                                 const posPlayers = getActivePosPlayers(posLabel);
                                 const isExpanded = !!expandedPositions[posLabel];
+                                const strength = getPositionStrength(posLabel);
+
+                                // Compute positional stats (Suggestion 8)
+                                const ageAvg = posPlayers.length > 0 ? (posPlayers.reduce((a, b) => a + getPlayerAge(b), 0) / posPlayers.length).toFixed(1) : "0";
+                                const leftCount = posPlayers.filter(p => getParsedNotes(p.notes).preferredFoot === "Left").length;
+                                const rightCount = posPlayers.filter(p => getParsedNotes(p.notes).preferredFoot === "Right").length;
+                                const bothCount = posPlayers.filter(p => getParsedNotes(p.notes).preferredFoot === "Both").length;
+                                const availableCount = posPlayers.filter(p => p.availability).length;
+                                const naturalCount = posPlayers.filter(p => getShortPosition(p.position) === posLabel).length;
+                                const utilityCount = posPlayers.length - naturalCount;
 
                                 return (
                                     <div
@@ -662,32 +812,43 @@ export default function SquadDepthPage() {
                                         onDrop={() => handleDropOnPosition(posLabel)}
                                         className="border rounded-xl bg-slate-50/50 overflow-hidden"
                                     >
-                                        {/* Accordion Trigger Header */}
+                                        {/* Accordion Trigger Header with Rating (Suggestion 4) */}
                                         <div
                                             onClick={() => toggleAccordion(posLabel)}
                                             className="flex items-center justify-between p-3.5 cursor-pointer bg-slate-50 hover:bg-slate-100 border-b transition-colors select-none"
                                         >
                                             <div className="flex items-center gap-2">
                                                 <span className="font-black text-xs text-slate-900 w-10 block">{posLabel}</span>
-                                                <span className="text-[10px] text-slate-400 font-bold">({POSITION_FULL_NAMES[posLabel] || posLabel})</span>
+                                                <span className="text-[10px] text-slate-400 font-bold hidden sm:inline">({POSITION_FULL_NAMES[posLabel] || posLabel})</span>
                                             </div>
                                             
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className={`text-[9px] font-bold ${posPlayers.length === 0 ? 'bg-red-50 text-red-600 border-red-200' : 'bg-slate-200/50'}`}>
-                                                    {posPlayers.length === 0 ? "No coverage" : `${posPlayers.length} players`}
+                                            <div className="flex items-center gap-3">
+                                                <Badge className={`text-[8px] font-black uppercase tracking-wider ${strength.colorClass}`}>
+                                                    {strength.rating}
                                                 </Badge>
                                                 {isExpanded ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
                                             </div>
                                         </div>
 
-                                        {/* Accordion Expanded Content */}
+                                        {/* Accordion Expanded Content (Position Cards, Suggestion 11) */}
                                         {isExpanded && (
-                                            <div className="p-2.5 space-y-2 bg-white/70">
+                                            <div className="p-3.5 space-y-3 bg-white">
+                                                {/* Positional Stats Ticker (Suggestion 8) */}
+                                                <div className="grid grid-cols-3 gap-2 bg-slate-50 p-2.5 rounded-lg border text-[9px] text-slate-650 font-bold mb-2">
+                                                    <div>Players: <span className="text-slate-900 font-black">{posPlayers.length}</span></div>
+                                                    <div>Avg Age: <span className="text-slate-900 font-black">{ageAvg} yrs</span></div>
+                                                    <div>Available: <span className="text-slate-900 font-black">{availableCount}</span></div>
+                                                    <div>Left/Right/Both: <span className="text-slate-900 font-black">{leftCount}/{rightCount}/{bothCount}</span></div>
+                                                    <div>Natural: <span className="text-slate-900 font-black">{naturalCount}</span></div>
+                                                    <div>Utility: <span className="text-slate-900 font-black">{utilityCount}</span></div>
+                                                </div>
+
                                                 {posPlayers.length === 0 ? (
                                                     <p className="text-[10px] text-slate-400 italic text-center py-4">No players assigned. Drag a player here to fill position.</p>
                                                 ) : (
                                                     posPlayers.map((p, index) => {
-                                                        const rankLabel = index === 0 ? "1st Choice" : index === 1 ? "2nd Choice" : `${index + 1}rd Choice`;
+                                                        // Professional Rank Hierarchy (Suggestion 11)
+                                                        const rankLabel = index === 0 ? "Starter" : index === 1 ? "Backup" : index === 2 ? "Rotation" : index === 3 ? "Development" : "Emergency Cover";
                                                         
                                                         return (
                                                             <div
@@ -704,7 +865,9 @@ export default function SquadDepthPage() {
                                                                 <div className="flex items-center gap-2.5 overflow-hidden">
                                                                     <GripVertical className="h-3.5 w-3.5 text-slate-300 group-hover:text-slate-500 shrink-0" />
                                                                     <div className="text-left overflow-hidden">
-                                                                        <p className="font-bold text-xs text-slate-800 truncate">{p.firstName} {p.lastName}</p>
+                                                                        <p className="font-bold text-xs text-slate-800 truncate">
+                                                                            {p.firstName} {p.lastName}
+                                                                        </p>
                                                                         <p className="text-[9px] text-slate-400">
                                                                             Natural: {p.position} {p.secondaryPositions && p.secondaryPositions.length > 0 && `/ ${p.secondaryPositions.join(" / ")}`}
                                                                         </p>
@@ -712,8 +875,8 @@ export default function SquadDepthPage() {
                                                                 </div>
 
                                                                 <div className="flex items-center gap-2 shrink-0">
-                                                                    <Badge variant="secondary" className={`text-[8px] font-black px-1.5 py-0 ${
-                                                                        index === 0 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600'
+                                                                    <Badge variant="secondary" className={`text-[8px] font-black px-1.5 py-0.5 rounded-md ${
+                                                                        index === 0 ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-650'
                                                                     }`}>
                                                                         {rankLabel}
                                                                     </Badge>
