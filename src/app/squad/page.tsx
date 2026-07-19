@@ -658,13 +658,9 @@ export default function SquadPage() {
         }, 'image/jpeg', 0.9);
     };
 
-    if (!isClubLoaded || isAuthLoading) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="w-8 h-8 animate-spin text-red-600" />
-            </div>
-        );
-    }
+
+
+
 
     return (
         <div className="space-y-6">

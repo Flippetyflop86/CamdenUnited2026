@@ -1360,13 +1360,7 @@ export default function FinancePage() {
             return `${a.lastName} ${a.firstName}`.localeCompare(`${b.lastName} ${b.firstName}`);
         });
 
-    if (!isClubLoaded || isAuthLoading) {
-        return (
-            <div className="flex items-center justify-center min-h-[400px]">
-                <Loader2 className="w-8 h-8 animate-spin text-red-600" />
-            </div>
-        );
-    }
+
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto pb-24 px-4 sm:px-6">
