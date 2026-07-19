@@ -22,7 +22,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const isPublicCheckin = cleanPath?.startsWith("/checkin") || cleanPath?.startsWith("/match-checkin") || cleanPath?.startsWith("/respond");
     const isAuthPage = ["/login", "/signup", "/reset-password", "/update-password", "/join"].includes(cleanPath);
     const isOnboardingPage = cleanPath === "/onboarding";
-    const isNoShellPage = isAuthPage || isOnboardingPage || isPublicCheckin;
+    const isNoShellPage = isAuthPage || isOnboardingPage || isPublicCheckin || cleanPath === "/" || !cleanPath;
 
     useEffect(() => {
         console.warn("AppShell redirect check:", {
