@@ -30,7 +30,18 @@ export default function PlayerProfilePage() {
 
     const [seasonFilter, setSeasonFilter] = useState<string>("26/27");
     const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
-    const [calculatedStats, setCalculatedStats] = useState({ apps: 0, goals: 0, assists: 0 });
+    const [calculatedStats, setCalculatedStats] = useState({
+        apps: 0,
+        goals: 0,
+        assists: 0,
+        yellow: 0,
+        red: 0,
+        minutes: 0,
+        wins: 0,
+        draws: 0,
+        losses: 0,
+        winRate: 0
+    });
     const [includeFriendlies, setIncludeFriendlies] = useState<boolean>(() => {
         if (typeof window !== 'undefined') {
             const val = localStorage.getItem("clubflow_include_friendlies_squad");
@@ -144,7 +155,7 @@ export default function PlayerProfilePage() {
             
             const [playerRes, matchesRes, statsRes, sessionsRes] = await Promise.all([
                 supabase.from('players').select('*, email, mobile_number, status, trusted_devices').eq('id', id).single(),
-                supabase.from('matches').select('id, date, competition'),
+                supabase.from('matches').select('id, date, competition, result'),
                 supabase.from('match_player_stats').select('*').eq('player_id', id),
                 supabase.from('training_sessions').select('id, date, topic, attendance').order('date', { ascending: false }).limit(10)
             ]);
@@ -201,6 +212,7 @@ export default function PlayerProfilePage() {
  
             const matchSeasons = new Map<string, string>();
             const matchCompetitions = new Map<string, string>();
+            const matchResultsMap = new Map<string, string>();
             const seasonSet = new Set<string>();
             matches.forEach((m: any) => {
                 let seasonStr = "";
@@ -219,12 +231,22 @@ export default function PlayerProfilePage() {
                 }
                 matchSeasons.set(m.id, seasonStr);
                 matchCompetitions.set(m.id, m.competition || "");
+                matchResultsMap.set(m.id, m.result || "Pending");
                 seasonSet.add(seasonStr);
             });
             seasonSet.add(getCurrentSeasonStr());
             setAvailableSeasons(Array.from(seasonSet).sort().reverse());
  
-            let apps = 0; let goals = 0; let assists = 0;
+            let apps = 0;
+            let goals = 0;
+            let assists = 0;
+            let yellow = 0;
+            let red = 0;
+            let minutes = 0;
+            let wins = 0;
+            let draws = 0;
+            let losses = 0;
+            
             stats.forEach((s: any) => {
                 const season = matchSeasons.get(s.match_id);
                 if (seasonFilter !== "All" && season !== seasonFilter) return;
@@ -236,8 +258,18 @@ export default function PlayerProfilePage() {
                 apps += 1;
                 goals += (s.goals || 0);
                 assists += (s.assists || 0);
+                yellow += (s.yellow_cards || 0);
+                red += (s.red_cards || 0);
+                minutes += (s.minutes_played || 90);
+
+                const res = matchResultsMap.get(s.match_id);
+                if (res === "Win") wins++;
+                else if (res === "Draw") draws++;
+                else if (res === "Loss") losses++;
             });
-            setCalculatedStats({ apps, goals, assists });
+
+            const winRate = apps > 0 ? Math.round((wins / apps) * 100) : 0;
+            setCalculatedStats({ apps, goals, assists, yellow, red, minutes, wins, draws, losses, winRate });
  
             setLoading(false);
         };
@@ -343,22 +375,63 @@ export default function PlayerProfilePage() {
                     </select>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Appearances</CardTitle></CardHeader>
-                        <CardContent><div className="text-2xl font-bold">{calculatedStats.apps}</div></CardContent>
+                <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+                    {/* Appearances */}
+                    <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 border-indigo-200 shadow-sm overflow-hidden">
+                        <CardHeader className="pb-1 pt-4 px-4"><CardTitle className="text-xs uppercase tracking-wider font-bold text-indigo-600">Appearances</CardTitle></CardHeader>
+                        <CardContent className="pb-4 px-4"><div className="text-3xl font-extrabold text-indigo-900">{calculatedStats.apps}</div></CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Goals</CardTitle></CardHeader>
-                        <CardContent><div className="text-2xl font-bold">{calculatedStats.goals}</div></CardContent>
+
+                    {/* Goals */}
+                    <Card className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 border-emerald-200 shadow-sm overflow-hidden">
+                        <CardHeader className="pb-1 pt-4 px-4"><CardTitle className="text-xs uppercase tracking-wider font-bold text-emerald-600">Goals</CardTitle></CardHeader>
+                        <CardContent className="pb-4 px-4"><div className="text-3xl font-extrabold text-emerald-900">{calculatedStats.goals}</div></CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Assists</CardTitle></CardHeader>
-                        <CardContent><div className="text-2xl font-bold">{calculatedStats.assists}</div></CardContent>
+
+                    {/* Assists */}
+                    <Card className="bg-gradient-to-br from-sky-50 to-sky-100/50 border-sky-200 shadow-sm overflow-hidden">
+                        <CardHeader className="pb-1 pt-4 px-4"><CardTitle className="text-xs uppercase tracking-wider font-bold text-sky-600">Assists</CardTitle></CardHeader>
+                        <CardContent className="pb-4 px-4"><div className="text-3xl font-extrabold text-sky-900">{calculatedStats.assists}</div></CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader className="pb-2"><CardTitle className="text-sm text-slate-500">Mins Played</CardTitle></CardHeader>
-                        <CardContent><div className="text-2xl font-bold">{player.appearances * 90}</div></CardContent>
+
+                    {/* Goal Contributions */}
+                    <Card className="bg-gradient-to-br from-purple-50 to-purple-100/50 border-purple-200 shadow-sm overflow-hidden">
+                        <CardHeader className="pb-1 pt-4 px-4"><CardTitle className="text-xs uppercase tracking-wider font-bold text-purple-600">Goal Contributions</CardTitle></CardHeader>
+                        <CardContent className="pb-4 px-4"><div className="text-3xl font-extrabold text-purple-900">{calculatedStats.goals + calculatedStats.assists}</div></CardContent>
+                    </Card>
+
+                    {/* Mins Played */}
+                    <Card className="bg-gradient-to-br from-slate-50 to-slate-100/50 border-slate-200 shadow-sm overflow-hidden">
+                        <CardHeader className="pb-1 pt-4 px-4"><CardTitle className="text-xs uppercase tracking-wider font-bold text-slate-600">Minutes Played</CardTitle></CardHeader>
+                        <CardContent className="pb-4 px-4"><div className="text-3xl font-extrabold text-slate-900">{calculatedStats.minutes}</div></CardContent>
+                    </Card>
+
+                    {/* Win Rate */}
+                    <Card className="bg-gradient-to-br from-amber-50 to-amber-100/50 border-amber-200 shadow-sm overflow-hidden">
+                        <CardHeader className="pb-1 pt-4 px-4">
+                            <CardTitle className="text-xs uppercase tracking-wider font-bold text-amber-700 flex justify-between">
+                                <span>Win Rate</span>
+                                <span className="text-[10px] text-amber-600 normal-case font-normal">{calculatedStats.wins}W - {calculatedStats.draws}D - {calculatedStats.losses}L</span>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="pb-4 px-4">
+                            <div className="text-3xl font-extrabold text-amber-900">{calculatedStats.winRate}%</div>
+                            <div className="w-full bg-amber-200/50 h-1.5 rounded-full mt-2 overflow-hidden">
+                                <div className="bg-amber-600 h-1.5 rounded-full" style={{ width: `${calculatedStats.winRate}%` }}></div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Yellow Cards */}
+                    <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100/50 border-yellow-200 shadow-sm overflow-hidden">
+                        <CardHeader className="pb-1 pt-4 px-4"><CardTitle className="text-xs uppercase tracking-wider font-bold text-yellow-750">Yellow Cards</CardTitle></CardHeader>
+                        <CardContent className="pb-4 px-4"><div className="text-3xl font-extrabold text-yellow-900">{calculatedStats.yellow}</div></CardContent>
+                    </Card>
+
+                    {/* Red Cards */}
+                    <Card className="bg-gradient-to-br from-rose-50 to-rose-100/50 border-rose-200 shadow-sm overflow-hidden">
+                        <CardHeader className="pb-1 pt-4 px-4"><CardTitle className="text-xs uppercase tracking-wider font-bold text-rose-600">Red Cards</CardTitle></CardHeader>
+                        <CardContent className="pb-4 px-4"><div className="text-3xl font-extrabold text-rose-900">{calculatedStats.red}</div></CardContent>
                     </Card>
                 </div>
 
