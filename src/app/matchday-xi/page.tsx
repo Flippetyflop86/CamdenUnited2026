@@ -255,6 +255,7 @@ export default function MatchdayXIPage() {
                 starters: parsed.starters || {},
                 substitutes: parsed.substitutes || ["", "", "", "", ""],
                 usedSubstitutes: parsed.usedSubstitutes || [],
+                substitutions: parsed.substitutions || [],
                 squad: activeSquadTab,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
@@ -270,6 +271,7 @@ export default function MatchdayXIPage() {
             starters: {},
             substitutes: ["", "", "", "", ""],
             usedSubstitutes: [],
+            substitutions: [],
             squad: activeSquadTab,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
@@ -296,6 +298,31 @@ export default function MatchdayXIPage() {
             });
         }
 
+        // Calculate minutes played for each player
+        const minutesMap = new Map<string, number>();
+        if (newLineup.starters) {
+            Object.values(newLineup.starters).forEach((id: any) => {
+                if (id) minutesMap.set(id, 90);
+            });
+        }
+        if (newLineup.usedSubstitutes && Array.isArray(newLineup.usedSubstitutes)) {
+            newLineup.usedSubstitutes.forEach((id: any) => {
+                if (id) minutesMap.set(id, 30); // default fallback for playing subs
+            });
+        }
+
+        if (newLineup.substitutions && Array.isArray(newLineup.substitutions)) {
+            newLineup.substitutions.forEach(sub => {
+                const subMin = Number(sub.minute) || 60;
+                if (sub.replacedId && minutesMap.has(sub.replacedId)) {
+                    minutesMap.set(sub.replacedId, subMin);
+                }
+                if (sub.subId && minutesMap.has(sub.subId)) {
+                    minutesMap.set(sub.subId, 90 - subMin);
+                }
+            });
+        }
+
         // Fetch current stats for the match
         const { data: existingStats, error: fetchErr } = await supabase
             .from('match_player_stats')
@@ -310,8 +337,9 @@ export default function MatchdayXIPage() {
         const existingMap = new Map<string, any>();
         existingStats?.forEach(s => existingMap.set(s.player_id, s));
 
-        // 1. Ensure rows exist for everyone in the lineup
+        // 1. Ensure rows exist for everyone in the lineup with calculated minutes
         for (const playerId of playerIds) {
+            const mins = minutesMap.get(playerId) ?? 90;
             const existing = existingMap.get(playerId);
             if (!existing) {
                 const { error: insertErr } = await supabase
@@ -321,11 +349,18 @@ export default function MatchdayXIPage() {
                         player_id: playerId,
                         goals: 0,
                         assists: 0,
-                        minutes_played: 90,
+                        minutes_played: mins,
                         yellow_cards: 0,
                         red_cards: 0
                     }]);
                 if (insertErr) console.error("Error inserting stats row:", insertErr);
+            } else {
+                // Update minutes played to match the lineup details
+                const { error: updateErr } = await supabase
+                    .from('match_player_stats')
+                    .update({ minutes_played: mins })
+                    .eq('id', existing.id);
+                if (updateErr) console.error("Error updating stats row minutes:", updateErr);
             }
         }
 
@@ -353,7 +388,8 @@ export default function MatchdayXIPage() {
             formation: newLineup.formation,
             starters: newLineup.starters,
             substitutes: newLineup.substitutes,
-            usedSubstitutes: newLineup.usedSubstitutes || []
+            usedSubstitutes: newLineup.usedSubstitutes || [],
+            substitutions: newLineup.substitutions || []
         };
 
         let cleanNotes = (currentMatch.notes || "").trim();
@@ -407,6 +443,25 @@ export default function MatchdayXIPage() {
         } else if (!newLineup.id.startsWith("match-lineup-")) {
             await supabase.from('matchday_xis').update(payload).eq('id', newLineup.id);
         }
+    };
+
+    const handleSubDetailChange = (subId: string, replacedId: string, minute: number) => {
+        if (!lineup) return;
+        const currentSubs = lineup.substitutions || [];
+        const filtered = currentSubs.filter(s => s.subId !== subId);
+        
+        let updatedSubs = filtered;
+        if (replacedId || minute) {
+            updatedSubs = [...filtered, { subId, replacedId, minute }];
+        }
+        
+        const updated = {
+            ...lineup,
+            substitutions: updatedSubs,
+            updatedAt: new Date().toISOString()
+        };
+        setLineup(updated);
+        saveLineup(updated);
     };
 
     const handleFormationChange = (newFormation: string) => {
@@ -1213,70 +1268,109 @@ export default function MatchdayXIPage() {
                             const player = rawSubId ? players.find(p => p.id === rawSubId) : null;
                             const subId = player ? rawSubId : "";
                             const displayName = formatPlayerName(player);
+                            const subDetail = lineup.substitutions?.find(s => s.subId === subId);
 
                             return (
-                                <div 
-                                    key={idx} 
-                                    className="flex items-center gap-2 w-full"
-                                    onDragOver={handleDragOver}
-                                    onDrop={(e) => handleDropOnSub(e, idx)}
-                                >
-                                    <span className="text-[10px] font-bold text-slate-400 w-3 shrink-0">{idx + 1}.</span>
-                                    
+                                <div key={idx} className="space-y-1.5 p-1.5 rounded-lg border border-slate-200 bg-white">
                                     <div 
-                                        draggable={!!subId}
-                                        onDragStart={(e) => subId && handleDragStart(e, subId, {type: 'sub', index: idx})}
-                                        onClick={() => setActiveSlot({ type: 'sub', index: idx, label: `Bench Slot ${idx + 1}` })}
-                                        className={`flex-1 min-w-0 flex items-center justify-between p-2 border rounded-lg shadow-sm transition-all cursor-pointer hover:border-slate-400
-                                            ${subId ? 'bg-white hover:border-red-400 border-slate-200 group' : 'bg-slate-100 border-dashed border-slate-300 text-slate-400 hover:bg-slate-200'}`}
+                                        className="flex items-center gap-2 w-full"
+                                        onDragOver={handleDragOver}
+                                        onDrop={(e) => handleDropOnSub(e, idx)}
                                     >
-                                        {subId ? (
-                                            <>
-                                                <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                    <GripVertical className="h-4 w-4 text-slate-300 group-hover:text-red-400 transition-colors shrink-0" />
-                                                    <span className="text-xs font-bold text-slate-800 truncate" title={displayName}>{displayName}</span>
-                                                </div>
-                                                <span className="text-[9px] uppercase text-slate-500 font-bold mr-1 shrink-0 ml-2">{player?.position}</span>
-                                            </>
-                                        ) : (
-                                            <span className="text-[10px] font-medium text-center w-full block">Drag here</span>
+                                        <span className="text-[10px] font-bold text-slate-400 w-3 shrink-0">{idx + 1}.</span>
+                                        
+                                        <div 
+                                            draggable={!!subId}
+                                            onDragStart={(e) => subId && handleDragStart(e, subId, {type: 'sub', index: idx})}
+                                            onClick={() => setActiveSlot({ type: 'sub', index: idx, label: `Bench Slot ${idx + 1}` })}
+                                            className={`flex-1 min-w-0 flex items-center justify-between p-2 border rounded-lg shadow-sm transition-all cursor-pointer hover:border-slate-400
+                                                ${subId ? 'bg-white hover:border-red-400 border-slate-200 group' : 'bg-slate-100 border-dashed border-slate-300 text-slate-400 hover:bg-slate-200'}`}
+                                        >
+                                            {subId ? (
+                                                <>
+                                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                                        <GripVertical className="h-4 w-4 text-slate-300 group-hover:text-red-400 transition-colors shrink-0" />
+                                                        <span className="text-xs font-bold text-slate-800 truncate" title={displayName}>{displayName}</span>
+                                                    </div>
+                                                    <span className="text-[9px] uppercase text-slate-500 font-bold mr-1 shrink-0 ml-2">{player?.position}</span>
+                                                </>
+                                            ) : (
+                                                <span className="text-[10px] font-medium text-center w-full block">Drag here</span>
+                                            )}
+                                        </div>
+                                        
+                                        {subId && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    const usedSubs = lineup.usedSubstitutes || [];
+                                                    let nextUsed;
+                                                    let nextSubstitutions = lineup.substitutions || [];
+                                                    if (usedSubs.includes(subId)) {
+                                                        nextUsed = usedSubs.filter(id => id !== subId);
+                                                        nextSubstitutions = nextSubstitutions.filter(s => s.subId !== subId);
+                                                    } else {
+                                                        nextUsed = [...usedSubs, subId];
+                                                    }
+                                                    const updated = { ...lineup, usedSubstitutes: nextUsed, substitutions: nextSubstitutions, updatedAt: new Date().toISOString() };
+                                                    setLineup(updated);
+                                                    saveLineup(updated);
+                                                }}
+                                                className={`px-2 py-1 rounded text-[9px] font-bold border transition-colors shrink-0 ${
+                                                    lineup.usedSubstitutes?.includes(subId)
+                                                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 hover:bg-emerald-500/30"
+                                                        : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
+                                                }`}
+                                            >
+                                                {lineup.usedSubstitutes?.includes(subId) ? "Played" : "Unused"}
+                                            </button>
+                                        )}
+                                        
+                                        {lineup.substitutes.length > 1 && (
+                                            <button
+                                                onClick={() => handleRemoveSub(idx)}
+                                                className="p-1.5 text-slate-400 hover:text-red-600 transition-colors rounded-full hover:bg-red-50"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
                                         )}
                                     </div>
-                                    
-                                    {subId && (
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.preventDefault();
-                                                e.stopPropagation();
-                                                const usedSubs = lineup.usedSubstitutes || [];
-                                                let nextUsed;
-                                                if (usedSubs.includes(subId)) {
-                                                    nextUsed = usedSubs.filter(id => id !== subId);
-                                                } else {
-                                                    nextUsed = [...usedSubs, subId];
-                                                }
-                                                const updated = { ...lineup, usedSubstitutes: nextUsed, updatedAt: new Date().toISOString() };
-                                                setLineup(updated);
-                                                saveLineup(updated);
-                                            }}
-                                            className={`px-2 py-1 rounded text-[9px] font-bold border transition-colors shrink-0 ${
-                                                lineup.usedSubstitutes?.includes(subId)
-                                                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 hover:bg-emerald-500/30"
-                                                    : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
-                                            }`}
-                                        >
-                                            {lineup.usedSubstitutes?.includes(subId) ? "Played" : "Unused"}
-                                        </button>
-                                    )}
-                                    
-                                    {lineup.substitutes.length > 1 && (
-                                        <button
-                                            onClick={() => handleRemoveSub(idx)}
-                                            className="p-1.5 text-slate-400 hover:text-red-600 transition-colors rounded-full hover:bg-red-50"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </button>
+                                    {subId && lineup.usedSubstitutes?.includes(subId) && (
+                                        <div className="pl-5 pr-1 py-1 flex items-center justify-between gap-1.5 border-t border-slate-100 mt-1 bg-slate-50 p-1.5 rounded">
+                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Subbed For:</span>
+                                            <div className="flex items-center gap-1 flex-1 justify-end">
+                                                <select
+                                                    value={subDetail?.replacedId || ""}
+                                                    onChange={(e) => handleSubDetailChange(subId, e.target.value, subDetail?.minute || 60)}
+                                                    className="text-[9px] bg-white border border-slate-200 text-slate-800 rounded px-1 py-0.5 h-6 max-w-[110px] outline-none"
+                                                >
+                                                    <option value="">Starter...</option>
+                                                    {Object.entries(lineup.starters).map(([pos, starterId]) => {
+                                                        if (!starterId) return null;
+                                                        const starter = players.find(p => p.id === starterId);
+                                                        return (
+                                                            <option key={starterId} value={starterId}>
+                                                                {starter ? formatPlayerName(starter) : "Unknown"} ({pos})
+                                                            </option>
+                                                        );
+                                                    })}
+                                                </select>
+                                                <div className="flex items-center gap-1 font-bold text-[9px] text-slate-500">
+                                                    <span>Min:</span>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        max="90"
+                                                        value={subDetail?.minute ?? ""}
+                                                        placeholder="60"
+                                                        onChange={(e) => handleSubDetailChange(subId, subDetail?.replacedId || "", parseInt(e.target.value) || 60)}
+                                                        className="text-[9px] bg-white border border-slate-200 text-slate-800 rounded px-1 py-0.5 h-6 w-9 text-center outline-none"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
                                     )}
                                 </div>
                             );
