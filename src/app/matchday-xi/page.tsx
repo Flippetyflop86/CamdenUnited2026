@@ -929,7 +929,7 @@ export default function MatchdayXIPage() {
                         const matchObj = matches.find(m => m.id === selectedMatchId);
                         const opponentName = matchObj ? matchObj.opponent : "this game";
                         alert(`Lineup saved successfully for vs ${opponentName}!`);
-                    }} className="bg-red-650 hover:bg-red-700 text-white font-bold">
+                    }} className="bg-red-600 hover:bg-red-700 text-white font-bold">
                         <Save className="h-4 w-4 mr-2" />
                         Save &amp; Confirm Lineup
                     </Button>
@@ -1272,7 +1272,7 @@ export default function MatchdayXIPage() {
                                 const opponentName = matchObj ? matchObj.opponent : "this game";
                                 alert(`Lineup saved successfully for vs ${opponentName}!`);
                             }} 
-                            className="bg-red-650 hover:bg-red-700 text-white font-bold w-full text-xs h-9"
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold w-full text-xs h-9"
                         >
                             <Save className="h-4 w-4 mr-1.5" />
                             Save Lineup for Game
