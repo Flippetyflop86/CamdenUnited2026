@@ -298,27 +298,68 @@ export default function MatchdayXIPage() {
             });
         }
 
-        // Calculate minutes played for each player
+        // Calculate minutes played using a timeline
         const minutesMap = new Map<string, number>();
+        const onPitchSince = new Map<string, number>();
+
+        // Initialize starters
         if (newLineup.starters) {
             Object.values(newLineup.starters).forEach((id: any) => {
-                if (id) minutesMap.set(id, 90);
-            });
-        }
-        if (newLineup.usedSubstitutes && Array.isArray(newLineup.usedSubstitutes)) {
-            newLineup.usedSubstitutes.forEach((id: any) => {
-                if (id) minutesMap.set(id, 30); // default fallback for playing subs
+                if (id) {
+                    onPitchSince.set(id, 0);
+                    minutesMap.set(id, 0);
+                }
             });
         }
 
-        if (newLineup.substitutions && Array.isArray(newLineup.substitutions)) {
-            newLineup.substitutions.forEach(sub => {
-                const subMin = Number(sub.minute) || 60;
-                if (sub.replacedId && minutesMap.has(sub.replacedId)) {
-                    minutesMap.set(sub.replacedId, subMin);
+        // Initialize playing subs
+        if (newLineup.usedSubstitutes && Array.isArray(newLineup.usedSubstitutes)) {
+            newLineup.usedSubstitutes.forEach((id: any) => {
+                if (id) {
+                    minutesMap.set(id, 0);
                 }
-                if (sub.subId && minutesMap.has(sub.subId)) {
-                    minutesMap.set(sub.subId, 90 - subMin);
+            });
+        }
+
+        // Sort substitutions chronologically by minute
+        const sortedSubs = [...(newLineup.substitutions || [])]
+            .filter(sub => sub.subId)
+            .sort((a, b) => (Number(a.minute) || 60) - (Number(b.minute) || 60));
+
+        sortedSubs.forEach(sub => {
+            const subMin = Number(sub.minute) || 60;
+            
+            // 1. Take the replaced player off the pitch
+            if (sub.replacedId && onPitchSince.has(sub.replacedId)) {
+                const startedAt = onPitchSince.get(sub.replacedId)!;
+                const played = Math.max(0, subMin - startedAt);
+                minutesMap.set(sub.replacedId, (minutesMap.get(sub.replacedId) || 0) + played);
+                onPitchSince.delete(sub.replacedId);
+            }
+            
+            // 2. Put the sub onto the pitch
+            if (sub.subId) {
+                if (!minutesMap.has(sub.subId)) {
+                    minutesMap.set(sub.subId, 0);
+                }
+                onPitchSince.set(sub.subId, subMin);
+            }
+        });
+
+        // End of match (90th minute) - add remaining time for everyone still on pitch
+        onPitchSince.forEach((startedAt, id) => {
+            const played = Math.max(0, 90 - startedAt);
+            minutesMap.set(id, (minutesMap.get(id) || 0) + played);
+        });
+
+        // Ensure any used sub that wasn't logged in substitutions gets a fallback of 30 mins
+        if (newLineup.usedSubstitutes && Array.isArray(newLineup.usedSubstitutes)) {
+            newLineup.usedSubstitutes.forEach((id: any) => {
+                if (id && minutesMap.get(id) === 0) {
+                    const hasSubRecord = newLineup.substitutions?.some(s => s.subId === id);
+                    if (!hasSubRecord) {
+                        minutesMap.set(id, 30);
+                    }
                 }
             });
         }
@@ -1344,18 +1385,32 @@ export default function MatchdayXIPage() {
                                                 <select
                                                     value={subDetail?.replacedId || ""}
                                                     onChange={(e) => handleSubDetailChange(subId, e.target.value, subDetail?.minute || 60)}
-                                                    className="text-[9px] bg-white border border-slate-200 text-slate-800 rounded px-1 py-0.5 h-6 max-w-[110px] outline-none"
+                                                    className="text-[9px] bg-white border border-slate-200 text-slate-800 rounded px-1 py-0.5 h-6 max-w-[110px] outline-none font-medium"
                                                 >
-                                                    <option value="">Starter...</option>
-                                                    {Object.entries(lineup.starters).map(([pos, starterId]) => {
-                                                        if (!starterId) return null;
-                                                        const starter = players.find(p => p.id === starterId);
-                                                        return (
-                                                            <option key={starterId} value={starterId}>
-                                                                {starter ? formatPlayerName(starter) : "Unknown"} ({pos})
-                                                            </option>
-                                                        );
-                                                    })}
+                                                    <option value="">Replaced player...</option>
+                                                    <optgroup label="Starters">
+                                                        {Object.entries(lineup.starters).map(([pos, starterId]) => {
+                                                            if (!starterId) return null;
+                                                            const starter = players.find(p => p.id === starterId);
+                                                            return (
+                                                                <option key={starterId} value={starterId}>
+                                                                    {starter ? formatPlayerName(starter) : "Unknown"} ({pos})
+                                                                </option>
+                                                            );
+                                                        })}
+                                                    </optgroup>
+                                                    <optgroup label="Substitutes">
+                                                        {lineup.substitutes.map((rawId, sIdx) => {
+                                                            if (!rawId || rawId === subId) return null;
+                                                            if (!lineup.usedSubstitutes?.includes(rawId)) return null;
+                                                            const otherSub = players.find(p => p.id === rawId);
+                                                            return (
+                                                                <option key={rawId} value={rawId}>
+                                                                    {otherSub ? formatPlayerName(otherSub) : "Unknown"} (Sub #{sIdx + 1})
+                                                                </option>
+                                                            );
+                                                        })}
+                                                    </optgroup>
                                                 </select>
                                                 <div className="flex items-center gap-1 font-bold text-[9px] text-slate-500">
                                                     <span>Min:</span>
