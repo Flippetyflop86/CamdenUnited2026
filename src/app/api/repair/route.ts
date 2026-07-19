@@ -16,6 +16,8 @@ export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const secret = searchParams.get("secret");
+        const action = searchParams.get("action");
+        const playerName = searchParams.get("player");
         
         if (secret !== "clubflow_cleanup_2026") {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -23,7 +25,51 @@ export async function GET(request: Request) {
 
         const supabase = getAdminClient();
         
-        // 1. Fetch all matches
+        if (action === "inspect" && playerName) {
+            const { data: players } = await supabase
+                .from('players')
+                .select('id, first_name, last_name')
+                .ilike('last_name', `%${playerName}%`);
+            
+            if (!players || players.length === 0) {
+                return NextResponse.json({ error: `Player matching ${playerName} not found` });
+            }
+            
+            const player = players[0];
+            const { data: stats } = await supabase
+                .from('match_player_stats')
+                .select('*')
+                .eq('player_id', player.id);
+            
+            const { data: matches } = await supabase
+                .from('matches')
+                .select('id, opponent, date, competition');
+            
+            const matchMap = new Map();
+            matches?.forEach(m => matchMap.set(m.id, m));
+            
+            const details = stats?.map(s => {
+                const m = matchMap.get(s.match_id);
+                return {
+                    matchId: s.match_id,
+                    opponent: m ? m.opponent : "Unknown",
+                    date: m ? m.date : "Unknown",
+                    competition: m ? m.competition : "Unknown",
+                    goals: s.goals,
+                    assists: s.assists,
+                    minutes: s.minutes_played
+                };
+            }) || [];
+            
+            return NextResponse.json({
+                player: `${player.first_name} ${player.last_name}`,
+                playerId: player.id,
+                totalAppearances: details.length,
+                details
+            });
+        }
+        
+        // Default action: purge pending match stats
         const { data: matches, error: matchesErr } = await supabase
             .from('matches')
             .select('id, opponent, date, result');
@@ -39,7 +85,6 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: true, message: "No pending matches found." });
         }
 
-        // 2. Delete all match_player_stats rows linked to pending matches
         const { data: deletedStats, error: deleteErr } = await supabase
             .from('match_player_stats')
             .delete()
