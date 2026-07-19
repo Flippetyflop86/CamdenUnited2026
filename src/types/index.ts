@@ -55,6 +55,8 @@ export interface Player {
     isParentClub?: boolean;
     injuryType?: string;
     injuryDuration?: string;
+    suspensionReason?: string;
+    suspensionDuration?: string;
 }
 
 export interface Staff {

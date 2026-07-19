@@ -421,6 +421,8 @@ export default function SquadPage() {
                     isParentClub: p.notes && p.notes.includes("[REG:LoanParent]") ? true : false,
                     injuryType: p.notes && p.notes.match(/\[INJURY:(.*?)\]/) ? p.notes.match(/\[INJURY:(.*?)\]/)![1] : undefined,
                     injuryDuration: p.notes && p.notes.match(/\[OUT_DURATION:(.*?)\]/) ? p.notes.match(/\[OUT_DURATION:(.*?)\]/)![1] : undefined,
+                    suspensionReason: p.notes && p.notes.match(/\[SUSPENSION_REASON:(.*?)\]/) ? p.notes.match(/\[SUSPENSION_REASON:(.*?)\]/)![1] : undefined,
+                    suspensionDuration: p.notes && p.notes.match(/\[SUSPENSION_DURATION:(.*?)\]/) ? p.notes.match(/\[SUSPENSION_DURATION:(.*?)\]/)![1] : undefined,
                     isInTrainingSquad: p.is_in_training_squad,
                     isInMatchdayTracker: p.is_in_matchday_tracker,
                     secondaryPositions: p.secondary_position ? p.secondary_position.split(",").map((s: string) => s.trim() as Position) : [],
@@ -555,6 +557,10 @@ export default function SquadPage() {
         if (updatedPlayer.medicalStatus === "Injured" || updatedPlayer.medicalStatus === "Doubtful") {
             if (updatedPlayer.injuryType) finalNotes = `${finalNotes} [INJURY:${updatedPlayer.injuryType}]`.trim();
             if (updatedPlayer.injuryDuration) finalNotes = `${finalNotes} [OUT_DURATION:${updatedPlayer.injuryDuration}]`.trim();
+        }
+        if (updatedPlayer.medicalStatus === "Suspended") {
+            if (updatedPlayer.suspensionReason) finalNotes = `${finalNotes} [SUSPENSION_REASON:${updatedPlayer.suspensionReason}]`.trim();
+            if (updatedPlayer.suspensionDuration) finalNotes = `${finalNotes} [SUSPENSION_DURATION:${updatedPlayer.suspensionDuration}]`.trim();
         }
 
         const payload: any = {
@@ -1157,6 +1163,29 @@ export default function SquadPage() {
                                             value={editingPlayer.injuryDuration || ""}
                                             onChange={(e) => setEditingPlayer({ ...editingPlayer, injuryDuration: e.target.value })}
                                             placeholder="e.g. 3-4 weeks"
+                                            className="h-8 text-sm bg-white"
+                                        />
+                                    </div>
+                                </div>
+                            )}
+
+                            {editingPlayer.medicalStatus === "Suspended" && (
+                                <div className="space-y-3 bg-red-50/50 p-3 rounded-lg border border-red-100">
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-medium text-slate-600">Suspension Reason</label>
+                                        <Input
+                                            value={editingPlayer.suspensionReason || ""}
+                                            onChange={(e) => setEditingPlayer({ ...editingPlayer, suspensionReason: e.target.value })}
+                                            placeholder="e.g. 5 Yellow Cards / Red Card"
+                                            className="h-8 text-sm bg-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-medium text-slate-600">Suspension Duration (matches/days)</label>
+                                        <Input
+                                            value={editingPlayer.suspensionDuration || ""}
+                                            onChange={(e) => setEditingPlayer({ ...editingPlayer, suspensionDuration: e.target.value })}
+                                            placeholder="e.g. 3 matches"
                                             className="h-8 text-sm bg-white"
                                         />
                                     </div>

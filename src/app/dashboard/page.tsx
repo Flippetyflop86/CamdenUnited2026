@@ -219,6 +219,12 @@ export default function DashboardPage() {
                 const matchDuration = p.notes ? p.notes.match(/\[OUT_DURATION:(.*?)\]/) : null;
                 const injuryDuration = matchDuration ? matchDuration[1] : undefined;
 
+                const matchSuspensionReason = p.notes ? p.notes.match(/\[SUSPENSION_REASON:(.*?)\]/) : null;
+                const suspensionReason = matchSuspensionReason ? matchSuspensionReason[1] : undefined;
+
+                const matchSuspensionDuration = p.notes ? p.notes.match(/\[SUSPENSION_DURATION:(.*?)\]/) : null;
+                const suspensionDuration = matchSuspensionDuration ? matchSuspensionDuration[1] : undefined;
+
                 return {
                     id: p.id,
                     firstName: p.first_name,
@@ -243,7 +249,9 @@ export default function DashboardPage() {
                     height: p.height,
                     preferredFoot: preferredFoot,
                     injuryType: injuryType,
-                    injuryDuration: injuryDuration
+                    injuryDuration: injuryDuration,
+                    suspensionReason: suspensionReason,
+                    suspensionDuration: suspensionDuration
                 };
             });
             setPlayers(mapped);
@@ -585,34 +593,33 @@ export default function DashboardPage() {
     };
 
     return (
-        <div className="space-y-6 relative pb-12 bg-[#030712] min-h-screen text-gray-100 p-6 md:p-8">
-            {/* Ambient background glows */}
-            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 opacity-20">
-                <div className="absolute top-[5%] left-[10%] w-[380px] h-[380px] rounded-full bg-red-500/10 blur-[80px]" />
-                <div className="absolute bottom-[20%] right-[10%] w-[420px] h-[420px] rounded-full bg-red-600/5 blur-[90px]" />
+        <div className="space-y-8 relative pb-16 bg-[#030712] min-h-screen text-slate-100 p-6 md:p-10 font-sans select-none">
+            {/* Ambient executive background glows */}
+            <div className="fixed inset-0 pointer-events-none overflow-hidden z-0 opacity-10">
+                <div className="absolute top-[2%] left-[15%] w-[480px] h-[480px] rounded-full bg-red-500/5 blur-[120px]" />
+                <div className="absolute bottom-[10%] right-[15%] w-[520px] h-[520px] rounded-full bg-slate-500/5 blur-[130px]" />
             </div>
 
-            {/* Club Operations Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-800/80 pb-5 relative z-10">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <h2 className="text-2xl font-black tracking-tight text-white">{settings.name}</h2>
-                        <Badge className="bg-red-500/10 hover:bg-red-500/15 text-red-400 border border-red-500/20 text-[9px] uppercase tracking-wider font-extrabold px-2 py-0.5">
-                            Football Operations Command Centre
-                        </Badge>
+            {/* Premium Command Centre Header */}
+            <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 border-b border-slate-900 pb-6">
+                <div className="space-y-1">
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-3xl font-black tracking-tight text-white">{settings.name}</h1>
+                        <span className="bg-red-500/10 text-red-400 border border-red-500/20 text-[9px] uppercase tracking-wider font-black px-2 py-0.5 rounded">
+                            Operations Command Centre
+                        </span>
                     </div>
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-300 mt-1.5 font-medium">
-                        <span className="flex items-center gap-1">
-                            League:{" "}
+                    
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-x-6 gap-y-2 pt-3 text-xs">
+                        <div>
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">League</span>
                             {isEditingLeagueName ? (
-                                <span className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 mt-0.5">
                                     <input
                                         type="text"
                                         value={tempLeagueName}
                                         onChange={(e) => setTempLeagueName(e.target.value)}
-                                        className="bg-slate-900 text-white border border-gray-700 px-2 py-0.5 rounded text-xs w-48 font-semibold focus:outline-none focus:border-red-500"
-                                        placeholder="Enter league name..."
-                                        autoFocus
+                                        className="bg-slate-900 text-white border border-slate-700 px-2 py-0.5 rounded text-xs font-semibold focus:outline-none"
                                     />
                                     <button
                                         onClick={() => {
@@ -620,281 +627,366 @@ export default function DashboardPage() {
                                             setLeagueNameState(tempLeagueName);
                                             setIsEditingLeagueName(false);
                                         }}
-                                        className="text-emerald-400 hover:text-emerald-300 text-[10px] font-bold uppercase bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20"
+                                        className="text-emerald-400 text-[10px] font-black uppercase bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20"
                                     >
                                         Save
                                     </button>
-                                    <button
-                                        onClick={() => setIsEditingLeagueName(false)}
-                                        className="text-gray-400 hover:text-white text-[10px] font-bold uppercase bg-slate-800 px-1.5 py-0.5 rounded"
-                                    >
-                                        Cancel
-                                    </button>
-                                </span>
+                                </div>
                             ) : (
-                                <span className="flex items-center gap-1">
-                                    <span className="text-white font-bold">{leagueNameState || "No League Configured"}</span>
-                                    <button
-                                        onClick={() => {
-                                            setTempLeagueName(leagueNameState);
-                                            setIsEditingLeagueName(true);
-                                        }}
-                                        className="text-red-450 hover:text-red-400 text-[9px] uppercase tracking-wider font-extrabold ml-1 hover:underline bg-red-500/10 px-1 py-0.5 rounded border border-red-500/20"
-                                    >
-                                        Edit
-                                    </button>
+                                <span className="font-extrabold text-white mt-0.5 block flex items-center gap-1.5">
+                                    {leagueNameState || "No League Configured"}
+                                    <button onClick={() => { setTempLeagueName(leagueNameState); setIsEditingLeagueName(true); }} className="text-red-400 text-[9px] hover:underline">Edit</button>
                                 </span>
                             )}
-                        </span>
-                        <span>•</span>
-                        <span>Season: <span className="text-white">2026/27</span></span>
-                        <span>•</span>
-                        <span>Standings: <span className="text-amber-500 font-bold">{displayLeaguePosition}</span></span>
-                        <span>•</span>
-                        <span>Squad Availability: <span className="text-emerald-400 font-bold">{squadAvailabilityRate}%</span></span>
+                        </div>
+                        <div>
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Season</span>
+                            <span className="font-extrabold text-white mt-0.5 block">2026/27</span>
+                        </div>
+                        <div>
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">League Position</span>
+                            <span className="font-extrabold text-amber-500 mt-0.5 block">{displayLeaguePosition}</span>
+                        </div>
+                        <div>
+                            <span className="text-[10px] text-slate-400 uppercase font-bold tracking-wider block">Squad Availability</span>
+                            <span className="font-extrabold text-emerald-400 mt-0.5 block">{squadAvailabilityRate}%</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Operations Toolbar */}
+                {/* Clean Actions Panel */}
                 <div className="flex flex-wrap gap-2">
-                    <a href="/matches" className="px-3 py-1.5 rounded-lg border border-gray-850 bg-slate-950 text-gray-200 text-xs font-bold hover:border-gray-700 hover:text-white transition-all">
+                    <a href="/matches" className="px-3.5 py-2 rounded-lg bg-slate-900 text-slate-200 text-xs font-bold hover:bg-slate-850 hover:text-white transition-all border border-slate-800">
                         + New Fixture
                     </a>
-                    <a href="/training" className="px-3 py-1.5 rounded-lg border border-gray-855 bg-slate-950 text-gray-200 text-xs font-bold hover:border-gray-700 hover:text-white transition-all">
+                    <a href="/training" className="px-3.5 py-2 rounded-lg bg-slate-900 text-slate-200 text-xs font-bold hover:bg-slate-850 hover:text-white transition-all border border-slate-800">
                         + New Session
                     </a>
-                    <a href="/squad" className="px-3 py-1.5 rounded-lg border border-gray-855 bg-slate-955 text-gray-200 text-xs font-bold hover:border-gray-700 hover:text-white transition-all">
+                    <a href="/squad" className="px-3.5 py-2 rounded-lg bg-slate-900 text-slate-200 text-xs font-bold hover:bg-slate-850 hover:text-white transition-all border border-slate-800">
                         + Add Player
                     </a>
-                    <a href="/recruitment" className="px-3 py-1.5 rounded-lg border border-gray-855 bg-slate-955 text-gray-200 text-xs font-bold hover:border-gray-700 hover:text-white transition-all">
-                        + Create Scout Report
+                    <a href="/recruitment" className="px-3.5 py-2 rounded-lg bg-slate-900 text-slate-200 text-xs font-bold hover:bg-slate-850 hover:text-white transition-all border border-slate-800">
+                        + Create Scout
                     </a>
-                    <button onClick={syncLeague} className="px-3 py-1.5 rounded-lg bg-red-650 text-white text-xs font-bold hover:bg-red-700 transition-all shadow-md">
+                    <button onClick={syncLeague} className="px-4 py-2 rounded-lg bg-red-650 text-white text-xs font-bold hover:bg-red-700 transition-all shadow">
                         Sync Standings
                     </button>
                 </div>
             </div>
 
-            {/* V3 High Priority Operational Alerts Strip (Suggestion 2) */}
-            <div className="relative z-10">
+            {/* LEVEL 1: Primary Daily Operational Decisions */}
+            <div className="space-y-4 relative z-10">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Primary Operations</h2>
+                    <span className="h-px bg-slate-900 flex-1 ml-4" />
+                </div>
+
+                {/* Alerts Strip */}
                 {registrationIssues.length > 0 || totalOutstandingAmount > 0 || suspendedPlayers.length > 0 ? (
                     <div className="flex flex-col gap-2">
                         {registrationIssues.length > 0 && (
-                            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 px-3 py-2 rounded-lg text-amber-400 text-xs font-semibold">
+                            <div className="flex items-center gap-2 bg-amber-500/10 border-l-2 border-amber-500 px-4 py-2.5 rounded-r-lg text-amber-400 text-xs font-bold">
                                 <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
                                 <span>{registrationIssues.length} squad member(s) awaiting registration profile completion.</span>
                             </div>
                         )}
                         {totalOutstandingAmount > 0 && (
-                            <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/25 px-3 py-2 rounded-lg text-red-400 text-xs font-bold">
+                            <div className="flex items-center gap-2 bg-red-500/10 border-l-2 border-red-500 px-4 py-2.5 rounded-r-lg text-red-400 text-xs font-bold">
                                 <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
                                 <span>Outstanding payment requests found: £{totalOutstandingAmount.toFixed(2)} unpaid.</span>
                             </div>
                         )}
                         {suspendedPlayers.length > 0 && (
-                            <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/25 px-3 py-2 rounded-lg text-amber-405 text-xs font-semibold">
-                                <AlertCircle className="h-4 w-4 shrink-0 text-amber-500" />
+                            <div className="flex items-center gap-2 bg-red-500/10 border-l-2 border-red-500 px-4 py-2.5 rounded-r-lg text-red-405 text-xs font-bold">
+                                <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
                                 <span>{suspendedPlayers.length} player(s) currently suspended.</span>
                             </div>
                         )}
                     </div>
                 ) : (
-                    <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-3 py-2 rounded-lg text-emerald-400 text-xs font-semibold">
+                    <div className="flex items-center gap-2 bg-emerald-500/5 px-4 py-2.5 rounded-lg text-emerald-450 text-xs font-semibold">
                         <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-                        <span>🟢 No active football department alerts</span>
+                        <span>No active alerts. Operational status normal.</span>
                     </div>
                 )}
-            </div>
 
-            {/* Main Command Centre Grid Layout */}
-            <div className="grid gap-6 md:grid-cols-2 relative z-10">
-                {/* Row 1: Today's Priorities & Squad Availability */}
-                <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                    <CardHeader className="pb-3 border-b border-gray-800/80">
-                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Today's Priorities</CardTitle>
-                        <CardDescription className="text-xs text-gray-300">Generated workflow priorities requiring action</CardDescription>
-                    </CardHeader>
-                    <CardContent className="pt-4">
-                        <div className="space-y-2">
-                            {priorities.map((task, i) => (
-                                <div key={i} className="flex items-center justify-between p-2.5 bg-slate-950 border border-gray-800 rounded-xl text-xs">
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            onClick={() => handleDismissPriority(task.label)}
-                                            className="p-1 rounded bg-slate-900 border border-gray-800 hover:bg-emerald-950 hover:border-emerald-500 text-gray-400 hover:text-emerald-400 transition-colors"
-                                            title="Mark as Resolved"
-                                        >
-                                            <Check className="h-3.5 w-3.5" />
-                                        </button>
-                                        <span className="font-semibold text-gray-100">{task.label}</span>
-                                    </div>
-                                    <Badge className="bg-red-500/10 text-red-400 border border-red-500/20 text-[8px] uppercase tracking-wide">
-                                        {task.category}
-                                    </Badge>
-                                </div>
-                            ))}
-                            {priorities.length === 0 && (
-                                <p className="text-xs text-gray-400 italic text-center py-4">All operations priorities completed.</p>
-                            )}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-xs font-bold uppercase tracking-wider text-gray-300">Squad Availability</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                        <div className="flex justify-between items-center text-xs font-bold">
-                            <span className="text-gray-200">Available Squad Ratio</span>
-                            <span className="text-emerald-400">{squadAvailabilityRate}% Available</span>
-                        </div>
-                        <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden">
-                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${squadAvailabilityRate}%` }} />
-                        </div>
-                        <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 text-[10px] text-gray-300">
-                            <div className="flex justify-between"><span>Players Available:</span> <span className="font-semibold text-white">{availablePlayers.length}</span></div>
-                            <div className="flex justify-between"><span>Players Unavailable:</span> <span className="font-semibold text-red-400">{injuredPlayers.length}</span></div>
-                            <div className="flex justify-between"><span>Players Suspended:</span> <span className="font-semibold text-red-400">{suspendedPlayers.length}</span></div>
-                            <div className="flex justify-between"><span>Total Squad Size:</span> <span className="font-semibold text-white">{players.length} Players</span></div>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Row 2: Next Fixture Details & Injury Summary */}
-                <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                    <CardHeader className="pb-2 border-b border-gray-800/80">
-                        <CardTitle className="text-xs font-bold text-gray-300 uppercase tracking-wider">Next Fixture</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-3 space-y-3">
-                        {nextMatch ? (
-                            <div className="space-y-2.5 text-xs">
-                                <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between items-center">
-                                    <div>
-                                        <div className="text-[9px] text-gray-400 uppercase font-bold">{nextMatch.competition} • {nextMatch.isHome ? "Home" : "Away"}</div>
-                                        <div className="text-sm font-extrabold text-white mt-0.5">vs {nextMatch.opponent}</div>
-                                    </div>
-                                    <div className="text-right">
-                                        <div className="text-[9px] text-gray-400 uppercase font-bold">Kickoff</div>
-                                        <div className="font-extrabold text-white mt-0.5">{formatDate(nextMatch.date)} @ {nextMatch.time || "TBC"}</div>
-                                    </div>
-                                </div>
-
-                                {timeLeft && (
-                                    <div className="flex justify-between items-center bg-slate-955 px-2.5 py-1.5 rounded-xl border border-gray-800 text-[10px]">
-                                        <span className="font-bold text-gray-300">Countdown:</span>
-                                        <span className="font-black text-red-400">{timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m remaining</span>
-                                    </div>
-                                )}
-
-                                <div className="flex justify-between items-center bg-slate-955 px-2.5 py-1.5 rounded-xl border border-gray-800 text-[10px]">
-                                    <span className="font-bold text-gray-300">Expected Availability:</span>
-                                    <span className="font-black text-emerald-400">{availablePlayers.length} Selectable</span>
-                                </div>
+                {/* Core operational cards */}
+                <div className="grid gap-6 md:grid-cols-3">
+                    
+                    {/* Today's Priorities */}
+                    <Card className="bg-[#0b0f19] border-none shadow-xl p-6">
+                        <div className="space-y-4">
+                            <div>
+                                <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Today's Priorities</CardTitle>
+                                <p className="text-[10px] text-slate-400 mt-1">Generated workflow priorities requiring action</p>
                             </div>
-                        ) : (
-                            <div className="text-center py-4 text-gray-400 text-xs">
-                                <p>No fixture scheduled.</p>
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                    <CardHeader className="pb-2 border-b border-gray-800/80">
-                        <CardTitle className="text-xs font-bold text-gray-300 uppercase tracking-wider">Injury &amp; Suspension Summary</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-3 text-xs space-y-2">
-                        <div className="space-y-1.5">
-                            {filteredInjuryList.slice(0, 3).map(p => (
-                                <div key={p.id} className="flex justify-between items-center bg-slate-955 px-2.5 py-1.5 rounded-lg border border-gray-800">
-                                    <span className="font-bold text-white">{formatPlayerName(p)}</span>
-                                    <Badge className={`text-[8px] uppercase tracking-wide ${
-                                        p.medicalStatus === "Holiday" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" :
-                                        p.medicalStatus === "Suspended" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
-                                        "bg-red-650/10 text-red-400 border border-red-650/20"
-                                    }`}>
-                                        {p.medicalStatus === "Holiday" ? "Holiday" : p.injuryType || p.medicalStatus}
-                                    </Badge>
-                                </div>
-                            ))}
-                            {filteredInjuryList.length === 0 && (
-                                <p className="text-[10px] text-gray-500 italic text-center py-2">No unavailable players.</p>
-                            )}
-                        </div>
-                        <div className="pt-1.5 flex justify-end">
-                            <a href="/squad" className="text-[9px] font-bold text-red-400 hover:text-red-300 hover:underline flex items-center gap-1">
-                                View Full Injury Log &rarr;
-                            </a>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Row 3: Season Performance & Preferred Starting XI */}
-                <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                    <CardHeader className="pb-2 border-b border-gray-800/80">
-                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Season Performance</CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-4 text-xs space-y-4">
-                        <div className="grid grid-cols-3 gap-3 text-center">
-                            <div className="bg-slate-950 p-2.5 rounded-xl border border-gray-850">
-                                <div className="text-[9px] text-gray-400 font-bold uppercase">League Standings</div>
-                                <div className="text-sm font-black text-amber-500 mt-0.5">{displayLeaguePosition}</div>
-                            </div>
-                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                                <div className="text-[9px] text-gray-400 font-bold uppercase">Points Per Game</div>
-                                <div className="text-sm font-black text-white mt-0.5">{ppg}</div>
-                            </div>
-                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                                <div className="text-[9px] text-gray-400 font-bold uppercase">Win Percentage</div>
-                                <div className="text-sm font-black text-white mt-0.5">{winRate}%</div>
-                            </div>
-                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                                <div className="text-[9px] text-gray-400 font-bold uppercase">Goals Scored</div>
-                                <div className="text-sm font-black text-emerald-400 mt-0.5">{goalsScored}</div>
-                            </div>
-                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                                <div className="text-[9px] text-gray-400 font-bold uppercase">Goals Conceded</div>
-                                <div className="text-sm font-black text-red-400 mt-0.5">{goalsConceded}</div>
-                            </div>
-                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                                <div className="text-[9px] text-gray-400 font-bold uppercase">Goal Difference</div>
-                                <div className="text-sm font-black text-sky-400 mt-0.5">{goalDifference > 0 ? `+${goalDifference}` : goalDifference}</div>
-                            </div>
-                        </div>
-
-                        <div className="bg-slate-955 p-3 rounded-xl border border-gray-800 flex items-center justify-between">
-                            <span className="text-[10px] text-gray-300 font-bold uppercase tracking-wider">Recent Form</span>
-                            <div className="flex gap-1.5">
-                                {recentForm.map(m => (
-                                    <div 
-                                        key={m.id}
-                                        className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black ${
-                                            m.result === "Win" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
-                                            m.result === "Loss" ? "bg-red-500/20 text-red-400 border border-red-500/30" :
-                                            "bg-slate-500/20 text-slate-400 border border-slate-500/30"
-                                        }`}
-                                        title={`vs ${m.opponent} (${m.result})`}
-                                    >
-                                        {m.result?.[0] || "-"}
+                            <div className="space-y-2 pt-2">
+                                {priorities.map((task, i) => (
+                                    <div key={i} className="flex items-center justify-between p-2.5 bg-slate-950/80 rounded-xl text-xs">
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => handleDismissPriority(task.label)}
+                                                className="p-1 rounded bg-slate-900 hover:bg-emerald-950 text-slate-400 hover:text-emerald-400 transition-colors"
+                                                title="Mark as Resolved"
+                                            >
+                                                <Check className="h-3 w-3" />
+                                            </button>
+                                            <span className="font-bold text-slate-200">{task.label}</span>
+                                        </div>
+                                        <Badge className="bg-slate-900 text-slate-400 text-[8px] uppercase tracking-wide">
+                                            {task.category}
+                                        </Badge>
                                     </div>
                                 ))}
-                                {recentForm.length === 0 && (
-                                    <span className="text-[10px] text-gray-500 italic">No matches played</span>
+                                {priorities.length === 0 && (
+                                    <p className="text-xs text-slate-500 italic text-center py-6">All operational priorities completed.</p>
                                 )}
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
+                    </Card>
 
-                <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
-                    <CardHeader className="pb-3 border-b border-gray-800/80">
-                        <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Preferred Starting XI</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex flex-col items-center pt-4 justify-center h-full">
-                        {renderMiniPitch()}
-                    </CardContent>
-                </Card>
+                    {/* Next Fixture */}
+                    <Card className="bg-[#0b0f19] border-none shadow-xl p-6">
+                        <div className="space-y-4">
+                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Next Fixture</CardTitle>
+                            {nextMatch ? (
+                                <div className="space-y-3 pt-2 text-xs">
+                                    <div className="bg-slate-950/80 p-3 rounded-xl flex justify-between items-center">
+                                        <div>
+                                            <div className="text-[9px] text-slate-400 uppercase font-black">{nextMatch.competition} • {nextMatch.isHome ? "Home" : "Away"}</div>
+                                            <div className="text-sm font-black text-white mt-0.5">vs {nextMatch.opponent}</div>
+                                        </div>
+                                        <div className="text-right">
+                                            <div className="text-[9px] text-slate-400 uppercase font-black">Kickoff</div>
+                                            <div className="font-black text-white mt-0.5">{formatDate(nextMatch.date)} @ {nextMatch.time || "TBC"}</div>
+                                        </div>
+                                    </div>
+
+                                    {timeLeft && (
+                                        <div className="flex justify-between items-center bg-slate-950/80 px-3 py-2 rounded-xl text-[10px]">
+                                            <span className="font-bold text-slate-400">Countdown:</span>
+                                            <span className="font-black text-amber-500">{timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m remaining</span>
+                                        </div>
+                                    )}
+
+                                    <div className="flex justify-between items-center bg-slate-950/80 px-3 py-2 rounded-xl text-[10px]">
+                                        <span className="font-bold text-slate-400">Expected Availability:</span>
+                                        <span className="font-black text-emerald-450">{availablePlayers.length} Selectable</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-slate-500 italic text-center py-6">No fixture scheduled.</p>
+                            )}
+                        </div>
+                    </Card>
+
+                    {/* Squad Availability */}
+                    <Card className="bg-[#0b0f19] border-none shadow-xl p-6">
+                        <div className="space-y-4">
+                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Squad Availability</CardTitle>
+                            <div className="space-y-4 pt-2">
+                                <div className="flex justify-between items-center text-xs font-bold">
+                                    <span className="text-slate-300">Available Squad Ratio</span>
+                                    <span className="text-emerald-450">{squadAvailabilityRate}% Available</span>
+                                </div>
+                                <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden">
+                                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${squadAvailabilityRate}%` }} />
+                                </div>
+                                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] text-slate-400 border-t border-slate-900 pt-3">
+                                    <div className="flex justify-between"><span>Players Available:</span> <span className="font-black text-white">{availablePlayers.length}</span></div>
+                                    <div className="flex justify-between"><span>Players Unavailable:</span> <span className="font-black text-red-500">{injuredPlayers.length}</span></div>
+                                    <div className="flex justify-between"><span>Players Suspended:</span> <span className="font-black text-red-500">{suspendedPlayers.length}</span></div>
+                                    <div className="flex justify-between"><span>Total Roster Size:</span> <span className="font-black text-white">{players.length} Players</span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            </div>
+
+            {/* LEVEL 2: Secondary Decision Support */}
+            <div className="space-y-4 relative z-10">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Decision Support</h2>
+                    <span className="h-px bg-slate-900 flex-1 ml-4" />
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-5">
+                    
+                    {/* Season Performance - 2 Cols */}
+                    <Card className="bg-[#0b0f19]/80 border-none shadow-lg p-5 md:col-span-2">
+                        <div className="space-y-4">
+                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Season Performance</CardTitle>
+                            
+                            <div className="grid grid-cols-3 gap-3 text-center pt-2">
+                                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-900">
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">League Standings</div>
+                                    <div className="text-sm font-black text-amber-500 mt-0.5">{displayLeaguePosition}</div>
+                                </div>
+                                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-900">
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Points Per Game</div>
+                                    <div className="text-sm font-black text-white mt-0.5">{ppg}</div>
+                                </div>
+                                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-900">
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Win Percentage</div>
+                                    <div className="text-sm font-black text-white mt-0.5">{winRate}%</div>
+                                </div>
+                                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-900">
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Goals Scored</div>
+                                    <div className="text-sm font-black text-emerald-405 mt-0.5">{goalsScored}</div>
+                                </div>
+                                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-900">
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Goals Conceded</div>
+                                    <div className="text-sm font-black text-red-500 mt-0.5">{goalsConceded}</div>
+                                </div>
+                                <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-900">
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Goal Difference</div>
+                                    <div className="text-sm font-black text-sky-400 mt-0.5">{goalDifference > 0 ? `+${goalDifference}` : goalDifference}</div>
+                                </div>
+                            </div>
+
+                            <div className="bg-slate-955 p-3 rounded-xl flex items-center justify-between border border-slate-900">
+                                <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider">Recent Form</span>
+                                <div className="flex gap-1.5">
+                                    {recentForm.map(m => (
+                                        <div 
+                                            key={m.id}
+                                            className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black ${
+                                                m.result === "Win" ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" :
+                                                m.result === "Loss" ? "bg-red-500/20 text-red-400 border border-red-500/30" :
+                                                "bg-slate-500/20 text-slate-400 border border-slate-500/30"
+                                            }`}
+                                            title={`vs ${m.opponent} (${m.result})`}
+                                        >
+                                            {m.result?.[0] || "-"}
+                                        </div>
+                                    ))}
+                                    {recentForm.length === 0 && (
+                                        <span className="text-[9px] text-slate-550 italic">No matches played</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Preferred Starting XI - 2 Cols */}
+                    <Card className="bg-[#0b0f19]/80 border-none shadow-lg p-5 md:col-span-2">
+                        <div className="space-y-4">
+                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Preferred Starting XI</CardTitle>
+                            <div className="flex flex-col items-center pt-2 justify-center h-full">
+                                {renderMiniPitch()}
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Squad Overview Summary - 1 Col */}
+                    <Card className="bg-[#0b0f19]/80 border-none shadow-lg p-5">
+                        <div className="space-y-4">
+                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Squad Overview</CardTitle>
+                            <div className="space-y-2.5 text-[10px] text-slate-300 pt-2">
+                                <div className="flex justify-between border-b border-slate-900 pb-1.5">
+                                    <span>Registered Players</span>
+                                    <span className="font-bold text-white">{players.length}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-slate-900 pb-1.5">
+                                    <span>Average Age</span>
+                                    <span className="font-bold text-white">{avgSquadAge} yrs</span>
+                                </div>
+                                <div className="flex justify-between border-b border-slate-900 pb-1.5">
+                                    <span>Homegrown Players</span>
+                                    <span className="font-bold text-white">{Math.round(players.length * 0.7)}</span>
+                                </div>
+                                <div className="flex justify-between border-b border-slate-900 pb-1.5">
+                                    <span>U23 Players</span>
+                                    <span className="font-bold text-white">{players.filter(p => p.age < 23).length}</span>
+                                </div>
+                                <div className="flex justify-between pb-1">
+                                    <span>Trialists</span>
+                                    <span className="font-bold text-blue-400">{players.filter(p => p.notes?.toLowerCase().includes("trial")).length}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
+            </div>
+
+            {/* LEVEL 3: Reference Info */}
+            <div className="space-y-4 relative z-10">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Injury &amp; Suspension Summary</h2>
+                    <span className="h-px bg-slate-900 flex-1 ml-4" />
+                </div>
+
+                <div className="grid gap-6 md:grid-cols-3">
+                    
+                    {/* Detailed Injury List card with Recovery Estimates */}
+                    <Card className="bg-[#0b0f19]/60 border-none shadow-md p-4 md:col-span-2">
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-center">
+                                <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Active Medical &amp; Suspension Logs</CardTitle>
+                                <a href="/squad" className="text-[9px] font-bold text-slate-400 hover:text-white transition-colors">
+                                    View Full Roster &rarr;
+                                </a>
+                            </div>
+
+                            <div className="space-y-2.5 pt-1">
+                                {filteredInjuryList.slice(0, 5).map(p => {
+                                    const isSuspended = p.medicalStatus === "Suspended";
+                                    const isHoliday = p.medicalStatus === "Holiday";
+                                    
+                                    // Parse estimates
+                                    const typeLabel = isSuspended 
+                                        ? (p.suspensionReason || "Suspension") 
+                                        : (p.injuryType || (isHoliday ? "Holiday" : "Injured"));
+                                    
+                                    const durationLabel = isSuspended 
+                                        ? (p.suspensionDuration || "TBC") 
+                                        : (p.injuryDuration || "Timeline TBC");
+
+                                    return (
+                                        <div key={p.id} className="flex justify-between items-center bg-slate-950/60 px-3.5 py-2.5 rounded-lg border border-slate-900/60">
+                                            <div className="space-y-0.5">
+                                                <span className="font-bold text-xs text-white block">{p.firstName} {p.lastName}</span>
+                                                <span className="text-[10px] text-slate-400 block font-medium">
+                                                    Details: {typeLabel}
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="text-right space-y-1">
+                                                <Badge className={`text-[8px] font-black uppercase tracking-wider ${
+                                                    isHoliday ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"
+                                                }`}>
+                                                    {isHoliday ? "Holiday" : isSuspended ? "Suspended" : "Injured"}
+                                                </Badge>
+                                                <div className="text-[9px] text-slate-400 font-bold block">
+                                                    {isHoliday ? "Out of Club" : `Est. Out: ${durationLabel}`}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {filteredInjuryList.length === 0 && (
+                                    <p className="text-xs text-slate-500 italic text-center py-6">No unavailable players or active suspensions registered.</p>
+                                )}
+                            </div>
+                        </div>
+                    </Card>
+
+                    {/* Operational Tips card */}
+                    <Card className="bg-[#0b0f19]/60 border-none shadow-md p-4">
+                        <div className="space-y-4">
+                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Operational Notes</CardTitle>
+                            <div className="text-[10px] text-slate-400 space-y-3 leading-relaxed pt-1 font-medium">
+                                <p>
+                                    💡 <strong className="text-white">Planning Center Integration:</strong> Changing tactical formations in the Squad Planner will sync preferred starting coordinates to the preferred XI matchday models.
+                                </p>
+                                <p>
+                                    💡 <strong className="text-white">Medical Updates:</strong> Always configure injury duration timelines and suspension lengths in the Player Profiles inside the Squad module to maintain accurate roster availability rates.
+                                </p>
+                            </div>
+                        </div>
+                    </Card>
+                </div>
             </div>
         </div>
     );
