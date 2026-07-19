@@ -722,7 +722,7 @@ export default function DashboardPage() {
                                         <div className="flex justify-between"><span>Pitch surface:</span> <span className="font-bold text-white">{nextMatch.surface || "4G"}</span></div>
                                         <div className="flex justify-between"><span>Expected Squad Size:</span> <span className="font-bold text-white">{availablePlayers.length} Selectable</span></div>
                                         <div className="flex justify-between"><span>Formations Analyzed:</span> <span className="font-bold text-white">4-2-3-1</span></div>
-                                        <div className="flex justify-between"><span>Lead Physio Reports:</span> <span className="font-bold text-emerald-400">Fit</span></div>
+                                        <div className="flex justify-between"><span>Venue / Location:</span> <span className="font-bold text-white truncate max-w-[100px]" title={nextMatch.location || "TBC"}>{nextMatch.location || "TBC"}</span></div>
                                     </div>
                                 </div>
                             ) : (
