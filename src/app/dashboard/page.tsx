@@ -502,16 +502,16 @@ export default function DashboardPage() {
         const kitColor = settings.homeKitShirt || "#ffffff";
 
         return (
-            <div className="relative w-full max-w-[380px] h-[360px] bg-emerald-950/90 rounded-xl overflow-hidden shadow-lg border border-emerald-900/60 flex-shrink-0 mx-auto">
-                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-5">
+            <div className="relative w-full max-w-[380px] h-[360px] bg-gradient-to-b from-emerald-600 to-emerald-800 rounded-xl overflow-hidden shadow-xl border border-emerald-500/30 flex-shrink-0 mx-auto">
+                <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10">
                     {Array.from({ length: 6 }).map((_, idx) => (
                         <div key={idx} className={`h-[60px] w-full ${idx % 2 === 0 ? 'bg-black' : 'bg-transparent'}`} />
                     ))}
                 </div>
 
-                <div className="absolute inset-0 border border-white/10 m-2 pointer-events-none">
-                    <div className="absolute top-1/2 left-2 right-2 border-t border-white/10" />
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 border border-white/10 rounded-full" />
+                <div className="absolute inset-0 border border-white/25 m-2 pointer-events-none">
+                    <div className="absolute top-1/2 left-2 right-2 border-t border-white/25" />
+                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 border border-white/25 rounded-full" />
                 </div>
 
                 {formation.map((pos, idx) => {
@@ -519,22 +519,33 @@ export default function DashboardPage() {
                     const player = playerId ? players.find(p => p.id === playerId) : null;
                     const name = player ? (player.useNickname && player.nickname ? player.nickname : `${player.firstName.charAt(0)}. ${player.lastName}`) : pos.label;
                     
+                    const numberBg = pos.label === "GK" ? "#f97316" : kitColor;
+                    const textContrast = (() => {
+                        const hex = numberBg.replace("#", "");
+                        if (hex.length !== 6) return "#ffffff";
+                        const r = parseInt(hex.substring(0, 2), 16);
+                        const g = parseInt(hex.substring(2, 4), 16);
+                        const b = parseInt(hex.substring(4, 6), 16);
+                        const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+                        return (yiq >= 128) ? "#000000" : "#ffffff";
+                    })();
+
                     return (
                         <div 
                             key={idx}
-                            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+                            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center z-10"
                             style={{
                                 left: `${pos.x}%`,
                                 top: `${pos.y}%`,
                             }}
                         >
                             <div 
-                                className="w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-black text-white border border-black/50 shadow-md"
-                                style={{ backgroundColor: pos.label === "GK" ? "#ea580c" : kitColor }}
+                                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black border border-slate-950 shadow-md"
+                                style={{ backgroundColor: numberBg, color: textContrast }}
                             >
                                 {pos.number}
                             </div>
-                            <span className="text-[8px] font-extrabold text-white bg-slate-950/90 px-1.5 py-0.5 rounded shadow mt-0.5 max-w-[55px] truncate leading-none border border-slate-800">
+                            <span className="text-[9px] font-black text-slate-900 bg-white px-1.5 py-0.5 rounded shadow mt-1 max-w-[65px] truncate leading-none border border-slate-200">
                                 {name}
                             </span>
                         </div>
@@ -826,10 +837,7 @@ export default function DashboardPage() {
                                 <span className="text-gray-300 font-bold">Average Squad Age</span>
                                 <span className="font-black text-white">{avgSquadAge} years</span>
                             </div>
-                            <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
-                                <span className="text-gray-300 font-bold">Homegrown Squad Members</span>
-                                <span className="font-black text-white">{homegrownCount}</span>
-                            </div>
+
                             <div className="flex justify-between items-center bg-slate-950 p-2.5 rounded-xl border border-gray-800">
                                 <span className="text-gray-300 font-bold">U23 Players</span>
                                 <span className="font-black text-white">{u23Count}</span>
