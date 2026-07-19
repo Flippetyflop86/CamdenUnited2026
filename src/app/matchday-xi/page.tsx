@@ -263,8 +263,17 @@ export default function MatchdayXIPage() {
             return;
         }
 
-        // Fallback to fetch latest general lineup
-        fetchLineupOnly(true);
+        // Fallback to blank lineup
+        setLineup({
+            id: `match-lineup-${selectedMatchId}`,
+            formation: "4-2-3-1",
+            starters: {},
+            substitutes: ["", "", "", "", ""],
+            usedSubstitutes: [],
+            squad: activeSquadTab,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        });
         loadedLineupKeyRef.current = currentKey;
     }, [selectedMatchId, matches, activeSquadTab]);
 
