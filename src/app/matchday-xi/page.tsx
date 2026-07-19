@@ -926,7 +926,9 @@ export default function MatchdayXIPage() {
                         if (!selectedMatchId) return;
                         await saveLineup(lineup);
                         localStorage.setItem("matchday_squad_confirmed_" + selectedMatchId, "true");
-                        alert("Matchday squad confirmed! This task will be removed from your dashboard priorities.");
+                        const matchObj = matches.find(m => m.id === selectedMatchId);
+                        const opponentName = matchObj ? matchObj.opponent : "this game";
+                        alert(`Lineup saved successfully for vs ${opponentName}!`);
                     }} className="bg-red-650 hover:bg-red-700 text-white font-bold">
                         <Save className="h-4 w-4 mr-2" />
                         Save &amp; Confirm Lineup
@@ -1259,6 +1261,22 @@ export default function MatchdayXIPage() {
                                 </div>
                             );
                         })}
+                    </div>
+                    <div className="p-3 border-t border-slate-200 bg-slate-100 flex items-center justify-end">
+                        <Button 
+                            onClick={async () => {
+                                if (!selectedMatchId) return;
+                                await saveLineup(lineup);
+                                localStorage.setItem("matchday_squad_confirmed_" + selectedMatchId, "true");
+                                const matchObj = matches.find(m => m.id === selectedMatchId);
+                                const opponentName = matchObj ? matchObj.opponent : "this game";
+                                alert(`Lineup saved successfully for vs ${opponentName}!`);
+                            }} 
+                            className="bg-red-650 hover:bg-red-700 text-white font-bold w-full text-xs h-9"
+                        >
+                            <Save className="h-4 w-4 mr-1.5" />
+                            Save Lineup for Game
+                        </Button>
                     </div>
                 </Card>
             </div>
