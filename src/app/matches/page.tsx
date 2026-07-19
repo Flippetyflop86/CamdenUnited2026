@@ -373,22 +373,36 @@ export default function MatchesPage() {
         const meetTimePrefix = `[MeetTime: ${formData.meetTime || ""}]`;
         
         let lineupTag = "";
+        let existingUserNotes = "";
         if (editingId) {
             const currentMatch = matches.find(m => m.id === editingId);
-            if (currentMatch && (currentMatch as any).rawNotes && (currentMatch as any).rawNotes.includes("[Lineup: ")) {
-                const startIdx = (currentMatch as any).rawNotes.indexOf("[Lineup: ");
-                const endIdx = (currentMatch as any).rawNotes.indexOf("}]", startIdx);
-                if (endIdx !== -1) {
-                    lineupTag = (currentMatch as any).rawNotes.substring(startIdx, endIdx + 2) + "\n";
-                } else {
-                    const singleEndIdx = (currentMatch as any).rawNotes.indexOf("]", startIdx);
-                    if (singleEndIdx !== -1) {
-                        lineupTag = (currentMatch as any).rawNotes.substring(startIdx, singleEndIdx + 1) + "\n";
+            if (currentMatch) {
+                if ((currentMatch as any).rawNotes && (currentMatch as any).rawNotes.includes("[Lineup: ")) {
+                    const startIdx = (currentMatch as any).rawNotes.indexOf("[Lineup: ");
+                    const endIdx = (currentMatch as any).rawNotes.indexOf("}]", startIdx);
+                    if (endIdx !== -1) {
+                        lineupTag = (currentMatch as any).rawNotes.substring(startIdx, endIdx + 2) + "\n";
+                    } else {
+                        const singleEndIdx = (currentMatch as any).rawNotes.indexOf("]", startIdx);
+                        if (singleEndIdx !== -1) {
+                            lineupTag = (currentMatch as any).rawNotes.substring(startIdx, singleEndIdx + 1) + "\n";
+                        }
+                    }
+                }
+                
+                // Check if there is actual plain-text user note existing
+                if (currentMatch.notes) {
+                    const onlyLettersNumbers = currentMatch.notes.replace(/[\{\}\[\]\s,]+/g, "").trim();
+                    // If the cleaned text has actual words and isn't just leftover garbage brackets
+                    if (onlyLettersNumbers && onlyLettersNumbers !== "1") {
+                        existingUserNotes = currentMatch.notes;
                     }
                 }
             }
         }
-        const combinedNotes = `${lineupTag}${locationPrefix}${surfacePrefix}${meetTimePrefix}\n${formData.notes || ""}`.trim();
+        
+        const finalUserNotes = (formData.notes || "").trim() || existingUserNotes;
+        const combinedNotes = `${lineupTag}${locationPrefix}${surfacePrefix}${meetTimePrefix}\n${finalUserNotes}`.trim();
 
         const payload: any = {
             date: formData.date,
@@ -465,7 +479,7 @@ export default function MatchesPage() {
             assists: match.assists || "",
             yellow_cards: match.yellow_cards || "",
             red_cards: match.red_cards || "",
-            notes: match.notes || "",
+            notes: "", // Leave blank by default so users can add custom notes/adjustments
             surface: match.surface || "4G",
             location: match.location || "",
             lockType: (match as any).lock_type || "Never",
