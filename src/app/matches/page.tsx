@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Match } from "@/types";
 import { Input } from "@/components/ui/input";
@@ -60,6 +60,8 @@ export default function MatchesPage() {
     const [expenseAmount, setExpenseAmount] = useState("");
     const [expenseCategory, setExpenseCategory] = useState("Ref Fees");
     const [expenseNotes, setExpenseNotes] = useState("");
+
+
 
     const handleSaveExpense = async () => {
         if (!selectedExpenseMatch) return;
@@ -294,7 +296,44 @@ export default function MatchesPage() {
         lockTime: ""
     });
 
-    // ... (keep state) ...
+    const hasLoadedRef = useRef(false);
+
+    // Restore fixture editing form draft on mount
+    useEffect(() => {
+        const savedDraft = sessionStorage.getItem("fixture_form_draft");
+        if (savedDraft) {
+            try {
+                const parsed = JSON.parse(savedDraft);
+                if (parsed.isAddOpen !== undefined) setIsAddOpen(parsed.isAddOpen);
+                if (parsed.editingId !== undefined) setEditingId(parsed.editingId);
+                if (parsed.formData !== undefined) setFormData(parsed.formData);
+                if (parsed.selectedGoals !== undefined) setSelectedGoals(parsed.selectedGoals);
+                if (parsed.selectedAssists !== undefined) setSelectedAssists(parsed.selectedAssists);
+                if (parsed.selectedAppearances !== undefined) setSelectedAppearances(parsed.selectedAppearances);
+                if (parsed.opponentInstagram !== undefined) setOpponentInstagram(parsed.opponentInstagram);
+                if (parsed.opponentBadgeUrl !== undefined) setOpponentBadgeUrl(parsed.opponentBadgeUrl);
+            } catch (e) {
+                console.error("Error restoring fixture form draft:", e);
+            }
+        }
+        hasLoadedRef.current = true;
+    }, []);
+
+    // Save fixture editing form draft on modification
+    useEffect(() => {
+        if (!hasLoadedRef.current) return;
+        const draft = {
+            isAddOpen,
+            editingId,
+            formData,
+            selectedGoals,
+            selectedAssists,
+            selectedAppearances,
+            opponentInstagram,
+            opponentBadgeUrl
+        };
+        sessionStorage.setItem("fixture_form_draft", JSON.stringify(draft));
+    }, [isAddOpen, editingId, formData, selectedGoals, selectedAssists, selectedAppearances, opponentInstagram, opponentBadgeUrl]);
 
     const getLocalDateString = (dateStr: string) => {
         const d = new Date(dateStr);
@@ -958,6 +997,7 @@ export default function MatchesPage() {
     };
 
     const resetForm = () => {
+        sessionStorage.removeItem("fixture_form_draft");
         setIsAddOpen(false);
         setEditingId(null);
         setFormData({
