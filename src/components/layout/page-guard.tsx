@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/auth-context";
 import { canAccess } from "@/lib/permissions";
 import { usePathname } from "next/navigation";
@@ -16,9 +17,14 @@ interface PageGuardProps {
 export function PageGuard({ children }: PageGuardProps) {
     const { role, pagePermissions, isLoading } = useAuth();
     const pathname = usePathname();
+    const [isMounted, setIsMounted] = useState(false);
 
-    // While auth is loading, render nothing (prevents flash)
-    if (isLoading) return null;
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
+
+    // While auth is loading or component has not mounted yet, render nothing (prevents flash & hydration warnings)
+    if (!isMounted || isLoading) return null;
 
     // Check access
     if (!canAccess(pathname, role, pagePermissions)) {

@@ -153,13 +153,33 @@ function generateSecondaryColor(hex: string): string {
 
 export function ClubProvider({ children }: { children: React.ReactNode }) {
     const { user, clubId, isLoading: authLoading } = useAuth();
-    const [settings, setSettings] = useState<ClubSettings>(defaultSettings);
-    const [isLoaded, setIsLoaded] = useState(false);
+    const [settings, setSettings] = useState<ClubSettings>(() => {
+        if (typeof window === 'undefined') return defaultSettings;
+        try {
+            const cached = localStorage.getItem("clubflow_cache_clubSettings");
+            return cached ? JSON.parse(cached) : defaultSettings;
+        } catch (e) {
+            return defaultSettings;
+        }
+    });
+    const [isLoaded, setIsLoaded] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        try {
+            return !!localStorage.getItem("clubflow_cache_clubSettings");
+        } catch (e) {
+            return false;
+        }
+    });
 
     // Initial Fetch
     useEffect(() => {
         if (authLoading) {
-            setIsLoaded(false);
+            if (typeof window !== 'undefined') {
+                const cached = localStorage.getItem("clubflow_cache_clubSettings");
+                if (!cached) setIsLoaded(false);
+            } else {
+                setIsLoaded(false);
+            }
             return;
         }
 
@@ -184,7 +204,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                 }
 
                 if (data) {
-                    setSettings({
+                    const loadedSettings: ClubSettings = {
                         name: data.name || "My Club",
                         logo: data.logo || null,
                         primaryColor: data.primary_color || "#ef4444",
@@ -217,7 +237,13 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         contractsEnabled: data.contracts_enabled !== undefined ? !!data.contracts_enabled : false,
                         subsEnabled: data.subs_enabled !== undefined ? !!data.subs_enabled : true,
                         measurementUnit: (typeof window !== "undefined" ? localStorage.getItem("clubflow_measurement_unit") : "metric") as any || "metric"
-                    });
+                    };
+                    setSettings(loadedSettings);
+                    if (typeof window !== 'undefined') {
+                        try {
+                            localStorage.setItem("clubflow_cache_clubSettings", JSON.stringify(loadedSettings));
+                        } catch (e) {}
+                    }
                 }
             } catch (err) {
                 console.error("Error loading settings:", err);

@@ -21,19 +21,38 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const getCachedVal = (key: string, fallback: any) => {
+    if (typeof window === 'undefined') return fallback;
+    try {
+        const item = localStorage.getItem(`clubflow_cache_${key}`);
+        return item ? JSON.parse(item) : fallback;
+    } catch (e) {
+        return fallback;
+    }
+};
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUserState] = useState<User | null>(null);
-    const userRef = useRef<User | null>(null);
+    const [user, setUserState] = useState<User | null>(() => getCachedVal('user', null));
+    const userRef = useRef<User | null>(user);
     const setUser = (u: User | null) => {
         userRef.current = u;
         setUserState(u);
     };
     const [session, setSession] = useState<Session | null>(null);
-    const [clubId, setClubId] = useState<string | null>(null);
-    const [role, setRole] = useState<string | null>(null);
-    const [pagePermissions, setPagePermissions] = useState<string[]>([]);
-    const [displayName, setDisplayName] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [clubId, setClubId] = useState<string | null>(() => getCachedVal('clubId', null));
+    const [role, setRole] = useState<string | null>(() => getCachedVal('role', null));
+    const [pagePermissions, setPagePermissions] = useState<string[]>(() => getCachedVal('pagePermissions', []));
+    const [displayName, setDisplayName] = useState<string | null>(() => getCachedVal('displayName', null));
+    const [isLoading, setIsLoading] = useState(() => {
+        if (typeof window === 'undefined') return true;
+        try {
+            const cachedUser = localStorage.getItem(`clubflow_cache_user`);
+            const cachedClub = localStorage.getItem(`clubflow_cache_clubId`);
+            return !(cachedUser && cachedClub);
+        } catch (e) {
+            return true;
+        }
+    });
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     const router = useRouter();
@@ -133,9 +152,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const data = finalMember;
                 setClubId(data.club_id);
                 setGlobalClubId(data.club_id);
-                setRole(data.role ? data.role.toLowerCase() : null);
-                setPagePermissions(data.page_permissions || []);
-                setDisplayName(data.display_name || null);
+                const finalRole = data.role ? data.role.toLowerCase() : null;
+                setRole(finalRole);
+                const finalPerms = data.page_permissions || [];
+                setPagePermissions(finalPerms);
+                const finalDisplayName = data.display_name || null;
+                setDisplayName(finalDisplayName);
+
+                if (typeof window !== 'undefined') {
+                    try {
+                        localStorage.setItem("clubflow_cache_clubId", JSON.stringify(data.club_id));
+                        localStorage.setItem("clubflow_cache_role", JSON.stringify(finalRole));
+                        localStorage.setItem("clubflow_cache_pagePermissions", JSON.stringify(finalPerms));
+                        localStorage.setItem("clubflow_cache_displayName", JSON.stringify(finalDisplayName));
+                    } catch (e) {}
+                }
             } else {
                 console.warn("No membership found in club_members table for user_id:", userId, "email:", userEmail);
             }
@@ -199,6 +230,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             
             if (nextUser) {
                 setIsLoggingOut(false);
+                if (typeof window !== 'undefined') {
+                    try {
+                        localStorage.setItem("clubflow_cache_user", JSON.stringify(nextUser));
+                    } catch (e) {}
+                }
                 if (userChanged) {
                     // Clear any stored browser settings/states when switching user accounts to prevent leaks
                     if (typeof window !== 'undefined') {
@@ -206,7 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             sessionStorage.clear();
                             for (let i = localStorage.length - 1; i >= 0; i--) {
                                 const key = localStorage.key(i);
-                                if (key && key.startsWith('clubflow_')) {
+                                if (key && (key.startsWith('clubflow_') || key.startsWith('clubflow_cache_'))) {
                                     localStorage.removeItem(key);
                                 }
                             }
@@ -223,6 +259,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setPagePermissions([]);
                 setDisplayName(null);
                 setIsLoading(false);
+                if (typeof window !== 'undefined') {
+                    try {
+                        for (let i = localStorage.length - 1; i >= 0; i--) {
+                            const key = localStorage.key(i);
+                            if (key && (key.startsWith('clubflow_') || key.startsWith('clubflow_cache_'))) {
+                                localStorage.removeItem(key);
+                            }
+                        }
+                    } catch (e) {}
+                }
                 if (!isPublicPage(pathnameRef.current)) {
                     router.push("/login");
                 }
@@ -245,7 +291,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 sessionStorage.clear();
                 for (let i = localStorage.length - 1; i >= 0; i--) {
                     const key = localStorage.key(i);
-                    if (key && key.startsWith('clubflow_')) {
+                    if (key && (key.startsWith('clubflow_') || key.startsWith('clubflow_cache_'))) {
                         localStorage.removeItem(key);
                     }
                 }
