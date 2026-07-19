@@ -574,6 +574,12 @@ export default function SquadDepthPage() {
                 </div>
 
                 <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={() => {
+                        setWizardStep(0);
+                        setShowSetupWizard(true);
+                    }} className="text-slate-650 hover:text-slate-800 font-bold text-xs h-9">
+                        Setup Planner Wizard
+                    </Button>
                     <Button variant="outline" size="sm" onClick={handleResetChart} className="text-slate-500 hover:text-red-650 font-bold text-xs h-9">
                         <Trash2 className="h-4 w-4 mr-1.5" /> Reset Custom Planner
                     </Button>
