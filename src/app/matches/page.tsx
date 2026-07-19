@@ -138,9 +138,6 @@ export default function MatchesPage() {
     const [resultSort, setResultSort] = useState<"desc" | "asc">("desc"); // desc = Newest First
 
     const [players, setPlayers] = useState<any[]>([]);
-    const [selectedGoals, setSelectedGoals] = useState<Array<{ playerId: string; count: number }>>([]);
-    const [selectedAssists, setSelectedAssists] = useState<Array<{ playerId: string; count: number }>>([]);
-    const [selectedAppearances, setSelectedAppearances] = useState<string[]>([]);
 
     const fetchPlayers = async () => {
         const { data, error } = await supabase
@@ -155,125 +152,6 @@ export default function MatchesPage() {
         if (!player) return "";
         const firstInitial = player.first_name ? player.first_name[0] : "";
         return `${firstInitial}.${player.last_name}`;
-    };
-
-    // Sync dropdown selections back to text representation for display compatibility
-    useEffect(() => {
-        if (players.length === 0) return;
-        const goalsText = selectedGoals
-            .map(g => {
-                const player = players.find(p => p.id === g.playerId);
-                const name = player ? getFormattedPlayerName(player) : "Unknown";
-                return `${name}${g.count > 1 ? ` (${g.count})` : ""}`;
-            })
-            .join(", ");
-        setFormData((prev: any) => ({ ...prev, goalscorers: goalsText }));
-    }, [selectedGoals, players]);
-
-    useEffect(() => {
-        if (players.length === 0) return;
-        const assistsText = selectedAssists
-            .map(a => {
-                const player = players.find(p => p.id === a.playerId);
-                const name = player ? getFormattedPlayerName(player) : "Unknown";
-                return `${name}${a.count > 1 ? ` (${a.count})` : ""}`;
-            })
-            .join(", ");
-        setFormData((prev: any) => ({ ...prev, assists: assistsText }));
-    }, [selectedAssists, players]);
-
-    const syncMatchPlayerStats = async (
-        matchId: string, 
-        selectedGoals: Array<{playerId: string, count: number}>, 
-        selectedAssists: Array<{playerId: string, count: number}>,
-        selectedAppearances: string[]
-    ) => {
-        const playersInvolved = new Set<string>(selectedAppearances);
-        selectedGoals.forEach(g => playersInvolved.add(g.playerId));
-        selectedAssists.forEach(a => playersInvolved.add(a.playerId));
-
-        const { data: existingStats, error: fetchErr } = await supabase
-            .from('match_player_stats')
-            .select('*')
-            .eq('match_id', matchId);
-
-        if (fetchErr) {
-            console.error("Error fetching existing match player stats:", fetchErr);
-            return;
-        }
-
-        const existingMap = new Map<string, any>();
-        existingStats?.forEach(s => existingMap.set(s.player_id, s));
-
-        for (const playerId of playersInvolved) {
-            const goalsCount = selectedGoals.find(g => g.playerId === playerId)?.count || 0;
-            const assistsCount = selectedAssists.find(a => a.playerId === playerId)?.count || 0;
-
-            const existing = existingMap.get(playerId);
-            if (existing) {
-                const { error: updateErr } = await supabase
-                    .from('match_player_stats')
-                    .update({ goals: goalsCount, assists: assistsCount })
-                    .eq('id', existing.id);
-                if (updateErr) console.error("Error updating player stat:", updateErr);
-            } else {
-                const { error: insertErr } = await supabase
-                    .from('match_player_stats')
-                    .insert([{
-                        match_id: matchId,
-                        player_id: playerId,
-                        goals: goalsCount,
-                        assists: assistsCount,
-                        minutes_played: 90,
-                        yellow_cards: 0,
-                        red_cards: 0
-                    }]);
-                if (insertErr) console.error("Error inserting player stat:", insertErr);
-            }
-        }
-
-        for (const existing of existingStats || []) {
-            if (!playersInvolved.has(existing.player_id)) {
-                const hasOtherStats = (existing.yellow_cards || 0) > 0 || (existing.red_cards || 0) > 0 || (existing.minutes_played || 90) !== 90;
-                if (hasOtherStats) {
-                    await supabase
-                        .from('match_player_stats')
-                        .update({ goals: 0, assists: 0 })
-                        .eq('id', existing.id);
-                } else {
-                    await supabase
-                        .from('match_player_stats')
-                        .delete()
-                        .eq('id', existing.id);
-                }
-            }
-        }
-    };
-
-    const addGoalscorerRow = () => {
-        if (players.length === 0) return;
-        setSelectedGoals(prev => [...prev, { playerId: players[0].id, count: 1 }]);
-    };
-    
-    const updateGoalscorerRow = (index: number, playerId: string, count: number) => {
-        setSelectedGoals(prev => prev.map((item, idx) => idx === index ? { playerId, count: Math.max(1, count) } : item));
-    };
-
-    const deleteGoalscorerRow = (index: number) => {
-        setSelectedGoals(prev => prev.filter((_, idx) => idx !== index));
-    };
-
-    const addAssisterRow = () => {
-        if (players.length === 0) return;
-        setSelectedAssists(prev => [...prev, { playerId: players[0].id, count: 1 }]);
-    };
-    
-    const updateAssisterRow = (index: number, playerId: string, count: number) => {
-        setSelectedAssists(prev => prev.map((item, idx) => idx === index ? { playerId, count: Math.max(1, count) } : item));
-    };
-
-    const deleteAssisterRow = (index: number) => {
-        setSelectedAssists(prev => prev.filter((_, idx) => idx !== index));
     };
 
     // Form State
@@ -307,9 +185,6 @@ export default function MatchesPage() {
                 if (parsed.isAddOpen !== undefined) setIsAddOpen(parsed.isAddOpen);
                 if (parsed.editingId !== undefined) setEditingId(parsed.editingId);
                 if (parsed.formData !== undefined) setFormData(parsed.formData);
-                if (parsed.selectedGoals !== undefined) setSelectedGoals(parsed.selectedGoals);
-                if (parsed.selectedAssists !== undefined) setSelectedAssists(parsed.selectedAssists);
-                if (parsed.selectedAppearances !== undefined) setSelectedAppearances(parsed.selectedAppearances);
                 if (parsed.opponentInstagram !== undefined) setOpponentInstagram(parsed.opponentInstagram);
                 if (parsed.opponentBadgeUrl !== undefined) setOpponentBadgeUrl(parsed.opponentBadgeUrl);
             } catch (e) {
@@ -326,14 +201,11 @@ export default function MatchesPage() {
             isAddOpen,
             editingId,
             formData,
-            selectedGoals,
-            selectedAssists,
-            selectedAppearances,
             opponentInstagram,
             opponentBadgeUrl
         };
         sessionStorage.setItem("fixture_form_draft", JSON.stringify(draft));
-    }, [isAddOpen, editingId, formData, selectedGoals, selectedAssists, selectedAppearances, opponentInstagram, opponentBadgeUrl]);
+    }, [isAddOpen, editingId, formData, opponentInstagram, opponentBadgeUrl]);
 
     const getLocalDateString = (dateStr: string) => {
         const d = new Date(dateStr);
@@ -547,10 +419,6 @@ export default function MatchesPage() {
                 if (error) throw error;
             }
 
-            if (matchId) {
-                await syncMatchPlayerStats(matchId, selectedGoals, selectedAssists, selectedAppearances);
-            }
-
             // Sync details to league_teams inline
             try {
                 const teamNameClean = formData.opponent.trim();
@@ -585,95 +453,6 @@ export default function MatchesPage() {
     };
 
     const handleEditMatch = async (match: Match) => {
-        const { data: stats } = await supabase
-            .from('match_player_stats')
-            .select('*')
-            .eq('match_id', match.id);
-
-        const goalsList: Array<{ playerId: string, count: number }> = [];
-        const assistsList: Array<{ playerId: string, count: number }> = [];
-
-        stats?.forEach(s => {
-            if (s.goals > 0) {
-                goalsList.push({ playerId: s.player_id, count: s.goals });
-            }
-            if (s.assists > 0) {
-                assistsList.push({ playerId: s.player_id, count: s.assists });
-            }
-        });
-
-        setSelectedGoals(goalsList);
-        setSelectedAssists(assistsList);
-        
-        const appearanceList: string[] = stats?.map(s => s.player_id) || [];
-        if (appearanceList.length > 0) {
-            setSelectedAppearances(appearanceList);
-        } else {
-            // Try to load lineup from match notes first
-            let parsed = null;
-            if (match.notes && match.notes.includes("[Lineup: ")) {
-                const startIdx = match.notes.indexOf("[Lineup: ");
-                const endIdx = match.notes.indexOf("}]");
-                if (endIdx !== -1) {
-                    try {
-                        parsed = JSON.parse(match.notes.substring(startIdx + "[Lineup: ".length, endIdx + 1));
-                    } catch (e) {
-                        console.error("Error parsing lineup from match notes during edit", e);
-                    }
-                }
-            }
-            let loaded = false;
-            if (parsed) {
-                try {
-                    const playerIds = new Set<string>();
-                    if (parsed.starters) {
-                        Object.values(parsed.starters).forEach((id: any) => {
-                            if (id) playerIds.add(id);
-                        });
-                    }
-                    if (parsed.usedSubstitutes && Array.isArray(parsed.usedSubstitutes)) {
-                        parsed.usedSubstitutes.forEach((id: any) => {
-                            if (id) playerIds.add(id);
-                        });
-                    } else if (parsed.substitutes && Array.isArray(parsed.substitutes)) {
-                        parsed.substitutes.forEach((id: any) => {
-                            if (id) playerIds.add(id);
-                        });
-                    }
-                    setSelectedAppearances(Array.from(playerIds));
-                    loaded = true;
-                } catch (e) {
-                    console.error("Error parsing lineup from match notes during edit", e);
-                }
-            }
-
-            if (!loaded) {
-                // Automatically pre-populate default appearances from the latest Matchday XI lineup
-                supabase
-                    .from('matchday_xis')
-                    .select('*')
-                    .order('created_at', { ascending: false })
-                    .limit(1)
-                    .then(({ data }) => {
-                        if (data && data.length > 0) {
-                            const latestLineup = data[0];
-                            const playerIds = new Set<string>();
-                            if (latestLineup.starters) {
-                                Object.values(latestLineup.starters).forEach((id: any) => {
-                                    if (id) playerIds.add(id);
-                                });
-                            }
-                            if (latestLineup.substitutes && Array.isArray(latestLineup.substitutes)) {
-                                latestLineup.substitutes.forEach((id: any) => {
-                                    if (id) playerIds.add(id);
-                                });
-                            }
-                            setSelectedAppearances(Array.from(playerIds));
-                        }
-                    });
-            }
-        }
-
         setFormData({
             date: match.date,
             time: match.time,
@@ -702,74 +481,6 @@ export default function MatchesPage() {
             setOpponentBadgeUrl("");
         }
         setIsAddOpen(true);
-    };
-
-    const handleAutofillFromMatchdayXI = async () => {
-        try {
-            let latestLineup = null;
-
-            if (editingId) {
-                const currentMatch = matches.find(m => m.id === editingId);
-                if (currentMatch?.notes && currentMatch.notes.includes("[Lineup: ")) {
-                    const startIdx = currentMatch.notes.indexOf("[Lineup: ");
-                    const endIdx = currentMatch.notes.indexOf("}]");
-                    if (endIdx !== -1) {
-                        try {
-                            latestLineup = JSON.parse(currentMatch.notes.substring(startIdx + "[Lineup: ".length, endIdx + 1));
-                        } catch (e) {
-                            console.error("Error parsing lineup from match notes", e);
-                        }
-                    }
-                }
-            }
-
-            if (!latestLineup) {
-                const { data: lineupData, error: lineupErr } = await supabase
-                    .from('matchday_xis')
-                    .select('*')
-                    .order('created_at', { ascending: false })
-                    .limit(1);
-
-                if (lineupErr) throw lineupErr;
-                if (lineupData && lineupData.length > 0) {
-                    latestLineup = lineupData[0];
-                }
-            }
-
-            if (!latestLineup) {
-                alert("No Matchday XI lineup found to load.");
-                return;
-            }
-
-            const playerIds = new Set<string>();
-
-            if (latestLineup.starters) {
-                Object.values(latestLineup.starters).forEach((id: any) => {
-                    if (id) playerIds.add(id);
-                });
-            }
-
-            if (latestLineup.usedSubstitutes && Array.isArray(latestLineup.usedSubstitutes)) {
-                latestLineup.usedSubstitutes.forEach((id: any) => {
-                    if (id) playerIds.add(id);
-                });
-            } else if (latestLineup.substitutes && Array.isArray(latestLineup.substitutes)) {
-                latestLineup.substitutes.forEach((id: any) => {
-                    if (id) playerIds.add(id);
-                });
-            }
-
-            if (playerIds.size === 0) {
-                alert("The selected lineup is empty.");
-                return;
-            }
-
-            const uniqueIds = Array.from(playerIds);
-            setSelectedAppearances(uniqueIds);
-        } catch (err: any) {
-            console.error("Error auto-filling from Matchday XI:", err);
-            alert("Failed to load lineup: " + err.message);
-        }
     };
 
     const handleDeleteMatch = async (id: string) => {
@@ -1040,9 +751,6 @@ export default function MatchesPage() {
         });
         setOpponentInstagram("");
         setOpponentBadgeUrl("");
-        setSelectedGoals([]);
-        setSelectedAssists([]);
-        setSelectedAppearances([]);
     };
 
     const handleBadgeFile = async (file: File) => {
@@ -1674,206 +1382,7 @@ export default function MatchesPage() {
                                                     />
                                                     <span className="text-xs font-bold text-slate-500 w-10">Away</span>
                                                 </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Goalscorers (Preview)</Label>
-                                                <Input
-                                                    readOnly
-                                                    placeholder="Dropdown selection auto-populates this field..."
-                                                    value={formData.goalscorers}
-                                                    className="h-9 text-xs bg-slate-50 cursor-default"
-                                                />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Assists (Preview)</Label>
-                                                <Input
-                                                    readOnly
-                                                    placeholder="Dropdown selection auto-populates this field..."
-                                                    value={formData.assists}
-                                                    className="h-9 text-xs bg-slate-50 cursor-default"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-4 bg-slate-50/60 p-3 rounded-xl border border-slate-100 mt-2">
-                                            {/* Goals / Scorers Section */}
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between items-center">
-                                                    <Label className="text-xs font-bold text-slate-700">⚽ Goalscorers (Dropdown Selection)</Label>
-                                                    <Button 
-                                                        type="button" 
-                                                        variant="outline" 
-                                                        size="sm" 
-                                                        onClick={addGoalscorerRow}
-                                                        className="h-7 text-[11px] font-semibold text-emerald-700 border-emerald-200 hover:bg-emerald-50"
-                                                    >
-                                                        <Plus className="h-3 w-3 mr-1" /> Add Scorer
-                                                    </Button>
-                                                </div>
-                                                
-                                                <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
-                                                    {selectedGoals.map((row, index) => (
-                                                        <div key={index} className="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-slate-200">
-                                                            <select
-                                                                value={row.playerId}
-                                                                onChange={(e) => updateGoalscorerRow(index, e.target.value, row.count)}
-                                                                className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 cursor-pointer text-slate-700 font-medium flex-1 outline-none"
-                                                            >
-                                                                {players.map(p => (
-                                                                    <option key={p.id} value={p.id}>
-                                                                        {p.use_nickname && p.nickname ? p.nickname : `${p.first_name} ${p.last_name}`}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                            
-                                                            <div className="flex items-center border rounded-md overflow-hidden bg-white h-8 shrink-0">
-                                                                <button 
-                                                                    type="button"
-                                                                    onClick={() => updateGoalscorerRow(index, row.playerId, row.count - 1)} 
-                                                                    className="px-1.5 hover:bg-slate-100 h-full border-r"
-                                                                >
-                                                                    <Minus className="h-3 w-3" />
-                                                                </button>
-                                                                <span className="w-8 text-center text-xs font-bold text-slate-800">{row.count}</span>
-                                                                <button 
-                                                                    type="button"
-                                                                    onClick={() => updateGoalscorerRow(index, row.playerId, row.count + 1)} 
-                                                                    className="px-1.5 hover:bg-slate-100 h-full border-l"
-                                                                >
-                                                                    <Plus className="h-3 w-3" />
-                                                                </button>
-                                                            </div>
-                                                            
-                                                            <Button 
-                                                                type="button" 
-                                                                variant="ghost" 
-                                                                size="icon" 
-                                                                onClick={() => deleteGoalscorerRow(index)}
-                                                                className="h-8 w-8 text-slate-400 hover:text-red-500"
-                                                            >
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        </div>
-                                                    ))}
-                                                    {selectedGoals.length === 0 && (
-                                                        <p className="text-[10px] text-slate-400 italic text-center py-2 bg-white rounded border border-dashed">No goalscorers selected.</p>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            {/* Assists Section */}
-                                            <div className="space-y-2">
-                                                <div className="flex justify-between items-center">
-                                                    <Label className="text-xs font-bold text-slate-700">🅰️ Assists (Dropdown Selection)</Label>
-                                                    <Button 
-                                                        type="button" 
-                                                        variant="outline" 
-                                                        size="sm" 
-                                                        onClick={addAssisterRow}
-                                                        className="h-7 text-[11px] font-semibold text-blue-700 border-blue-200 hover:bg-blue-50"
-                                                    >
-                                                        <Plus className="h-3 w-3 mr-1" /> Add Assister
-                                                    </Button>
-                                                </div>
-                                                
-                                                <div className="space-y-1.5 max-h-[140px] overflow-y-auto">
-                                                    {selectedAssists.map((row, index) => (
-                                                        <div key={index} className="flex items-center gap-2 bg-white p-1.5 rounded-lg border border-slate-200">
-                                                            <select
-                                                                value={row.playerId}
-                                                                onChange={(e) => updateAssisterRow(index, e.target.value, row.count)}
-                                                                className="flex h-8 w-full rounded-md border border-slate-200 bg-white px-2 py-1 text-xs shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 cursor-pointer text-slate-700 font-medium flex-1 outline-none"
-                                                            >
-                                                                {players.map(p => (
-                                                                    <option key={p.id} value={p.id}>
-                                                                        {p.use_nickname && p.nickname ? p.nickname : `${p.first_name} ${p.last_name}`}
-                                                                    </option>
-                                                                ))}
-                                                            </select>
-                                                            
-                                                            <div className="flex items-center border rounded-md overflow-hidden bg-white h-8 shrink-0">
-                                                                <button 
-                                                                    type="button"
-                                                                    onClick={() => updateAssisterRow(index, row.playerId, row.count - 1)} 
-                                                                    className="px-1.5 hover:bg-slate-100 h-full border-r"
-                                                                >
-                                                                    <Minus className="h-3 w-3" />
-                                                                </button>
-                                                                <span className="w-8 text-center text-xs font-bold text-slate-800">{row.count}</span>
-                                                                <button 
-                                                                    type="button"
-                                                                    onClick={() => updateAssisterRow(index, row.playerId, row.count + 1)} 
-                                                                    className="px-1.5 hover:bg-slate-100 h-full border-l"
-                                                                >
-                                                                    <Plus className="h-3 w-3" />
-                                                                </button>
-                                                            </div>
-                                                            
-                                                            <Button 
-                                                                type="button" 
-                                                                variant="ghost" 
-                                                                size="icon" 
-                                                                onClick={() => deleteAssisterRow(index)}
-                                                                className="h-8 w-8 text-slate-400 hover:text-red-500"
-                                                            >
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        </div>
-                                                    ))}
-                                                    {selectedAssists.length === 0 && (
-                                                        <p className="text-[10px] text-slate-400 italic text-center py-2 bg-white rounded border border-dashed">No assisters selected.</p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            {/* Matchday Appearances Section */}
-                                            <div className="space-y-2 pt-2 border-t border-slate-200 col-span-2">
-                                                <div className="flex justify-between items-center pb-1">
-                                                    <Label className="text-xs font-bold text-slate-700">👕 Additional Appearances (Select players who played but had no goals/assists)</Label>
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={handleAutofillFromMatchdayXI}
-                                                        className="h-7 text-[10px] font-semibold text-indigo-700 border-indigo-200 hover:bg-indigo-50"
-                                                    >
-                                                        📋 Load from Matchday XI
-                                                    </Button>
-                                                </div>
-                                                <div className="flex flex-wrap gap-1.5 p-2 bg-white rounded-lg border border-slate-200 max-h-[140px] overflow-y-auto">
-                                                    {players.map(p => {
-                                                        const isScorerOrAssister = selectedGoals.some(g => g.playerId === p.id) || selectedAssists.some(a => a.playerId === p.id);
-                                                        const isSelected = selectedAppearances.includes(p.id) || isScorerOrAssister;
-                                                        
-                                                        return (
-                                                            <button
-                                                                type="button"
-                                                                key={p.id}
-                                                                disabled={isScorerOrAssister}
-                                                                onClick={() => {
-                                                                    if (selectedAppearances.includes(p.id)) {
-                                                                        setSelectedAppearances(prev => prev.filter(id => id !== p.id));
-                                                                    } else {
-                                                                        setSelectedAppearances(prev => [...prev, p.id]);
-                                                                    }
-                                                                }}
-                                                                className={`px-2 py-1 rounded-md text-[10px] font-semibold border transition-all ${
-                                                                    isScorerOrAssister
-                                                                        ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed flex items-center gap-1"
-                                                                        : isSelected
-                                                                            ? "bg-emerald-50 text-emerald-700 border-emerald-300 font-bold shadow-sm"
-                                                                            : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
-                                                                }`}
-                                                            >
-                                                                {isScorerOrAssister && "⚽/🅰️ "}
-                                                                {p.first_name} {p.last_name}
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
+                                                                    </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3">
