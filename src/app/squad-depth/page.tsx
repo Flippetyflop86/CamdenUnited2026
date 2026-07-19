@@ -642,62 +642,69 @@ export default function SquadDepthPage() {
 
                         {/* Visual Position Nodes on the Pitch */}
                         <div className="absolute inset-0 p-10 flex flex-col justify-between">
-                            {activePositions.map((pos) => {
-                                const zoneKey = `${pos.label}_${pos.number}`;
-                                const positionPlayers = getActivePosPlayers(pos.label);
-                                
-                                // Starter is the first choice in depth list
-                                const starter = positionPlayers[0];
+                            {(() => {
+                                const renderedCounts: Record<string, number> = {};
+                                return activePositions.map((pos) => {
+                                    const zoneKey = `${pos.label}_${pos.number}`;
+                                    const positionPlayers = getActivePosPlayers(pos.label);
+                                    
+                                    // Track index of current rendered label (for duplicate positions)
+                                    const index = renderedCounts[pos.label] || 0;
+                                    renderedCounts[pos.label] = index + 1;
 
-                                const adjustedY = 12 + (pos.y * 0.76);
-                                const adjustedX = pos.x;
+                                    const starter = positionPlayers[index];
+                                    const choiceLabel = index === 0 ? "1st Choice" : index === 1 ? "2nd Choice" : index === 2 ? "3rd Choice" : `${index + 1}th Choice`;
 
-                                return (
-                                    <div
-                                        key={zoneKey}
-                                        onDragOver={(e) => e.preventDefault()}
-                                        onDrop={() => handleDropOnPosition(pos.label)}
-                                        onClick={() => {
-                                            toggleAccordion(pos.label);
-                                            const element = document.getElementById(`depth-accordion-${pos.label}`);
-                                            if (element) {
-                                                element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                            }
-                                        }}
-                                        className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center min-w-[130px] z-10 cursor-pointer group"
-                                        style={{ left: `${adjustedX}%`, top: `${adjustedY}%` }}
-                                    >
-                                        {/* Zone Label Header */}
-                                        <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-slate-700/80 text-[10px] font-black text-slate-200 shadow-md group-hover:border-red-500 transition-colors">
-                                            {pos.label}
-                                        </div>
+                                    const adjustedY = 12 + (pos.y * 0.76);
+                                    const adjustedX = pos.x;
 
-                                        {/* Placed 1st Choice Card */}
-                                        <div className="w-full mt-2 bg-slate-950/85 border border-slate-800 text-white rounded-xl p-2.5 text-center shadow-lg transition-all group-hover:scale-105 group-hover:border-slate-500">
-                                            {starter ? (
-                                                <div className="space-y-1.5 text-left">
-                                                    <div className="flex items-center justify-between gap-1">
-                                                        <span className="truncate text-white text-[11px] font-bold">
-                                                            {starter.notes?.includes("[CAPTAIN]") && "👑 "}
-                                                            {starter.firstName[0]}. {starter.lastName}
-                                                        </span>
-                                                        <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${starter.availability ? 'bg-green-500' : 'bg-red-500'}`} />
+                                    return (
+                                        <div
+                                            key={zoneKey}
+                                            onDragOver={(e) => e.preventDefault()}
+                                            onDrop={() => handleDropOnPosition(pos.label)}
+                                            onClick={() => {
+                                                toggleAccordion(pos.label);
+                                                const element = document.getElementById(`depth-accordion-${pos.label}`);
+                                                if (element) {
+                                                    element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                                }
+                                            }}
+                                            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center min-w-[130px] z-10 cursor-pointer group"
+                                            style={{ left: `${adjustedX}%`, top: `${adjustedY}%` }}
+                                        >
+                                            {/* Zone Label Header */}
+                                            <div className="px-3 py-0.5 rounded-full bg-slate-900 border border-slate-700/80 text-[10px] font-black text-slate-200 shadow-md group-hover:border-red-500 transition-colors">
+                                                {pos.label}
+                                            </div>
+
+                                            {/* Placed Card */}
+                                            <div className="w-full mt-2 bg-slate-950/85 border border-slate-800 text-white rounded-xl p-2.5 text-center shadow-lg transition-all group-hover:scale-105 group-hover:border-slate-500">
+                                                {starter ? (
+                                                    <div className="space-y-1.5 text-left">
+                                                        <div className="flex items-center justify-between gap-1">
+                                                            <span className="truncate text-white text-[11px] font-bold">
+                                                                {starter.notes?.includes("[CAPTAIN]") && "👑 "}
+                                                                {starter.firstName[0]}. {starter.lastName}
+                                                            </span>
+                                                            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${starter.availability ? 'bg-green-500' : 'bg-red-500'}`} />
+                                                        </div>
+                                                        
+                                                        <div className="flex items-center justify-between text-[9px] text-slate-400 font-semibold pt-1 border-t border-slate-850">
+                                                            <span>{choiceLabel}</span>
+                                                            {starter.squadNumber > 0 && <span>#{starter.squadNumber}</span>}
+                                                        </div>
                                                     </div>
-                                                    
-                                                    <div className="flex items-center justify-between text-[9px] text-slate-400 font-semibold pt-1 border-t border-slate-850">
-                                                        <span>1st Choice</span>
-                                                        {starter.squadNumber > 0 && <span>#{starter.squadNumber}</span>}
+                                                ) : (
+                                                    <div className="flex flex-col items-center justify-center h-10 text-slate-550 text-[10px] italic">
+                                                        <span>No {choiceLabel} Assigned</span>
                                                     </div>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col items-center justify-center h-10 text-slate-500 text-[10px] italic">
-                                                    <span>No Starter Assigned</span>
-                                                </div>
-                                            )}
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                });
+                            })()}
                         </div>
                     </div>
                 </div>
