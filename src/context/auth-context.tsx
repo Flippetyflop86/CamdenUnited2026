@@ -22,7 +22,12 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUser] = useState<User | null>(null);
+    const [user, setUserState] = useState<User | null>(null);
+    const userRef = useRef<User | null>(null);
+    const setUser = (u: User | null) => {
+        userRef.current = u;
+        setUserState(u);
+    };
     const [session, setSession] = useState<Session | null>(null);
     const [clubId, setClubId] = useState<string | null>(null);
     const [role, setRole] = useState<string | null>(null);
@@ -186,24 +191,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
             setSession(session);
-            setUser(session?.user ?? null);
-            if (session?.user) {
+            const nextUser = session?.user ?? null;
+            const previousUser = userRef.current;
+            const userChanged = (!previousUser && nextUser) || (previousUser && nextUser && previousUser.id !== nextUser.id);
+            
+            setUser(nextUser);
+            
+            if (nextUser) {
                 setIsLoggingOut(false);
-                // Clear any stored browser settings/states when switching user accounts to prevent leaks
-                if (typeof window !== 'undefined') {
-                    try {
-                        sessionStorage.clear();
-                        for (let i = localStorage.length - 1; i >= 0; i--) {
-                            const key = localStorage.key(i);
-                            if (key && key.startsWith('clubflow_')) {
-                                localStorage.removeItem(key);
+                if (userChanged) {
+                    // Clear any stored browser settings/states when switching user accounts to prevent leaks
+                    if (typeof window !== 'undefined') {
+                        try {
+                            sessionStorage.clear();
+                            for (let i = localStorage.length - 1; i >= 0; i--) {
+                                const key = localStorage.key(i);
+                                if (key && key.startsWith('clubflow_')) {
+                                    localStorage.removeItem(key);
+                                }
                             }
+                        } catch (e) {
+                            console.warn("Storage cleanup failed:", e);
                         }
-                    } catch (e) {
-                        console.warn("Storage cleanup failed:", e);
                     }
+                    fetchClubMembership(nextUser.id, nextUser.email);
                 }
-                fetchClubMembership(session.user.id, session.user.email);
             } else {
                 setClubId(null);
                 setGlobalClubId(null);
