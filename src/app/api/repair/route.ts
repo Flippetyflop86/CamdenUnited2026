@@ -69,10 +69,10 @@ export async function GET(request: Request) {
             });
         }
         
-        // Default action: purge pending match stats
+        // Default action: purge pending match stats and reset lineups
         const { data: matches, error: matchesErr } = await supabase
             .from('matches')
-            .select('id, opponent, date, result');
+            .select('id, opponent, date, result, notes');
         
         if (matchesErr) {
             return NextResponse.json({ error: matchesErr.message }, { status: 500 });
@@ -80,6 +80,34 @@ export async function GET(request: Request) {
 
         const pendingMatches = (matches || []).filter(m => m.result === 'Pending' || !m.result);
         const pendingMatchIds = pendingMatches.map(m => m.id);
+
+        let cleanedLineupsCount = 0;
+        const cleanedLineupsList = [];
+
+        // Strip [Lineup: ...] tags from pending matches
+        for (const m of pendingMatches) {
+            if (m.notes && m.notes.includes("[Lineup: ")) {
+                let cleanNotes = m.notes;
+                const startIdx = cleanNotes.indexOf("[Lineup: ");
+                const endIdx = cleanNotes.indexOf("}]", startIdx);
+                if (endIdx !== -1) {
+                    cleanNotes = (cleanNotes.substring(0, startIdx) + cleanNotes.substring(endIdx + 2)).trim();
+                } else {
+                    const singleEndIdx = cleanNotes.indexOf("]", startIdx);
+                    if (singleEndIdx !== -1) {
+                        cleanNotes = (cleanNotes.substring(0, startIdx) + cleanNotes.substring(singleEndIdx + 1)).trim();
+                    }
+                }
+                
+                await supabase
+                    .from('matches')
+                    .update({ notes: cleanNotes })
+                    .eq('id', m.id);
+                
+                cleanedLineupsCount++;
+                cleanedLineupsList.push(`${m.opponent} on ${m.date}`);
+            }
+        }
 
         if (pendingMatchIds.length === 0) {
             return NextResponse.json({ success: true, message: "No pending matches found." });
@@ -97,8 +125,10 @@ export async function GET(request: Request) {
 
         return NextResponse.json({ 
             success: true, 
-            message: `Successfully purged stats for pending matches.`, 
+            message: `Successfully purged stats and reset lineups for pending matches.`, 
             purgedCount: deletedStats?.length || 0,
+            cleanedLineupsCount,
+            cleanedLineupsList,
             pendingMatchesDeletedFrom: pendingMatches.map(m => `${m.opponent} on ${m.date}`)
         });
     } catch (err: any) {
