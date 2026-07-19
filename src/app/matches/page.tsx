@@ -370,10 +370,15 @@ export default function MatchesPage() {
             const meetTime = meetTimeMatch ? meetTimeMatch[1] : "";
 
             let cleanNotes = m.notes || "";
+            if (cleanNotes.includes("[Lineup: ")) {
+                const endIdx = cleanNotes.indexOf("}]");
+                if (endIdx !== -1) {
+                    cleanNotes = cleanNotes.substring(endIdx + 2);
+                }
+            }
             cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/, "");
             cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "");
-            cleanNotes = cleanNotes.replace(/\[MeetTime: .*?\]\n?/, "");
-            cleanNotes = cleanNotes.replace(/\[Lineup: \{.*\}\]\n?/, "").trim();
+            cleanNotes = cleanNotes.replace(/\[MeetTime: .*?\]\n?/, "").trim();
             
             return {
                 id: m.id,

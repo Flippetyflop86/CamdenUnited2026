@@ -144,9 +144,14 @@ export default function DashboardPage() {
                 const surface = surfaceMatch ? surfaceMatch[1] : "4G";
                 
                 let cleanNotes = m.notes || "";
+                if (cleanNotes.includes("[Lineup: ")) {
+                    const endIdx = cleanNotes.indexOf("}]");
+                    if (endIdx !== -1) {
+                        cleanNotes = cleanNotes.substring(endIdx + 2);
+                    }
+                }
                 cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/, "");
-                cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "");
-                cleanNotes = cleanNotes.replace(/\[Lineup: \{.*\}\]\n?/, "").trim();
+                cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "").trim();
                 
                 return {
                     id: m.id,
