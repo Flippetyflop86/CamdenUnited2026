@@ -133,32 +133,42 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                     </div>
                 </div>
             </CardHeader>
-            <CardContent className="p-2 sm:p-4 flex justify-between items-center text-center text-xs sm:text-sm overflow-x-auto no-scrollbar">
-                <div className="space-y-0.5 sm:space-y-1">
-                    <p className="text-slate-500 text-[10px] sm:text-xs">Apps</p>
-                    <p className="font-bold text-white">{player.appearances ?? 0}</p>
+            <CardContent className="p-2 sm:p-3 grid grid-cols-5 gap-1 text-center text-xs border-t border-slate-800 bg-slate-950/40">
+                <div className="space-y-0.5 p-1 rounded bg-slate-900 border border-slate-800">
+                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider">Apps</p>
+                    <p className="font-extrabold text-indigo-400 text-xs sm:text-sm">{player.appearances ?? 0}</p>
                 </div>
-                <div className="space-y-0.5 sm:space-y-1">
-                    <p className="text-slate-500 text-[10px] sm:text-xs">Goals</p>
-                    <p className="font-bold text-white">{player.goals ?? 0}</p>
+                <div className="space-y-0.5 p-1 rounded bg-slate-900 border border-slate-800">
+                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider">Goals</p>
+                    <p className="font-extrabold text-emerald-400 text-xs sm:text-sm">{player.goals ?? 0}</p>
                 </div>
-                <div className="space-y-0.5 sm:space-y-1">
-                    <p className="text-slate-500 text-[10px] sm:text-xs">Assists</p>
-                    <p className="font-bold text-white">{player.assists ?? 0}</p>
+                <div className="space-y-0.5 p-1 rounded bg-slate-900 border border-slate-800">
+                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider">Asts</p>
+                    <p className="font-extrabold text-sky-400 text-xs sm:text-sm">{player.assists ?? 0}</p>
                 </div>
-                {player.yellow_cards !== undefined && player.yellow_cards > 0 && (
-                    <div className="space-y-0.5 sm:space-y-1">
-                        <p className="text-yellow-400 text-[10px] sm:text-xs font-bold">YC</p>
-                        <p className="font-bold text-white">{player.yellow_cards}</p>
-                    </div>
-                )}
-                {player.red_cards !== undefined && player.red_cards > 0 && (
-                    <div className="space-y-0.5 sm:space-y-1">
-                        <p className="text-red-500 text-[10px] sm:text-xs font-bold">RC</p>
-                        <p className="font-bold text-white">{player.red_cards}</p>
-                    </div>
-                )}
+                <div className="space-y-0.5 p-1 rounded bg-slate-900 border border-slate-800">
+                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider">Mins</p>
+                    <p className="font-extrabold text-slate-300 text-xs sm:text-sm">{(player as any).minutes_played ?? 0}</p>
+                </div>
+                <div className="space-y-0.5 p-1 rounded bg-slate-900 border border-slate-800">
+                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider">Win%</p>
+                    <p className="font-extrabold text-amber-400 text-xs sm:text-sm">{(player as any).win_rate ?? 0}%</p>
+                </div>
             </CardContent>
+            {((player.yellow_cards !== undefined && player.yellow_cards > 0) || (player.red_cards !== undefined && player.red_cards > 0)) && (
+                <div className="px-3 pb-2 flex gap-1.5 justify-center text-[9px] sm:text-[10px] bg-slate-950/40">
+                    {player.yellow_cards !== undefined && player.yellow_cards > 0 && (
+                        <span className="px-2 py-0.5 bg-yellow-500/10 border border-yellow-500/25 text-yellow-400 rounded-md font-bold flex items-center gap-1">
+                            🟨 {player.yellow_cards} YC
+                        </span>
+                    )}
+                    {player.red_cards !== undefined && player.red_cards > 0 && (
+                        <span className="px-2 py-0.5 bg-rose-500/10 border border-rose-500/25 text-rose-400 rounded-md font-bold flex items-center gap-1">
+                            🟥 {player.red_cards} RC
+                        </span>
+                    )}
+                </div>
+            )}
             <CardFooter className="p-2 sm:p-4 pt-0 sm:pt-0 mt-auto">
                 <Button asChild className="w-full h-8 sm:h-9 text-xs sm:text-sm bg-slate-900 hover:bg-slate-800">
                     <Link href={`/squad/${player.id}`}>View Profile</Link>

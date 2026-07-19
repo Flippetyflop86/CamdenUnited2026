@@ -269,7 +269,7 @@ export default function SquadPage() {
         try {
             const [playersRes, matchesRes, statsRes] = await Promise.all([
                 supabase.from("players").select("*"),
-                supabase.from("matches").select("id, date, competition"),
+                supabase.from("matches").select("id, date, competition, result"),
                 supabase.from("match_player_stats").select("*")
             ]);
 
@@ -280,6 +280,7 @@ export default function SquadPage() {
 
             const matchSeasons = new Map<string, string>();
             const matchCompetitions = new Map<string, string>();
+            const matchResults = new Map<string, string>();
             const seasonSet = new Set<string>();
             
             matches.forEach((m: any) => {
@@ -302,6 +303,7 @@ export default function SquadPage() {
                 }
                 matchSeasons.set(m.id, seasonStr);
                 matchCompetitions.set(m.id, m.competition || "");
+                matchResults.set(m.id, m.result || "Pending");
                 seasonSet.add(seasonStr);
             });
             
@@ -310,7 +312,7 @@ export default function SquadPage() {
             setAvailableSeasons(Array.from(seasonSet).sort().reverse());
 
             // Calculate stats per player for the selected season
-            const playerStats = new Map<string, { apps: number, goals: number, assists: number, yellow: number, red: number }>();
+            const playerStats = new Map<string, { apps: number, goals: number, assists: number, yellow: number, red: number, minutes: number, wins: number, draws: number, losses: number }>();
             stats.forEach((s: any) => {
                 const season = matchSeasons.get(s.match_id);
                 if (seasonFilter !== "All" && season !== seasonFilter) return;
@@ -319,10 +321,19 @@ export default function SquadPage() {
                 const isFriendly = comp.toLowerCase().includes("friendly") || comp.toLowerCase().includes("trial");
                 if (!includeFriendlies && isFriendly) return;
 
-                const p = playerStats.get(s.player_id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0 };
+                const p = playerStats.get(s.player_id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0, minutes: 0, wins: 0, draws: 0, losses: 0 };
                 p.apps += 1;
                 p.goals += (s.goals || 0);
                 p.assists += (s.assists || 0);
+                p.yellow += (s.yellow_cards || 0);
+                p.red += (s.red_cards || 0);
+                p.minutes += (s.minutes_played || 90);
+
+                const res = matchResults.get(s.match_id);
+                if (res === "Win") p.wins++;
+                else if (res === "Draw") p.draws++;
+                else if (res === "Loss") p.losses++;
+
                 playerStats.set(s.player_id, p);
             });
 
@@ -360,7 +371,7 @@ export default function SquadPage() {
                         });
 
                         if (matchedPlayer) {
-                            const pStat = playerStats.get(matchedPlayer.id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0 };
+                            const pStat = playerStats.get(matchedPlayer.id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0, minutes: 0, wins: 0, draws: 0, losses: 0 };
                             if (type === 'yellow') pStat.yellow += count;
                             if (type === 'red') pStat.red += count;
                             playerStats.set(matchedPlayer.id, pStat);
@@ -374,7 +385,8 @@ export default function SquadPage() {
             });
 
             const formattedPlayers: Player[] = dbPlayers.map((p: any) => {
-                const s = playerStats.get(p.id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0 };
+                const s = playerStats.get(p.id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0, minutes: 0, wins: 0, draws: 0, losses: 0 };
+                const winRate = s.apps > 0 ? Math.round((s.wins / s.apps) * 100) : 0;
 
                 return {
                     id: p.id,
@@ -395,6 +407,8 @@ export default function SquadPage() {
                     assists: s.assists,
                     yellow_cards: s.yellow,
                     red_cards: s.red,
+                    minutes_played: s.minutes,
+                    win_rate: winRate,
                     dateOfBirth: p.date_of_birth,
                     holidayStart: p.holiday_start,
                     holidayEnd: p.holiday_end,
