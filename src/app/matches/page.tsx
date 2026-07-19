@@ -551,11 +551,21 @@ export default function MatchesPage() {
             setSelectedAppearances(appearanceList);
         } else {
             // Try to load lineup from match notes first
-            const lineupMatch = match.notes ? match.notes.match(/\[Lineup: (.*?)\]/) : null;
+            let parsed = null;
+            if (match.notes && match.notes.includes("[Lineup: ")) {
+                const startIdx = match.notes.indexOf("[Lineup: ");
+                const endIdx = match.notes.indexOf("}]");
+                if (endIdx !== -1) {
+                    try {
+                        parsed = JSON.parse(match.notes.substring(startIdx + "[Lineup: ".length, endIdx + 1));
+                    } catch (e) {
+                        console.error("Error parsing lineup from match notes during edit", e);
+                    }
+                }
+            }
             let loaded = false;
-            if (lineupMatch) {
+            if (parsed) {
                 try {
-                    const parsed = JSON.parse(lineupMatch[1]);
                     const playerIds = new Set<string>();
                     if (parsed.starters) {
                         Object.values(parsed.starters).forEach((id: any) => {
@@ -641,12 +651,15 @@ export default function MatchesPage() {
 
             if (editingId) {
                 const currentMatch = matches.find(m => m.id === editingId);
-                const lineupMatch = currentMatch?.notes ? currentMatch.notes.match(/\[Lineup: (.*?)\]/) : null;
-                if (lineupMatch) {
-                    try {
-                        latestLineup = JSON.parse(lineupMatch[1]);
-                    } catch (e) {
-                        console.error("Error parsing lineup from match notes", e);
+                if (currentMatch?.notes && currentMatch.notes.includes("[Lineup: ")) {
+                    const startIdx = currentMatch.notes.indexOf("[Lineup: ");
+                    const endIdx = currentMatch.notes.indexOf("}]");
+                    if (endIdx !== -1) {
+                        try {
+                            latestLineup = JSON.parse(currentMatch.notes.substring(startIdx + "[Lineup: ".length, endIdx + 1));
+                        } catch (e) {
+                            console.error("Error parsing lineup from match notes", e);
+                        }
                     }
                 }
             }
@@ -1295,10 +1308,10 @@ export default function MatchesPage() {
                         {match.lineup && (
                             <div className="w-full mt-3 pt-3 border-t border-slate-100 flex flex-col items-center">
                                 <Button
-                                    variant="ghost"
+                                    variant="outline"
                                     size="sm"
                                     onClick={() => setShowLineup(!showLineup)}
-                                    className="text-xs font-bold text-slate-500 hover:text-slate-900 flex items-center gap-1.5 h-7"
+                                    className="text-xs font-bold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1 flex items-center gap-1.5 h-8 transition-colors shadow-sm"
                                 >
                                     <span>📋</span> {showLineup ? "Hide Saved Lineup" : `Show Saved Lineup (${match.lineup.formation})`}
                                 </Button>

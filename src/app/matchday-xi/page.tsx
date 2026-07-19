@@ -236,25 +236,31 @@ export default function MatchdayXIPage() {
         setNextMatch(currentMatch);
 
         // Parse lineup from match notes
-        const lineupMatch = currentMatch.notes ? currentMatch.notes.match(/\[Lineup: (.*?)\]/) : null;
-        if (lineupMatch) {
-            try {
-                const parsed = JSON.parse(lineupMatch[1]);
-                setLineup({
-                    id: `match-lineup-${currentMatch.id}`,
-                    formation: parsed.formation || "4-2-3-1",
-                    starters: parsed.starters || {},
-                    substitutes: parsed.substitutes || ["", "", "", "", ""],
-                    usedSubstitutes: parsed.usedSubstitutes || [],
-                    squad: activeSquadTab,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString()
-                });
-                loadedLineupKeyRef.current = currentKey;
-                return;
-            } catch (e) {
-                console.error("Failed to parse lineup from match notes:", e);
+        let parsed = null;
+        if (currentMatch.notes && currentMatch.notes.includes("[Lineup: ")) {
+            const startIdx = currentMatch.notes.indexOf("[Lineup: ");
+            const endIdx = currentMatch.notes.indexOf("}]");
+            if (endIdx !== -1) {
+                try {
+                    parsed = JSON.parse(currentMatch.notes.substring(startIdx + "[Lineup: ".length, endIdx + 1));
+                } catch (e) {
+                    console.error("Failed to parse lineup from match notes:", e);
+                }
             }
+        }
+        if (parsed) {
+            setLineup({
+                id: `match-lineup-${currentMatch.id}`,
+                formation: parsed.formation || "4-2-3-1",
+                starters: parsed.starters || {},
+                substitutes: parsed.substitutes || ["", "", "", "", ""],
+                usedSubstitutes: parsed.usedSubstitutes || [],
+                squad: activeSquadTab,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
+            });
+            loadedLineupKeyRef.current = currentKey;
+            return;
         }
 
         // Fallback to fetch latest general lineup
