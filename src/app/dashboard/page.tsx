@@ -421,6 +421,41 @@ export default function DashboardPage() {
     };
     const depth = getDepthMetrics();
 
+    // Average training attendance calculation (Suggestion 4)
+    const calculateAverageAttendance = () => {
+        if (trainingSessions.length === 0) return 0;
+        let totalRatesSum = 0;
+        let count = 0;
+        trainingSessions.forEach(s => {
+            if (s.attendance && Array.isArray(s.attendance) && s.attendance.length > 0) {
+                const present = s.attendance.filter((att: any) => att.status === "Present" || att.status === "Late").length;
+                totalRatesSum += (present / s.attendance.length) * 100;
+                count++;
+            }
+        });
+        return count > 0 ? Math.round(totalRatesSum / count) : 0;
+    };
+    const averageTrainingAttendance = calculateAverageAttendance();
+
+    // Next training session finder (Suggestion 7)
+    const getNextTrainingSession = () => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const upcoming = trainingSessions
+            .filter(s => s.date >= todayStr)
+            .sort((a, b) => a.date.localeCompare(b.date));
+        return upcoming[0] || null;
+    };
+    const nextTrainingSession = getNextTrainingSession();
+
+    // Recent results lookup (Suggestion 9)
+    const getRecentResults = () => {
+        const completed = matches
+            .filter(m => m.result && m.result !== "Pending")
+            .sort((a, b) => b.date.localeCompare(a.date));
+        return completed.slice(0, 2);
+    };
+    const recentResults = getRecentResults();
+
     // Injury table list filtering
     const getFilteredInjuryList = () => {
         const holidayPlayers = players.filter(p => p.medicalStatus === "Holiday");
@@ -600,35 +635,33 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* V3 High Priority Operational Alerts Banner */}
+            {/* V3 Control Cards Row */}
             <div className="grid gap-4 md:grid-cols-2 relative z-10">
-                {/* Football Department Alerts (Registration / Compliance Issues) */}
+                {/* V3 Quick Actions Control Panel (Suggestion 10) */}
                 <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
                     <CardHeader className="pb-2">
                         <CardTitle className="text-xs font-bold uppercase tracking-wider text-gray-300 flex items-center gap-1.5">
-                            <ShieldAlert className="h-4 w-4 text-red-500" />
-                            Football Department Alerts
+                            <Plus className="h-4 w-4 text-red-500" />
+                            Quick Actions Control Panel
                         </CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-2">
-                        {registrationIssues.length > 0 || totalOutstandingAmount > 0 ? (
-                            <div className="space-y-1.5 text-xs text-gray-200">
-                                {registrationIssues.length > 0 && (
-                                    <div className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1.5 rounded-lg text-amber-450">
-                                        <AlertCircle className="h-4 w-4 shrink-0" />
-                                        <span>{registrationIssues.length} squad member(s) awaiting registration profile completion.</span>
-                                    </div>
-                                )}
-                                {totalOutstandingAmount > 0 && (
-                                    <div className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-2.5 py-1.5 rounded-lg text-red-400 font-bold">
-                                        <AlertCircle className="h-4 w-4 shrink-0" />
-                                        <span>Outstanding payment requests found: £{totalOutstandingAmount.toFixed(2)} unpaid.</span>
-                                    </div>
-                                )}
-                            </div>
-                        ) : (
-                            <p className="text-xs text-gray-400 italic">No football department alerts.</p>
-                        )}
+                    <CardContent className="grid grid-cols-2 gap-2 pt-1">
+                        <a href="/matches" className="flex items-center gap-2 p-2 bg-slate-950 hover:bg-slate-900 border border-gray-800 rounded-lg text-xs text-gray-250 transition-colors">
+                            <Calendar className="h-4 w-4 text-red-500 shrink-0" />
+                            <span>Add / Schedule Fixture</span>
+                        </a>
+                        <a href="/matchday-xi" className="flex items-center gap-2 p-2 bg-slate-950 hover:bg-slate-900 border border-gray-800 rounded-lg text-xs text-gray-250 transition-colors">
+                            <Users className="h-4 w-4 text-emerald-500 shrink-0" />
+                            <span>Matchday XI Board</span>
+                        </a>
+                        <a href="/squad" className="flex items-center gap-2 p-2 bg-slate-950 hover:bg-slate-900 border border-gray-800 rounded-lg text-xs text-gray-250 transition-colors">
+                            <UserCheck className="h-4 w-4 text-sky-500 shrink-0" />
+                            <span>Invite / Add Player</span>
+                        </a>
+                        <a href="/watcher" className="flex items-center gap-2 p-2 bg-slate-950 hover:bg-slate-900 border border-gray-800 rounded-lg text-xs text-gray-250 transition-colors">
+                            <Activity className="h-4 w-4 text-amber-500 shrink-0" />
+                            <span>Match Watcher</span>
+                        </a>
                     </CardContent>
                 </Card>
 
@@ -708,12 +741,24 @@ export default function DashboardPage() {
                                     </div>
 
                                     {timeLeft && (
-                                        <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-3 flex justify-between items-center">
-                                            <span className="font-bold text-gray-200">Days to Kickoff:</span>
-                                            <div className="flex gap-2 text-white font-black">
-                                                <div className="bg-slate-950 px-2.5 py-1 rounded-lg border border-gray-800">{timeLeft.days}d</div>
-                                                <div className="bg-slate-950 px-2.5 py-1 rounded-lg border border-gray-800">{timeLeft.hours}h</div>
-                                                <div className="bg-slate-950 px-2.5 py-1 rounded-lg border border-gray-800">{timeLeft.minutes}m</div>
+                                        <div className="space-y-2">
+                                            <div className="bg-red-500/5 border border-red-500/10 rounded-xl p-3 flex justify-between items-center">
+                                                <span className="font-bold text-gray-200">Days to Kickoff:</span>
+                                                <div className="flex gap-2 text-white font-black">
+                                                    <div className="bg-slate-955 px-2.5 py-1 rounded-lg border border-gray-800">{timeLeft.days}d</div>
+                                                    <div className="bg-slate-955 px-2.5 py-1 rounded-lg border border-gray-800">{timeLeft.hours}h</div>
+                                                    <div className="bg-slate-955 px-2.5 py-1 rounded-lg border border-gray-800">{timeLeft.minutes}m</div>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Roster Status (Suggestion 5) */}
+                                            <div className="bg-slate-950 p-3 rounded-xl border border-gray-800 flex justify-between items-center text-[10px] text-gray-300">
+                                                <span>Roster Status:</span>
+                                                <Badge className={`text-[8px] uppercase tracking-wide ${nextMatch.notes?.includes("[Lineup: ") 
+                                                    ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                                                    : "bg-amber-500/10 text-amber-400 border border-amber-500/20"}`}>
+                                                    {nextMatch.notes?.includes("[Lineup: ") ? "Lineup Configured" : "Roster Blank"}
+                                                </Badge>
                                             </div>
                                         </div>
                                     )}
@@ -721,7 +766,7 @@ export default function DashboardPage() {
                                     <div className="grid grid-cols-2 gap-3 text-[10px] text-gray-300 bg-slate-950 p-3 rounded-xl border border-gray-800">
                                         <div className="flex justify-between"><span>Pitch surface:</span> <span className="font-bold text-white">{nextMatch.surface || "4G"}</span></div>
                                         <div className="flex justify-between"><span>Expected Squad Size:</span> <span className="font-bold text-white">{availablePlayers.length} Selectable</span></div>
-                                        <div className="flex justify-between"><span>Formations Analyzed:</span> <span className="font-bold text-white">4-2-3-1</span></div>
+                                        <div className="flex justify-between"><span>Kickoff Time:</span> <span className="font-bold text-white">{nextMatch.time || "TBC"}</span></div>
                                         <div className="flex justify-between"><span>Venue / Location:</span> <span className="font-bold text-white truncate max-w-[100px]" title={nextMatch.location || "TBC"}>{nextMatch.location || "TBC"}</span></div>
                                     </div>
                                 </div>
@@ -732,6 +777,33 @@ export default function DashboardPage() {
                                         Schedule Fixture
                                     </a>
                                 </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Next Training Session Details (Suggestion 7) */}
+                    <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
+                        <CardHeader className="pb-3 border-b border-gray-800/80">
+                            <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Next Training Session</CardTitle>
+                        </CardHeader>
+                        <CardContent className="pt-4">
+                            {nextTrainingSession ? (
+                                <div className="space-y-3 text-xs bg-slate-950 p-3 rounded-xl border border-gray-800">
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400 font-medium">Date:</span>
+                                        <span className="font-bold text-white">{formatDate(nextTrainingSession.date)}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400 font-medium">Time &amp; Location:</span>
+                                        <span className="font-bold text-white">{nextTrainingSession.time || "TBC"} • {nextTrainingSession.location || "TBC"}</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="text-gray-400 font-medium">Topic / Focus:</span>
+                                        <span className="font-bold text-emerald-400">{nextTrainingSession.topic || "General Squad Session"}</span>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="text-xs text-gray-400 italic text-center py-2">No upcoming training sessions scheduled.</p>
                             )}
                         </CardContent>
                     </Card>
@@ -770,6 +842,23 @@ export default function DashboardPage() {
                                         : `Left ${leftFootedCount} • Right ${rightFootedCount} • Both ${bothFootedCount}`}
                                 </span>
                             </div>
+
+                            {/* Active Injury Feed (Suggestion 6) */}
+                            <div className="border-t border-gray-800 pt-2 mt-2 space-y-1.5">
+                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Active Injury Feed</span>
+                                {injuredPlayers.length === 0 ? (
+                                    <p className="text-[10px] text-gray-500 italic">No current injuries logged.</p>
+                                ) : (
+                                    <div className="space-y-1 max-h-[100px] overflow-y-auto pr-1">
+                                        {injuredPlayers.map(p => (
+                                            <div key={p.id} className="flex justify-between items-center text-[10px] bg-red-950/20 border border-red-900/30 px-2 py-1 rounded text-red-300">
+                                                <span className="font-bold">{formatPlayerName(p)}</span>
+                                                <span className="text-[9px] opacity-80">{p.injuryType || "Injured"}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -777,35 +866,55 @@ export default function DashboardPage() {
                     <Card className="bg-[#0b0f19] border-gray-800/80 shadow-md">
                         <CardHeader className="pb-3 border-b border-gray-800/80">
                             <CardTitle className="text-sm font-bold text-white uppercase tracking-wider">Season Performance</CardTitle>
-                            <CardDescription className="text-xs text-gray-300">KPI summaries</CardDescription>
+                            <CardDescription className="text-xs text-gray-300">KPI & results summary</CardDescription>
                         </CardHeader>
                         <CardContent className="pt-4 text-xs space-y-3">
-                            <div className="grid grid-cols-2 gap-3 text-center">
-                                <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                                    <div className="text-[10px] text-gray-300 font-bold uppercase">Points Per Game</div>
-                                    <div className="text-base font-black text-white mt-0.5">{ppg}</div>
+                            {/* Streamlined Stats Layout (Suggestion 3) */}
+                            <div className="grid grid-cols-3 gap-2 text-center">
+                                <div className="bg-slate-950 p-2 rounded-lg border border-gray-850">
+                                    <div className="text-[8px] text-gray-400 font-bold uppercase">Record</div>
+                                    <div className="text-xs font-black text-white mt-0.5">{winsCount}W - {drawsCount}D - {completedMatches.length - winsCount - drawsCount}L</div>
                                 </div>
-                                <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800">
-                                    <div className="text-[10px] text-gray-300 font-bold uppercase">Win Percentage</div>
-                                    <div className="text-base font-black text-white mt-0.5">{winRate}%</div>
+                                <div className="bg-slate-950 p-2 rounded-lg border border-gray-850">
+                                    <div className="text-[8px] text-gray-400 font-bold uppercase">Goal Diff</div>
+                                    <div className="text-xs font-black text-white mt-0.5">{goalDifference > 0 ? `+${goalDifference}` : goalDifference}</div>
                                 </div>
-                            </div>
-
-                            <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 space-y-2">
-                                <div className="flex justify-between text-gray-300 font-bold">
-                                    <span>Goals Scored / Conceded</span>
-                                    <span className="text-white font-black">{goalsScored} / {goalsConceded} (GD: {goalDifference})</span>
+                                <div className="bg-slate-950 p-2 rounded-lg border border-gray-850">
+                                    <div className="text-[8px] text-gray-400 font-bold uppercase">Win Rate</div>
+                                    <div className="text-xs font-black text-white mt-0.5">{winRate}%</div>
                                 </div>
                             </div>
 
+                            {/* Training Attendance rate (Suggestion 4) */}
                             <div className="bg-slate-955 p-2.5 rounded-xl border border-gray-800 flex justify-between items-center">
                                 <div>
-                                    <span className="text-[10px] text-gray-200 uppercase font-bold">Training Attendance Tracking</span>
-                                    <div className="text-sm font-black text-white mt-0.5">{lastSessionAttendanceRate}%</div>
-                                    <p className="text-[8px] text-gray-400 mt-1 leading-none">
-                                        {lastSession ? `Last session: ${formatDate(lastSession.date)} ${lastSession.topic ? `• ${lastSession.topic}` : ''}` : 'No sessions logged'}
-                                    </p>
+                                    <span className="text-[9px] text-gray-400 uppercase font-bold tracking-wider block">Average Training Attendance</span>
+                                    <div className="text-sm font-black text-white mt-0.5">{averageTrainingAttendance}%</div>
+                                    <p className="text-[8px] text-gray-500 mt-0.5">Overall average attendance across all logged sessions</p>
                                 </div>
+                            </div>
+
+                            {/* Recent Results Ticker (Suggestion 9) */}
+                            <div className="border-t border-gray-800 pt-2 mt-2 space-y-1.5">
+                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">Recent Results</span>
+                                {recentResults.length === 0 ? (
+                                    <p className="text-[10px] text-gray-500 italic text-center py-2">No matches completed yet.</p>
+                                ) : (
+                                    <div className="space-y-1">
+                                        {recentResults.map(m => (
+                                            <div key={m.id} className="flex justify-between items-center text-[10px] bg-slate-950 border border-gray-850 px-2 py-1 rounded">
+                                                <span className="text-gray-350 font-medium">vs {m.opponent}</span>
+                                                <Badge className={`text-[8px] font-bold uppercase ${
+                                                    m.result === "Win" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" :
+                                                    m.result === "Loss" ? "bg-red-500/10 text-red-400 border border-red-500/20" :
+                                                    "bg-slate-500/10 text-slate-400 border border-slate-500/20"
+                                                }`}>
+                                                    {m.scoreline ? `${m.scoreline} (${m.result})` : m.result}
+                                                </Badge>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>
