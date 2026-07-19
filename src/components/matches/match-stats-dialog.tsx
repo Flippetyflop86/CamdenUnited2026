@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart3, Plus, Minus, Search, Trash2, Filter, RefreshCw, Link as LinkIcon } from "lucide-react";
+import { BarChart3, Plus, Minus, Search, Trash2, Filter, RefreshCw, Link as LinkIcon, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
 
@@ -36,6 +36,11 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
     const [showPasteInput, setShowPasteInput] = useState(false);
     const [pasteText, setPasteText] = useState("");
     const [isParsing, setIsParsing] = useState(false);
+
+    // Matchday XI lineup states
+    const [lineupStarters, setLineupStarters] = useState<string[]>([]);
+    const [lineupSubs, setLineupSubs] = useState<string[]>([]);
+    const [rightPanelTab, setRightPanelTab] = useState<'lineup' | 'all'>('lineup');
 
     const { settings } = useClub();
     const currentSquads = settings.squads || ["First Team"];
@@ -118,6 +123,65 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
         // Fetch existing stats for this match
         const { data: sData } = await supabase.from('match_player_stats').select('*').eq('match_id', matchId);
         if (sData) setStats(sData);
+
+        // Fetch raw notes of the match to extract lineup
+        const { data: matchData } = await supabase.from('matches').select('notes').eq('id', matchId).single();
+        if (matchData?.notes) {
+            const rawNotes = matchData.notes;
+            if (rawNotes.includes("[Lineup: ")) {
+                const startIdx = rawNotes.indexOf("[Lineup: ");
+                const endIdx = rawNotes.indexOf("}]", startIdx);
+                if (endIdx !== -1) {
+                    try {
+                        const parsed = JSON.parse(rawNotes.substring(startIdx + "[Lineup: ".length, endIdx + 1));
+                        if (parsed) {
+                            const startersList: string[] = [];
+                            if (parsed.starters) {
+                                Object.values(parsed.starters).forEach((id: any) => {
+                                    if (id) startersList.push(id);
+                                });
+                            }
+                            setLineupStarters(startersList);
+                            
+                            const subsList: string[] = [];
+                            if (parsed.substitutes && Array.isArray(parsed.substitutes)) {
+                                parsed.substitutes.forEach((id: any) => {
+                                    if (id) subsList.push(id);
+                                });
+                            }
+                            setLineupSubs(subsList);
+                            setRightPanelTab('lineup');
+                        }
+                    } catch(e) {
+                        console.error("Error parsing lineup in stats dialog", e);
+                    }
+                }
+            } else {
+                setRightPanelTab('all');
+            }
+        } else {
+            setRightPanelTab('all');
+        }
+        setIsLoading(false);
+    };
+
+    const addAllStarters = async () => {
+        setIsLoading(true);
+        const newStats = [];
+        for (const sId of lineupStarters) {
+            if (!stats.find(s => s.player_id === sId)) {
+                newStats.push({ match_id: matchId, player_id: sId, goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90 });
+            }
+        }
+        if (newStats.length > 0) {
+            const { data, error } = await supabase.from('match_player_stats').insert(newStats).select();
+            if (error) {
+                alert("Error adding starters: " + error.message);
+            } else if (data) {
+                setStats(prev => [...prev, ...data]);
+                await syncMatchesTable(matchId);
+            }
+        }
         setIsLoading(false);
     };
 
@@ -373,17 +437,34 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                     <div className="flex flex-col h-[400px] overflow-hidden bg-white border rounded-lg shadow-sm">
                         <div className="p-3 bg-slate-100 border-b sticky top-0 z-10 space-y-2">
                             <div className="flex items-center justify-between">
-                                <span className="font-bold text-sm text-slate-700">Available Squad</span>
-                                <select 
-                                    className="text-xs bg-white border border-slate-200 rounded px-2 py-1 outline-none"
-                                    value={squadFilter}
-                                    onChange={(e) => setSquadFilter(e.target.value)}
-                                >
-                                    <option value="All">All Squads</option>
-                                    {currentSquads.map((s: string) => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
+                                <div className="flex bg-slate-200 p-0.5 rounded-lg border border-slate-300">
+                                    {(lineupStarters.length > 0 || lineupSubs.length > 0) && (
+                                        <button
+                                            onClick={() => setRightPanelTab('lineup')}
+                                            className={`px-2 py-0.5 text-[10px] font-bold rounded ${rightPanelTab === 'lineup' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                        >
+                                            Lineup
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setRightPanelTab('all')}
+                                        className={`px-2 py-0.5 text-[10px] font-bold rounded ${rightPanelTab === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                    >
+                                        Squad
+                                    </button>
+                                </div>
+                                {rightPanelTab === 'all' && (
+                                    <select 
+                                        className="text-[10px] bg-white border border-slate-200 rounded px-1 py-0.5 outline-none font-bold"
+                                        value={squadFilter}
+                                        onChange={(e) => setSquadFilter(e.target.value)}
+                                    >
+                                        <option value="All">All Squads</option>
+                                        {currentSquads.map((s: string) => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
                             <div className="relative">
                                 <Search className="absolute left-2 top-2 h-4 w-4 text-slate-400" />
@@ -395,18 +476,94 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                                 />
                             </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                            {availablePlayers.map(p => (
-                                <div key={p.id} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded-lg group transition-colors border border-transparent hover:border-slate-100">
-                                    <div>
-                                        <span className="font-semibold text-sm">{p.first_name} {p.last_name}</span>
-                                        <span className="ml-2 text-xs text-slate-400">{p.position}</span>
-                                    </div>
-                                    <Button size="sm" variant="outline" className="h-7 bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => addPlayerToMatch(p.id)}>
-                                        <Plus className="h-3 w-3 mr-1" /> Add
-                                    </Button>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-3">
+                            {rightPanelTab === 'lineup' ? (
+                                <div className="space-y-4 text-left">
+                                    {/* Starters Section */}
+                                    {lineupStarters.length > 0 && (
+                                        <div className="space-y-1.5">
+                                            <div className="flex justify-between items-center px-1">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Starters ({lineupStarters.length})</span>
+                                                {lineupStarters.some(sId => !stats.find(s => s.player_id === sId)) && (
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="ghost" 
+                                                        onClick={addAllStarters}
+                                                        className="h-6 text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 rounded"
+                                                    >
+                                                        Add All Starters
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <div className="space-y-1">
+                                                {lineupStarters.map(sId => {
+                                                    const p = players.find(x => x.id === sId);
+                                                    if (!p) return null;
+                                                    const isAdded = stats.find(s => s.player_id === sId);
+                                                    return (
+                                                        <div key={sId} className="flex justify-between items-center p-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs">
+                                                            <div>
+                                                                <span className="font-semibold">{p.first_name} {p.last_name}</span>
+                                                                <span className="ml-1.5 text-[10px] text-slate-400">{p.position}</span>
+                                                            </div>
+                                                            {isAdded ? (
+                                                                <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100"><Check className="h-3 w-3" /> Starter</span>
+                                                            ) : (
+                                                                <Button size="sm" variant="outline" className="h-6 text-[10px] bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => addPlayerToMatch(sId)}>
+                                                                    <Plus className="h-3 w-3 mr-1" /> Add
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Substitutes Section */}
+                                    {lineupSubs.length > 0 && (
+                                        <div className="space-y-1.5 border-t pt-3">
+                                            <div className="px-1">
+                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Substitutes Bench ({lineupSubs.length})</span>
+                                            </div>
+                                            <div className="space-y-1">
+                                                {lineupSubs.map(sId => {
+                                                    const p = players.find(x => x.id === sId);
+                                                    if (!p) return null;
+                                                    const isAdded = stats.find(s => s.player_id === sId);
+                                                    return (
+                                                        <div key={sId} className="flex justify-between items-center p-1.5 bg-slate-50 border border-slate-100 rounded-lg text-xs">
+                                                            <div>
+                                                                <span className="font-semibold">{p.first_name} {p.last_name}</span>
+                                                                <span className="ml-1.5 text-[10px] text-slate-400">{p.position}</span>
+                                                            </div>
+                                                            {isAdded ? (
+                                                                <span className="text-[10px] text-indigo-650 font-semibold flex items-center gap-1 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100"><Check className="h-3 w-3" /> Played (Sub)</span>
+                                                            ) : (
+                                                                <Button size="sm" variant="outline" className="h-6 text-[10px] bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50" onClick={() => addPlayerToMatch(sId)}>
+                                                                    <Plus className="h-3 w-3 mr-1" /> Played Sub
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            ))}
+                            ) : (
+                                availablePlayers.map(p => (
+                                    <div key={p.id} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded-lg group transition-colors border border-transparent hover:border-slate-100 text-left">
+                                        <div>
+                                            <span className="font-semibold text-sm">{p.first_name} {p.last_name}</span>
+                                            <span className="ml-2 text-xs text-slate-400">{p.position}</span>
+                                        </div>
+                                        <Button size="sm" variant="outline" className="h-7 bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => addPlayerToMatch(p.id)}>
+                                            <Plus className="h-3 w-3 mr-1" /> Add
+                                        </Button>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>
@@ -533,17 +690,34 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                     <div className="flex flex-col h-full overflow-hidden bg-white border rounded-lg shadow-sm">
                         <div className="p-3 bg-slate-100 border-b sticky top-0 z-10 space-y-2">
                             <div className="flex items-center justify-between">
-                                <span className="font-bold text-sm text-slate-700">Available Squad</span>
-                                <select 
-                                    className="text-xs bg-white border border-slate-200 rounded px-2 py-1 outline-none"
-                                    value={squadFilter}
-                                    onChange={(e) => setSquadFilter(e.target.value)}
-                                >
-                                    <option value="All">All Squads</option>
-                                    {currentSquads.map((s: string) => (
-                                        <option key={s} value={s}>{s}</option>
-                                    ))}
-                                </select>
+                                <div className="flex bg-slate-200 p-0.5 rounded-lg border border-slate-300">
+                                    {(lineupStarters.length > 0 || lineupSubs.length > 0) && (
+                                        <button
+                                            onClick={() => setRightPanelTab('lineup')}
+                                            className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${rightPanelTab === 'lineup' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                        >
+                                            Lineup
+                                        </button>
+                                    )}
+                                    <button
+                                        onClick={() => setRightPanelTab('all')}
+                                        className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${rightPanelTab === 'all' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                                    >
+                                        Squad
+                                    </button>
+                                </div>
+                                {rightPanelTab === 'all' && (
+                                    <select 
+                                        className="text-xs bg-white border border-slate-200 rounded px-2 py-1 outline-none font-bold"
+                                        value={squadFilter}
+                                        onChange={(e) => setSquadFilter(e.target.value)}
+                                    >
+                                        <option value="All">All Squads</option>
+                                        {currentSquads.map((s: string) => (
+                                            <option key={s} value={s}>{s}</option>
+                                        ))}
+                                    </select>
+                                )}
                             </div>
                             <div className="relative">
                                 <Search className="absolute left-2 top-2 h-4 w-4 text-slate-400" />
@@ -555,21 +729,103 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                                 />
                             </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                            {availablePlayers.map(p => (
-                                <div key={p.id} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded-lg group transition-colors border border-transparent hover:border-slate-100">
-                                    <div>
-                                        <span className="font-semibold text-sm">{p.first_name} {p.last_name}</span>
-                                        <span className="ml-2 text-xs text-slate-400">{p.position}</span>
-                                    </div>
-                                    <Button size="sm" variant="outline" className="h-7 bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => addPlayerToMatch(p.id)}>
-                                        <Plus className="h-3 w-3 mr-1" /> Add
-                                    </Button>
+                        <div className="flex-1 overflow-y-auto p-2 space-y-3">
+                            {rightPanelTab === 'lineup' ? (
+                                <div className="space-y-4 text-left">
+                                    {/* Starters Section */}
+                                    {lineupStarters.length > 0 && (
+                                        <div className="space-y-1.5">
+                                            <div className="flex justify-between items-center px-1">
+                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Starters ({lineupStarters.length})</span>
+                                                {lineupStarters.some(sId => !stats.find(s => s.player_id === sId)) && (
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="ghost" 
+                                                        onClick={addAllStarters}
+                                                        className="h-6 text-[10px] font-bold text-indigo-600 hover:text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 rounded"
+                                                    >
+                                                        Add All Starters
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <div className="space-y-1">
+                                                {lineupStarters.map(sId => {
+                                                    const p = players.find(x => x.id === sId);
+                                                    if (!p) return null;
+                                                    const isAdded = stats.find(s => s.player_id === sId);
+                                                    return (
+                                                        <div key={sId} className="flex justify-between items-center p-2 bg-slate-50 border border-slate-100 rounded-lg text-sm">
+                                                            <div>
+                                                                <span className="font-semibold">{p.first_name} {p.last_name}</span>
+                                                                <span className="ml-2 text-xs text-slate-400">{p.position}</span>
+                                                            </div>
+                                                            {isAdded ? (
+                                                                <span className="text-xs text-emerald-600 font-semibold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100"><Check className="h-3 w-3" /> Starter</span>
+                                                            ) : (
+                                                                <Button size="sm" variant="outline" className="h-7 bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => addPlayerToMatch(sId)}>
+                                                                    <Plus className="h-3 w-3 mr-1" /> Add
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Substitutes Section */}
+                                    {lineupSubs.length > 0 && (
+                                        <div className="space-y-1.5 border-t pt-3">
+                                            <div className="px-1">
+                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Substitutes Bench ({lineupSubs.length})</span>
+                                            </div>
+                                            <div className="space-y-1">
+                                                {lineupSubs.map(sId => {
+                                                    const p = players.find(x => x.id === sId);
+                                                    if (!p) return null;
+                                                    const isAdded = stats.find(s => s.player_id === sId);
+                                                    return (
+                                                        <div key={sId} className="flex justify-between items-center p-2 bg-slate-50 border border-slate-100 rounded-lg text-sm">
+                                                            <div>
+                                                                <span className="font-semibold">{p.first_name} {p.last_name}</span>
+                                                                <span className="ml-2 text-xs text-slate-400">{p.position}</span>
+                                                            </div>
+                                                            {isAdded ? (
+                                                                <span className="text-xs text-indigo-650 font-semibold flex items-center gap-1 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100"><Check className="h-3 w-3" /> Played (Sub)</span>
+                                                            ) : (
+                                                                <Button size="sm" variant="outline" className="h-7 bg-white text-indigo-600 border-indigo-200 hover:bg-indigo-50" onClick={() => addPlayerToMatch(sId)}>
+                                                                    <Plus className="h-3 w-3 mr-1" /> Played Sub
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-                            ))}
+                            ) : (
+                                availablePlayers.map(p => (
+                                    <div key={p.id} className="flex justify-between items-center p-2 hover:bg-slate-50 rounded-lg group transition-colors border border-transparent hover:border-slate-100 text-left">
+                                        <div>
+                                            <span className="font-semibold text-sm">{p.first_name} {p.last_name}</span>
+                                            <span className="ml-2 text-xs text-slate-400">{p.position}</span>
+                                        </div>
+                                        <Button size="sm" variant="outline" className="h-7 bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => addPlayerToMatch(p.id)}>
+                                            <Plus className="h-3 w-3 mr-1" /> Add
+                                        </Button>
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>
+                <DialogFooter className="mt-4 border-t pt-4 flex justify-between items-center bg-white p-3 shrink-0 rounded-b-lg">
+                    <span className="text-xs text-slate-500 font-medium">All changes are saved automatically.</span>
+                    <Button onClick={() => setIsOpen(false)} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold">
+                        Save & Close
+                    </Button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );
