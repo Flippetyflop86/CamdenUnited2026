@@ -356,8 +356,19 @@ export default function MatchdayXIPage() {
             usedSubstitutes: newLineup.usedSubstitutes || []
         };
 
-        const tagPattern = /\[Lineup: .*?\]\n?/;
-        const cleanNotes = (currentMatch.notes || "").replace(tagPattern, "").trim();
+        let cleanNotes = (currentMatch.notes || "").trim();
+        if (cleanNotes.includes("[Lineup: ")) {
+            const startIdx = cleanNotes.indexOf("[Lineup: ");
+            const endIdx = cleanNotes.indexOf("}]", startIdx);
+            if (endIdx !== -1) {
+                cleanNotes = (cleanNotes.substring(0, startIdx) + cleanNotes.substring(endIdx + 2)).trim();
+            } else {
+                const singleEndIdx = cleanNotes.indexOf("]", startIdx);
+                if (singleEndIdx !== -1) {
+                    cleanNotes = (cleanNotes.substring(0, startIdx) + cleanNotes.substring(singleEndIdx + 1)).trim();
+                }
+            }
+        }
         const updatedNotes = `[Lineup: ${JSON.stringify(serialized)}]\n${cleanNotes}`.trim();
 
         // Update local matches state so we don't trigger re-fetch loops

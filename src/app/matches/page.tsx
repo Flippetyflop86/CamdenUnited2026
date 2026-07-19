@@ -425,7 +425,9 @@ export default function MatchesPage() {
             }
             cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/, "");
             cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "");
-            cleanNotes = cleanNotes.replace(/\[MeetTime: .*?\]\n?/, "").trim();
+            cleanNotes = cleanNotes.replace(/\[MeetTime: .*?\]\n?/, "");
+            cleanNotes = cleanNotes.replace(/(?:,?\s*["']usedSubstitutes["']\s*:\s*\[\]\s*\}\s*)+/g, "");
+            cleanNotes = cleanNotes.replace(/^,\s*/, "").replace(/^[,\s\}\{]+/, "").trim();
             
             return {
                 id: m.id,
@@ -442,6 +444,7 @@ export default function MatchesPage() {
                 yellow_cards: m.yellow_cards,
                 red_cards: m.red_cards,
                 notes: cleanNotes,
+                rawNotes: m.notes || "",
                 surface: surface,
                 location: location,
                 lineup: parsedLineup
@@ -496,7 +499,24 @@ export default function MatchesPage() {
         const locationPrefix = `[Location: ${formData.location || ""}]`;
         const surfacePrefix = `[Surface: ${formData.surface || "4G"}]`;
         const meetTimePrefix = `[MeetTime: ${formData.meetTime || ""}]`;
-        const combinedNotes = `${locationPrefix}${surfacePrefix}${meetTimePrefix}\n${formData.notes || ""}`.trim();
+        
+        let lineupTag = "";
+        if (editingId) {
+            const currentMatch = matches.find(m => m.id === editingId);
+            if (currentMatch && (currentMatch as any).rawNotes && (currentMatch as any).rawNotes.includes("[Lineup: ")) {
+                const startIdx = (currentMatch as any).rawNotes.indexOf("[Lineup: ");
+                const endIdx = (currentMatch as any).rawNotes.indexOf("}]", startIdx);
+                if (endIdx !== -1) {
+                    lineupTag = (currentMatch as any).rawNotes.substring(startIdx, endIdx + 2) + "\n";
+                } else {
+                    const singleEndIdx = (currentMatch as any).rawNotes.indexOf("]", startIdx);
+                    if (singleEndIdx !== -1) {
+                        lineupTag = (currentMatch as any).rawNotes.substring(startIdx, singleEndIdx + 1) + "\n";
+                    }
+                }
+            }
+        }
+        const combinedNotes = `${lineupTag}${locationPrefix}${surfacePrefix}${meetTimePrefix}\n${formData.notes || ""}`.trim();
 
         const payload: any = {
             date: formData.date,
