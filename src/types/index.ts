@@ -145,6 +145,7 @@ export interface MatchdayXI {
     };
     substitutes: string[]; // array of playerIds
     usedSubstitutes?: string[]; // array of used substitutes
+    substitutions?: { subId: string; replacedId: string; minute: number }[]; // substitution details
     squad?: string;
     createdAt: string;
     updatedAt: string;
