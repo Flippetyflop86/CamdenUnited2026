@@ -677,7 +677,7 @@ export default function DashboardPage() {
             {/* LEVEL 1: Primary Daily Operational Decisions */}
             <div className="space-y-4 relative z-10">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Primary Operations</h2>
+                    <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Primary</h2>
                     <span className="h-px bg-slate-900 flex-1 ml-4" />
                 </div>
 
@@ -693,7 +693,7 @@ export default function DashboardPage() {
                         {totalOutstandingAmount > 0 && (
                             <div className="flex items-center gap-2 bg-red-500/10 border-l-2 border-red-500 px-4 py-2.5 rounded-r-lg text-red-400 text-xs font-bold">
                                 <AlertCircle className="h-4 w-4 shrink-0 text-red-500" />
-                                <span>Outstanding payment requests found: £{totalOutstandingAmount.toFixed(2)} unpaid.</span>
+                                <span>Outstanding payment requests: £{totalOutstandingAmount.toFixed(2)} unpaid.</span>
                             </div>
                         )}
                         {suspendedPlayers.length > 0 && (
@@ -703,26 +703,18 @@ export default function DashboardPage() {
                             </div>
                         )}
                     </div>
-                ) : (
-                    <div className="flex items-center gap-2 bg-emerald-500/5 px-4 py-2.5 rounded-lg text-emerald-450 text-xs font-semibold">
-                        <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
-                        <span>No active alerts. Operational status normal.</span>
-                    </div>
-                )}
+                ) : null}
 
                 {/* Core operational cards */}
                 <div className="grid gap-6 md:grid-cols-3">
                     
-                    {/* Today's Priorities */}
+                    {/* Today's Focus */}
                     <Card className="bg-[#0b0f19] border-none shadow-xl p-6">
                         <div className="space-y-4">
-                            <div>
-                                <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Today's Priorities</CardTitle>
-                                <p className="text-[10px] text-slate-400 mt-1">Generated workflow priorities requiring action</p>
-                            </div>
+                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Today's Focus</CardTitle>
                             <div className="space-y-2 pt-2">
                                 {priorities.map((task, i) => (
-                                    <div key={i} className="flex items-center justify-between p-2.5 bg-slate-950/80 rounded-xl text-xs">
+                                    <div key={i} className="flex items-center justify-between p-2.5 bg-slate-955 border border-slate-900 rounded-xl text-xs">
                                         <div className="flex items-center gap-2">
                                             <button
                                                 onClick={() => handleDismissPriority(task.label)}
@@ -733,9 +725,6 @@ export default function DashboardPage() {
                                             </button>
                                             <span className="font-bold text-slate-200">{task.label}</span>
                                         </div>
-                                        <Badge className="bg-slate-900 text-slate-400 text-[8px] uppercase tracking-wide">
-                                            {task.category}
-                                        </Badge>
                                     </div>
                                 ))}
                                 {priorities.length === 0 && (
@@ -745,10 +734,10 @@ export default function DashboardPage() {
                         </div>
                     </Card>
 
-                    {/* Next Fixture */}
+                    {/* Next Match */}
                     <Card className="bg-[#0b0f19] border-none shadow-xl p-6">
                         <div className="space-y-4">
-                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Next Fixture</CardTitle>
+                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Next Match</CardTitle>
                             {nextMatch ? (
                                 <div className="space-y-3 pt-2 text-xs">
                                     <div className="bg-slate-950/80 p-3 rounded-xl flex justify-between items-center">
@@ -764,14 +753,14 @@ export default function DashboardPage() {
 
                                     {timeLeft && (
                                         <div className="flex justify-between items-center bg-slate-950/80 px-3 py-2 rounded-xl text-[10px]">
-                                            <span className="font-bold text-slate-400">Countdown:</span>
+                                            <span className="font-bold text-slate-400">Countdown</span>
                                             <span className="font-black text-amber-500">{timeLeft.days}d {timeLeft.hours}h {timeLeft.minutes}m remaining</span>
                                         </div>
                                     )}
 
                                     <div className="flex justify-between items-center bg-slate-950/80 px-3 py-2 rounded-xl text-[10px]">
-                                        <span className="font-bold text-slate-400">Expected Availability:</span>
-                                        <span className="font-black text-emerald-450">{availablePlayers.length} Selectable</span>
+                                        <span className="font-bold text-slate-400">Available Players</span>
+                                        <span className="font-black text-emerald-405">{availablePlayers.length}</span>
                                     </div>
                                 </div>
                             ) : (
@@ -780,23 +769,34 @@ export default function DashboardPage() {
                         </div>
                     </Card>
 
-                    {/* Squad Availability */}
+                    {/* Availability */}
                     <Card className="bg-[#0b0f19] border-none shadow-xl p-6">
                         <div className="space-y-4">
-                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Squad Availability</CardTitle>
+                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Availability</CardTitle>
                             <div className="space-y-4 pt-2">
-                                <div className="flex justify-between items-center text-xs font-bold">
-                                    <span className="text-slate-300">Available Squad Ratio</span>
-                                    <span className="text-emerald-450">{squadAvailabilityRate}% Available</span>
+                                <div className="text-center py-2">
+                                    <span className="text-4xl font-black text-emerald-450 block">{squadAvailabilityRate}%</span>
                                 </div>
                                 <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden">
                                     <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${squadAvailabilityRate}%` }} />
                                 </div>
                                 <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] text-slate-400 border-t border-slate-900 pt-3">
-                                    <div className="flex justify-between"><span>Players Available:</span> <span className="font-black text-white">{availablePlayers.length}</span></div>
-                                    <div className="flex justify-between"><span>Players Unavailable:</span> <span className="font-black text-red-500">{injuredPlayers.length}</span></div>
-                                    <div className="flex justify-between"><span>Players Suspended:</span> <span className="font-black text-red-500">{suspendedPlayers.length}</span></div>
-                                    <div className="flex justify-between"><span>Total Roster Size:</span> <span className="font-black text-white">{players.length} Players</span></div>
+                                    <div className="flex justify-between">
+                                        <span className="font-black text-white">{availablePlayers.length}</span>
+                                        <span>Available</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-black text-red-500">{injuredPlayers.length}</span>
+                                        <span>Injured</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-black text-red-500">{suspendedPlayers.length}</span>
+                                        <span>Suspended</span>
+                                    </div>
+                                    <div className="flex justify-between">
+                                        <span className="font-black text-white">{players.length}</span>
+                                        <span>Roster</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -807,40 +807,40 @@ export default function DashboardPage() {
             {/* LEVEL 2: Secondary Decision Support */}
             <div className="space-y-4 relative z-10">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Decision Support</h2>
+                    <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Secondary</h2>
                     <span className="h-px bg-slate-900 flex-1 ml-4" />
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-5">
                     
-                    {/* Season Performance - 2 Cols */}
+                    {/* Season - 2 Cols */}
                     <Card className="bg-[#0b0f19]/80 border-none shadow-lg p-5 md:col-span-2">
                         <div className="space-y-4">
-                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Season Performance</CardTitle>
+                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Season</CardTitle>
                             
                             <div className="grid grid-cols-3 gap-3 text-center pt-2">
                                 <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-900">
-                                    <div className="text-[8px] text-slate-400 font-bold uppercase">League Standings</div>
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">League</div>
                                     <div className="text-sm font-black text-amber-500 mt-0.5">{displayLeaguePosition}</div>
                                 </div>
                                 <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-900">
-                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Points Per Game</div>
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">PPG</div>
                                     <div className="text-sm font-black text-white mt-0.5">{ppg}</div>
                                 </div>
                                 <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-900">
-                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Win Percentage</div>
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Win %</div>
                                     <div className="text-sm font-black text-white mt-0.5">{winRate}%</div>
                                 </div>
                                 <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-900">
-                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Goals Scored</div>
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Goals</div>
                                     <div className="text-sm font-black text-emerald-405 mt-0.5">{goalsScored}</div>
                                 </div>
                                 <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-900">
-                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Goals Conceded</div>
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Against</div>
                                     <div className="text-sm font-black text-red-500 mt-0.5">{goalsConceded}</div>
                                 </div>
                                 <div className="bg-slate-950/80 p-2.5 rounded-xl border border-slate-900">
-                                    <div className="text-[8px] text-slate-400 font-bold uppercase">Goal Difference</div>
+                                    <div className="text-[8px] text-slate-400 font-bold uppercase">GD</div>
                                     <div className="text-sm font-black text-sky-400 mt-0.5">{goalDifference > 0 ? `+${goalDifference}` : goalDifference}</div>
                                 </div>
                             </div>
@@ -869,10 +869,10 @@ export default function DashboardPage() {
                         </div>
                     </Card>
 
-                    {/* Preferred Starting XI - 2 Cols */}
+                    {/* Preferred XI - 2 Cols */}
                     <Card className="bg-[#0b0f19]/80 border-none shadow-lg p-5 md:col-span-2">
                         <div className="space-y-4">
-                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Preferred Starting XI</CardTitle>
+                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Preferred XI</CardTitle>
                             <div className="flex flex-col items-center pt-2 justify-center h-full">
                                 {renderMiniPitch()}
                             </div>
@@ -913,28 +913,20 @@ export default function DashboardPage() {
             {/* LEVEL 3: Reference Info */}
             <div className="space-y-4 relative z-10">
                 <div className="flex items-center justify-between">
-                    <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Injury &amp; Suspension Summary</h2>
+                    <h2 className="text-xs font-black uppercase text-slate-400 tracking-widest">Injuries &amp; Suspensions</h2>
                     <span className="h-px bg-slate-900 flex-1 ml-4" />
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-3">
                     
                     {/* Detailed Injury List card with Recovery Estimates */}
-                    <Card className="bg-[#0b0f19]/60 border-none shadow-md p-4 md:col-span-2">
+                    <Card className="bg-[#0b0f19]/60 border-none shadow-md p-4 md:col-span-3">
                         <div className="space-y-4">
-                            <div className="flex justify-between items-center">
-                                <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Active Medical &amp; Suspension Logs</CardTitle>
-                                <a href="/squad" className="text-[9px] font-bold text-slate-400 hover:text-white transition-colors">
-                                    View Full Roster &rarr;
-                                </a>
-                            </div>
-
                             <div className="space-y-2.5 pt-1">
                                 {filteredInjuryList.slice(0, 5).map(p => {
                                     const isSuspended = p.medicalStatus === "Suspended";
                                     const isHoliday = p.medicalStatus === "Holiday";
                                     
-                                    // Parse estimates
                                     const typeLabel = isSuspended 
                                         ? (p.suspensionReason || "Suspension") 
                                         : (p.injuryType || (isHoliday ? "Holiday" : "Injured"));
@@ -948,19 +940,16 @@ export default function DashboardPage() {
                                             <div className="space-y-0.5">
                                                 <span className="font-bold text-xs text-white block">{p.firstName} {p.lastName}</span>
                                                 <span className="text-[10px] text-slate-400 block font-medium">
-                                                    Details: {typeLabel}
+                                                    {typeLabel} • {isHoliday ? "Out of Club" : durationLabel}
                                                 </span>
                                             </div>
                                             
-                                            <div className="text-right space-y-1">
+                                            <div className="text-right">
                                                 <Badge className={`text-[8px] font-black uppercase tracking-wider ${
                                                     isHoliday ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-red-500/10 text-red-400 border border-red-500/20"
                                                 }`}>
                                                     {isHoliday ? "Holiday" : isSuspended ? "Suspended" : "Injured"}
                                                 </Badge>
-                                                <div className="text-[9px] text-slate-400 font-bold block">
-                                                    {isHoliday ? "Out of Club" : `Est. Out: ${durationLabel}`}
-                                                </div>
                                             </div>
                                         </div>
                                     );
@@ -968,21 +957,6 @@ export default function DashboardPage() {
                                 {filteredInjuryList.length === 0 && (
                                     <p className="text-xs text-slate-500 italic text-center py-6">No unavailable players or active suspensions registered.</p>
                                 )}
-                            </div>
-                        </div>
-                    </Card>
-
-                    {/* Operational Tips card */}
-                    <Card className="bg-[#0b0f19]/60 border-none shadow-md p-4">
-                        <div className="space-y-4">
-                            <CardTitle className="text-xs font-black uppercase text-slate-400 tracking-wider">Operational Notes</CardTitle>
-                            <div className="text-[10px] text-slate-400 space-y-3 leading-relaxed pt-1 font-medium">
-                                <p>
-                                    💡 <strong className="text-white">Planning Center Integration:</strong> Changing tactical formations in the Squad Planner will sync preferred starting coordinates to the preferred XI matchday models.
-                                </p>
-                                <p>
-                                    💡 <strong className="text-white">Medical Updates:</strong> Always configure injury duration timelines and suspension lengths in the Player Profiles inside the Squad module to maintain accurate roster availability rates.
-                                </p>
                             </div>
                         </div>
                     </Card>
