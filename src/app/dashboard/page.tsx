@@ -649,7 +649,7 @@ export default function DashboardPage() {
                             <div className="flex justify-between"><span>Players Available:</span> <span className="font-semibold text-white">{availablePlayers.length}</span></div>
                             <div className="flex justify-between"><span>Players Unavailable:</span> <span className="font-semibold text-red-400">{injuredPlayers.length}</span></div>
                             <div className="flex justify-between"><span>Players Suspended:</span> <span className="font-semibold text-red-400">{suspendedPlayers.length}</span></div>
-                            <div className="flex justify-between"><span>Upcoming Trainings:</span> <span className="font-semibold text-white">2 remaining</span></div>
+                            <div className="flex justify-between"><span>Total Squad Size:</span> <span className="font-semibold text-white">{players.length} Players</span></div>
                         </div>
                     </CardContent>
                 </Card>
