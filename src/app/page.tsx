@@ -150,16 +150,7 @@ export default function LandingPage() {
                 </div>
             </header>
 
-            {/* Trusted By Roster */}
-            <section className="py-16 border-t border-slate-900 bg-slate-950/10 text-center">
-                <p className="text-xs uppercase tracking-widest font-black text-slate-500">Trusted by ambitious football departments</p>
-                <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-12 pt-8 opacity-25 grayscale filter text-slate-400 font-extrabold text-sm tracking-wider">
-                    <div>CAMDEN UNITED FC</div>
-                    <div>ELITE PRO ACADEMY</div>
-                    <div>APEX FOOTBALL LAB</div>
-                    <div>METRO ATHLETIC</div>
-                </div>
-            </section>
+
 
             {/* Interactive Vector Product Tour Section */}
             <section id="tour" className="py-32 max-w-6xl mx-auto px-6 space-y-16">
