@@ -61,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
 
     const isPublicPage = (path: string) => {
-        const AUTH_PAGES = ["/login", "/signup", "/reset-password", "/update-password", "/join", "/signup/player"];
+        const AUTH_PAGES = ["", "/", "/login", "/signup", "/reset-password", "/update-password", "/join", "/signup/player"];
         let currentPath = path;
         if (typeof window !== 'undefined') {
             currentPath = window.location.pathname;
