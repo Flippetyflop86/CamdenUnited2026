@@ -2,7 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Sparkles, ArrowRight, Shield, Activity, Users, FileText, Database, CreditCard, LayoutDashboard, Calendar, CalendarDays, CheckCircle2, DollarSign, Trophy } from "lucide-react";
+import { Sparkles, ArrowRight, Shield, Activity, Users, FileText, Database, CreditCard, LayoutDashboard, Calendar, CalendarDays, CheckCircle2, DollarSign, Trophy, UserCheck, Search, Plus, Trash2 } from "lucide-react";
+
+// SVG Jersey Icon matching the exact shape in the screenshot
+function JerseyIcon({ className, color = "#1e40af" }: { className?: string; color?: string }) {
+    return (
+        <svg className={className} viewBox="0 0 24 24" fill={color} stroke="#0f172a" strokeWidth="1.5">
+            {/* T-Shirt jersey path */}
+            <path d="M 6 3 L 18 3 L 21 6 L 19 8 L 17 6.5 L 17 21 L 7 21 L 7 6.5 L 5 8 L 3 6 Z" />
+        </svg>
+    );
+}
 
 export default function LandingPage() {
     const [activeTab, setActiveTab] = useState<"dashboard" | "matchday" | "squad" | "finances" | "attendance">("dashboard");
@@ -12,7 +22,7 @@ export default function LandingPage() {
         { id: "matchday", label: "Matchday XI & Tactics", desc: "Drag, drop, and define. Lock in formations, manage the substitutes bench, and generate automated matchday squad notifications." },
         { id: "squad", label: "Squad Depth & Registry", desc: "Long-term roster planning. Map primary and secondary roles, side-specific defensive positions, and track medical status updates." },
         { id: "finances", label: "Finances & Billing", desc: "Keep your club out of the red. Track monthly subscriptions, match fees, and sponsorships. Check who has paid and send reminders." },
-        { id: "attendance", label: "Training Attendance", desc: "Track attendance rates across matches and sessions to get real data on player dedication." },
+        { id: "attendance", label: "Training Attendance", desc: "Track attendance rates across matches and sessions to get data-backed insights on player dedication." },
     ] as const;
 
     return (
@@ -90,57 +100,81 @@ export default function LandingPage() {
                             <div className="w-8" />
                         </div>
 
-                        {/* Interactive Screen Preview container */}
-                        <div className="bg-[#030712] p-8 text-left space-y-6">
-                            {/* Dashboard Live Component */}
-                            <div className="flex justify-between items-center border-b border-slate-900 pb-4">
-                                <div>
-                                    <div className="flex items-center gap-2.5">
-                                        <h3 className="text-xl font-black text-white">Camden United</h3>
-                                        <span className="bg-red-500/10 text-red-400 border border-red-500/20 text-[9px] uppercase tracking-wider font-black px-2.5 py-0.5 rounded">
-                                            Operations Command Centre
-                                        </span>
+                        {/* Interactive Screen Preview: App Layout (Dark Sidebar, Light Panel) */}
+                        <div className="flex h-[520px] bg-[#f8fafc] text-slate-950 font-sans text-left overflow-hidden">
+                            {/* App Sidebar */}
+                            <div className="w-48 bg-[#0b0f19] text-slate-100 p-4 flex flex-col justify-between text-xs font-semibold select-none border-r border-[#1f293d]/45 shrink-0">
+                                <div className="space-y-5">
+                                    <div className="flex items-center gap-2 px-1 pb-2 border-b border-[#1f293d]/30">
+                                        <div className="h-6 w-6 rounded bg-red-600 flex items-center justify-center font-bold text-white text-xs">CF</div>
+                                        <div>
+                                            <span className="font-extrabold text-[12px] text-white block">ClubFlow</span>
+                                            <span className="text-[8px] text-slate-500 block leading-none font-bold uppercase">Workspace</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block px-2 pb-1">Football Operations</span>
+                                        {[
+                                            { label: "Dashboard Overview", icon: <LayoutDashboard className="h-3.5 w-3.5 text-red-500" /> },
+                                            { label: "Matchday Tactics", icon: <Calendar className="h-3.5 w-3.5" /> },
+                                            { label: "Squad Registry", icon: <Users className="h-3.5 w-3.5" /> },
+                                            { label: "Club Finances", icon: <CreditCard className="h-3.5 w-3.5" /> },
+                                            { label: "Training Attendance", icon: <Activity className="h-3.5 w-3.5" /> }
+                                        ].map((item, idx) => (
+                                            <div key={idx} className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg font-bold transition-all text-[11px] ${idx === 0 ? "bg-red-500/10 text-red-400 border border-red-500/20" : "text-slate-400"}`}>
+                                                {item.icon}
+                                                <span>{item.label}</span>
+                                            </div>
+                                        ))}
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Operational Stats Grid */}
-                            <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-                                <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-2">
-                                    <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider">Squad Availability</span>
-                                    <div className="text-xl font-black text-white">33 / 36 Available (92%)</div>
-                                </div>
-                                <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-2">
-                                    <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider">Registration Alerts</span>
-                                    <div className="text-xl font-black text-amber-400">2 Outstanding</div>
-                                </div>
-                                <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-2">
-                                    <span className="text-[10px] font-black uppercase text-slate-400 block tracking-wider">Unpaid Invoices</span>
-                                    <div className="text-xl font-black text-red-400">£450.00</div>
-                                </div>
-                            </div>
-
-                            {/* Dashboard Layout Grid */}
-                            <div className="grid gap-6 grid-cols-1 lg:grid-cols-5">
-                                <div className="lg:col-span-3 space-y-6">
-                                    <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-4">
-                                        <span className="text-xs font-black uppercase text-white tracking-wider block">Next Fixture</span>
-                                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-900 flex justify-between items-center text-sm">
-                                            <div>
-                                                <span className="font-black text-white text-base">vs Western Athletic</span>
-                                                <div className="text-xs text-slate-450 mt-1">Isthmian League • 🌱 Natural Grass</div>
-                                            </div>
-                                            <span className="text-white font-bold bg-slate-900 border border-slate-800 px-4 py-2 rounded-lg">16 Jul • 14:00</span>
+                            {/* Main Content Area (Light Theme matching actual app) */}
+                            <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-[#f8fafc]">
+                                <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+                                    <div>
+                                        <div className="flex items-center gap-2.5">
+                                            <h3 className="text-lg font-black text-slate-900">Camden United</h3>
+                                            <span className="bg-red-500/10 text-red-600 border border-red-500/20 text-[9px] uppercase tracking-wider font-black px-2 py-0.5 rounded">
+                                                Operations Command Centre
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="lg:col-span-2 space-y-6">
-                                    <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-4">
-                                        <span className="text-xs font-black uppercase text-white tracking-wider block">Performance Metrics</span>
-                                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-900 space-y-1">
-                                            <span className="text-[10px] text-slate-450 block uppercase font-bold">Training Attendance</span>
-                                            <div className="text-xl font-black text-white leading-none">92%</div>
+                                {/* Mini stats Grid */}
+                                <div className="grid gap-4 grid-cols-3">
+                                    <div className="bg-white border border-slate-200/80 p-4 rounded-xl space-y-1 shadow-sm">
+                                        <span className="text-[9px] font-black uppercase text-slate-400 block">Squad Availability</span>
+                                        <div className="text-base font-black text-slate-900">33 / 36 (92%)</div>
+                                    </div>
+                                    <div className="bg-white border border-slate-200/80 p-4 rounded-xl space-y-1 shadow-sm">
+                                        <span className="text-[9px] font-black uppercase text-slate-400 block">Registration Alerts</span>
+                                        <div className="text-base font-black text-amber-600">2 Outstanding</div>
+                                    </div>
+                                    <div className="bg-white border border-slate-200/80 p-4 rounded-xl space-y-1 shadow-sm">
+                                        <span className="text-[9px] font-black uppercase text-slate-400 block">Unpaid Invoices</span>
+                                        <div className="text-base font-black text-red-600">£450.00</div>
+                                    </div>
+                                </div>
+
+                                {/* Layout Grid */}
+                                <div className="grid gap-4 grid-cols-5">
+                                    <div className="col-span-3 bg-white border border-slate-200/80 p-4 rounded-xl shadow-sm space-y-3">
+                                        <span className="text-[10px] font-black uppercase text-slate-900 tracking-wider block">Next Fixture</span>
+                                        <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 flex justify-between items-center text-xs">
+                                            <div>
+                                                <span className="font-extrabold text-slate-900">vs Western Athletic</span>
+                                                <div className="text-[10px] text-slate-400 mt-0.5">Isthmian League • 🌱 Natural Grass</div>
+                                            </div>
+                                            <span className="text-slate-900 font-bold bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg">16 Jul • 14:00</span>
+                                        </div>
+                                    </div>
+                                    <div className="col-span-2 bg-white border border-slate-200/80 p-4 rounded-xl shadow-sm space-y-3">
+                                        <span className="text-[10px] font-black uppercase text-slate-900 tracking-wider block">Training Attendance</span>
+                                        <div className="bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-center">
+                                            <div className="text-2xl font-black text-slate-900">92%</div>
                                         </div>
                                     </div>
                                 </div>
@@ -150,15 +184,13 @@ export default function LandingPage() {
                 </div>
             </header>
 
-
-
             {/* Interactive Vector Product Tour Section */}
-            <section id="tour" className="py-32 max-w-6xl mx-auto px-6 space-y-16">
+            <section id="tour" className="py-32 max-w-[94%] mx-auto px-6 space-y-16">
                 <div className="text-center space-y-4 max-w-2xl mx-auto">
                     <span className="text-xs font-black uppercase text-red-500 tracking-wider">Interactive Preview</span>
                     <h2 className="text-3xl md:text-5xl font-black text-white leading-tight">Explore the platform.</h2>
                     <p className="text-lg text-slate-400 leading-relaxed">
-                        Click the tabs below to interact with the exact vector-sharp interfaces of our modules.
+                        Interact with high-fidelity React layouts mapped precisely to the actual design patterns of ClubFlow.
                     </p>
                 </div>
 
@@ -187,8 +219,8 @@ export default function LandingPage() {
                     </div>
                 </div>
 
-                {/* High-Fidelity Interactive Preview Interface */}
-                <div className="rounded-2xl overflow-hidden border border-slate-900 bg-slate-950/40 shadow-2xl">
+                {/* Live Vector Application Shell Interface (Matching screenshots exactly!) */}
+                <div className="rounded-2xl overflow-hidden border border-slate-900 shadow-2xl">
                     
                     {/* Minimalist Browser Header Bar */}
                     <div className="h-7 bg-[#0c101b] border-b border-[#1f293d]/30 px-4 flex items-center justify-between">
@@ -203,143 +235,246 @@ export default function LandingPage() {
                         <div className="w-8" />
                     </div>
 
-                    {/* Content area simulating real screen */}
-                    <div className="bg-[#030712] p-8 text-left min-h-[480px]">
+                    {/* App viewport wrapper (Dark sidebar, Light main screen) */}
+                    <div className="flex min-h-[520px] bg-[#f8fafc] text-slate-900 font-sans text-left overflow-hidden">
                         
-                        {/* Tab 1: Dashboard Preview */}
-                        {activeTab === "dashboard" && (
-                            <div className="space-y-6 animate-in fade-in duration-200">
-                                <div className="flex justify-between items-center border-b border-slate-900 pb-3">
+                        {/* Sidebar (Dark) */}
+                        <div className="w-48 bg-[#0b0f19] text-slate-100 p-4 flex flex-col justify-between text-xs font-semibold select-none border-r border-[#1f293d]/45 shrink-0">
+                            <div className="space-y-5">
+                                <div className="flex items-center gap-2 px-1 pb-2 border-b border-[#1f293d]/30">
+                                    <div className="h-6 w-6 rounded bg-red-600 flex items-center justify-center font-bold text-white text-xs">CF</div>
                                     <div>
-                                        <h3 className="text-lg font-black text-white">Operations Command Centre</h3>
-                                        <p className="text-slate-450 text-xs mt-1">Squad Management &amp; Analytics</p>
+                                        <span className="font-extrabold text-[12px] text-white block">ClubFlow</span>
+                                        <span className="text-[8px] text-slate-500 block leading-none font-bold uppercase">Workspace</span>
                                     </div>
                                 </div>
-                                <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
-                                    <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-1.5">
-                                        <span className="text-[10px] font-black uppercase text-slate-455 block">Squad Availability</span>
-                                        <div className="text-lg font-black text-white">33 / 36 (92%)</div>
-                                    </div>
-                                    <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-1.5">
-                                        <span className="text-[10px] font-black uppercase text-slate-455 block">Pending Alerts</span>
-                                        <div className="text-lg font-black text-amber-400">2 Actions Required</div>
-                                    </div>
-                                    <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-1.5">
-                                        <span className="text-[10px] font-black uppercase text-slate-455 block">Unpaid Invoices</span>
-                                        <div className="text-lg font-black text-red-400">£450.00</div>
-                                    </div>
+                                <div className="space-y-1">
+                                    <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest block px-2 pb-1">Football Operations</span>
+                                    {[
+                                        { id: "dashboard", label: "Dashboard Overview", icon: <LayoutDashboard className="h-3.5 w-3.5" /> },
+                                        { id: "matchday", label: "Matchday Tactics", icon: <Calendar className="h-3.5 w-3.5" /> },
+                                        { id: "squad", label: "Squad Registry", icon: <Users className="h-3.5 w-3.5" /> },
+                                        { id: "finances", label: "Club Finances", icon: <CreditCard className="h-3.5 w-3.5" /> },
+                                        { id: "attendance", label: "Training Attendance", icon: <Activity className="h-3.5 w-3.5" /> }
+                                    ].map((item) => (
+                                        <div 
+                                            key={item.id} 
+                                            className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg font-bold transition-all text-[11px] ${
+                                                activeTab === item.id 
+                                                    ? "bg-red-500/10 text-red-400 border border-red-500/20" 
+                                                    : "text-slate-400"
+                                            }`}
+                                        >
+                                            {item.icon}
+                                            <span>{item.label}</span>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-                        )}
+                        </div>
 
-                        {/* Tab 2: Matchday Preview */}
-                        {activeTab === "matchday" && (
-                            <div className="grid gap-6 md:grid-cols-5 animate-in fade-in duration-200">
-                                <div className="md:col-span-3 bg-[#0a2315]/40 rounded-xl p-5 border border-emerald-950 relative h-[340px] flex flex-col justify-between overflow-hidden shadow-inner">
-                                    <div className="absolute inset-0 pointer-events-none opacity-10">
-                                        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 border-2 border-white rounded-full" />
-                                        <div className="absolute top-1/2 left-0 right-0 border-t-2 border-white" />
+                        {/* Viewport Content Area (Light Theme) */}
+                        <div className="flex-1 p-6 overflow-y-auto space-y-6">
+                            
+                            {/* Tab: Dashboard */}
+                            {activeTab === "dashboard" && (
+                                <div className="space-y-6 animate-in fade-in duration-200">
+                                    <div className="flex justify-between items-center border-b border-slate-200 pb-3">
+                                        <div>
+                                            <h3 className="text-lg font-black text-slate-900">Operations Command Centre</h3>
+                                            <p className="text-slate-500 text-xs mt-0.5">Squad Management &amp; Analytics</p>
+                                        </div>
                                     </div>
                                     
-                                    <div className="flex justify-around items-center z-10">
-                                        <div className="flex flex-col items-center">
-                                            <div className="w-8 h-8 rounded-full bg-red-600 border-2 border-white flex items-center justify-center font-bold text-xs text-white">9</div>
-                                            <span className="text-[10px] font-black text-white bg-slate-950/80 px-2 py-0.5 rounded mt-1">Liam Johnson</span>
+                                    <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+                                        <div className="bg-white border border-slate-200 p-5 rounded-xl space-y-1.5 shadow-sm">
+                                            <span className="text-[10px] font-black uppercase text-slate-400 block">Squad Availability</span>
+                                            <div className="text-lg font-black text-slate-900">33 / 36 (92%)</div>
+                                        </div>
+                                        <div className="bg-white border border-slate-200 p-5 rounded-xl space-y-1.5 shadow-sm">
+                                            <span className="text-[10px] font-black uppercase text-slate-400 block">Pending Alerts</span>
+                                            <div className="text-lg font-black text-amber-600">2 Actions Required</div>
+                                        </div>
+                                        <div className="bg-white border border-slate-200 p-5 rounded-xl space-y-1.5 shadow-sm">
+                                            <span className="text-[10px] font-black uppercase text-slate-400 block">Unpaid Invoices</span>
+                                            <div className="text-lg font-black text-red-650">£450.00</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Tab: Matchday XI (MATCHING SCREENSHOTS EXACTLY!) */}
+                            {activeTab === "matchday" && (
+                                <div className="grid gap-6 grid-cols-1 xl:grid-cols-6 animate-in fade-in duration-200 text-slate-900">
+                                    
+                                    {/* Left Panel: Available Squad */}
+                                    <div className="xl:col-span-1.5 bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-3 shrink-0 min-w-[160px]">
+                                        <div className="flex justify-between items-center text-xs font-bold text-slate-900">
+                                            <span>AVAILABLE SQUAD</span>
+                                            <span className="bg-slate-100 text-slate-700 px-1.5 py-0.5 rounded text-[10px]">18</span>
+                                        </div>
+                                        <div className="flex gap-1 text-[9px] font-black border-b pb-2 text-slate-400">
+                                            <span className="bg-slate-900 text-white px-1.5 py-0.5 rounded">All</span>
+                                            <span>GK</span>
+                                            <span>DEF</span>
+                                            <span>MID</span>
+                                        </div>
+                                        <div className="space-y-1.5 max-h-[220px] overflow-y-auto pr-1">
+                                            {["Mohammed Khan", "Bobby Eden", "Ryan King", "Steven Robinson", "Thomas Harris"].map((p, i) => (
+                                                <div key={i} className="bg-white border border-slate-200/80 px-2 py-1.5 rounded-lg text-[10px] font-bold text-slate-700 shadow-sm">
+                                                    {p}
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
 
-                                    <div className="flex justify-around items-center z-10">
-                                        <div className="flex flex-col items-center">
-                                            <div className="w-8 h-8 rounded-full bg-red-650 border-2 border-white flex items-center justify-center font-bold text-xs text-white">8</div>
-                                            <span className="text-[10px] font-black text-white bg-slate-950/80 px-2 py-0.5 rounded mt-1">Chris</span>
+                                    {/* Centre Panel: Visual Pitch layout */}
+                                    <div className="xl:col-span-3 bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col justify-between space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-sm font-black text-slate-900">Starting XI</span>
+                                            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-semibold">
+                                                <span>FORMATION</span>
+                                                <span className="bg-slate-100 border border-slate-200 px-2 py-1 rounded text-slate-900 font-bold">4-2-3-1</span>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col items-center">
-                                            <div className="w-8 h-8 rounded-full bg-red-650 border-2 border-white flex items-center justify-center font-bold text-xs text-white">10</div>
-                                            <span className="text-[10px] font-black text-white bg-slate-950/80 px-2 py-0.5 rounded mt-1">Matheus</span>
+
+                                        {/* Grass pitch graphic matching second screenshot */}
+                                        <div className="relative w-full h-[320px] bg-gradient-to-b from-[#10b981] to-[#047857] rounded-xl overflow-hidden shadow-inner border border-emerald-600/40 p-2">
+                                            {/* Pitch line markings */}
+                                            <div className="absolute inset-0 pointer-events-none opacity-25 border border-white m-1.5">
+                                                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-10 border-x border-b border-white" />
+                                                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-32 h-10 border-x border-t border-white" />
+                                                <div className="absolute top-1/2 left-0 right-0 border-t border-white" />
+                                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 border border-white rounded-full" />
+                                            </div>
+
+                                            {/* Pinned Players Jerseys */}
+                                            {/* GK */}
+                                            <div className="absolute top-3 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                                                <JerseyIcon className="w-7 h-7" color="#f97316" />
+                                                <span className="text-[8px] font-black text-white bg-slate-950 px-1.5 py-0.5 rounded shadow mt-1">David</span>
+                                            </div>
+                                            {/* DEF */}
+                                            <div className="absolute top-[28%] left-0 right-0 flex justify-around px-4">
+                                                {[{ name: "Fidel" }, { name: "Ahmad" }, { name: "Junior" }, { name: "John" }].map((p, i) => (
+                                                    <div key={i} className="flex flex-col items-center">
+                                                        <JerseyIcon className="w-7 h-7" color="#2563eb" />
+                                                        <span className="text-[8px] font-black text-white bg-slate-950 px-1.5 py-0.5 rounded shadow mt-1">{p.name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {/* MID */}
+                                            <div className="absolute top-[52%] left-0 right-0 flex justify-around px-12">
+                                                {[{ name: "Chris" }, { name: "Matthew" }].map((p, i) => (
+                                                    <div key={i} className="flex flex-col items-center">
+                                                        <JerseyIcon className="w-7 h-7" color="#2563eb" />
+                                                        <span className="text-[8px] font-black text-white bg-slate-950 px-1.5 py-0.5 rounded shadow mt-1">{p.name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {/* AM */}
+                                            <div className="absolute top-[72%] left-0 right-0 flex justify-around px-6">
+                                                {[{ name: "Oliver" }, { name: "William" }, { name: "Delano" }].map((p, i) => (
+                                                    <div key={i} className="flex flex-col items-center">
+                                                        <JerseyIcon className="w-7 h-7" color="#2563eb" />
+                                                        <span className="text-[8px] font-black text-white bg-slate-950 px-1.5 py-0.5 rounded shadow mt-1">{p.name}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {/* ST */}
+                                            <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex flex-col items-center">
+                                                <JerseyIcon className="w-7 h-7" color="#2563eb" />
+                                                <span className="text-[8px] font-black text-white bg-slate-950 px-1.5 py-0.5 rounded shadow mt-1">Shoaib</span>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    <div className="flex flex-col items-center z-10 pb-2">
-                                        <div className="w-8 h-8 rounded-full bg-yellow-600 border-2 border-white flex items-center justify-center font-bold text-xs text-white">1</div>
-                                        <span className="text-[10px] font-black text-white bg-slate-950/80 px-2 py-0.5 rounded mt-1">David</span>
-                                    </div>
-                                </div>
-
-                                <div className="md:col-span-2 space-y-3">
-                                    <span className="text-xs font-black uppercase text-slate-400 block tracking-wider">Substitutes Bench</span>
-                                    <div className="space-y-2">
-                                        {["Harry Norling (ST)", "James Cooper (CM)", "Mohamed Abdalla (CB)"].map((sub, i) => (
-                                            <div key={i} className="bg-[#0b0f19] border border-slate-900 px-4 py-2.5 rounded-xl flex items-center justify-between text-xs font-bold text-slate-200">
-                                                <span>{sub}</span>
-                                                <span className="w-2 h-2 rounded-full bg-red-500" />
+                                    {/* Right Panel: Bench (5) */}
+                                    <div className="xl:col-span-1.5 bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col justify-between min-h-[360px] min-w-[160px]">
+                                        <div className="space-y-3">
+                                            <div className="flex justify-between items-center text-xs font-bold text-slate-950">
+                                                <span>BENCH (5)</span>
+                                                <span className="text-red-500 font-extrabold text-[10px] uppercase hover:underline">+ ADD SLOT</span>
                                             </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Tab 3: Squad Depth Preview */}
-                        {activeTab === "squad" && (
-                            <div className="space-y-4 animate-in fade-in duration-200 text-xs">
-                                <div className="bg-[#0b0f19] border border-slate-900 rounded-xl overflow-hidden">
-                                    <div className="bg-slate-950 px-4 py-3 font-bold text-slate-400 border-b border-slate-900 flex justify-between uppercase tracking-wider text-[10px]">
-                                        <span className="w-1/3">Player Name</span>
-                                        <span className="w-1/4 text-center">Primary Position</span>
-                                        <span className="w-1/4 text-center">Footedness</span>
-                                        <span className="w-1/4 text-right">Status</span>
-                                    </div>
-                                    <div className="divide-y divide-slate-900 font-bold">
-                                        {[
-                                            { name: "Liam Johnson", pos: "Striker (ST)", foot: "Right", status: "Available", color: "text-green-450" },
-                                            { name: "Sufi Ali", pos: "Left Back (LB)", foot: "Left", status: "Injured", color: "text-red-400" },
-                                            { name: "Morgan Whittick", pos: "Winger (LW)", foot: "Both", status: "On Holiday", color: "text-amber-450" },
-                                        ].map((player, i) => (
-                                            <div key={i} className="px-4 py-3 flex justify-between items-center text-slate-300">
-                                                <span className="w-1/3 text-white">{player.name}</span>
-                                                <span className="w-1/4 text-center">{player.pos}</span>
-                                                <span className="w-1/4 text-center text-slate-500">{player.foot}</span>
-                                                <span className={`w-1/4 text-right ${player.color}`}>{player.status}</span>
+                                            <div className="space-y-1.5">
+                                                {["Sebastian Senna", "Lloyd Hucknall", "Chris Hall", "Sam Ward"].map((name, i) => (
+                                                    <div key={i} className="bg-slate-50 border border-slate-200/80 px-2 py-1.5 rounded-lg flex items-center justify-between text-[10px] font-bold text-slate-700">
+                                                        <span>{name}</span>
+                                                        <span className="text-[9px] text-slate-400 font-black uppercase">Unused</span>
+                                                    </div>
+                                                ))}
                                             </div>
-                                        ))}
+                                        </div>
+                                        <button className="w-full bg-red-600 hover:bg-red-500 text-white font-extrabold py-2 rounded-lg text-xs mt-3 shadow-md shadow-red-650/10">
+                                            Save Lineup for Game
+                                        </button>
+                                    </div>
+                                    
+                                </div>
+                            )}
+
+                            {/* Tab: Squad registry */}
+                            {activeTab === "squad" && (
+                                <div className="space-y-4 animate-in fade-in duration-200 text-xs">
+                                    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                        <div className="bg-slate-50 px-4 py-3 font-bold text-slate-450 border-b border-slate-200 flex justify-between uppercase tracking-wider text-[10px]">
+                                            <span className="w-1/3">Player Name</span>
+                                            <span className="w-1/4 text-center">Primary Position</span>
+                                            <span className="w-1/4 text-center">Footedness</span>
+                                            <span className="w-1/4 text-right">Status</span>
+                                        </div>
+                                        <div className="divide-y divide-slate-100 font-bold">
+                                            {[
+                                                { name: "Liam Johnson", pos: "Striker (ST)", foot: "Right", status: "Available", color: "text-green-600" },
+                                                { name: "Sufi Ali", pos: "Left Back (LB)", foot: "Left", status: "Injured", color: "text-red-500" },
+                                                { name: "Morgan Whittick", pos: "Winger (LW)", foot: "Both", status: "On Holiday", color: "text-amber-600" },
+                                            ].map((player, i) => (
+                                                <div key={i} className="px-4 py-3.5 flex justify-between items-center text-slate-600">
+                                                    <span className="w-1/3 text-slate-900">{player.name}</span>
+                                                    <span className="w-1/4 text-center">{player.pos}</span>
+                                                    <span className="w-1/4 text-center text-slate-450">{player.foot}</span>
+                                                    <span className={`w-1/4 text-right ${player.color}`}>{player.status}</span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* Tab 4: Finances Preview */}
-                        {activeTab === "finances" && (
-                            <div className="space-y-6 animate-in fade-in duration-200">
-                                <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-                                    <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-1">
-                                        <span className="text-[10px] font-black uppercase text-slate-455 block">Monthly Subs Collected</span>
-                                        <div className="text-2xl font-black text-red-500">£1,250.00</div>
-                                    </div>
-                                    <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-1">
-                                        <span className="text-[10px] font-black uppercase text-slate-455 block">Outstanding Arrears</span>
-                                        <div className="text-2xl font-black text-red-400">£320.00</div>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Tab 5: Training Attendance Preview */}
-                        {activeTab === "attendance" && (
-                            <div className="space-y-4 animate-in fade-in duration-200 text-xs">
-                                <div className="bg-[#0b0f19] border border-slate-900 rounded-xl p-5 space-y-3">
-                                    <span className="text-xs font-black uppercase text-white tracking-wider block">Recent Squad Attendance</span>
-                                    <div className="space-y-2">
-                                        {["First Team Training - 15 Jul", "Tactical Pre-Match Setup - 12 Jul"].map((session, i) => (
-                                            <div key={i} className="flex justify-between items-center bg-slate-950 p-3.5 rounded-xl border border-slate-900">
-                                                <span className="font-bold text-white text-xs">{session}</span>
-                                                <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-3 py-1 rounded-full font-black text-[10px]">94% ATTENDANCE</span>
-                                            </div>
-                                        ))}
+                            {/* Tab: Finances */}
+                            {activeTab === "finances" && (
+                                <div className="space-y-6 animate-in fade-in duration-200">
+                                    <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
+                                        <div className="bg-white border border-slate-200 p-5 rounded-xl space-y-1 shadow-sm">
+                                            <span className="text-[10px] font-black uppercase text-slate-450 block">Monthly Subs Collected</span>
+                                            <div className="text-2xl font-black text-slate-900">£1,250.00</div>
+                                        </div>
+                                        <div className="bg-white border border-slate-200 p-5 rounded-xl space-y-1 shadow-sm">
+                                            <span className="text-[10px] font-black uppercase text-slate-455 block">Outstanding Arrears</span>
+                                            <div className="text-2xl font-black text-red-650">£320.00</div>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
+                            {/* Tab: Training Attendance */}
+                            {activeTab === "attendance" && (
+                                <div className="space-y-4 animate-in fade-in duration-200 text-xs">
+                                    <div className="bg-white border border-slate-200 rounded-xl p-5 space-y-3 shadow-sm">
+                                        <span className="text-xs font-black uppercase text-slate-900 tracking-wider block">Recent Attendance Logs</span>
+                                        <div className="space-y-2">
+                                            {["First Team Training - 15 Jul", "Tactical Pre-Match Setup - 12 Jul"].map((session, i) => (
+                                                <div key={i} className="flex justify-between items-center bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                                                    <span className="font-bold text-slate-900 text-xs">{session}</span>
+                                                    <span className="bg-red-500/10 text-red-600 border border-red-500/20 px-3 py-1 rounded-full font-black text-[10px]">94% ATTENDANCE</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
                     </div>
                 </div>
             </section>
@@ -407,7 +542,7 @@ export default function LandingPage() {
                             Organize your lineup with an interactive visual pitch selector, synchronize bench options, and export professional PDF team sheets directly for league match officials.
                         </p>
                     </div>
-                    {/* Live vector Matchday board inside marketing grid */}
+                    {/* Visual Team Sheet */}
                     <div className="rounded-xl overflow-hidden border border-slate-900 shadow-2xl p-6 bg-[#030712] space-y-4">
                         <span className="text-xs font-black uppercase text-slate-400 block tracking-wider">Visual Team Sheet</span>
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-900 space-y-3">
