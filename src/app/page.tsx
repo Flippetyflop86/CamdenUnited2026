@@ -16,13 +16,13 @@ export default function LandingPage() {
     ] as const;
 
     return (
-        <div className="bg-[#030712] text-slate-100 min-h-screen font-sans selection:bg-emerald-500/30 selection:text-emerald-400 overflow-x-hidden antialiased">
+        <div className="bg-[#030712] text-slate-100 min-h-screen font-sans selection:bg-red-500/30 selection:text-red-400 overflow-x-hidden antialiased">
             {/* Global navigation */}
             <nav className="fixed top-0 left-0 right-0 z-50 bg-[#030712]/80 backdrop-blur-md border-b border-slate-900/40 px-8 py-5">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     <div className="flex items-center gap-12">
                         <Link href="/" className="flex items-center gap-3">
-                            <span className="h-7 w-7 rounded bg-emerald-500 flex items-center justify-center font-black text-slate-955 text-sm">CF</span>
+                            <span className="h-7 w-7 rounded bg-red-600 flex items-center justify-center font-black text-white text-sm">CF</span>
                             <span className="font-black text-xl tracking-tight text-white">ClubFlow</span>
                         </Link>
                         
@@ -35,7 +35,7 @@ export default function LandingPage() {
 
                     <div className="flex items-center gap-6 text-sm font-semibold">
                         <Link href="/login" className="text-slate-400 hover:text-white transition-colors">Sign In</Link>
-                        <a href="mailto:demo@clubflow.com" className="bg-emerald-500 hover:bg-emerald-400 text-slate-955 px-4.5 py-2 rounded-lg transition-colors font-bold shadow-md shadow-emerald-500/10">
+                        <a href="mailto:demo@clubflow.com" className="bg-red-600 hover:bg-red-500 text-white px-4.5 py-2 rounded-lg transition-colors font-bold shadow-md shadow-red-650/10">
                             Request Demo
                         </a>
                     </div>
@@ -52,7 +52,7 @@ export default function LandingPage() {
                 <div className="absolute inset-0 bg-gradient-to-b from-[#030712]/20 via-[#030712]/90 to-[#030712] z-0" />
 
                 <div className="relative z-10 max-w-5xl mx-auto space-y-8 flex flex-col items-center">
-                    <span className="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest text-emerald-400">
+                    <span className="inline-flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest text-red-400">
                         <Sparkles className="h-3.5 w-3.5" /> Football Operations Platform
                     </span>
                     
@@ -65,7 +65,7 @@ export default function LandingPage() {
                     </p>
 
                     <div className="flex items-center gap-4 pt-6">
-                        <a href="mailto:demo@clubflow.com" className="bg-emerald-500 hover:bg-emerald-400 text-slate-955 px-7 py-3.5 rounded-lg font-bold text-sm transition-all shadow-xl shadow-emerald-500/10">
+                        <a href="mailto:demo@clubflow.com" className="bg-red-600 hover:bg-red-500 text-white px-7 py-3.5 rounded-lg font-bold text-sm transition-all shadow-xl shadow-red-650/10">
                             Request Demo
                         </a>
                         <a href="#tour" className="bg-slate-900/80 hover:bg-slate-800 text-slate-200 px-7 py-3.5 rounded-lg font-bold text-sm transition-all border border-slate-800">
@@ -76,7 +76,7 @@ export default function LandingPage() {
 
                 {/* Main Product Interactive Vector Preview (Dashboard preview) */}
                 <div className="relative z-10 w-full max-w-5xl mt-24 px-4 md:px-0">
-                    <div className="rounded-2xl overflow-hidden border border-slate-900 shadow-[0_0_80px_-10px_rgba(16,185,129,0.08)] bg-[#070a13] p-1">
+                    <div className="rounded-2xl overflow-hidden border border-slate-900 shadow-[0_0_80px_-10px_rgba(239,68,68,0.06)] bg-[#070a13] p-1">
                         {/* Minimalist Browser Header Bar */}
                         <div className="h-7 bg-[#0c101b] border-b border-[#1f293d]/30 px-4 flex items-center justify-between">
                             <div className="flex items-center gap-1.5">
@@ -97,7 +97,7 @@ export default function LandingPage() {
                                 <div>
                                     <div className="flex items-center gap-2.5">
                                         <h3 className="text-xl font-black text-white">Camden United</h3>
-                                        <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] uppercase tracking-wider font-black px-2.5 py-0.5 rounded">
+                                        <span className="bg-red-500/10 text-red-400 border border-red-500/20 text-[9px] uppercase tracking-wider font-black px-2.5 py-0.5 rounded">
                                             Operations Command Centre
                                         </span>
                                     </div>
@@ -164,7 +164,7 @@ export default function LandingPage() {
             {/* Interactive Vector Product Tour Section */}
             <section id="tour" className="py-32 max-w-6xl mx-auto px-6 space-y-16">
                 <div className="text-center space-y-4 max-w-2xl mx-auto">
-                    <span className="text-xs font-black uppercase text-emerald-400 tracking-wider">Interactive Preview</span>
+                    <span className="text-xs font-black uppercase text-red-500 tracking-wider">Interactive Preview</span>
                     <h2 className="text-3xl md:text-5xl font-black text-white leading-tight">Explore the platform.</h2>
                     <p className="text-lg text-slate-400 leading-relaxed">
                         Click the tabs below to interact with the exact vector-sharp interfaces of our modules.
@@ -180,7 +180,7 @@ export default function LandingPage() {
                                 onClick={() => setActiveTab(tab.id)}
                                 className={`px-5 py-3 text-xs md:text-sm font-black transition-all rounded-lg ${
                                     activeTab === tab.id 
-                                        ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" 
+                                        ? "bg-red-500/10 text-red-400 border border-red-500/20" 
                                         : "text-slate-400 hover:text-white"
                                 }`}
                             >
@@ -226,15 +226,15 @@ export default function LandingPage() {
                                 </div>
                                 <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
                                     <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-1.5">
-                                        <span className="text-[10px] font-black uppercase text-slate-450 block">Squad Availability</span>
+                                        <span className="text-[10px] font-black uppercase text-slate-455 block">Squad Availability</span>
                                         <div className="text-lg font-black text-white">33 / 36 (92%)</div>
                                     </div>
                                     <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-1.5">
-                                        <span className="text-[10px] font-black uppercase text-slate-450 block">Pending Alerts</span>
+                                        <span className="text-[10px] font-black uppercase text-slate-455 block">Pending Alerts</span>
                                         <div className="text-lg font-black text-amber-400">2 Actions Required</div>
                                     </div>
                                     <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-1.5">
-                                        <span className="text-[10px] font-black uppercase text-slate-450 block">Unpaid Invoices</span>
+                                        <span className="text-[10px] font-black uppercase text-slate-455 block">Unpaid Invoices</span>
                                         <div className="text-lg font-black text-red-400">£450.00</div>
                                     </div>
                                 </div>
@@ -252,18 +252,18 @@ export default function LandingPage() {
                                     
                                     <div className="flex justify-around items-center z-10">
                                         <div className="flex flex-col items-center">
-                                            <div className="w-8 h-8 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center font-bold text-xs text-slate-950">9</div>
+                                            <div className="w-8 h-8 rounded-full bg-red-600 border-2 border-white flex items-center justify-center font-bold text-xs text-white">9</div>
                                             <span className="text-[10px] font-black text-white bg-slate-950/80 px-2 py-0.5 rounded mt-1">Liam Johnson</span>
                                         </div>
                                     </div>
 
                                     <div className="flex justify-around items-center z-10">
                                         <div className="flex flex-col items-center">
-                                            <div className="w-8 h-8 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center font-bold text-xs text-slate-950">8</div>
+                                            <div className="w-8 h-8 rounded-full bg-red-650 border-2 border-white flex items-center justify-center font-bold text-xs text-white">8</div>
                                             <span className="text-[10px] font-black text-white bg-slate-950/80 px-2 py-0.5 rounded mt-1">Chris</span>
                                         </div>
                                         <div className="flex flex-col items-center">
-                                            <div className="w-8 h-8 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center font-bold text-xs text-slate-950">10</div>
+                                            <div className="w-8 h-8 rounded-full bg-red-650 border-2 border-white flex items-center justify-center font-bold text-xs text-white">10</div>
                                             <span className="text-[10px] font-black text-white bg-slate-950/80 px-2 py-0.5 rounded mt-1">Matheus</span>
                                         </div>
                                     </div>
@@ -280,7 +280,7 @@ export default function LandingPage() {
                                         {["Harry Norling (ST)", "James Cooper (CM)", "Mohamed Abdalla (CB)"].map((sub, i) => (
                                             <div key={i} className="bg-[#0b0f19] border border-slate-900 px-4 py-2.5 rounded-xl flex items-center justify-between text-xs font-bold text-slate-200">
                                                 <span>{sub}</span>
-                                                <span className="w-2 h-2 rounded-full bg-green-500" />
+                                                <span className="w-2 h-2 rounded-full bg-red-500" />
                                             </div>
                                         ))}
                                     </div>
@@ -300,9 +300,9 @@ export default function LandingPage() {
                                     </div>
                                     <div className="divide-y divide-slate-900 font-bold">
                                         {[
-                                            { name: "Liam Johnson", pos: "Striker (ST)", foot: "Right", status: "Available", color: "text-green-400" },
+                                            { name: "Liam Johnson", pos: "Striker (ST)", foot: "Right", status: "Available", color: "text-green-450" },
                                             { name: "Sufi Ali", pos: "Left Back (LB)", foot: "Left", status: "Injured", color: "text-red-400" },
-                                            { name: "Morgan Whittick", pos: "Winger (LW)", foot: "Both", status: "On Holiday", color: "text-amber-400" },
+                                            { name: "Morgan Whittick", pos: "Winger (LW)", foot: "Both", status: "On Holiday", color: "text-amber-450" },
                                         ].map((player, i) => (
                                             <div key={i} className="px-4 py-3 flex justify-between items-center text-slate-300">
                                                 <span className="w-1/3 text-white">{player.name}</span>
@@ -321,11 +321,11 @@ export default function LandingPage() {
                             <div className="space-y-6 animate-in fade-in duration-200">
                                 <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                                     <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-1">
-                                        <span className="text-[10px] font-black uppercase text-slate-450 block">Monthly Subs Collected</span>
-                                        <div className="text-2xl font-black text-emerald-400">£1,250.00</div>
+                                        <span className="text-[10px] font-black uppercase text-slate-455 block">Monthly Subs Collected</span>
+                                        <div className="text-2xl font-black text-red-500">£1,250.00</div>
                                     </div>
                                     <div className="bg-[#0b0f19] border border-slate-900 p-5 rounded-xl space-y-1">
-                                        <span className="text-[10px] font-black uppercase text-slate-450 block">Outstanding Arrears</span>
+                                        <span className="text-[10px] font-black uppercase text-slate-455 block">Outstanding Arrears</span>
                                         <div className="text-2xl font-black text-red-400">£320.00</div>
                                     </div>
                                 </div>
@@ -341,7 +341,7 @@ export default function LandingPage() {
                                         {["First Team Training - 15 Jul", "Tactical Pre-Match Setup - 12 Jul"].map((session, i) => (
                                             <div key={i} className="flex justify-between items-center bg-slate-950 p-3.5 rounded-xl border border-slate-900">
                                                 <span className="font-bold text-white text-xs">{session}</span>
-                                                <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-full font-black text-[10px]">94% ATTENDANCE</span>
+                                                <span className="bg-red-500/10 text-red-400 border border-red-500/20 px-3 py-1 rounded-full font-black text-[10px]">94% ATTENDANCE</span>
                                             </div>
                                         ))}
                                     </div>
@@ -357,7 +357,7 @@ export default function LandingPage() {
             <section id="features" className="py-32 bg-slate-950/20 border-t border-b border-slate-900">
                 <div className="max-w-7xl mx-auto px-6 space-y-24">
                     <div className="text-center space-y-4 max-w-2xl mx-auto">
-                        <span className="text-xs font-black uppercase text-emerald-400 tracking-wider">Modular Features</span>
+                        <span className="text-xs font-black uppercase text-red-500 tracking-wider">Modular Features</span>
                         <h2 className="text-3xl md:text-5xl font-black text-white leading-tight">Everything in one workflow.</h2>
                         <p className="text-lg text-slate-400 leading-relaxed">
                             Replace fragmented messages and spreadsheets with a single connected data hub.
@@ -367,7 +367,7 @@ export default function LandingPage() {
                     <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
                         {/* Matchday */}
                         <div className="bg-[#0b0f19] p-8 rounded-2xl border border-slate-900 space-y-4 shadow-lg">
-                            <Activity className="h-8 w-8 text-emerald-400" />
+                            <Activity className="h-8 w-8 text-red-500" />
                             <h3 className="font-black text-white text-lg">Matchday Tactics</h3>
                             <p className="text-sm text-slate-400 leading-relaxed">
                                 Know who is selectable. Plan formations, select the starting XI, and generate instant RSVP updates for players.
@@ -376,7 +376,7 @@ export default function LandingPage() {
 
                         {/* Squad Planning */}
                         <div className="bg-[#0b0f19] p-8 rounded-2xl border border-slate-900 space-y-4 shadow-lg">
-                            <Users className="h-8 w-8 text-emerald-400" />
+                            <Users className="h-8 w-8 text-red-500" />
                             <h3 className="font-black text-white text-lg">Roster Depth</h3>
                             <p className="text-sm text-slate-400 leading-relaxed">
                                 Track availability, injuries, and contract expiries. Rank choices for every position side-by-side.
@@ -385,7 +385,7 @@ export default function LandingPage() {
 
                         {/* Recruitment */}
                         <div className="bg-[#0b0f19] p-8 rounded-2xl border border-slate-900 space-y-4 shadow-lg">
-                            <FileText className="h-8 w-8 text-emerald-400" />
+                            <FileText className="h-8 w-8 text-red-500" />
                             <h3 className="font-black text-white text-lg">Scout Reports</h3>
                             <p className="text-sm text-slate-400 leading-relaxed">
                                 Log trial performance, coordinate candidate pipelines, and store team gap analysis on one platform.
@@ -394,7 +394,7 @@ export default function LandingPage() {
 
                         {/* Player Development */}
                         <div className="bg-[#0b0f19] p-8 rounded-2xl border border-slate-900 space-y-4 shadow-lg">
-                            <Database className="h-8 w-8 text-emerald-400" />
+                            <Database className="h-8 w-8 text-red-500" />
                             <h3 className="font-black text-white text-lg">Performance Logs</h3>
                             <p className="text-sm text-slate-400 leading-relaxed">
                                 Monitor training attendance rates, register individual physical parameters, and review historical logs.
@@ -410,7 +410,7 @@ export default function LandingPage() {
                 {/* Visual Focus: Matchday */}
                 <div className="grid gap-12 lg:grid-cols-2 items-center">
                     <div className="space-y-6">
-                        <span className="text-xs font-black uppercase text-emerald-400 tracking-wider">01 Matchday Operations</span>
+                        <span className="text-xs font-black uppercase text-red-500 tracking-wider">01 Matchday Operations</span>
                         <h2 className="text-3xl md:text-5.5xl font-black text-white leading-tight">Run matchdays with absolute confidence.</h2>
                         <p className="text-lg text-slate-400 leading-relaxed">
                             Organize your lineup with an interactive visual pitch selector, synchronize bench options, and export professional PDF team sheets directly for league match officials.
@@ -422,7 +422,7 @@ export default function LandingPage() {
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-900 space-y-3">
                             <div className="flex justify-between items-center text-xs font-bold text-slate-400">
                                 <span>vs London Albion</span>
-                                <span className="text-emerald-400 font-extrabold uppercase">Formation: 4-3-3</span>
+                                <span className="text-red-400 font-extrabold uppercase">Formation: 4-3-3</span>
                             </div>
                             <div className="h-0.5 bg-slate-900" />
                             <div className="space-y-2">
@@ -455,7 +455,7 @@ export default function LandingPage() {
                         </div>
                     </div>
                     <div className="space-y-6">
-                        <span className="text-xs font-black uppercase text-emerald-400 tracking-wider">02 Roster Depth & Health</span>
+                        <span className="text-xs font-black uppercase text-red-500 tracking-wider">02 Roster Depth & Health</span>
                         <h2 className="text-3xl md:text-5.5xl font-black text-white leading-tight">Identify positional gaps instantly.</h2>
                         <p className="text-lg text-slate-400 leading-relaxed">
                             Log secondary coverage positions and side-specific options (LCB vs RCB). Maintain real-time roster health rates and get automatically estimated timelines for recoveries.
@@ -468,7 +468,7 @@ export default function LandingPage() {
             {/* Waitlist / CTA banner */}
             <section className="py-32 bg-gradient-to-t from-slate-950 to-transparent border-t border-slate-900 text-center px-6">
                 <div className="max-w-4xl mx-auto space-y-8">
-                    <span className="text-xs font-black uppercase text-emerald-400 tracking-widest inline-block">Join ClubFlow</span>
+                    <span className="text-xs font-black uppercase text-red-500 tracking-widest inline-block">Join ClubFlow</span>
                     <h2 className="text-4xl md:text-6xl font-black text-white tracking-tight leading-tight">
                         One platform. One workflow. <br />One source of truth.
                     </h2>
@@ -476,7 +476,7 @@ export default function LandingPage() {
                         Unify your football department operations, matches, training sessions, and player profiles today.
                     </p>
                     <div className="flex items-center justify-center gap-4 pt-4">
-                        <a href="mailto:demo@clubflow.com" className="inline-flex items-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-955 px-6 py-3 rounded-lg font-bold text-sm transition-all shadow-lg shadow-emerald-500/10">
+                        <a href="mailto:demo@clubflow.com" className="inline-flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-6 py-3 rounded-lg font-bold text-sm transition-all shadow-lg shadow-red-650/10">
                             Request Demo <ArrowRight className="h-4 w-4" />
                         </a>
                         <a href="#tour" className="bg-slate-905 border border-slate-800 text-slate-300 px-6 py-3 rounded-lg font-bold text-sm transition-all hover:bg-slate-850">
@@ -490,7 +490,7 @@ export default function LandingPage() {
             <footer className="border-t border-slate-900/60 py-16 px-8 bg-[#030712] relative z-10 text-xs">
                 <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-8">
                     <div className="flex items-center gap-3">
-                        <span className="h-6 w-6 rounded bg-emerald-500 flex items-center justify-center font-black text-slate-955 text-xs">CF</span>
+                        <span className="h-6 w-6 rounded bg-red-600 flex items-center justify-center font-black text-white text-xs">CF</span>
                         <span className="font-extrabold tracking-tight text-white text-base">ClubFlow</span>
                     </div>
                     <p className="text-slate-500 font-medium">

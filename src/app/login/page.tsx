@@ -93,14 +93,14 @@ export default function LoginPage() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="bg-slate-955 border-slate-900 text-white placeholder:text-slate-700 focus-visible:ring-emerald-500 rounded-xl h-10 text-xs transition-all"
+                                className="bg-slate-955 border-slate-900 text-white placeholder:text-slate-700 focus-visible:ring-red-650 rounded-xl h-10 text-xs transition-all"
                             />
                         </div>
                         
                         <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
                                 <Label htmlFor="password" className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Password</Label>
-                                <Link href="/reset-password" className="text-[10px] font-bold text-slate-400 hover:text-emerald-400 transition-colors">
+                                <Link href="/reset-password" className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors">
                                     Forgot?
                                 </Link>
                             </div>
@@ -110,13 +110,13 @@ export default function LoginPage() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                className="bg-slate-955 border-slate-900 text-white focus-visible:ring-emerald-500 rounded-xl h-10 text-xs transition-all"
+                                className="bg-slate-955 border-slate-900 text-white focus-visible:ring-red-650 rounded-xl h-10 text-xs transition-all"
                             />
                         </div>
                         
                         <Button 
                             type="submit" 
-                            className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-955 font-bold h-10 rounded-xl transition-all mt-2 text-xs" 
+                            className="w-full bg-red-600 hover:bg-red-500 text-white font-bold h-10 rounded-xl transition-all mt-2 text-xs" 
                             disabled={loading}
                         >
                             {loading ? "Signing in..." : "Sign In"}
@@ -125,7 +125,7 @@ export default function LoginPage() {
                         <div className="text-center pt-2">
                             <span className="text-[10px] text-slate-500">
                                 Don't have an account?{" "}
-                                <Link href="/signup" className="text-emerald-400 hover:text-emerald-300 font-bold transition-colors">
+                                <Link href="/signup" className="text-red-400 hover:text-red-300 font-bold transition-colors">
                                     Sign Up
                                 </Link>
                             </span>
