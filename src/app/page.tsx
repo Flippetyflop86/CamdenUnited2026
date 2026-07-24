@@ -56,7 +56,7 @@ export default function LandingPage() {
             <header className="relative pt-40 pb-32 md:pt-48 md:pb-44 flex flex-col items-center text-center px-6 overflow-hidden">
                 {/* Stadium background with premium dark overlay */}
                 <div 
-                    className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-15 filter grayscale scale-105"
+                    className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-35 scale-105"
                     style={{ backgroundImage: "url('/stadium_hero_bg.png')" }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-b from-[#030712]/20 via-[#030712]/90 to-[#030712] z-0" />
