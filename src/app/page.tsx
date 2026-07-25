@@ -93,7 +93,7 @@ export default function LandingPage() {
                     </div>
                 </div>
 
-                {/* Main Product Screenshot (Dashboard view, extremely clear) */}
+                {/* Main Product Screenshot (Dashboard view, zoomed in on the key metrics panel) */}
                 <div className="relative z-10 w-full max-w-5xl mt-24 px-4 md:px-0">
                     <div className="rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_80px_-10px_rgba(239,68,68,0.1)] bg-[#0c101b] p-1">
                         {/* Minimalist Browser Header Bar */}
@@ -109,12 +109,12 @@ export default function LandingPage() {
                             <div className="w-8" />
                         </div>
 
-                        {/* Sharp Screenshot container */}
-                        <div className="bg-[#030712] overflow-hidden rounded-xl">
+                        {/* Zoned in dashboard view to highlight specific details */}
+                        <div className="bg-[#030712] overflow-hidden rounded-xl aspect-[16/10] max-h-[460px]">
                             <img 
                                 src="/dashboard-screenshot.png" 
-                                alt="ClubFlow Dashboard" 
-                                className="w-full h-auto object-cover select-none"
+                                alt="ClubFlow Dashboard Zoomed" 
+                                className="w-full h-auto object-cover select-none scale-[1.5] origin-top-left"
                             />
                         </div>
                     </div>
@@ -172,12 +172,14 @@ export default function LandingPage() {
                         <div className="w-8" />
                     </div>
 
-                    {/* Screenshot presentation */}
-                    <div className="bg-[#030712] overflow-hidden rounded-xl">
+                    {/* Screenshot presentation with zoom for the dashboard */}
+                    <div className="bg-[#030712] overflow-hidden rounded-xl aspect-[16/10] max-h-[460px]">
                         <img 
                             src={tabs.find(t => t.id === activeTab)?.img} 
                             alt={`ClubFlow ${activeTab}`} 
-                            className="w-full h-auto object-cover select-none animate-in fade-in duration-200"
+                            className={`w-full h-auto object-cover select-none animate-in fade-in duration-200 ${
+                                activeTab === "dashboard" ? "scale-[1.5] origin-top-left" : ""
+                            }`}
                         />
                     </div>
                 </div>
