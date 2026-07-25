@@ -12,7 +12,7 @@ export default function LandingPage() {
             id: "dashboard", 
             label: "Dashboard Overview", 
             desc: "Your club's mission control. Real-time availability rates, dynamic priorities, and league standings consolidated into one clean dashboard.",
-            img: "/dashboard-screenshot.png"
+            img: "/dashboard-screenshot-cropped.png"
         },
         { 
             id: "matchday", 
@@ -93,7 +93,7 @@ export default function LandingPage() {
                     </div>
                 </div>
 
-                {/* Main Product Screenshot (Dashboard view, focused & magnified on the 4 stats cards) */}
+                {/* Main Product Screenshot (Cropped Dashboard stats view) */}
                 <div className="relative z-10 w-full max-w-5xl mt-24 px-4 md:px-0">
                     <div className="rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_80px_-10px_rgba(239,68,68,0.1)] bg-[#0c101b] p-1">
                         {/* Minimalist Browser Header Bar */}
@@ -109,12 +109,12 @@ export default function LandingPage() {
                             <div className="w-8" />
                         </div>
 
-                        {/* Zoned in dashboard view to highlight specific stats cards */}
-                        <div className="bg-[#030712] overflow-hidden rounded-xl aspect-[16/7] max-h-[360px]">
+                        {/* Physical cropped stats cards */}
+                        <div className="bg-[#030712] overflow-hidden rounded-xl">
                             <img 
-                                src="/dashboard-screenshot.png" 
-                                alt="ClubFlow Dashboard Zoomed" 
-                                className="w-full h-auto object-cover select-none scale-[1.9] origin-center -translate-y-[12%]"
+                                src="/dashboard-screenshot-cropped.png" 
+                                alt="ClubFlow Dashboard Metrics" 
+                                className="w-full h-auto object-cover select-none"
                             />
                         </div>
                     </div>
@@ -172,13 +172,12 @@ export default function LandingPage() {
                         <div className="w-8" />
                     </div>
 
-                    {/* Screenshot presentation with zoom for the dashboard */}
-                    <div className="bg-[#030712] overflow-hidden rounded-xl aspect-[16/7] max-h-[360px]">
+                    {/* Clean screenshot presentation */}
+                    <div className="bg-[#030712] overflow-hidden rounded-xl">
                         <img 
                             src={tabs.find(t => t.id === activeTab)?.img} 
                             alt={`ClubFlow ${activeTab}`} 
-                            className={`w-full h-auto object-cover select-none animate-in fade-in duration-200`}
-                            style={activeTab === "dashboard" ? { transform: 'scale(1.9) translateY(-12%)', transformOrigin: 'center' } : undefined}
+                            className="w-full h-auto object-cover select-none animate-in fade-in duration-200"
                         />
                     </div>
                 </div>
