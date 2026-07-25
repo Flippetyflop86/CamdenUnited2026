@@ -93,7 +93,7 @@ export default function LandingPage() {
                     </div>
                 </div>
 
-                {/* Main Product Screenshot (Dashboard view, zoomed in on the key metrics panel) */}
+                {/* Main Product Screenshot (Dashboard view, focused & magnified on the 4 stats cards) */}
                 <div className="relative z-10 w-full max-w-5xl mt-24 px-4 md:px-0">
                     <div className="rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_80px_-10px_rgba(239,68,68,0.1)] bg-[#0c101b] p-1">
                         {/* Minimalist Browser Header Bar */}
@@ -109,12 +109,12 @@ export default function LandingPage() {
                             <div className="w-8" />
                         </div>
 
-                        {/* Zoned in dashboard view to highlight specific details */}
-                        <div className="bg-[#030712] overflow-hidden rounded-xl aspect-[16/10] max-h-[460px]">
+                        {/* Zoned in dashboard view to highlight specific stats cards */}
+                        <div className="bg-[#030712] overflow-hidden rounded-xl aspect-[16/7] max-h-[360px]">
                             <img 
                                 src="/dashboard-screenshot.png" 
                                 alt="ClubFlow Dashboard Zoomed" 
-                                className="w-full h-auto object-cover select-none scale-[1.5] origin-top-left"
+                                className="w-full h-auto object-cover select-none scale-[1.9] origin-center -translate-y-[12%]"
                             />
                         </div>
                     </div>
@@ -173,13 +173,12 @@ export default function LandingPage() {
                     </div>
 
                     {/* Screenshot presentation with zoom for the dashboard */}
-                    <div className="bg-[#030712] overflow-hidden rounded-xl aspect-[16/10] max-h-[460px]">
+                    <div className="bg-[#030712] overflow-hidden rounded-xl aspect-[16/7] max-h-[360px]">
                         <img 
                             src={tabs.find(t => t.id === activeTab)?.img} 
                             alt={`ClubFlow ${activeTab}`} 
-                            className={`w-full h-auto object-cover select-none animate-in fade-in duration-200 ${
-                                activeTab === "dashboard" ? "scale-[1.5] origin-top-left" : ""
-                            }`}
+                            className={`w-full h-auto object-cover select-none animate-in fade-in duration-200`}
+                            style={activeTab === "dashboard" ? { transform: 'scale(1.9) translateY(-12%)', transformOrigin: 'center' } : undefined}
                         />
                     </div>
                 </div>
@@ -252,7 +251,7 @@ export default function LandingPage() {
                     <div className="rounded-xl overflow-hidden border border-slate-900 shadow-2xl p-6 bg-[#030712] space-y-4">
                         <span className="text-xs font-black uppercase text-slate-400 block tracking-wider">Visual Team Sheet</span>
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-900 space-y-3">
-                            <div className="flex justify-between items-center text-xs font-bold text-slate-400">
+                            <div className="flex justify-between items-center text-xs font-bold text-slate-450">
                                 <span>vs London Albion</span>
                                 <span className="text-red-400 font-extrabold uppercase">Formation: 4-3-3</span>
                             </div>
@@ -276,11 +275,11 @@ export default function LandingPage() {
                     <div className="rounded-xl overflow-hidden border border-slate-900 shadow-2xl lg:order-first order-last p-6 bg-[#030712] space-y-4">
                         <span className="text-xs font-black uppercase text-slate-400 block tracking-wider">Positional Coverage</span>
                         <div className="bg-slate-950 p-4 rounded-xl border border-slate-900 space-y-3">
-                            <div className="flex justify-between text-xs font-bold text-slate-400">
+                            <div className="flex justify-between text-xs font-bold text-slate-450">
                                 <span>Left Centre Back (LCB)</span>
                                 <span className="text-red-400">Critical (0 backups)</span>
                             </div>
-                            <div className="flex justify-between text-xs font-bold text-slate-400">
+                            <div className="flex justify-between text-xs font-bold text-slate-450">
                                 <span>Advanced Right 8 (R8)</span>
                                 <span className="text-green-400">Healthy (2 backups)</span>
                             </div>
