@@ -55,11 +55,11 @@ export default function LandingPage() {
             {/* Hero Section */}
             <header className="relative pt-40 pb-32 md:pt-48 md:pb-44 flex flex-col items-center text-center px-6 overflow-hidden">
                 {/* Stadium background with premium dark overlay */}
-                <div 
-                    className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-35 scale-105"
+                 <div 
+                    className="absolute inset-0 z-0 bg-cover bg-center bg-no-repeat opacity-65 scale-105"
                     style={{ backgroundImage: "url('/stadium_hero_bg.png')" }}
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-[#030712]/20 via-[#030712]/90 to-[#030712] z-0" />
+                <div className="absolute inset-0 bg-gradient-to-b from-[#030712]/10 via-[#030712]/75 to-[#030712] z-0" />
 
                 <div className="relative z-10 max-w-5xl mx-auto space-y-8 flex flex-col items-center">
                     <span className="inline-flex items-center gap-2 bg-red-500/10 border border-red-500/20 px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest text-red-400">
