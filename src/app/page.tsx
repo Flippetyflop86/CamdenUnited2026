@@ -18,7 +18,7 @@ export default function LandingPage() {
             id: "matchday", 
             label: "Matchday XI & Tactics", 
             desc: "Drag, drop, and define. Lock in formations, manage the substitutes bench, and generate automated matchday squad notifications.",
-            img: "/matchday-xi-screenshot.png"
+            img: "/matchday-xi-screenshot-v2.png"
         },
         { 
             id: "squad", 
