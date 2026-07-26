@@ -94,7 +94,7 @@ export default function LandingPage() {
 
                 {/* Main Product Screenshot (Lengthy original Dashboard view) */}
                 <div className="relative z-10 w-full max-w-5xl mt-24 px-4 md:px-0">
-                    <div className="rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_80px_-10px_rgba(239,68,68,0.1)] bg-[#0c101b] p-1">
+                    <div className="rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_80px_-10px_rgba(239,68,68,0.1)] bg-[#0c101b]">
                         {/* Minimalist Browser Header Bar */}
                         <div className="h-7 bg-[#0c101b] px-4 flex items-center justify-between">
                             <div className="flex items-center gap-1.5">
@@ -109,11 +109,11 @@ export default function LandingPage() {
                         </div>
 
                         {/* Lengthy full site view */}
-                        <div className="bg-[#030712] overflow-hidden rounded-xl">
+                        <div className="bg-[#030712] overflow-hidden">
                             <img 
                                 src="/dashboard-screenshot-full.png" 
                                 alt="ClubFlow Dashboard Overview" 
-                                className="w-full h-auto object-cover select-none"
+                                className="w-full h-auto select-none"
                             />
                         </div>
                     </div>
@@ -156,7 +156,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* High-Fidelity App Screenshot Frame */}
-                <div className="rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-[#0c101b] p-1">
+                <div className="rounded-2xl overflow-hidden border border-slate-800 shadow-2xl bg-[#0c101b]">
                     
                     {/* Minimalist Browser Header Bar */}
                     <div className="h-7 bg-[#0c101b] px-4 flex items-center justify-between">
@@ -172,11 +172,11 @@ export default function LandingPage() {
                     </div>
 
                     {/* Clean screenshot presentation */}
-                    <div className="bg-[#030712] overflow-hidden rounded-xl">
+                    <div className="bg-[#030712] overflow-hidden">
                         <img 
                             src={tabs.find(t => t.id === activeTab)?.img} 
                             alt={`ClubFlow ${activeTab}`} 
-                            className="w-full h-auto object-cover select-none animate-in fade-in duration-200"
+                            className="w-full h-auto select-none animate-in fade-in duration-200"
                         />
                     </div>
                 </div>
