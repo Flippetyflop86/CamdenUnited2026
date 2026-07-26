@@ -229,23 +229,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         localStorage.setItem("clubflow_cache_user", JSON.stringify(nextUser));
                     } catch (e) {}
                 }
-                if (userChanged) {
-                    // Clear any stored browser settings/states when switching user accounts to prevent leaks
-                    if (typeof window !== 'undefined') {
-                        try {
-                            sessionStorage.clear();
-                            for (let i = localStorage.length - 1; i >= 0; i--) {
-                                const key = localStorage.key(i);
-                                if (key && (key.startsWith('clubflow_') || key.startsWith('clubflow_cache_'))) {
-                                    localStorage.removeItem(key);
-                                }
+                
+                // Clear any stored browser settings/states when switching user accounts to prevent leaks
+                if (userChanged && typeof window !== 'undefined') {
+                    try {
+                        sessionStorage.clear();
+                        for (let i = localStorage.length - 1; i >= 0; i--) {
+                            const key = localStorage.key(i);
+                            if (key && (key.startsWith('clubflow_') || key.startsWith('clubflow_cache_'))) {
+                                localStorage.removeItem(key);
                             }
-                        } catch (e) {
-                            console.warn("Storage cleanup failed:", e);
                         }
+                    } catch (e) {
+                        console.warn("Storage cleanup failed:", e);
                     }
-                    fetchClubMembership(nextUser.id, nextUser.email);
                 }
+                // ALWAYS fetch membership on login/recovery/change to avoid cache mismatch
+                fetchClubMembership(nextUser.id, nextUser.email);
             } else {
                 setClubId(null);
                 setGlobalClubId(null);
@@ -275,6 +275,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const signOut = async () => {
         setIsLoggingOut(true);
+        setClubId(null);
+        setGlobalClubId(null);
+        setRole(null);
+        setPagePermissions([]);
+        setDisplayName(null);
         try {
             await supabase.auth.signOut();
         } catch (e) {
