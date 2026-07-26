@@ -17,6 +17,24 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const { user, role, isLoading: authLoading, isLoggingOut } = useAuth();
     const [isFabOpen, setIsFabOpen] = useState(false);
+    const [theme, setTheme] = useState<"light" | "dark">("dark");
+
+    useEffect(() => {
+        const currentTheme = (localStorage.getItem("theme") as "light" | "dark") || "dark";
+        setTheme(currentTheme);
+        if (currentTheme === "dark") {
+            document.documentElement.classList.add("dark");
+        } else {
+            document.documentElement.classList.remove("dark");
+        }
+
+        const handleThemeChange = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            setTheme(detail);
+        };
+        window.addEventListener("theme-changed", handleThemeChange);
+        return () => window.removeEventListener("theme-changed", handleThemeChange);
+    }, []);
 
     const cleanPath = pathname?.endsWith("/") && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
     const isPublicCheckin = cleanPath?.startsWith("/checkin") || cleanPath?.startsWith("/match-checkin") || cleanPath?.startsWith("/respond");
@@ -44,7 +62,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }, [isLoaded, settings.isOnboarded, isNoShellPage, router, authLoading, role, user, isLoggingOut]);
 
     if (isNoShellPage) {
-        return <main className="min-h-screen bg-slate-50">{children}</main>;
+        return <main className="min-h-screen bg-slate-50 dark:bg-[#030712] text-slate-900 dark:text-slate-100">{children}</main>;
     }
 
     if (isLoaded && !settings.isOnboarded && !isAuthPage && !isOnboardingPage) {
@@ -59,7 +77,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="flex h-screen w-full bg-slate-50 overflow-hidden text-slate-900">
+        <div className="flex h-screen w-full bg-slate-50 dark:bg-[#030712] overflow-hidden text-slate-900 dark:text-slate-100">
             {/* Mobile Header */}
             <header className="fixed top-0 left-0 right-0 h-16 bg-slate-900 flex items-center px-4 justify-between z-40 md:hidden">
                 <div className="flex items-center gap-3 overflow-hidden">

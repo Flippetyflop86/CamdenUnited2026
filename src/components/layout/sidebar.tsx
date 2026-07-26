@@ -33,7 +33,9 @@ import {
     CreditCard,
     Search,
     Mail,
-    History
+    History,
+    Sun,
+    Moon
 } from "lucide-react";
 
 import { useClub } from "@/context/club-context";
@@ -89,6 +91,24 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     const { settings } = useClub();
     const { user, role, pagePermissions, displayName, signOut, isManager } = useAuth();
     const [copiedEmail, setCopiedEmail] = useState(false);
+    const [theme, setTheme] = useState<"light" | "dark">("dark");
+
+    useEffect(() => {
+        const storedTheme = (localStorage.getItem("theme") as "light" | "dark") || "dark";
+        setTheme(storedTheme);
+    }, []);
+
+    const toggleTheme = () => {
+        const newTheme = theme === "light" ? "dark" : "light";
+        setTheme(newTheme);
+        localStorage.setItem("theme", newTheme);
+        if (newTheme === "dark") {
+            document.documentElement.classList.add("dark");
+        } else {
+            document.documentElement.classList.remove("dark");
+        }
+        window.dispatchEvent(new CustomEvent("theme-changed", { detail: newTheme }));
+    };
 
     // Subscription & Gating State
     const [sub, setSub] = useState(() => getSubscription());
@@ -313,15 +333,28 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                             <span className="text-xs font-bold">{avatarLetter}</span>
                         </div>
                         <div className="text-sm overflow-hidden">
-                            <p className="font-medium text-white truncate max-w-[110px]" title={shownName}>
+                            <p className="font-medium text-white truncate max-w-[90px]" title={shownName}>
                                 {shownName}
                             </p>
                             <p className="text-xs text-slate-500 capitalize">{role || "Club Member"}</p>
                         </div>
                     </div>
-                    <button onClick={signOut} className="text-xs text-red-400 hover:text-red-300 transition-colors p-1" title="Sign out">
-                        Logout
-                    </button>
+                    <div className="flex items-center gap-2.5">
+                        <button 
+                            onClick={toggleTheme}
+                            className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                        >
+                            {theme === "dark" ? (
+                                <Sun className="h-3.5 w-3.5" />
+                            ) : (
+                                <Moon className="h-3.5 w-3.5" />
+                            )}
+                        </button>
+                        <button onClick={signOut} className="text-xs text-red-400 hover:text-red-300 transition-colors p-1" title="Sign out">
+                            Logout
+                        </button>
+                    </div>
                 </div>
             </div>
 
