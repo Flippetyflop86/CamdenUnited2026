@@ -96,22 +96,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return;
             }
 
-            const res = await fetch("/api/auth/sync", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
+            let finalMember = null;
+            try {
+                const res = await fetch("/api/auth/sync", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    }
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    console.warn("fetchClubMembership API resolved:", { userId, userEmail, result });
+                    finalMember = result.success ? result.membership : null;
+                } else {
+                    console.warn(`Sync API returned status ${res.status}`);
                 }
-            });
-
-            if (!res.ok) {
-                throw new Error(`Sync API failed with status ${res.status}`);
+            } catch (syncErr) {
+                console.error("Sync API request failed, falling back to client query:", syncErr);
             }
-
-            const result = await res.json();
-            console.warn("fetchClubMembership API resolved:", { userId, userEmail, result });
-
-            let finalMember = result.success ? result.membership : null;
 
             // Client-side fallback if backend API didn't resolve a membership (e.g. Service Role Key not set on host)
             if (!finalMember) {
