@@ -104,7 +104,7 @@ export default function LandingPage() {
                                 <span className="h-2 w-2 rounded-full bg-[#27c93f] inline-block" />
                             </div>
                             <div className="text-[9px] text-slate-500 font-mono tracking-wider uppercase font-bold select-none">
-                                app.clubflow.com/dashboard
+                                app.clubflow.org.uk/dashboard
                             </div>
                             <div className="w-8" />
                         </div>
@@ -167,7 +167,7 @@ export default function LandingPage() {
                             <span className="h-2 w-2 rounded-full bg-[#27c93f] inline-block" />
                         </div>
                         <div className="text-[9px] text-slate-500 font-mono tracking-wider uppercase font-bold select-none">
-                            app.clubflow.com/{activeTab}
+                            app.clubflow.org.uk/{activeTab}
                         </div>
                         <div className="w-8" />
                     </div>
