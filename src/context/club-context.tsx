@@ -190,6 +190,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         }
 
         async function fetchSettings() {
+            setIsLoaded(false);
             try {
                 const { data, error } = await supabase
                     .from("clubs")
