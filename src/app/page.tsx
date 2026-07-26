@@ -48,7 +48,6 @@ export default function LandingPage() {
                         <div className="hidden md:flex items-center gap-8 text-sm font-semibold text-slate-400">
                             <a href="#tour" className="hover:text-white transition-colors">Product Tour</a>
                             <a href="#features" className="hover:text-white transition-colors">Workspaces</a>
-                            <a href="#workflow" className="hover:text-white transition-colors">Workflow</a>
                         </div>
                     </div>
 
@@ -93,7 +92,7 @@ export default function LandingPage() {
                     </div>
                 </div>
 
-                {/* Main Product Screenshot (Cropped Dashboard stats view) */}
+                {/* Main Product Screenshot (Lengthy original Dashboard view) */}
                 <div className="relative z-10 w-full max-w-5xl mt-24 px-4 md:px-0">
                     <div className="rounded-2xl overflow-hidden border border-slate-800 shadow-[0_0_80px_-10px_rgba(239,68,68,0.1)] bg-[#0c101b] p-1">
                         {/* Minimalist Browser Header Bar */}
@@ -109,11 +108,11 @@ export default function LandingPage() {
                             <div className="w-8" />
                         </div>
 
-                        {/* Physical cropped stats cards */}
+                        {/* Lengthy full site view */}
                         <div className="bg-[#030712] overflow-hidden rounded-xl">
                             <img 
-                                src="/dashboard-screenshot-cropped.png" 
-                                alt="ClubFlow Dashboard Metrics" 
+                                src="/dashboard-screenshot.png" 
+                                alt="ClubFlow Dashboard Overview" 
                                 className="w-full h-auto object-cover select-none"
                             />
                         </div>
@@ -121,7 +120,7 @@ export default function LandingPage() {
                 </div>
             </header>
 
-            {/* Interactive Vector Product Tour Section */}
+            {/* Interactive Product Tour Section */}
             <section id="tour" className="py-32 max-w-5xl mx-auto px-6 space-y-16">
                 <div className="text-center space-y-4 max-w-2xl mx-auto">
                     <span className="text-xs font-black uppercase text-red-500 tracking-wider">Product Tour</span>
@@ -183,11 +182,11 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            {/* Core Workspaces Section */}
+            {/* Core Capabilities Section */}
             <section id="features" className="py-32 bg-slate-950/20 border-t border-b border-slate-900">
                 <div className="max-w-7xl mx-auto px-6 space-y-24">
                     <div className="text-center space-y-4 max-w-2xl mx-auto">
-                        <span className="text-xs font-black uppercase text-red-500 tracking-wider">Modular Features</span>
+                        <span className="text-xs font-black uppercase text-red-500 tracking-wider">Capabilities</span>
                         <h2 className="text-3xl md:text-5xl font-black text-white leading-tight">Everything in one workflow.</h2>
                         <p className="text-lg text-slate-400 leading-relaxed">
                             Replace fragmented messages and spreadsheets with a single connected data hub.
@@ -200,14 +199,14 @@ export default function LandingPage() {
                             <Activity className="h-8 w-8 text-red-500" />
                             <h3 className="font-black text-white text-lg">Matchday Tactics</h3>
                             <p className="text-sm text-slate-400 leading-relaxed">
-                                Know who is selectable. Plan formations, select the starting XI, and generate instant RSVP updates for players.
+                                Know who is selectable. Plan formations, select the starting XI, and generate automated matchday squad notifications.
                             </p>
                         </div>
 
                         {/* Squad Planning */}
                         <div className="bg-[#0b0f19] p-8 rounded-2xl border border-slate-900 space-y-4 shadow-lg">
                             <Users className="h-8 w-8 text-red-500" />
-                            <h3 className="font-black text-white text-lg">Roster Depth</h3>
+                            <h3 className="font-black text-white text-lg">Squad Depth</h3>
                             <p className="text-sm text-slate-400 leading-relaxed">
                                 Track availability, injuries, and contract expiries. Rank choices for every position side-by-side.
                             </p>
@@ -227,72 +226,11 @@ export default function LandingPage() {
                             <Database className="h-8 w-8 text-red-500" />
                             <h3 className="font-black text-white text-lg">Performance Logs</h3>
                             <p className="text-sm text-slate-400 leading-relaxed">
-                                Monitor training attendance rates, register individual physical parameters, and review historical logs.
+                                Monitor training attendance rates, register shot locations on the pitch, and calculate match dominance metrics using our point-system calculator.
                             </p>
                         </div>
                     </div>
                 </div>
-            </section>
-
-            {/* Deep Feature Redesign sections */}
-            <section id="workflow" className="py-32 max-w-6xl mx-auto px-6 space-y-36">
-                
-                {/* Visual Focus: Matchday */}
-                <div className="grid gap-12 lg:grid-cols-2 items-center">
-                    <div className="space-y-6">
-                        <span className="text-xs font-black uppercase text-red-500 tracking-wider">01 Matchday Operations</span>
-                        <h2 className="text-3xl md:text-5.5xl font-black text-white leading-tight">Run matchdays with absolute confidence.</h2>
-                        <p className="text-lg text-slate-400 leading-relaxed">
-                            Organize your lineup with an interactive visual pitch selector, synchronize bench options, and export professional PDF team sheets directly for league match officials.
-                        </p>
-                    </div>
-                    {/* Visual Team Sheet */}
-                    <div className="rounded-xl overflow-hidden border border-slate-900 shadow-2xl p-6 bg-[#030712] space-y-4">
-                        <span className="text-xs font-black uppercase text-slate-400 block tracking-wider">Visual Team Sheet</span>
-                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-900 space-y-3">
-                            <div className="flex justify-between items-center text-xs font-bold text-slate-450">
-                                <span>vs London Albion</span>
-                                <span className="text-red-400 font-extrabold uppercase">Formation: 4-3-3</span>
-                            </div>
-                            <div className="h-0.5 bg-slate-900" />
-                            <div className="space-y-2">
-                                <div className="flex justify-between text-xs font-bold">
-                                    <span className="text-white">Liam Johnson</span>
-                                    <span className="text-slate-500">Striker (ST)</span>
-                                </div>
-                                <div className="flex justify-between text-xs font-bold">
-                                    <span className="text-white">Matheus Santana</span>
-                                    <span className="text-slate-500">Midfielder (AM)</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Visual Focus: Squad Planning */}
-                <div className="grid gap-12 lg:grid-cols-2 items-center">
-                    <div className="rounded-xl overflow-hidden border border-slate-900 shadow-2xl lg:order-first order-last p-6 bg-[#030712] space-y-4">
-                        <span className="text-xs font-black uppercase text-slate-400 block tracking-wider">Positional Coverage</span>
-                        <div className="bg-slate-950 p-4 rounded-xl border border-slate-900 space-y-3">
-                            <div className="flex justify-between text-xs font-bold text-slate-450">
-                                <span>Left Centre Back (LCB)</span>
-                                <span className="text-red-400">Critical (0 backups)</span>
-                            </div>
-                            <div className="flex justify-between text-xs font-bold text-slate-450">
-                                <span>Advanced Right 8 (R8)</span>
-                                <span className="text-green-400">Healthy (2 backups)</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="space-y-6">
-                        <span className="text-xs font-black uppercase text-red-500 tracking-wider">02 Roster Depth & Health</span>
-                        <h2 className="text-3xl md:text-5.5xl font-black text-white leading-tight">Identify positional gaps instantly.</h2>
-                        <p className="text-lg text-slate-400 leading-relaxed">
-                            Log secondary coverage positions and side-specific options (LCB vs RCB). Maintain real-time roster health rates and get automatically estimated timelines for recoveries.
-                        </p>
-                    </div>
-                </div>
-
             </section>
 
             {/* Waitlist / CTA banner */}
