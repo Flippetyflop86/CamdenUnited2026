@@ -1015,16 +1015,16 @@ export default function MatchdayXIPage() {
 
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 text-slate-900 dark:text-slate-100">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="space-y-1.5 flex-1">
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">Matchday XI</h2>
+                    <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Matchday XI</h2>
                     <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Fixture:</span>
+                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Fixture:</span>
                         <select
                             value={selectedMatchId}
                             onChange={(e) => setSelectedMatchId(e.target.value)}
-                            className="flex h-9 rounded-md border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 cursor-pointer text-slate-800 font-semibold outline-none max-w-full"
+                            className="flex h-9 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 cursor-pointer text-slate-800 dark:text-slate-100 font-semibold outline-none max-w-full"
                         >
                             {matches.map(m => {
                                 const formattedDate = new Date(m.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
@@ -1049,11 +1049,11 @@ export default function MatchdayXIPage() {
                         <Save className="h-4 w-4 mr-2" />
                         Save &amp; Confirm Lineup
                     </Button>
-                    <Button onClick={handleClearLineup} variant="outline" className="border-slate-300 hover:bg-slate-100 text-slate-700">
+                    <Button onClick={handleClearLineup} variant="outline" className="border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
                         <Trash2 className="h-4 w-4 mr-2" />
                         Clear Pitch
                     </Button>
-                    <Button onClick={handleAutoFillLastLineup} variant="outline" className="border-slate-300 hover:bg-slate-100 text-slate-700">
+                    <Button onClick={handleAutoFillLastLineup} variant="outline" className="border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
                         <RefreshCw className="h-4 w-4 mr-2" />
                         Fill Last Lineup
                     </Button>
@@ -1068,12 +1068,12 @@ export default function MatchdayXIPage() {
                 </div>
             </div>
 
-            <div className="flex space-x-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
+            <div className="flex space-x-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto no-scrollbar">
                 {currentSquads.map(squad => (
                     <button 
                         key={squad} 
                         onClick={() => setActiveSquadTab(squad)} 
-                        className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${activeSquadTab === squad ? "bg-red-50 text-red-700" : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}
+                        className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${activeSquadTab === squad ? "bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900"}`}
                     >
                         {squad}
                     </button>
@@ -1117,26 +1117,26 @@ export default function MatchdayXIPage() {
                 
                 {/* Left Panel - Squad */}
                 <Card 
-                    className="lg:col-span-1 h-[400px] lg:h-full flex flex-col border-slate-200 shadow-md order-2 lg:order-1 min-h-0 overflow-hidden"
+                    className="lg:col-span-1 h-[400px] lg:h-full flex flex-col border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md order-2 lg:order-1 min-h-0 overflow-hidden"
                     onDragOver={handleDragOver}
                     onDrop={handleDropOnSquad}
                 >
-                    <div className="p-3 bg-slate-100 font-bold text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200 flex items-center justify-between">
+                    <div className="p-3 bg-slate-100 dark:bg-slate-950 font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
                         <span>Available Squad</span>
-                        <span className="bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full text-[10px]">{players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p)).length}</span>
+                        <span className="bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full text-[10px]">{players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p)).length}</span>
                     </div>
-                    <div className="p-2 border-b border-slate-200 bg-white flex gap-1 overflow-x-auto no-scrollbar shrink-0 shadow-sm z-10">
+                    <div className="p-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex gap-1 overflow-x-auto no-scrollbar shrink-0 shadow-sm z-10">
                         {(["All", "GK", "DEF", "MID", "FWD"] as const).map(f => (
                             <button
                                 key={f}
                                 onClick={() => setSquadFilter(f)}
-                                className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all whitespace-nowrap ${squadFilter === f ? 'bg-slate-900 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}
+                                className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all whitespace-nowrap ${squadFilter === f ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
                             >
                                 {f}
                             </button>
                         ))}
                     </div>
-                    <div className="p-3 space-y-2 overflow-y-auto flex-1 bg-slate-50/30">
+                    <div className="p-3 space-y-2 overflow-y-auto flex-1 bg-slate-50/30 dark:bg-slate-950/20">
                         {sortedPlayers
                             .filter(p => squadFilter === "All" || getPositionCategory(p.position) === squadFilter)
                             .map(player => {
@@ -1147,18 +1147,18 @@ export default function MatchdayXIPage() {
                                         key={player.id}
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, player.id, {type: 'squad'})}
-                                        className="flex items-center gap-3 p-2 border border-slate-200 rounded-lg bg-white shadow-sm cursor-grab active:cursor-grabbing hover:border-red-400 hover:shadow-md transition-all group"
+                                        className="flex items-center gap-3 p-2 border border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900 shadow-sm cursor-grab active:cursor-grabbing hover:border-red-400 dark:hover:border-red-500 hover:shadow-md transition-all group"
                                     >
                                         <GripVertical className="h-4 w-4 text-slate-300 group-hover:text-red-400 transition-colors" />
                                         <div className="flex flex-col">
-                                            <span className="text-xs font-bold text-slate-800">{displayName}</span>
-                                            <span className="text-[9px] uppercase text-slate-500 font-bold tracking-wider">{player.position}</span>
+                                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{displayName}</span>
+                                            <span className="text-[9px] uppercase text-slate-500 dark:text-slate-400 font-black tracking-wider">{player.position}</span>
                                         </div>
                                     </div>
                                 );
                         })}
                         {availablePlayers.length === 0 && (
-                            <div className="text-center py-6 text-slate-400 text-sm border-2 border-dashed rounded-lg border-slate-200 m-2">
+                            <div className="text-center py-6 text-slate-400 dark:text-slate-500 text-sm border-2 border-dashed rounded-lg border-slate-200 dark:border-slate-800 m-2">
                                 <span className="text-xl mb-1 block">✅</span>
                                 Squad deployed!
                             </div>
@@ -1167,15 +1167,15 @@ export default function MatchdayXIPage() {
                 </Card>
 
                 {/* Center Content - Formation Display */}
-                <Card className="lg:col-span-2 h-auto lg:h-full flex flex-col order-1 lg:order-2 min-h-0 overflow-hidden">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 border-b border-slate-100 bg-white z-10 shrink-0">
-                        <CardTitle className="text-sm font-bold">Starting XI</CardTitle>
+                <Card className="lg:col-span-2 h-auto lg:h-full flex flex-col border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md order-1 lg:order-2 min-h-0 overflow-hidden">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 z-10 shrink-0">
+                        <CardTitle className="text-sm font-bold text-slate-900 dark:text-white">Starting XI</CardTitle>
                         <div className="flex items-center gap-2">
-                            <span className="text-[10px] text-slate-500 font-bold uppercase tracking-wider hidden sm:inline">Formation</span>
+                            <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider hidden sm:inline">Formation</span>
                             <select
                                 value={lineup.formation}
                                 onChange={(e) => handleFormationChange(e.target.value)}
-                                className="px-2 py-1.5 border rounded-md text-xs font-bold focus:ring-2 focus:ring-red-500 focus:outline-none bg-slate-50"
+                                className="px-2 py-1.5 border border-slate-200 dark:border-slate-800 rounded-md text-xs font-bold focus:ring-2 focus:ring-red-500 focus:outline-none bg-slate-50 dark:bg-slate-850 text-slate-800 dark:text-slate-100"
                             >
                                 {FORMATION_NAMES.map(name => (
                                     <option key={name} value={name}>{name}</option>
@@ -1297,10 +1297,10 @@ export default function MatchdayXIPage() {
                 </Card>
 
                 {/* Right Panel - Bench */}
-                <Card className="lg:col-span-1 h-[400px] lg:h-full flex flex-col border-slate-200 shadow-md bg-slate-50/30 order-3 min-h-0 overflow-hidden">
-                    <div className="p-3 bg-slate-100 border-b border-slate-200 font-bold text-xs uppercase tracking-wider text-slate-500 flex justify-between items-center">
+                <Card className="lg:col-span-1 h-[400px] lg:h-full flex flex-col border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md bg-slate-50/30 dark:bg-slate-950/20 order-3 min-h-0 overflow-hidden">
+                    <div className="p-3 bg-slate-100 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 flex justify-between items-center">
                         <span>Bench ({lineup.substitutes.filter(Boolean).length})</span>
-                        <button onClick={handleAddSub} className="text-red-600 hover:text-red-700 font-bold text-[10px] flex items-center px-2 py-1 rounded bg-red-50 hover:bg-red-100 transition-colors">
+                        <button onClick={handleAddSub} className="text-red-600 hover:text-red-700 font-bold text-[10px] flex items-center px-2 py-1 rounded bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/35 transition-colors">
                             <Plus className="h-3 w-3 mr-0.5" /> ADD SLOT
                         </button>
                     </div>
@@ -1312,28 +1312,28 @@ export default function MatchdayXIPage() {
                             const subDetail = lineup.substitutions?.find(s => s.subId === subId);
 
                             return (
-                                <div key={idx} className="space-y-1.5 p-1.5 rounded-lg border border-slate-200 bg-white">
+                                <div key={idx} className="space-y-1.5 p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                                     <div 
                                         className="flex items-center gap-2 w-full"
                                         onDragOver={handleDragOver}
                                         onDrop={(e) => handleDropOnSub(e, idx)}
                                     >
-                                        <span className="text-[10px] font-bold text-slate-400 w-3 shrink-0">{idx + 1}.</span>
+                                        <span className="text-[10px] font-bold text-slate-450 w-3 shrink-0">{idx + 1}.</span>
                                         
                                         <div 
                                             draggable={!!subId}
                                             onDragStart={(e) => subId && handleDragStart(e, subId, {type: 'sub', index: idx})}
                                             onClick={() => setActiveSlot({ type: 'sub', index: idx, label: `Bench Slot ${idx + 1}` })}
                                             className={`flex-1 min-w-0 flex items-center justify-between p-2 border rounded-lg shadow-sm transition-all cursor-pointer hover:border-slate-400
-                                                ${subId ? 'bg-white hover:border-red-400 border-slate-200 group' : 'bg-slate-100 border-dashed border-slate-300 text-slate-400 hover:bg-slate-200'}`}
+                                                ${subId ? 'bg-white dark:bg-slate-900 hover:border-red-400 border-slate-200 dark:border-slate-800 group' : 'bg-slate-100 dark:bg-slate-950 border-dashed border-slate-300 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'}`}
                                         >
                                             {subId ? (
                                                 <>
                                                     <div className="flex items-center gap-2 min-w-0 flex-1">
                                                         <GripVertical className="h-4 w-4 text-slate-300 group-hover:text-red-400 transition-colors shrink-0" />
-                                                        <span className="text-xs font-bold text-slate-800 truncate" title={displayName}>{displayName}</span>
+                                                        <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate" title={displayName}>{displayName}</span>
                                                     </div>
-                                                    <span className="text-[9px] uppercase text-slate-500 font-bold mr-1 shrink-0 ml-2">{player?.position}</span>
+                                                    <span className="text-[9px] uppercase text-slate-500 dark:text-slate-400 font-bold mr-1 shrink-0 ml-2">{player?.position}</span>
                                                 </>
                                             ) : (
                                                 <span className="text-[10px] font-medium text-center w-full block">Drag here</span>
@@ -1431,7 +1431,7 @@ export default function MatchdayXIPage() {
                             );
                         })}
                     </div>
-                    <div className="p-3 border-t border-slate-200 bg-slate-100 flex items-center justify-end">
+                    <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 flex items-center justify-end">
                         <Button 
                             onClick={async () => {
                                 if (!selectedMatchId) return;
