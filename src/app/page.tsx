@@ -111,7 +111,7 @@ export default function LandingPage() {
                         {/* Lengthy full site view */}
                         <div className="bg-[#030712] overflow-hidden rounded-xl">
                             <img 
-                                src="/dashboard-screenshot.png" 
+                                src="/dashboard-screenshot-full.png" 
                                 alt="ClubFlow Dashboard Overview" 
                                 className="w-full h-auto object-cover select-none"
                             />
