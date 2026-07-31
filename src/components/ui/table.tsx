@@ -28,7 +28,7 @@ const Table = React.forwardRef<
     <div className="relative w-full overflow-auto">
         <table
             ref={ref}
-            className={cn("w-full caption-bottom text-sm", className)}
+            className={cn("w-full caption-bottom cf-body", className)}
             {...props}
         />
     </div>
@@ -41,7 +41,7 @@ const TableHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <thead
         ref={ref}
-        className={cn("border-b bg-surface-2", className)}
+        className={cn("[&_tr]:border-b", className)}
         {...props}
     />
 ));
@@ -81,7 +81,7 @@ const TableRow = React.forwardRef<
     <tr
         ref={ref}
         className={cn(
-            "transition-colors hover:bg-surface-2/50",
+            "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
             className
         )}
         {...props}
@@ -96,7 +96,7 @@ const TableHead = React.forwardRef<
     <th
         ref={ref}
         className={cn(
-            "h-10 px-4 text-left align-middle cf-label text-muted-foreground [&:has([role=checkbox])]:pr-0",
+            "h-10 px-4 text-left align-middle cf-table-header [&:has([role=checkbox])]:pr-0",
             className
         )}
         {...props}
