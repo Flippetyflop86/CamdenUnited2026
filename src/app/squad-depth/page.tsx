@@ -522,7 +522,7 @@ export default function SquadDepthPage() {
                             key={sq}
                             onClick={() => setActiveSquadTab(sq)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                activeSquadTab === sq ? "bg-white text-slate-955 shadow-sm" : "text-slate-500 hover:text-slate-850"
+                                activeSquadTab === sq ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
                             }`}
                         >
                             {sq}
@@ -716,7 +716,7 @@ export default function SquadDepthPage() {
                                                             <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${starter.availability ? 'bg-green-500' : 'bg-red-500'}`} />
                                                         </div>
                                                         
-                                                        <div className="flex items-center justify-between text-[9px] text-slate-400 font-semibold pt-1 border-t border-slate-850">
+                                                        <div className="flex items-center justify-between text-[9px] text-slate-400 font-semibold pt-1 border-t border-slate-800">
                                                             <span>{choiceLabel}</span>
                                                             {starter.squadNumber > 0 && <span>#{starter.squadNumber}</span>}
                                                         </div>
@@ -971,7 +971,7 @@ export default function SquadDepthPage() {
                                 Drag players into your preferred squad hierarchy order. The first player will be set as your 1st choice starter.
                             </p>
 
-                            <div className="bg-slate-950 p-3 rounded-xl border border-gray-850 space-y-2 max-h-[280px] overflow-y-auto">
+                            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 max-h-[280px] overflow-y-auto">
                                 {(() => {
                                     const currentPos = uniqueFormationLabels[wizardStep];
                                     const posPlayers = getActivePosPlayers(currentPos);

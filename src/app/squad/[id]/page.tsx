@@ -456,7 +456,7 @@ export default function PlayerProfilePage() {
                                                 activity.status === "Present" ? "bg-green-500" : activity.status === "Late" ? "bg-amber-500" : activity.status === "Absent" ? "bg-red-500" : "bg-slate-400"
                                             }`} />
                                             <div>
-                                                <p className="text-sm font-medium text-slate-850">
+                                                <p className="text-sm font-medium text-slate-900">
                                                     Training Session - {dateFormatted}
                                                 </p>
                                                 <p className="text-xs text-slate-500">

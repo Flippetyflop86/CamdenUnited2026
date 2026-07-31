@@ -54,7 +54,7 @@ const DialogContent = ({ className, children, ...props }: any) => {
                 onClick={() => context.setOpen(false)}
             />
             <div className={cn(
-                "z-50 grid w-full max-w-lg scale-100 gap-4 border bg-white p-6 shadow-lg duration-200 animate-in fade-in-90 sm:rounded-lg md:w-full",
+                "z-50 grid w-full max-w-lg scale-100 gap-4 border bg-popover text-popover-foreground p-6 shadow-lg duration-200 animate-in fade-in-90 sm:rounded-lg md:w-full",
                 className
             )} {...props}>
                 {children}

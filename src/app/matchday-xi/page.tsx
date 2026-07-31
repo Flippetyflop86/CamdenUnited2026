@@ -1175,7 +1175,7 @@ export default function MatchdayXIPage() {
                             <select
                                 value={lineup.formation}
                                 onChange={(e) => handleFormationChange(e.target.value)}
-                                className="px-2 py-1.5 border border-slate-200 dark:border-slate-800 rounded-md text-xs font-bold focus:ring-2 focus:ring-red-500 focus:outline-none bg-slate-50 dark:bg-slate-850 text-slate-800 dark:text-slate-100"
+                                className="px-2 py-1.5 border border-slate-200 dark:border-slate-800 rounded-md text-xs font-bold focus:ring-2 focus:ring-red-500 focus:outline-none bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100"
                             >
                                 {FORMATION_NAMES.map(name => (
                                     <option key={name} value={name}>{name}</option>
@@ -1481,7 +1481,7 @@ export default function MatchdayXIPage() {
                                     placeholder="Search player by name or position..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2 bg-slate-850 border border-slate-700 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                    className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                                 />
                             </div>
                         </div>
@@ -1552,7 +1552,7 @@ export default function MatchdayXIPage() {
                                                     ? 'bg-slate-800/80 border-red-500/20 hover:border-red-500/50 hover:bg-slate-800' 
                                                     : matchesSecondary
                                                         ? 'bg-slate-800/50 border-amber-500/20 hover:border-amber-500/50 hover:bg-slate-800'
-                                                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 hover:bg-slate-850'
+                                                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 hover:bg-slate-800'
                                                 }`}
                                         >
                                             <div className="flex flex-col">

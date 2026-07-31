@@ -67,7 +67,7 @@ export default function LoginPage() {
                 {/* Logo and title */}
                 <div className="flex flex-col items-center text-center space-y-2">
                     <Link href="/" className="flex items-center gap-2.5 mb-2">
-                        <span className="h-7 w-7 rounded bg-emerald-500 flex items-center justify-center font-black text-slate-955 text-sm">CF</span>
+                        <span className="h-7 w-7 rounded bg-emerald-500 flex items-center justify-center font-black text-slate-900 text-sm">CF</span>
                         <span className="font-black text-xl tracking-tight text-white">ClubFlow</span>
                     </Link>
                     <h1 className="text-xl font-bold tracking-tight text-white">Welcome back.</h1>
@@ -78,7 +78,7 @@ export default function LoginPage() {
                 <Card className="border-slate-900 bg-slate-950/40 backdrop-blur-md shadow-2xl rounded-2xl p-6">
                     <form onSubmit={handleLogin} className="space-y-4">
                         {error && (
-                            <Alert variant="destructive" className="bg-red-955 border-red-900 text-red-405 rounded-xl py-2 px-3 text-xs flex gap-2 items-center">
+                            <Alert variant="destructive" className="bg-red-950 border-red-900 text-red-400 rounded-xl py-2 px-3 text-xs flex gap-2 items-center">
                                 <AlertCircle className="h-4 w-4 shrink-0" />
                                 <AlertDescription>{error}</AlertDescription>
                             </Alert>
@@ -93,7 +93,7 @@ export default function LoginPage() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="bg-slate-955 border-slate-900 text-white placeholder:text-slate-700 focus-visible:ring-red-650 rounded-xl h-10 text-xs transition-all"
+                                className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-700 focus-visible:ring-red-600 rounded-xl h-10 text-xs transition-all"
                             />
                         </div>
                         
@@ -110,7 +110,7 @@ export default function LoginPage() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                className="bg-slate-955 border-slate-900 text-white focus-visible:ring-red-650 rounded-xl h-10 text-xs transition-all"
+                                className="bg-slate-900 border-slate-800 text-white focus-visible:ring-red-600 rounded-xl h-10 text-xs transition-all"
                             />
                         </div>
                         

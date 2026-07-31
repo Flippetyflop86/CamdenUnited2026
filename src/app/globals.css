@@ -2,75 +2,222 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   CLUBFLOW DESIGN SYSTEM — v1.0
+   ============================================================
+   
+   Token Architecture
+   ──────────────────
+   • CSS custom properties store HSL channel values (H S% L%)
+   • Tailwind maps them via hsl(var(--token) / <alpha-value>)
+   • Components use semantic tokens — never hardcoded colours
+   • Dark mode overrides token values, not component code
+   
+   Colour Separation
+   ──────────────────
+   • Brand Crimson (--cf-brand) → CTAs, highlights, navigation
+   • Destructive Red (--destructive) → Errors, deletions, alerts
+   • Status colours → Contextual indicators only
+   
+   Typography Scale
+   ──────────────────
+   • cf-display    38px — Page titles
+   • cf-headline   24px — Section titles
+   • cf-title      18px — Card titles
+   • cf-metric     40px — KPI numbers
+   • cf-body       16px — Body text
+   • cf-supporting 14px — Secondary text
+   • cf-label      12px — Labels (uppercase)
+   
+   ============================================================ */
+
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* ── Core (shadcn compatibility) ─────────────────────── */
+    --background: 210 40% 98%;
+    --foreground: 222 84% 5%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
- 
+    --card-foreground: 222 84% 5%;
+
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
- 
-    --primary: 222.2 47.4% 11.2%;
+    --popover-foreground: 222 84% 5%;
+
+    --primary: 222 47% 11%;
     --primary-foreground: 210 40% 98%;
- 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
- 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
- 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
- 
-    --destructive: 0 84.2% 60.2%;
+
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 350 72% 50%;
+    --radius: 0.5rem;
+
+    /* ── ClubFlow Brand ──────────────────────────────────── */
+    --cf-brand: 350 72% 50%;
+    --cf-brand-hover: 350 72% 43%;
+    --cf-brand-subtle: 350 100% 97%;
+    --cf-brand-foreground: 0 0% 100%;
+
+    /* ── Surfaces (layered depth) ────────────────────────── */
+    --surface-0: 210 40% 98%;
+    --surface-1: 0 0% 100%;
+    --surface-2: 210 40% 96%;
+    --surface-3: 214 32% 91%;
+
+    /* ── Semantic Status ─────────────────────────────────── */
+    --status-success: 142 71% 45%;
+    --status-warning: 38 92% 50%;
+    --status-error: 0 84% 60%;
+    --status-info: 217 91% 60%;
+  }
+
+  .dark {
+    /* ── Core (shadcn compatibility) ─────────────────────── */
+    --background: 224 71% 4%;
+    --foreground: 210 40% 98%;
+
+    --card: 222 47% 11%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 210 40% 98%;
+    --primary-foreground: 222 47% 11%;
+
+    --secondary: 217 33% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 63% 31%;
     --destructive-foreground: 210 40% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
- 
-    --radius: 0.5rem;
-  }
- 
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
- 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
- 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
- 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
- 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
- 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
- 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
- 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
- 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 217 33% 17%;
+    --input: 217 33% 17%;
+    --ring: 350 72% 55%;
+
+    /* ── ClubFlow Brand ──────────────────────────────────── */
+    --cf-brand: 350 72% 55%;
+    --cf-brand-hover: 350 72% 48%;
+    --cf-brand-subtle: 350 50% 12%;
+    --cf-brand-foreground: 0 0% 100%;
+
+    /* ── Surfaces (layered depth) ────────────────────────── */
+    --surface-0: 224 71% 4%;
+    --surface-1: 222 47% 11%;
+    --surface-2: 217 33% 17%;
+    --surface-3: 215 25% 27%;
+
+    /* ── Semantic Status ─────────────────────────────────── */
+    --status-success: 142 71% 45%;
+    --status-warning: 38 92% 50%;
+    --status-error: 0 72% 55%;
+    --status-info: 217 91% 60%;
   }
 }
- 
+
+/* ── Base Resets ─────────────────────────────────────────── */
+
 @layer base {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
+
+  ::selection {
+    background-color: hsl(var(--cf-brand) / 0.15);
+  }
+}
+
+/* ============================================================
+   TYPOGRAPHY SCALE
+   ============================================================ */
+
+@layer utilities {
+  .cf-display {
+    font-size: 2.375rem;
+    line-height: 1.15;
+    font-weight: 800;
+    letter-spacing: -0.025em;
+  }
+
+  .cf-headline {
+    font-size: 1.5rem;
+    line-height: 1.25;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+  }
+
+  .cf-title {
+    font-size: 1.125rem;
+    line-height: 1.4;
+    font-weight: 600;
+  }
+
+  .cf-metric {
+    font-size: 2.5rem;
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+  }
+
+  .cf-body {
+    font-size: 1rem;
+    line-height: 1.5;
+  }
+
+  .cf-supporting {
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  .cf-label {
+    font-size: 0.75rem;
+    line-height: 1.5;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+}
+
+/* ── Scrollbar ───────────────────────────────────────────── */
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--border)) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: hsl(var(--border));
+  border-radius: 3px;
 }
