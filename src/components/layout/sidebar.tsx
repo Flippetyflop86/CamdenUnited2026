@@ -169,8 +169,8 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     const avatarLetter = shownName.charAt(0).toUpperCase();
 
     return (
-        <div className="flex h-full w-64 flex-col bg-slate-900 text-white">
-            <div className="flex h-16 items-center px-6 border-b border-slate-800 gap-3 shrink-0">
+        <div className="flex h-full w-64 flex-col bg-background border-r border-border text-foreground">
+            <div className="flex h-16 items-center px-6 border-b border-border gap-3 shrink-0">
                 {settings.logo ? (
                     <img src={settings.logo} alt={settings.name} className="h-8 w-8 object-contain" />
                 ) : (
@@ -178,11 +178,11 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                         <span className="text-sm font-bold text-white">{settings.name.charAt(0).toUpperCase()}</span>
                     </div>
                 )}
-                <h1 className="flex-1 text-lg font-bold text-white truncate text-ellipsis">{settings.name}</h1>
+                <h1 className="flex-1 text-lg font-bold text-foreground truncate text-ellipsis">{settings.name}</h1>
                 {onClose && (
                     <button
                         onClick={onClose}
-                        className="p-2 text-slate-400 hover:text-white md:hidden"
+                        className="p-2 text-muted-foreground hover:text-foreground md:hidden"
                         aria-label="Close sidebar"
                     >
                         <X className="h-6 w-6" />
@@ -196,7 +196,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                     <div className="px-3">
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent("open-global-search"))}
-                            className="flex w-full items-center gap-2 rounded-md bg-slate-800/60 border border-slate-700/60 px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-800 hover:border-slate-600 transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-500 shadow-inner group"
+                            className="flex w-full items-center gap-2 rounded border border-border bg-card/50 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-card transition-all outline-none focus-visible:ring-1 focus-visible:ring-ring group"
                             title="Search club database (Ctrl+K)"
                         >
                             <Search className="h-3.5 w-3.5 shrink-0 text-slate-500 group-hover:text-red-400 transition-colors" />
@@ -219,8 +219,8 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                     className={cn(
                                         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-500 group relative",
                                         pathname === "/dashboard"
-                                            ? "bg-slate-800 text-white font-semibold border-l-2 border-red-500 rounded-l-none"
-                                            : "text-slate-400 hover:bg-slate-800 hover:text-white",
+                                            ? "bg-card text-foreground font-semibold border-l-2 border-primary rounded-l-none"
+                                            : "text-muted-foreground hover:bg-card/50 hover:text-foreground",
                                         isRouteLocked("/dashboard") && "opacity-60"
                                     )}
                                 >
@@ -243,7 +243,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
  
                         return (
                             <div key={section.title}>
-                                <h3 className="px-3 text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2.5 mt-2">
+                                <h3 className="px-3 cf-label mb-2.5 mt-2">
                                     {section.title}
                                 </h3>
                                 <ul className="space-y-1" role="list">
@@ -266,8 +266,8 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                                     className={cn(
                                                         "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-500 group relative",
                                                         isActive
-                                                            ? "bg-slate-800 text-white font-semibold border-l-2 border-red-500 rounded-l-none"
-                                                            : "text-slate-400 hover:bg-slate-800 hover:text-white",
+                                                            ? "bg-card text-foreground font-semibold border-l-2 border-primary rounded-l-none"
+                                                            : "text-muted-foreground hover:bg-card/50 hover:text-foreground",
                                                         locked && "opacity-60 cursor-not-allowed"
                                                     )}
                                                 >
@@ -285,7 +285,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 </div>
             </nav>
 
-            <div className="border-t border-slate-800 p-4">
+            <div className="border-t border-border p-4">
                 {(settings.twitterUrl || settings.instagramUrl) && (
                     <div className="flex flex-col gap-2 mb-4">
                         {settings.instagramUrl && (
@@ -303,8 +303,8 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                     </div>
                 )}
 
-                <div className="mb-4 p-3 bg-slate-800/40 rounded-lg border border-slate-800/60 text-xs text-slate-400 space-y-1">
-                    <p className="font-bold text-slate-300">Need Support?</p>
+                <div className="mb-4 p-3 bg-card/40 rounded-lg border border-border text-xs text-muted-foreground space-y-1">
+                    <p className="font-bold text-foreground">Need Support?</p>
                     <div className="flex items-center justify-between gap-1 mt-0.5">
                         <span className="text-[11px] truncate">
                             Email: <a href="mailto:info@clubflow.org.uk" className="text-red-400 hover:text-red-300 hover:underline font-bold">info@clubflow.org.uk</a>
@@ -315,7 +315,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                 setCopiedEmail(true);
                                 setTimeout(() => setCopiedEmail(false), 2000);
                             }}
-                            className="p-1 hover:bg-slate-800 rounded transition-colors text-slate-400 hover:text-white shrink-0"
+                            className="p-1 hover:bg-card rounded transition-colors text-muted-foreground hover:text-foreground shrink-0"
                             title={copiedEmail ? "Copied to clipboard!" : "Copy email address"}
                         >
                             {copiedEmail ? (
@@ -342,7 +342,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                     <div className="flex items-center gap-2.5">
                         <button 
                             onClick={toggleTheme}
-                            className="p-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
+                            className="p-1.5 rounded bg-card hover:bg-card/80 text-muted-foreground hover:text-foreground transition-colors"
                             title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
                         >
                             {theme === "dark" ? (

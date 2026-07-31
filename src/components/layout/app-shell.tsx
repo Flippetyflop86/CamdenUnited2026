@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { usePathname, useRouter } from "next/navigation";
 import { PageGuard } from "@/components/layout/page-guard";
 import { useAuth } from "@/context/auth-context";
+import { PageContainer } from "@/components/layout/page-container";
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -62,7 +63,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }, [isLoaded, settings.isOnboarded, isNoShellPage, router, authLoading, role, user, isLoggingOut]);
 
     if (isNoShellPage) {
-        return <main className="min-h-screen bg-slate-50 dark:bg-[#030712] text-slate-900 dark:text-slate-100">{children}</main>;
+        return <main className="min-h-screen bg-background text-foreground">{children}</main>;
     }
 
     if (isLoaded && !settings.isOnboarded && !isAuthPage && !isOnboardingPage) {
@@ -77,7 +78,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <div className="flex h-screen w-full bg-slate-50 dark:bg-[#030712] overflow-hidden text-slate-900 dark:text-slate-100">
+        <div className="flex h-screen w-full bg-background overflow-hidden text-foreground">
             {/* Mobile Header */}
             <header className="fixed top-0 left-0 right-0 h-16 bg-slate-900 flex items-center px-4 justify-between z-40 md:hidden">
                 <div className="flex items-center gap-3 overflow-hidden">
@@ -133,14 +134,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <Sidebar onClose={() => setIsMobileMenuOpen(false)} />
             </aside>
 
-            <main className="flex-1 overflow-y-auto p-4 md:p-8 mt-16 md:mt-0 pb-20 md:pb-8 relative">
+            <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 mt-16 md:mt-0 pb-20 md:pb-8 relative scrollbar-thin">
                 <PageGuard>
-                    {children}
+                    <PageContainer>
+                        {children}
+                    </PageContainer>
                 </PageGuard>
             </main>
 
-            {/* Universal Add Button (FAB) */}
-            <div className="fixed bottom-20 right-6 md:bottom-8 md:right-8 z-50 flex flex-col items-end gap-3">
+            {/* Universal Add Button (FAB) - Mobile Only */}
+            <div className="fixed bottom-20 right-6 z-50 flex md:hidden flex-col items-end gap-3">
                 {isFabOpen && (
                     <div className="flex flex-col items-end gap-2.5 mb-2 animate-in slide-in-from-bottom-5 duration-200">
                         {/* Add Match */}
@@ -174,7 +177,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 )}
                 <button
                     onClick={() => setIsFabOpen(!isFabOpen)}
-                    className="h-14 w-14 rounded-full bg-red-600 hover:bg-red-750 text-white flex items-center justify-center shadow-xl shadow-red-650/30 transition-transform duration-200 active:scale-95"
+                    className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center shadow-xl transition-transform duration-200 active:scale-95"
                     style={{ transform: isFabOpen ? "rotate(45deg)" : "none" }}
                     aria-label="Universal Add Actions"
                 >
