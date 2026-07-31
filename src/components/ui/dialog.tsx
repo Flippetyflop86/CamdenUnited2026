@@ -54,7 +54,7 @@ const DialogContent = ({ className, children, ...props }: any) => {
                 onClick={() => context.setOpen(false)}
             />
             <div className={cn(
-                "z-50 grid w-full max-w-lg scale-100 gap-4 border bg-popover text-popover-foreground p-6 shadow-lg duration-200 animate-in fade-in-90 sm:rounded-lg md:w-full",
+                "z-50 grid w-full max-w-lg scale-100 gap-4 border bg-popover text-popover-foreground p-6 cf-elevated duration-200 animate-in fade-in-90 rounded md:w-full",
                 className
             )} {...props}>
                 {children}
@@ -79,12 +79,12 @@ const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 );
 
 const DialogTitle = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLHeadingElement>>(({ className, ...props }, ref) => (
-    <h3 ref={ref} className={cn("text-lg font-semibold leading-none tracking-tight", className)} {...props} />
+    <h3 ref={ref} className={cn("cf-section-title text-foreground", className)} {...props} />
 ));
 DialogTitle.displayName = "DialogTitle";
 
 const DialogDescription = React.forwardRef<HTMLParagraphElement, React.HTMLAttributes<HTMLParagraphElement>>(({ className, ...props }, ref) => (
-    <p ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />
+    <p ref={ref} className={cn("cf-metadata text-muted-foreground", className)} {...props} />
 ));
 DialogDescription.displayName = "DialogDescription";
 

@@ -37,7 +37,7 @@ function MetricCard({
     return (
         <div
             className={cn(
-                "rounded-lg border bg-card p-6 space-y-3",
+                "rounded border bg-card p-6 space-y-3",
                 className
             )}
         >
@@ -51,7 +51,7 @@ function MetricCard({
             </div>
 
             <div className="space-y-1">
-                <div className="cf-metric text-foreground">{value}</div>
+                <div className="text-3xl font-bold tracking-tight text-foreground">{value}</div>
 
                 {(trend || description) && (
                     <div className="flex items-center gap-1.5">
