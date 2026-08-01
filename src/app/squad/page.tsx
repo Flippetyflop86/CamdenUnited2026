@@ -11,6 +11,9 @@ import { Button } from "@/components/ui/button";
 import { Search, Plus, Filter, Settings, Trash2, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { PageHeader } from "@/components/ui/page-header";
+import { PageSection } from "@/components/layout/page-section";
+import { SectionHeader } from "@/components/ui/section-header";
 import { supabase } from "@/lib/supabase";
 import imageCompression from "browser-image-compression";
 import { UploadCloud, Loader2 } from "lucide-react";
@@ -708,120 +711,155 @@ export default function SquadPage() {
     const bothFootedCount = players.filter(p => p.preferredFoot === "Both").length;
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">Squad</h2>
-                    <p className="text-slate-500">View and manage player profiles, availability, and stats.</p>
-                </div>
-                <div className="flex gap-2 items-center flex-wrap">
-                    <Button 
-                        variant={includeFriendlies ? "default" : "outline"} 
-                        onClick={toggleIncludeFriendlies}
-                        className={includeFriendlies ? "bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs h-9" : "text-slate-500 font-semibold text-xs h-9"}
-                    >
-                        {includeFriendlies ? "⚽ Including Friendlies" : "🏆 Competitive Only"}
-                    </Button>
-                    <Button onClick={() => setIsManageSquadsOpen(true)} variant="outline" size="icon" className="h-9 w-9">
-                        <Settings className="w-4 h-4" />
-                    </Button>
-                    <Button className="bg-red-600 hover:bg-red-700 text-xs h-9" onClick={() => setEditingPlayer({ id: "new", firstName: "", lastName: "", position: "GK", squadNumber: 0, age: 0, nationality: "English", squad: currentSquads[0], medicalStatus: "Available", availability: true, contractExpiry: "", appearances: 0, goals: 0, assists: 0, imageUrl: "", isInTrainingSquad: true, isInMatchdayTracker: false, isContracted: false, contractAmount: 0, contractFrequency: "Weekly", contractStartDate: "", contractEndDate: "", subsBillingModel: "Monthly", subsCustomAmount: 0, holidayStart: "", holidayEnd: "" })}>
-                        <Plus className="h-4 w-4 mr-2" /> Add Player
-                    </Button>
-                </div>
-            </div>
-
-            {/* Squad Overview Dashboard (Suggestion 1) */}
-            <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
-                <Card className="bg-white border-slate-200 shadow-sm p-4 flex flex-col justify-between rounded-xl">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Registered Players</span>
-                    <span className="text-2xl font-black text-slate-900 mt-1.5">{players.length}</span>
-                </Card>
-                <Card className="bg-white border-slate-200 shadow-sm p-4 flex flex-col justify-between rounded-xl">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Average Age</span>
-                    <span className="text-2xl font-black text-slate-900 mt-1.5">{avgSquadAge} yrs</span>
-                </Card>
-                <Card className="bg-white border-slate-200 shadow-sm p-4 flex flex-col justify-between rounded-xl">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Homegrown Players</span>
-                    <span className="text-2xl font-black text-slate-900 mt-1.5">{homegrownCount}</span>
-                </Card>
-                <Card className="bg-white border-slate-200 shadow-sm p-4 flex flex-col justify-between rounded-xl">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">U23 Players</span>
-                    <span className="text-2xl font-black text-slate-900 mt-1.5">{u23Count}</span>
-                </Card>
-                <Card className="bg-white border-slate-200 shadow-sm p-4 flex flex-col justify-between rounded-xl col-span-2 md:col-span-1">
-                    <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Footedness</span>
-                    <div className="text-[10px] font-bold text-slate-700 mt-2 space-y-0.5">
-                        <div className="flex justify-between"><span>Left:</span> <span>{leftFootedCount}</span></div>
-                        <div className="flex justify-between"><span>Right:</span> <span>{rightFootedCount}</span></div>
-                        <div className="flex justify-between"><span>Both:</span> <span>{bothFootedCount}</span></div>
-                    </div>
-                </Card>
-            </div>
-
-            {/* CSV Import Row */}
-            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex justify-end gap-2.5 flex-wrap">
-                <input 
-                    type="file" 
-                    ref={fileInputRef} 
-                    onChange={handleCSVImport} 
-                    accept=".csv" 
-                    className="hidden" 
-                />
+        <div className="pb-16 bg-background min-h-screen">
+            <PageHeader 
+                title="Squad" 
+                description="Manage player profiles, availability, and stats."
+            >
                 <Button 
-                    variant="outline" 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-xs font-semibold h-9 flex-1 md:flex-none"
+                    variant={includeFriendlies ? "secondary" : "outline"} 
+                    onClick={toggleIncludeFriendlies}
+                    className="text-xs h-9 shadow-sm"
                 >
-                    Import Squad CSV
+                    {includeFriendlies ? "⚽ Including Friendlies" : "🏆 Competitive Only"}
                 </Button>
-            </div>
+                <Button onClick={() => setIsManageSquadsOpen(true)} variant="outline" size="icon" className="h-9 w-9 shadow-sm">
+                    <Settings className="w-4 h-4" />
+                </Button>
+                <Button className="bg-brand text-brand-foreground hover:bg-brand/90 text-xs h-9 shadow-sm" onClick={() => setEditingPlayer({ id: "new", firstName: "", lastName: "", position: "GK", squadNumber: 0, age: 0, nationality: "English", squad: currentSquads[0], medicalStatus: "Available", availability: true, contractExpiry: "", appearances: 0, goals: 0, assists: 0, imageUrl: "", isInTrainingSquad: true, isInMatchdayTracker: false, isContracted: false, contractAmount: 0, contractFrequency: "Weekly", contractStartDate: "", contractEndDate: "", subsBillingModel: "Monthly", subsCustomAmount: 0, holidayStart: "", holidayEnd: "" })}>
+                    <Plus className="h-4 w-4 mr-2" /> Add Player
+                </Button>
+            </PageHeader>
 
-            <div className="flex space-x-2 border-b border-slate-200 pb-2 overflow-x-auto no-scrollbar">
-                <button onClick={() => setActiveTab("All")} className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${activeTab === "All" ? "bg-red-50 text-red-700" : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>All Players</button>
-                {currentSquads.map(squad => (
-                    <button key={squad} onClick={() => setActiveTab(squad)} className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${activeTab === squad ? "bg-red-50 text-red-700" : "text-slate-500 hover:text-slate-700 hover:bg-slate-50"}`}>{squad}</button>
-                ))}
-            </div>
+            <PageSection>
+                {/* Squad Summary & Controls */}
+                <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center mb-6">
+                    {/* Compact Squad Summary */}
+                    <div className="flex items-center gap-4 text-sm bg-surface-1 border border-border px-4 py-2.5 rounded-lg shadow-sm">
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-foreground">{players.length}</span>
+                            <span className="text-muted-foreground hidden sm:inline">Registered</span>
+                        </div>
+                        <div className="w-px h-4 bg-border" />
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-status-success">{players.filter(p => p.medicalStatus === "Available").length}</span>
+                            <span className="text-muted-foreground hidden sm:inline">Available</span>
+                        </div>
+                        <div className="w-px h-4 bg-border" />
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-status-error">{players.filter(p => p.medicalStatus === "Injured").length}</span>
+                            <span className="text-muted-foreground hidden sm:inline">Injured</span>
+                        </div>
+                        <div className="w-px h-4 bg-border" />
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-semibold text-status-warning">{players.filter(p => p.medicalStatus === "Suspended").length}</span>
+                            <span className="text-muted-foreground hidden sm:inline">Suspended</span>
+                        </div>
+                    </div>
 
-            <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-lg border shadow-sm items-center">
-                <div className="relative flex-1 w-full">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-500" />
-                    <Input placeholder="Search players..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                    {/* Actions & Filters */}
+                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
+                        <div className="flex gap-1 overflow-x-auto no-scrollbar shrink-0 w-full sm:w-auto bg-surface-1 p-1 rounded-lg border border-border">
+                            {(["All", "GK", "DEF", "MID", "FWD"] as const).map((pos) => (
+                                <button 
+                                    key={pos} 
+                                    onClick={() => setPositionFilter(pos)}
+                                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${positionFilter === pos ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                                >
+                                    {pos}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="relative w-full sm:w-64 shrink-0">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input placeholder="Search players..." className="pl-9 h-10 bg-background border-border" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        </div>
+                        <Button 
+                            variant="outline" 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="text-xs h-10 shrink-0 w-full sm:w-auto"
+                        >
+                            Import CSV
+                        </Button>
+                        <input type="file" ref={fileInputRef} onChange={handleCSVImport} accept=".csv" className="hidden" />
+                    </div>
                 </div>
 
-                <div className="flex gap-2 overflow-x-auto no-scrollbar shrink-0 max-w-full">
-                    {(["All", "GK", "DEF", "MID", "FWD"] as const).map((pos) => (
-                        <Button key={pos} variant={positionFilter === pos ? "default" : "outline"} onClick={() => setPositionFilter(pos)}>{pos}</Button>
+                {/* Squad Filter Tabs */}
+                <div className="flex space-x-2 border-b border-border pb-px mb-6 overflow-x-auto no-scrollbar">
+                    <button onClick={() => setActiveTab("All")} className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${activeTab === "All" ? "border-brand text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>All Players</button>
+                    {currentSquads.map(squad => (
+                        <button key={squad} onClick={() => setActiveTab(squad)} className={`px-4 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors border-b-2 ${activeTab === squad ? "border-brand text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}>{squad}</button>
                     ))}
                 </div>
-            </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
-                {sortedPlayers.map((player) => (
-                    <PlayerCard
-                        key={player.id}
-                        player={player}
-                        onDelete={handleDelete}
-                        onEdit={handleEdit}
-                        onStatusToggle={handleStatusToggle}
-                    />
-                ))}
-            </div>
+                {/* Main Squad Grid - Positional Grouping */}
+                <div className="space-y-10">
+                    {filteredPlayers.length === 0 ? (
+                        <div className="text-center py-12 text-muted-foreground">
+                            <p>No players found matching your criteria.</p>
+                        </div>
+                    ) : (
+                        <>
+                            {/* Goalkeepers */}
+                            {sortedPlayers.filter(p => ["GK"].includes(p.position)).length > 0 && (
+                                <div>
+                                    <SectionHeader title="Goalkeepers" className="mb-4" />
+                                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                                        {sortedPlayers.filter(p => ["GK"].includes(p.position)).map(player => (
+                                            <PlayerCard key={player.id} player={player} onDelete={handleDelete} onEdit={handleEdit} onStatusToggle={handleStatusToggle} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
 
-            {filteredPlayers.length === 0 && (
-                <div className="text-center py-12 text-slate-500">
-                    <p>No players found matching your criteria.</p>
+                            {/* Defenders */}
+                            {sortedPlayers.filter(p => ["DEF", "CB", "LCB", "RCB", "RB", "LB", "RWB", "LWB"].includes(p.position)).length > 0 && (
+                                <div>
+                                    <SectionHeader title="Defenders" className="mb-4" />
+                                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                                        {sortedPlayers.filter(p => ["DEF", "CB", "LCB", "RCB", "RB", "LB", "RWB", "LWB"].includes(p.position)).map(player => (
+                                            <PlayerCard key={player.id} player={player} onDelete={handleDelete} onEdit={handleEdit} onStatusToggle={handleStatusToggle} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Midfielders */}
+                            {sortedPlayers.filter(p => ["MID", "CDM", "CM", "CAM", "RM", "LM"].includes(p.position)).length > 0 && (
+                                <div>
+                                    <SectionHeader title="Midfielders" className="mb-4" />
+                                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                                        {sortedPlayers.filter(p => ["MID", "CDM", "CM", "CAM", "RM", "LM"].includes(p.position)).map(player => (
+                                            <PlayerCard key={player.id} player={player} onDelete={handleDelete} onEdit={handleEdit} onStatusToggle={handleStatusToggle} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Forwards */}
+                            {sortedPlayers.filter(p => ["FWD", "ST", "CF", "RW", "LW"].includes(p.position)).length > 0 && (
+                                <div>
+                                    <SectionHeader title="Forwards" className="mb-4" />
+                                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                                        {sortedPlayers.filter(p => ["FWD", "ST", "CF", "RW", "LW"].includes(p.position)).map(player => (
+                                            <PlayerCard key={player.id} player={player} onDelete={handleDelete} onEdit={handleEdit} onStatusToggle={handleStatusToggle} />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </div>
-            )}
+            </PageSection>
 
             {editingPlayer && (
                 <div className="fixed inset-0 z-50 flex justify-end">
-                    <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={() => setEditingPlayer(null)} />
-                    <div className="relative h-full w-full max-w-[450px] bg-white shadow-xl border-l flex flex-col animate-in slide-in-from-right duration-300">
-                        <div className="p-3 border-b flex items-center justify-between shrink-0 bg-slate-50">
-                            <h2 className="text-lg font-semibold text-slate-800">{editingPlayer.firstName ? "Edit Player" : "Add Player"}</h2>
-                            <button onClick={() => setEditingPlayer(null)} className="text-sm text-slate-400 hover:text-slate-700 p-2">✕</button>
+                    <div className="absolute inset-0 bg-background/50 backdrop-blur-sm" onClick={() => setEditingPlayer(null)} />
+                    <div className="relative h-full w-full max-w-[450px] bg-surface-1 shadow-2xl border-l border-border flex flex-col animate-in slide-in-from-right duration-300">
+                        <div className="p-3 border-b border-border flex items-center justify-between shrink-0 bg-surface-2">
+                            <h2 className="text-lg font-semibold text-foreground">{editingPlayer.firstName ? "Edit Player" : "Add Player"}</h2>
+                            <button onClick={() => setEditingPlayer(null)} className="text-sm text-muted-foreground hover:text-foreground p-2">✕</button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
                             <div className="grid grid-cols-2 gap-3">
@@ -1358,7 +1396,7 @@ export default function SquadPage() {
                             </div>
                         </div>
 
-                        <div className="p-4 pb-8 sm:pb-4 border-t flex justify-between items-center shrink-0 bg-slate-50">
+                        <div className="p-4 pb-8 sm:pb-4 border-t border-border flex justify-between items-center shrink-0 bg-surface-2">
                             <button
                                 onClick={() => {
                                     if (confirm("Delete this player permanently?")) {
@@ -1366,20 +1404,20 @@ export default function SquadPage() {
                                         setEditingPlayer(null);
                                     }
                                 }}
-                                className="px-3 py-1.5 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-colors"
+                                className="px-3 py-1.5 text-xs text-status-error hover:bg-status-error/10 rounded transition-colors"
                             >
                                 Delete Player
                             </button>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setEditingPlayer(null)}
-                                    className="px-4 py-1.5 text-xs border border-slate-300 rounded hover:bg-slate-100 text-slate-700 transition-colors"
+                                    className="px-4 py-1.5 text-xs border border-border rounded hover:bg-muted text-muted-foreground transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <Button
                                     onClick={() => handleSavePlayer(editingPlayer)}
-                                    className="px-6 py-1.5 text-xs bg-slate-900 hover:bg-slate-800 text-white rounded shadow-sm transition-all active:scale-95"
+                                    className="px-6 py-1.5 text-xs bg-brand hover:bg-brand/90 text-brand-foreground rounded shadow-sm transition-all active:scale-95"
                                 >
                                     Save Player
                                 </Button>

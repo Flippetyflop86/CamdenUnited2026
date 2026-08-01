@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Activity, ShieldAlert, CheckCircle2, Trash2, Pencil } from "lucide-react";
+import { Activity, ShieldAlert, CheckCircle2, Trash2, Pencil, Calendar, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getImage } from "@/lib/db";
 
@@ -17,25 +17,18 @@ interface PlayerCardProps {
 }
 
 export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerCardProps) {
-    const getPositionBorder = (pos: string) => {
-        if (pos === "GK") return "border-amber-500";
-        if (["DEF", "CB", "RB", "LB"].includes(pos)) return "border-sky-500";
-        if (["MID", "CM", "CDM", "CAM", "RM", "LM"].includes(pos)) return "border-emerald-500";
-        return "border-rose-500"; // FWD
-    };
-
     const getStatusColor = (status: string) => {
         switch (status) {
-            case "Available": return "bg-green-500/20 text-green-500 border-green-500/50 hover:bg-green-500/30";
-            case "Unavailable": return "bg-slate-500/20 text-slate-500 border-slate-500/50 hover:bg-slate-500/30";
-            case "Holiday": return "bg-sky-500/20 text-sky-500 border-sky-500/50 hover:bg-sky-500/30";
-            case "Injured": return "bg-red-500/20 text-red-500 border-red-500/50 hover:bg-red-500/30";
-            case "Suspended": return "bg-orange-500/20 text-orange-500 border-orange-500/50 hover:bg-orange-500/30"; // Handled nicely
-            default: return "bg-slate-500/20 text-slate-500 border-slate-500/50";
+            case "Available": return "bg-status-success/10 text-status-success border-status-success/20 hover:bg-status-success/20";
+            case "Unavailable": return "bg-muted text-muted-foreground border-border hover:bg-muted/80";
+            case "Holiday": return "bg-status-info/10 text-status-info border-status-info/20 hover:bg-status-info/20";
+            case "Injured": return "bg-status-error/10 text-status-error border-status-error/20 hover:bg-status-error/20";
+            case "Suspended": return "bg-status-error/10 text-status-error border-status-error/20 hover:bg-status-error/20";
+            case "Doubtful": return "bg-status-warning/10 text-status-warning border-status-warning/20 hover:bg-status-warning/20";
+            default: return "bg-muted text-muted-foreground border-border hover:bg-muted/80";
         }
     };
 
-    const positionBorderClass = getPositionBorder(player.position);
     const statusClass = getStatusColor(player.medicalStatus);
 
     const defaultImage = player.imageUrl && player.imageUrl !== "/placeholder-player.png" ? player.imageUrl : "";
@@ -84,93 +77,140 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
     }
 
     return (
-        <Card className={`overflow-hidden hover:shadow-lg transition-all duration-200 group relative border-2 bg-slate-950 ${positionBorderClass} flex flex-col h-full`}>
-            <CardHeader className="p-0 flex-1 flex flex-col">
-                <div className="bg-slate-900 p-3 sm:p-6 pt-9 sm:pt-12 flex flex-col items-center justify-center flex-1 relative border-b border-slate-800">
-                    {onDelete && (
-                        <button
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                if (confirm('Delete this player?')) onDelete(player.id);
-                            }}
-                            className="absolute top-2 sm:top-3 left-2 sm:left-3 p-1.5 sm:p-2 bg-slate-800 hover:bg-red-900/50 rounded-full text-slate-400 hover:text-red-500 z-20"
-                            title="Delete Player"
-                        >
-                            <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        </button>
-                    )}
-                    {onEdit && (
-                        <button
-                            onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                onEdit(player);
-                            }}
-                            className="absolute top-2 sm:top-3 left-9 sm:left-12 p-1.5 sm:p-2 bg-slate-800 hover:bg-blue-900/50 rounded-full text-slate-400 hover:text-blue-500 z-20"
-                            title="Edit Player"
-                        >
-                            <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                        </button>
-                    )}
+        <Card className="overflow-hidden hover:shadow-md transition-all duration-200 group relative border-border bg-card flex flex-col h-full rounded-xl">
+            {/* Top Action Bar */}
+            <div className="absolute top-3 right-3 flex items-center gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                {onEdit && (
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onEdit(player);
+                        }}
+                        className="p-1.5 bg-background border border-border shadow-sm rounded-md text-muted-foreground hover:text-foreground transition-colors"
+                        title="Edit Player"
+                    >
+                        <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                )}
+                {onDelete && (
+                    <button
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (confirm('Delete this player?')) onDelete(player.id);
+                        }}
+                        className="p-1.5 bg-background border border-border shadow-sm rounded-md text-muted-foreground hover:text-status-error transition-colors"
+                        title="Delete Player"
+                    >
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                )}
+            </div>
+
+            <CardHeader className="p-5 pb-4 flex-1 flex flex-col items-center justify-center relative border-b border-border/50 bg-surface-1/50">
+                
+                {/* Position & Availability Strip */}
+                <div className="w-full flex justify-between items-start mb-4">
+                    <div className="flex flex-col items-start gap-1">
+                        <span className="text-xs font-bold px-2 py-1 bg-background border border-border rounded text-foreground uppercase tracking-wider shadow-sm">
+                            {player.position}
+                        </span>
+                        {player.squadNumber > 0 && (
+                            <span className="text-[10px] font-semibold text-muted-foreground ml-1">
+                                #{player.squadNumber}
+                            </span>
+                        )}
+                    </div>
+                    
                     <Badge
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             onStatusToggle?.(player);
                         }}
-                        className={`absolute top-2 sm:top-3 right-2 sm:right-3 border cursor-pointer select-none text-[10px] sm:text-xs px-1.5 py-0.5 ${statusClass}`}
+                        className={`border cursor-pointer select-none text-[10px] sm:text-xs px-2 py-0.5 rounded shadow-sm transition-colors ${statusClass}`}
                     >
                         {player.medicalStatus}
                     </Badge>
-                    <div className="mt-1 text-center">
-                        <CardTitle className="text-white text-sm sm:text-lg truncate max-w-[140px] sm:max-w-none">{formatPlayerName(player)}</CardTitle>
-                        <p className="text-slate-400 text-xs sm:text-sm font-medium">{player.position} • {squadLabel} • {displayAge} yo</p>
+                </div>
 
-                        {player.medicalStatus === "Holiday" && player.holidayStart && player.holidayEnd && (
-                            <p className="text-slate-300 text-[10px] sm:text-xs">Holiday: {player.holidayStart} to {player.holidayEnd}</p>
-                        )}
+                {/* Avatar (Optional but prominent if exists) */}
+                {displayImage ? (
+                    <Avatar className="h-20 w-20 sm:h-24 sm:w-24 mb-4 border-2 border-border shadow-sm">
+                        <AvatarImage src={displayImage} alt={formatPlayerName(player)} className="object-cover" />
+                        <AvatarFallback className="bg-surface-2 text-muted-foreground font-bold text-xl">
+                            {player.firstName?.charAt(0)}{player.lastName?.charAt(0)}
+                        </AvatarFallback>
+                    </Avatar>
+                ) : (
+                    <div className="h-20 w-20 sm:h-24 sm:w-24 mb-4 rounded-full bg-surface-2 border-2 border-border flex items-center justify-center text-muted-foreground font-bold text-2xl shadow-sm">
+                        {player.firstName?.charAt(0)}{player.lastName?.charAt(0)}
                     </div>
+                )}
+
+                {/* Identity */}
+                <div className="text-center w-full">
+                    <CardTitle className="text-foreground text-lg sm:text-xl font-bold truncate">
+                        {formatPlayerName(player)}
+                    </CardTitle>
+                    
+                    <div className="flex items-center justify-center gap-3 mt-1.5 text-xs text-muted-foreground font-medium">
+                        <div className="flex items-center gap-1">
+                            <Calendar className="w-3.5 h-3.5" />
+                            {displayAge} yrs
+                        </div>
+                        <div className="w-1 h-1 rounded-full bg-border" />
+                        <div className="flex items-center gap-1 truncate max-w-[120px]">
+                            <Users className="w-3.5 h-3.5 shrink-0" />
+                            <span className="truncate">{squadLabel || "No Squad"}</span>
+                        </div>
+                    </div>
+                    
+                    {player.medicalStatus === "Holiday" && player.holidayStart && player.holidayEnd && (
+                        <p className="text-status-info text-[10px] sm:text-xs mt-2 font-medium">Holiday: {player.holidayStart} to {player.holidayEnd}</p>
+                    )}
                 </div>
             </CardHeader>
-            <CardContent className="p-2 sm:p-3 grid grid-cols-5 gap-1 text-center text-xs border-t border-slate-800 bg-slate-950/40">
-                <div className="space-y-0.5 p-1 rounded bg-slate-900 border border-slate-800">
-                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider">Apps</p>
-                    <p className="font-extrabold text-indigo-400 text-xs sm:text-sm">{player.appearances ?? 0}</p>
+            
+            {/* Stats */}
+            <CardContent className="p-3 sm:p-4 grid grid-cols-4 gap-2 text-center text-xs bg-background">
+                <div className="space-y-1">
+                    <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Apps</p>
+                    <p className="font-bold text-foreground">{player.appearances ?? 0}</p>
                 </div>
-                <div className="space-y-0.5 p-1 rounded bg-slate-900 border border-slate-800">
-                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider">Goals</p>
-                    <p className="font-extrabold text-emerald-400 text-xs sm:text-sm">{player.goals ?? 0}</p>
+                <div className="space-y-1">
+                    <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Goals</p>
+                    <p className="font-bold text-foreground">{player.goals ?? 0}</p>
                 </div>
-                <div className="space-y-0.5 p-1 rounded bg-slate-900 border border-slate-800">
-                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider">Asts</p>
-                    <p className="font-extrabold text-sky-400 text-xs sm:text-sm">{player.assists ?? 0}</p>
+                <div className="space-y-1">
+                    <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Asts</p>
+                    <p className="font-bold text-foreground">{player.assists ?? 0}</p>
                 </div>
-                <div className="space-y-0.5 p-1 rounded bg-slate-900 border border-slate-800">
-                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider">Mins</p>
-                    <p className="font-extrabold text-slate-300 text-xs sm:text-sm">{(player as any).minutes_played ?? 0}</p>
-                </div>
-                <div className="space-y-0.5 p-1 rounded bg-slate-900 border border-slate-800">
-                    <p className="text-slate-400 text-[8px] sm:text-[9px] font-semibold uppercase tracking-wider">Win%</p>
-                    <p className="font-extrabold text-amber-400 text-xs sm:text-sm">{(player as any).win_rate ?? 0}%</p>
+                <div className="space-y-1">
+                    <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Mins</p>
+                    <p className="font-bold text-foreground">{(player as any).minutes_played ?? 0}</p>
                 </div>
             </CardContent>
+            
+            {/* Cards (Optional Strip) */}
             {((player.yellow_cards !== undefined && player.yellow_cards > 0) || (player.red_cards !== undefined && player.red_cards > 0)) && (
-                <div className="px-3 pb-2 flex gap-1.5 justify-center text-[9px] sm:text-[10px] bg-slate-950/40">
+                <div className="px-4 pb-3 flex gap-2 justify-center text-[10px] bg-background">
                     {player.yellow_cards !== undefined && player.yellow_cards > 0 && (
-                        <span className="px-2 py-0.5 bg-yellow-500/10 border border-yellow-500/25 text-yellow-400 rounded-md font-bold flex items-center gap-1">
-                            🟨 {player.yellow_cards} YC
+                        <span className="font-bold text-muted-foreground flex items-center gap-1">
+                            <div className="w-2 h-3 bg-yellow-400 rounded-sm" /> {player.yellow_cards}
                         </span>
                     )}
                     {player.red_cards !== undefined && player.red_cards > 0 && (
-                        <span className="px-2 py-0.5 bg-rose-500/10 border border-rose-500/25 text-rose-400 rounded-md font-bold flex items-center gap-1">
-                            🟥 {player.red_cards} RC
+                        <span className="font-bold text-muted-foreground flex items-center gap-1">
+                            <div className="w-2 h-3 bg-red-500 rounded-sm" /> {player.red_cards}
                         </span>
                     )}
                 </div>
             )}
-            <CardFooter className="p-2 sm:p-4 pt-0 sm:pt-0 mt-auto">
-                <Button asChild className="w-full h-8 sm:h-9 text-xs sm:text-sm bg-slate-900 hover:bg-slate-800">
+            
+            <CardFooter className="p-3 sm:p-4 pt-0 sm:pt-0 mt-auto bg-background">
+                <Button asChild variant="secondary" className="w-full h-8 sm:h-9 text-xs sm:text-sm font-bold bg-surface-2 hover:bg-border/50 text-foreground transition-colors shadow-sm">
                     <Link href={`/squad/${player.id}`}>View Profile</Link>
                 </Button>
             </CardFooter>
