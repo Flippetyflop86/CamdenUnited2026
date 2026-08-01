@@ -708,6 +708,9 @@ export default function TrainingPage() {
                                                 <Button className="bg-brand hover:bg-brand/90" asChild>
                                                     <Link href={`/training/${trueUpcomingSessions[0].id}`}>Manage Session</Link>
                                                 </Button>
+                                                <Button variant="outline" className="border-border text-foreground" onClick={() => handleEdit(trueUpcomingSessions[0])}>
+                                                    <Pencil className="h-4 w-4 mr-2" /> Edit Session
+                                                </Button>
                                                 <Button variant="outline" className="border-border text-foreground" onClick={() => handleOpenShare(trueUpcomingSessions[0])}>
                                                     <MessageCircle className="h-4 w-4 mr-2" /> Share Poll
                                                 </Button>

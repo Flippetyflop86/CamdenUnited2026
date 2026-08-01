@@ -6,7 +6,7 @@ import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, CalendarDays, MapPin, Clock, Download, Share2, Link2, MessageCircle, Bell } from "lucide-react";
+import { ArrowLeft, CalendarDays, MapPin, Clock, Download, Share2, Link2, MessageCircle, Bell, Pencil } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
@@ -266,7 +266,7 @@ export default function TrainingSessionPage() {
         if (!session) return;
         const { error } = await supabase
             .from('training_sessions')
-            .update({ attendance: session.attendance })
+            .update({ attendance: session.attendance, topic: session.topic })
             .eq('id', session.id);
 
         if (error) {
@@ -485,8 +485,19 @@ export default function TrainingSessionPage() {
                             <Badge className="w-fit mb-2" variant="outline">
                                 {formatSquad(session.squad as string)} Squad
                             </Badge>
-                            <CardTitle className="text-xl">{session.topic || "General Session"}</CardTitle>
-                            <CardDescription>Session Details</CardDescription>
+                            <div className="flex items-center gap-2 mb-1 group">
+                                <Input 
+                                    value={session.topic || ""} 
+                                    placeholder="General Session"
+                                    onChange={(e) => {
+                                        setSession({ ...session, topic: e.target.value });
+                                        setUnsavedChanges(true);
+                                    }}
+                                    className="text-xl font-semibold leading-none tracking-tight h-auto py-1 px-2 border-slate-300 bg-white/5 hover:border-slate-400 focus-visible:ring-2 focus-visible:ring-brand shadow-sm transition-all w-full min-w-[200px] sm:max-w-[300px]"
+                                />
+                                <Pencil className="h-4 w-4 text-slate-400 group-hover:text-slate-600 transition-colors" />
+                            </div>
+                            <CardDescription className="mt-1">Session Details</CardDescription>
                         </div>
                         <div className="flex gap-3">
                             <div className="text-center px-4 py-2 bg-green-50 rounded-lg border border-green-100 min-w-[80px]">
