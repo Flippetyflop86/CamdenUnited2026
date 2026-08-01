@@ -16,6 +16,11 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useSearchParams } from "next/navigation";
 
+import { PageHeader } from "@/components/ui/page-header";
+import { PageSection } from "@/components/layout/page-section";
+import { SectionHeader } from "@/components/ui/section-header";
+
+
 // I'll stick to native date formatting for zero-dep speed unless complex.
 function formatDate(dateStr: string) {
     const date = new Date(dateStr);
