@@ -682,7 +682,6 @@ export default function TrainingPage() {
                                             <div>
                                                 <div className="flex items-center gap-2 mb-2">
                                                     <Badge variant="secondary" className="bg-brand/10 text-brand hover:bg-brand/20">{formatSquad(trueUpcomingSessions[0].squad)}</Badge>
-                                                    <span className="text-sm font-semibold text-brand">MD-3</span>
                                                 </div>
                                                 <h4 className="text-3xl font-bold tracking-tight text-foreground">
                                                     {trueUpcomingSessions[0].topic || "General Preparation"}
