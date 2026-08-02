@@ -20,6 +20,11 @@ import { RefreshCw } from "lucide-react";
 import { MatchStatsDialog } from "@/components/matches/match-stats-dialog";
 import { FORMATIONS } from "@/lib/formations";
 import { calculateMeetTime, generateWhatsAppMessage } from "@/lib/whatsapp-utils";
+import { LeagueSync } from "./components/LeagueSync";
+import { NextMatchHero } from "./components/NextMatchHero";
+import { MatchPreparation } from "./components/MatchPreparation";
+import { UpcomingFixtures } from "./components/UpcomingFixtures";
+import { RecentResults } from "./components/RecentResults";
 
 export default function MatchesPage() {
     const router = useRouter();
@@ -933,8 +938,8 @@ export default function MatchesPage() {
         }
 
         return (
-            <Card className="overflow-hidden hover:shadow-md transition-shadow">
-                <CardHeader className="py-4 bg-slate-50/50 border-b flex flex-row items-center justify-between">
+            <Card className="overflow-hidden hover:shadow-md transition-shadow border-border bg-surface-1">
+                <CardHeader className="py-4 bg-surface-2/50 border-border border-b flex flex-row items-center justify-between">
                     <div className="flex items-center gap-3 flex-wrap">
                         <Badge variant="outline" className={`bg-white ${match.competition.toLowerCase().includes("cup") ? "border-amber-200 text-amber-700" : "border-slate-200"
                             }`}>
@@ -1012,7 +1017,7 @@ export default function MatchesPage() {
                             {!match.isHome && teamInfo?.badge_url && (
                                 <img src={teamInfo.badge_url} alt="Badge" className="h-6 w-6 object-contain shrink-0" />
                             )}
-                            <span className={`font-bold text-lg ${match.isHome ? 'text-slate-900' : 'text-slate-500'}`}>
+                            <span className={`font-bold text-lg ${match.isHome ? 'text-foreground' : 'text-muted-foreground'}`}>
                                 {match.isHome ? settings.name : match.opponent}
                             </span>
                             {match.isHome && <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded shrink-0">H</span>}
@@ -1020,7 +1025,7 @@ export default function MatchesPage() {
  
                         {/* Score / VS */}
                         <div className="flex flex-col items-center min-w-[100px]">
-                            <div className="text-2xl font-black text-slate-900 tracking-tight flex items-center justify-center min-w-[80px]">
+                            <div className="text-2xl font-black text-foreground tracking-tight flex items-center justify-center min-w-[80px]">
                                 {match.scoreline ? (
                                     match.scoreline.includes('-') ? (
                                         <div className="flex items-center gap-2">
@@ -1046,7 +1051,7 @@ export default function MatchesPage() {
                         {/* Away Team */}
                         <div className="flex-1 flex items-center justify-start gap-3 text-left">
                             {!match.isHome && <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded shrink-0">A</span>}
-                            <span className={`font-bold text-lg flex items-center gap-2 ${!match.isHome ? 'text-slate-900' : 'text-slate-500'}`}>
+                            <span className={`font-bold text-lg flex items-center gap-2 ${!match.isHome ? 'text-foreground' : 'text-muted-foreground'}`}>
                                 {!match.isHome && settings.logo && (
                                     <img src={settings.logo} alt="Club Logo" className="h-6 w-6 object-contain shrink-0 rounded-full" />
                                 )}
@@ -1526,7 +1531,7 @@ export default function MatchesPage() {
                 <div className="flex items-center gap-3">
                     <span className="text-sm font-semibold text-slate-500 hidden sm:inline-block">Season:</span>
                     <Select value={seasonFilter} onValueChange={setSeasonFilter}>
-                        <SelectTrigger className="h-9 w-[160px] text-sm bg-white border-slate-200 shadow-sm font-medium">
+                        <SelectTrigger className="h-9 w-[160px] text-sm bg-surface-1 border-border shadow-sm font-medium">
                             <SelectValue placeholder="Select Season" />
                         </SelectTrigger>
                         <SelectContent>
@@ -1539,96 +1544,28 @@ export default function MatchesPage() {
                 </div>
             </div>
 
-            {/* Import Tool */}
-            <div className="bg-indigo-50 border border-indigo-100 rounded-lg p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <div className="flex items-start gap-3">
-                    <div className="p-2 bg-indigo-100 rounded-full">
-                        <Target className="h-5 w-5 text-indigo-600" />
-                    </div>
-                    <div>
-                        <h3 className="font-semibold text-indigo-900">League Integration</h3>
-                        <p className="text-sm text-indigo-700">Sync directly with your live league website.</p>
-                    </div>
-                </div>
-                <div className="flex flex-col sm:flex-row gap-3 items-center w-full sm:w-auto">
-                    {(!settings.leagueUrl || isEditingUrl) ? (
-                        <div className="flex flex-1 sm:flex-none gap-2 w-full">
-                            <Input 
-                                placeholder="Paste FA Full-Time URL..." 
-                                value={tempUrl} 
-                                onChange={e => setTempUrl(e.target.value)}
-                                className="w-full sm:w-64 bg-white border-indigo-200"
-                            />
-                            <Button 
-                                onClick={() => {
-                                    if (tempUrl.trim()) {
-                                        updateSettings({ leagueUrl: tempUrl.trim() });
-                                        setIsEditingUrl(false);
-                                    }
-                                }}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0"
-                            >
-                                Save
-                            </Button>
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
-                            <Button variant="ghost" size="sm" onClick={() => { setTempUrl(settings.leagueUrl!); setIsEditingUrl(true); }} className="text-indigo-600 hover:text-indigo-800 hover:bg-indigo-100 hidden sm:flex">
-                                Edit URL
-                            </Button>
-                            <Button 
-                                onClick={handleSyncFixtures} 
-                                disabled={isSyncing}
-                                className="bg-indigo-600 hover:bg-indigo-700 text-white flex-1 sm:flex-none"
-                            >
-                                <RefreshCw className={`h-4 w-4 mr-2 ${isSyncing ? "animate-spin" : ""}`} />
-                                {isSyncing ? "Syncing..." : "Sync from League URL"}
-                            </Button>
-                        </div>
-                    )}
-                </div>
-            </div>
+            <LeagueSync />
 
-            {/* Tabs for Fixtures / Results */}
-            <Tabs defaultValue="upcoming" className="space-y-4">
-                <TabsList>
-                    <TabsTrigger value="upcoming">Upcoming Fixtures ({upcomingMatches.length})</TabsTrigger>
-                    <TabsTrigger value="results">Results ({pastMatches.length})</TabsTrigger>
-                </TabsList>
+            {upcomingMatches.length > 0 && (
+                <>
+                    <NextMatchHero 
+                        match={upcomingMatches[0]} 
+                        onManageMatch={handleEditMatch}
+                        onShareMatch={handleOpenShare}
+                    />
+                    <MatchPreparation nextMatch={upcomingMatches[0]} />
+                </>
+            )}
 
-                <TabsContent value="upcoming" className="space-y-4">
-                    {upcomingMatches.length === 0 ? (
-                        <div className="text-center py-12 text-slate-400 border-2 border-dashed rounded-lg bg-slate-50/50">
-                            <p>No upcoming fixtures found matching filters.</p>
-                        </div>
-                    ) : (
-                        upcomingMatches.map(match => <MatchCard key={match.id} match={match} isPast={false} />)
-                    )}
-                </TabsContent>
+            <UpcomingFixtures 
+                matches={upcomingMatches.length > 0 ? upcomingMatches.slice(1) : []} 
+                renderCard={(match) => <MatchCard key={match.id} match={match} isPast={false} />} 
+            />
 
-                <TabsContent value="results" className="space-y-4">
-                    {/* Sort Control */}
-                    <div className="flex justify-end mb-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-slate-500 text-xs gap-1"
-                            onClick={() => setResultSort(resultSort === "desc" ? "asc" : "desc")}
-                        >
-                            <ArrowUpDown className="h-3 w-3" />
-                            {resultSort === "desc" ? "Newest First" : "Oldest First"}
-                        </Button>
-                    </div>
-
-                    {pastMatches.length === 0 ? (
-                        <div className="text-center py-12 text-slate-400 border-2 border-dashed rounded-lg bg-slate-50/50">
-                            <p>No results found matching filters.</p>
-                        </div>
-                    ) : (
-                        pastMatches.map(match => <MatchCard key={match.id} match={match} isPast={true} />)
-                    )}
-                </TabsContent>
-            </Tabs>
+            <RecentResults 
+                matches={pastMatches.slice(0, 5)} 
+                renderCard={(match) => <MatchCard key={match.id} match={match} isPast={true} />} 
+            />
 
             {/* Share WhatsApp Poll Modal */}
             {/* Share WhatsApp Poll Modal */}
