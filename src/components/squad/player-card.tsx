@@ -78,35 +78,7 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
 
     return (
         <Card className="overflow-hidden hover:shadow-md transition-all duration-200 group relative border-border bg-card flex flex-col h-full rounded-xl">
-            {/* Top Action Bar */}
-            <div className="absolute top-3 right-3 flex items-center gap-2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
-                {onEdit && (
-                    <button
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onEdit(player);
-                        }}
-                        className="p-1.5 bg-background border border-border shadow-sm rounded-md text-muted-foreground hover:text-foreground transition-colors"
-                        title="Edit Player"
-                    >
-                        <Pencil className="h-3.5 w-3.5" />
-                    </button>
-                )}
-                {onDelete && (
-                    <button
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            if (confirm('Delete this player?')) onDelete(player.id);
-                        }}
-                        className="p-1.5 bg-background border border-border shadow-sm rounded-md text-muted-foreground hover:text-status-error transition-colors"
-                        title="Delete Player"
-                    >
-                        <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                )}
-            </div>
+
 
             <CardHeader className="p-5 pb-4 flex-1 flex flex-col items-center justify-center relative border-b border-border/50 bg-surface-1/50">
                 
@@ -209,10 +181,40 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                 </div>
             )}
             
-            <CardFooter className="p-3 sm:p-4 pt-0 sm:pt-0 mt-auto bg-background">
-                <Button asChild variant="secondary" className="w-full h-8 sm:h-9 text-xs sm:text-sm font-bold bg-surface-2 hover:bg-border/50 text-foreground transition-colors shadow-sm">
+            <CardFooter className="p-3 sm:p-4 pt-0 sm:pt-0 mt-auto bg-background flex gap-2">
+                <Button asChild variant="secondary" className="flex-1 h-8 sm:h-9 text-xs sm:text-sm font-bold bg-surface-2 hover:bg-border/50 text-foreground transition-colors shadow-sm">
                     <Link href={`/squad/${player.id}`}>View Profile</Link>
                 </Button>
+                {onEdit && (
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onEdit(player);
+                        }}
+                        className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 text-muted-foreground hover:text-foreground bg-surface-1 shadow-sm sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        title="Edit Player"
+                    >
+                        <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </Button>
+                )}
+                {onDelete && (
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            if (confirm('Delete this player?')) onDelete(player.id);
+                        }}
+                        className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 text-muted-foreground hover:text-status-error bg-surface-1 shadow-sm sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        title="Delete Player"
+                    >
+                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </Button>
+                )}
             </CardFooter>
         </Card>
     );
