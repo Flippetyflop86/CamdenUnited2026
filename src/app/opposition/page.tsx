@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { OppositionTeam } from "@/types";
-import { FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
+import { FORMATIONS, FORMATION_NAMES, getDisplayPosition } from "@/lib/formations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -533,7 +533,7 @@ export default function OppositionReportsPage() {
                                                     {/* Position label — small badge, no overflow */}
                                                     <div className={`absolute -translate-x-1/2 z-30 ${isTopHalf ? 'bottom-4' : 'top-4'}`}>
                                                         <span className="text-[8px] font-bold text-white bg-slate-900/50 px-1 py-0.5 rounded whitespace-nowrap backdrop-blur-sm">
-                                                            {pos.label}
+                                                            {getDisplayPosition(pos.label)}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -561,7 +561,7 @@ export default function OppositionReportsPage() {
                                                                 <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center shrink-0">
                                                                     <span className="text-[9px] font-bold text-white">{pos.number}</span>
                                                                 </div>
-                                                                <span className="text-xs font-medium text-slate-500 w-10 shrink-0">{pos.label}</span>
+                                                                <span className="text-xs font-medium text-slate-500 w-10 shrink-0">{getDisplayPosition(pos.label)}</span>
                                                                 {isEditing ? (
                                                                     <input
                                                                         type="text"
@@ -605,7 +605,7 @@ export default function OppositionReportsPage() {
                                                                 <div className="w-6 h-6 rounded-full bg-red-600 flex items-center justify-center shrink-0">
                                                                     <span className="text-[9px] font-bold text-white">{pos.number}</span>
                                                                 </div>
-                                                                <span className="text-xs font-medium text-slate-500 w-10 shrink-0">{pos.label}</span>
+                                                                <span className="text-xs font-medium text-slate-500 w-10 shrink-0">{getDisplayPosition(pos.label)}</span>
                                                                 {isEditing ? (
                                                                     <input
                                                                         type="text"

@@ -3,7 +3,7 @@
 
 import { useState, useEffect } from "react";
 import { Player, Position, MatchdayXI, SquadDepth } from "@/types";
-import { FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
+import { FORMATIONS, FORMATION_NAMES, getDisplayPosition } from "@/lib/formations";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -695,7 +695,7 @@ export default function SquadPlannerPage() {
                                         className="px-3 py-1 rounded-t-lg bg-slate-900 border-x border-t border-slate-700/80 text-[11px] font-black text-slate-200 shadow-md group-hover:bg-brand group-hover:border-brand transition-colors w-full text-center tracking-widest uppercase cursor-pointer"
                                         title="Click to edit position depth"
                                     >
-                                        {pos.label}
+                                        {getDisplayPosition(pos.label)}
                                     </div>
 
                                     <div className="w-full bg-slate-900/95 border-x border-b border-slate-700/80 rounded-b-lg shadow-2xl overflow-hidden backdrop-blur-md">
@@ -838,7 +838,7 @@ export default function SquadPlannerPage() {
                     <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
                         <div>
                             <DialogTitle className="text-xl font-black text-slate-900">
-                                {selectedPos ? (POSITION_FULL_NAMES[selectedPos] || selectedPos) : ''}
+                                {selectedPos ? (POSITION_FULL_NAMES[selectedPos] || selectedPos) : ''} ({getDisplayPosition(selectedPos || '')})
                             </DialogTitle>
                             <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">Depth Editor</p>
                         </div>
@@ -989,7 +989,7 @@ export default function SquadPlannerPage() {
                                             <div className="flex flex-wrap gap-2">
                                                 {coverage.alsoCovers.map(role => (
                                                     <Badge key={role} variant="secondary" className="bg-slate-100 text-slate-700 font-bold hover:bg-slate-200">
-                                                        {POSITION_FULL_NAMES[role] || role}
+                                                        {POSITION_FULL_NAMES[role] || role} ({getDisplayPosition(role)})
                                                     </Badge>
                                                 ))}
                                             </div>
@@ -1004,7 +1004,7 @@ export default function SquadPlannerPage() {
                                             <div className="flex flex-wrap gap-2">
                                                 {coverage.emergency.map(role => (
                                                     <Badge key={role} variant="outline" className="text-slate-500 font-medium">
-                                                        {POSITION_FULL_NAMES[role] || role}
+                                                        {POSITION_FULL_NAMES[role] || role} ({getDisplayPosition(role)})
                                                     </Badge>
                                                 ))}
                                             </div>

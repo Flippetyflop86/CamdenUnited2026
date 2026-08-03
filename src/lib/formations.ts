@@ -268,3 +268,15 @@ export const FORMATION_NAMES = [
     "5-3-2",
     "5-4-1",
 ];
+
+export const getDisplayPosition = (label: string): string => {
+    const map: Record<string, string> = { 
+        'LCB': 'CB', 
+        'RCB': 'CB', 
+        'LDM': 'DM', 
+        'RDM': 'DM', 
+        'LAM': 'CAM', 
+        'RAM': 'CAM' 
+    };
+    return map[label] || label;
+};

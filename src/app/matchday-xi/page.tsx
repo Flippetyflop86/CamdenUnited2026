@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { MatchdayXI, Player, Match, Position } from "@/types";
-import { FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
+import { FORMATIONS, FORMATION_NAMES, getDisplayPosition } from "@/lib/formations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, Save, FileDown, Calendar, MapPin, Clock, GripVertical, Trophy, MessageCircle, Search, X, Loader2, RefreshCw } from "lucide-react";
@@ -1310,10 +1310,7 @@ export default function MatchdayXIPage() {
                                             ${playerId ? 'bg-slate-900 border-slate-700' : 'bg-white/90 border-dashed border-slate-400'}
                                         `}>
                                             <span className={`text-[9px] sm:text-[12px] font-bold tracking-tight ${playerId ? 'text-white' : 'text-slate-500'}`}>
-                                                {playerId ? displayName : (() => {
-                                                    const map: Record<string, string> = { 'LCB': 'CB', 'RCB': 'CB', 'LDM': 'DM', 'RDM': 'DM', 'LAM': 'CAM', 'RAM': 'CAM' };
-                                                    return map[pos.label] || pos.label;
-                                                })()}
+                                                {playerId ? displayName : getDisplayPosition(pos.label)}
                                             </span>
                                             
                                             {/* Remove Button */}
