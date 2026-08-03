@@ -16,7 +16,8 @@ import {
     Trash2,
     Clock,
     X,
-    Save
+    Save,
+    Puzzle
 } from "lucide-react";
 import {
   Dialog,
@@ -166,21 +167,29 @@ export function FootballDataImportCentre({ clubId, clubName, clubSettings, onImp
                     </div>
                 </Card>
 
-                {/* Method 2: Connection (Coming Soon) */}
-                <Card className="border-border bg-surface-1 p-6 flex flex-col justify-between opacity-75">
+                {/* Method 2: Browser Integration */}
+                <Card className="border-border bg-surface-1 p-6 flex flex-col justify-between">
                     <div>
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-full bg-surface-2 flex items-center justify-center">
-                                    <Link2 className="h-4 w-4 text-muted-foreground" />
+                                <div className="h-8 w-8 rounded-full bg-brand/10 flex items-center justify-center">
+                                    <Puzzle className="h-4 w-4 text-brand" />
                                 </div>
-                                <h3 className="font-semibold text-foreground">League Connection</h3>
+                                <h3 className="font-semibold text-foreground">Browser Integration</h3>
                             </div>
-                            <Badge variant="outline" className="text-muted-foreground">Coming Soon</Badge>
+                            <Badge variant="outline" className="text-muted-foreground border-brand/20 bg-brand/5 text-brand">Chrome & Edge</Badge>
                         </div>
                         <p className="text-sm text-muted-foreground mt-2">
-                            Automatically sync fixtures and results directly from your league provider.
+                            Install the ClubFlow Browser Extension to import fixtures directly from supported football websites without copying and pasting.
                         </p>
+                    </div>
+                    <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <Button variant="outline" className="font-bold border-brand/30 text-brand bg-brand/10 hover:bg-brand/20">
+                            Install Extension
+                        </Button>
+                        <a href="#" className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
+                            Learn More
+                        </a>
                     </div>
                 </Card>
             </div>
