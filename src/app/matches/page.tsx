@@ -1546,6 +1546,7 @@ export default function MatchesPage() {
             </div>
 
             <FootballDataImportCentre 
+                clubId={clubId || ""}
                 clubName={settings.name} 
                 clubSettings={settings}
                 onImportComplete={fetchMatches}

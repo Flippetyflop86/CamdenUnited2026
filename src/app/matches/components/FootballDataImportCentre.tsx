@@ -40,12 +40,13 @@ interface ParsedItem {
 }
 
 interface FootballDataImportCentreProps {
+    clubId: string;
     clubName: string;
     clubSettings: any;
     onImportComplete: () => void;
 }
 
-export function FootballDataImportCentre({ clubName, clubSettings, onImportComplete }: FootballDataImportCentreProps) {
+export function FootballDataImportCentre({ clubId, clubName, clubSettings, onImportComplete }: FootballDataImportCentreProps) {
     const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
     const [rawText, setRawText] = useState("");
     const [isParsing, setIsParsing] = useState(false);
@@ -87,7 +88,7 @@ export function FootballDataImportCentre({ clubName, clubSettings, onImportCompl
             const res = await fetch('/api/import-fixtures', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fixtures: readyFixtures, clubName })
+                body: JSON.stringify({ fixtures: readyFixtures, clubId })
             });
             
             const data = await res.json();

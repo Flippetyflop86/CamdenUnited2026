@@ -9,24 +9,11 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { fixtures, clubName } = body;
+        const { fixtures, clubId } = body;
 
-        if (!fixtures || !clubName) {
-            return NextResponse.json({ success: false, error: 'Missing fixtures or clubName' }, { status: 400 });
+        if (!fixtures || !Array.isArray(fixtures) || !clubId) {
+            return NextResponse.json({ success: false, error: 'Missing fixtures or clubId' }, { status: 400 });
         }
-
-        // Get club ID - using ilike for case insensitivity and fuzzy matching
-        const { data: clubs, error: clubError } = await supabase
-            .from('clubs')
-            .select('id')
-            .ilike('name', `%${clubName}%`)
-            .limit(1);
-
-        if (clubError || !clubs || clubs.length === 0) {
-            return NextResponse.json({ success: false, error: 'Club not found' }, { status: 400 });
-        }
-        
-        const clubId = clubs[0].id;
 
         // Map parsed UI format to database format
         const matchesToInsert = fixtures.map((f: any) => ({
