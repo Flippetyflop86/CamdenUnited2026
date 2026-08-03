@@ -249,7 +249,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     }
                 }
                 // ALWAYS fetch membership on login/recovery/change to avoid cache mismatch
-                fetchClubMembership(nextUser.id, nextUser.email);
+                if (userChanged || _event === 'SIGNED_IN') {
+                    fetchClubMembership(nextUser.id, nextUser.email);
+                }
             } else {
                 setClubId(null);
                 setGlobalClubId(null);

@@ -210,7 +210,10 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         }
 
         async function fetchSettings() {
-            setIsLoaded(false);
+            // Only show full-screen loader if we don't have settings loaded yet
+            if (settings.name === "My Club") {
+                setIsLoaded(false);
+            }
             try {
                 const { data, error } = await supabase
                     .from("clubs")
