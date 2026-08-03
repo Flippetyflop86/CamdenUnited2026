@@ -194,7 +194,7 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                             e.stopPropagation();
                             onEdit(player);
                         }}
-                        className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 text-muted-foreground hover:text-foreground bg-surface-1 shadow-sm sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 text-muted-foreground hover:text-foreground bg-surface-1 shadow-sm"
                         title="Edit Player"
                     >
                         <Pencil className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -209,7 +209,7 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                             e.stopPropagation();
                             onDelete(player.id);
                         }}
-                        className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 text-muted-foreground hover:text-status-error bg-surface-1 shadow-sm sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+                        className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 text-muted-foreground hover:text-status-error bg-surface-1 shadow-sm"
                         title="Delete Player"
                     >
                         <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
