@@ -15,11 +15,11 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Missing fixtures or clubName' }, { status: 400 });
         }
 
-        // Get club ID
+        // Get club ID - using ilike for case insensitivity and fuzzy matching
         const { data: clubs, error: clubError } = await supabase
             .from('clubs')
             .select('id')
-            .eq('name', clubName)
+            .ilike('name', `%${clubName}%`)
             .limit(1);
 
         if (clubError || !clubs || clubs.length === 0) {

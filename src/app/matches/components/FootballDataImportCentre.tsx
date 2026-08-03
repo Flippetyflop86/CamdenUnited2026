@@ -84,11 +84,18 @@ export function FootballDataImportCentre({ clubName, clubSettings, onImportCompl
         const readyFixtures = parsedItems.filter(i => i.status === 'ready');
         
         try {
-            await fetch('/api/import-fixtures', {
+            const res = await fetch('/api/import-fixtures', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ fixtures: readyFixtures, clubName })
             });
+            
+            const data = await res.json();
+            if (!data.success) {
+                console.error("Import failed:", data.error);
+                alert("Failed to import: " + data.error);
+                return;
+            }
             
             setImportStats({
                 imported: readyFixtures.length,
