@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { 
     CalendarDays, 
     Link2, 
@@ -230,7 +231,7 @@ export function FootballDataImportCentre({ clubName, clubSettings, onImportCompl
                                                 <Input 
                                                     type="time" 
                                                     className="h-8 w-24 bg-amber-500/10 border-amber-500/50 text-amber-500" 
-                                                    onChange={(e) => {
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                                                         const newItems = [...parsedItems];
                                                         const idx = newItems.findIndex(i => i.id === item.id);
                                                         if (idx > -1 && e.target.value) {
