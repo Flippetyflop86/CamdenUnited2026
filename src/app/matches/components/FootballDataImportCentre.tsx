@@ -47,7 +47,25 @@ interface FootballDataImportCentreProps {
 }
 
 export function FootballDataImportCentre({ clubId, clubName, clubSettings, onImportComplete }: FootballDataImportCentreProps) {
-    const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
+    const [isPasteModalOpen, _setIsPasteModalOpen] = useState(false);
+    
+    // Wrapper to log state changes
+    const setIsPasteModalOpen = (val: boolean) => {
+        console.log(`[DEBUG] setIsPasteModalOpen called with: ${val}. Trace:`, new Error().stack);
+        _setIsPasteModalOpen(val);
+    };
+
+    useEffect(() => {
+        console.log(`[DEBUG] FootballDataImportCentre MOUNTED. clubId: ${clubId}`);
+        return () => {
+            console.log(`[DEBUG] FootballDataImportCentre UNMOUNTED.`);
+        };
+    }, []);
+
+    useEffect(() => {
+        console.log(`[DEBUG] FootballDataImportCentre re-rendered. isPasteModalOpen is now: ${isPasteModalOpen}`);
+    });
+
     const [rawText, setRawText] = useState("");
     const [isParsing, setIsParsing] = useState(false);
     

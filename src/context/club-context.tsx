@@ -418,7 +418,12 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         setSettings(updated);
     };
 
+    useEffect(() => {
+        console.log(`[DEBUG] ClubProvider isLoaded: ${isLoaded}`);
+    }, [isLoaded]);
+
     if (!isLoaded) {
+        console.log(`[DEBUG] ClubProvider returning loading spinner. children will unmount!`);
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">
                 <div className="flex flex-col items-center gap-3">
