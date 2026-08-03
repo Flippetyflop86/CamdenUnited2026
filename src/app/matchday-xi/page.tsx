@@ -1077,12 +1077,12 @@ export default function MatchdayXIPage() {
 
                     {/* The Fixture */}
                     {nextMatch ? (
-                        <div className="flex flex-col items-center gap-3">
-                            <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-6 text-3xl md:text-5xl font-black tracking-tight">
+                        <div className="flex flex-col items-center gap-2">
+                            <div className="flex flex-col items-center justify-center gap-1 md:gap-2 text-4xl md:text-6xl font-black tracking-tight leading-none text-center">
                                 <span className={nextMatch.isHome ? "text-white" : "text-slate-400"}>
                                     {settings.name}
                                 </span>
-                                <span className="text-slate-600 text-xl font-bold uppercase tracking-widest px-2">vs</span>
+                                <span className="text-slate-700/60 text-sm md:text-base font-bold uppercase tracking-widest my-1 md:my-0">vs</span>
                                 <span className={!nextMatch.isHome ? "text-white" : "text-slate-400"}>
                                     {nextMatch.opponent}
                                 </span>
@@ -1233,7 +1233,7 @@ export default function MatchdayXIPage() {
 
                                 {/* Watermark */}
                                 {settings.logo && (
-                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
+                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
                                         <img src={settings.logo} alt="Watermark" className="w-48 h-48 object-contain grayscale brightness-125" />
                                     </div>
                                 )}
@@ -1310,7 +1310,10 @@ export default function MatchdayXIPage() {
                                             ${playerId ? 'bg-slate-900 border-slate-700' : 'bg-white/90 border-dashed border-slate-400'}
                                         `}>
                                             <span className={`text-[9px] sm:text-[12px] font-bold tracking-tight ${playerId ? 'text-white' : 'text-slate-500'}`}>
-                                                {playerId ? displayName : pos.label}
+                                                {playerId ? displayName : (() => {
+                                                    const map: Record<string, string> = { 'LCB': 'CB', 'RCB': 'CB', 'LDM': 'DM', 'RDM': 'DM', 'LAM': 'CAM', 'RAM': 'CAM' };
+                                                    return map[pos.label] || pos.label;
+                                                })()}
                                             </span>
                                             
                                             {/* Remove Button */}
