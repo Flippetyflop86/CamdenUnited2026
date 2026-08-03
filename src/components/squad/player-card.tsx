@@ -207,7 +207,7 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
                         onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
-                            if (confirm('Delete this player?')) onDelete(player.id);
+                            onDelete(player.id);
                         }}
                         className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 text-muted-foreground hover:text-status-error bg-surface-1 shadow-sm sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
                         title="Delete Player"

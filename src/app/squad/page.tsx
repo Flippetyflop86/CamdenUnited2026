@@ -451,9 +451,21 @@ export default function SquadPage() {
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure?")) return;
         const player = players.find(p => p.id === id);
+        
+        // Store previous state for rollback
+        const previousPlayers = [...players];
+        
+        // Optimistic update
         setPlayers((prev) => prev.filter((p) => p.id !== id));
+        
         const { error } = await supabase.from("players").delete().eq("id", id);
-        if (!error && player) {
+        
+        if (error) {
+            console.error("Delete player error:", error);
+            alert(`Failed to delete player: ${error.message}\n\nIf this player has played in matches, you cannot delete them without deleting their match stats first (or the database needs ON DELETE CASCADE).`);
+            // Rollback
+            setPlayers(previousPlayers);
+        } else if (player) {
             logActivity("Deleted Player", `Removed ${player.firstName} ${player.lastName} from the squad.`);
         }
     };
