@@ -59,9 +59,19 @@ export default function MatchdayXIPage() {
         // Goalkeeper
         if (s === 'GK') return p === 'GK';
         
-        // Defenders (including fullbacks)
-        if (['CB', 'LB', 'RB', 'LWB', 'RWB', 'DEF'].includes(s)) {
-            return ['CB', 'LB', 'RB', 'LWB', 'RWB', 'DEF'].includes(p);
+        // Centre Backs
+        if (['CB', 'LCB', 'RCB'].includes(s)) {
+            return ['CB', 'DEF'].includes(p);
+        }
+        
+        // Left Backs
+        if (['LB', 'LWB'].includes(s)) {
+            return ['LB', 'LWB', 'DEF'].includes(p);
+        }
+        
+        // Right Backs
+        if (['RB', 'RWB'].includes(s)) {
+            return ['RB', 'RWB', 'DEF'].includes(p);
         }
         
         // Defensive Midfielders (DM)
