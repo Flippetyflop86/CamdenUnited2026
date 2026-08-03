@@ -52,22 +52,43 @@ export default function MatchdayXIPage() {
     const isIdealPosition = (playerPos: string, slotLabel: string) => {
         const p = playerPos.toUpperCase();
         const s = slotLabel.toUpperCase();
+        
+        // Exact match
         if (p === s) return true;
+        
+        // Goalkeeper
         if (s === 'GK') return p === 'GK';
-        if (s === 'CB') return p === 'CB' || p === 'DEF';
-        if (s === 'RB') return p === 'RB' || p === 'RWB' || p === 'DEF';
-        if (s === 'LB') return p === 'LB' || p === 'LWB' || p === 'DEF';
-        if (s === 'RWB') return p === 'RWB' || p === 'RB' || p === 'DEF';
-        if (s === 'LWB') return p === 'LWB' || p === 'LB' || p === 'DEF';
-        if (s === 'CDM') return p === 'CDM' || p === 'CM' || p === 'MID';
-        if (s === 'CM') return p === 'CM' || p === 'CDM' || p === 'CAM' || p === 'MID';
-        if (s === 'CAM') return p === 'CAM' || p === 'CM' || p === 'MID';
-        if (s === 'LAM' || s === 'RAM') return p === 'LAM' || p === 'RAM' || p === 'CAM' || p === 'CM' || p === 'MID';
-        if (s === 'RM') return p === 'RM' || p === 'RW' || p === 'MID';
-        if (s === 'LM') return p === 'LM' || p === 'LW' || p === 'MID';
-        if (s === 'RW') return p === 'RW' || p === 'RM' || p === 'FWD';
-        if (s === 'LW') return p === 'LW' || p === 'LM' || p === 'FWD';
-        if (s === 'CF' || s === 'ST' || s === 'FWD') return p === 'CF' || p === 'ST' || p === 'FWD';
+        
+        // Defenders (including fullbacks)
+        if (['CB', 'LB', 'RB', 'LWB', 'RWB', 'DEF'].includes(s)) {
+            return ['CB', 'LB', 'RB', 'LWB', 'RWB', 'DEF'].includes(p);
+        }
+        
+        // Defensive Midfielders (DM)
+        if (['CDM', 'LDM', 'RDM', 'DM'].includes(s)) {
+            return ['CDM', 'DM', 'CM', 'MID'].includes(p);
+        }
+        
+        // Attacking Midfielders (CAM)
+        if (['CAM', 'LAM', 'RAM', 'AM'].includes(s)) {
+            return ['CAM', 'CM', 'AM', 'MID'].includes(p);
+        }
+        
+        // Central Midfielders
+        if (['CM', 'MID'].includes(s)) {
+            return ['CM', 'CDM', 'CAM', 'DM', 'AM', 'MID'].includes(p);
+        }
+        
+        // Wide Midfielders / Wingers
+        if (['LM', 'RM', 'LW', 'RW'].includes(s)) {
+            return ['LM', 'RM', 'LW', 'RW', 'MID', 'FWD'].includes(p);
+        }
+        
+        // Forwards
+        if (['ST', 'CF', 'FWD'].includes(s)) {
+            return ['ST', 'CF', 'FWD'].includes(p);
+        }
+        
         return false;
     };
 
@@ -1017,29 +1038,88 @@ export default function MatchdayXIPage() {
 
 
     return (
-        <div className="space-y-6 text-slate-900 dark:text-slate-100">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="space-y-1.5 flex-1">
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900 dark:text-white">Matchday XI</h2>
-                    <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Fixture:</span>
+        <div className="pb-16 text-slate-900 dark:text-slate-100 flex flex-col gap-8">
+            
+            {/* Match Identity & Fixture Selection */}
+            <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 md:p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                {/* Subtle Pitch Pattern Background */}
+                <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, #ffffff 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
+                
+                <div className="relative z-10 w-full max-w-2xl mx-auto flex flex-col items-center">
+                    
+                    {/* Fixture Selector (Subtle) */}
+                    <div className="mb-6 w-full flex justify-center">
                         <select
                             value={selectedMatchId}
                             onChange={(e) => setSelectedMatchId(e.target.value)}
-                            className="flex h-9 rounded-md border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-slate-950 cursor-pointer text-slate-800 dark:text-slate-100 font-semibold outline-none max-w-full"
+                            className="bg-slate-800/50 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs md:text-sm rounded-full px-4 py-1.5 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-500 cursor-pointer font-medium max-w-full truncate"
                         >
                             {matches.map(m => {
                                 const formattedDate = new Date(m.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
                                 return (
-                                    <option key={m.id} value={m.id}>
+                                    <option key={m.id} value={m.id} className="bg-slate-900 text-slate-200">
                                         {m.isHome ? "🏠" : "🚌"} vs {m.opponent} ({formattedDate}) {m.result !== "Pending" ? `[${m.result}]` : ""}
                                     </option>
                                 );
                             })}
                         </select>
                     </div>
+
+                    {/* The Fixture */}
+                    {nextMatch ? (
+                        <div className="flex flex-col items-center gap-3">
+                            <div className="flex flex-col md:flex-row items-center justify-center gap-2 md:gap-6 text-3xl md:text-5xl font-black tracking-tight">
+                                <span className={nextMatch.isHome ? "text-white" : "text-slate-400"}>
+                                    {settings.name}
+                                </span>
+                                <span className="text-slate-600 text-xl font-bold uppercase tracking-widest px-2">vs</span>
+                                <span className={!nextMatch.isHome ? "text-white" : "text-slate-400"}>
+                                    {nextMatch.opponent}
+                                </span>
+                            </div>
+                            
+                            <div className="flex flex-wrap items-center justify-center gap-3 md:gap-6 text-slate-400 text-xs md:text-sm font-semibold tracking-wide uppercase mt-4">
+                                <span className="flex items-center gap-1.5 text-brand/90"><Trophy className="h-4 w-4" /> {nextMatch.competition || "Friendly"}</span>
+                                <span className="flex items-center gap-1.5 text-slate-300"><MapPin className="h-4 w-4" /> {nextMatch.isHome ? (settings.homeGround || 'Home') : 'Away'}</span>
+                                <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4" /> {new Date(nextMatch.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+                                <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" /> {nextMatch.time}</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <h2 className="text-3xl font-black text-white">No Upcoming Matches</h2>
+                    )}
                 </div>
-                <div className="flex flex-wrap items-center gap-3">
+            </div>
+
+            {/* Action Bar (Relocated from header) */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-1">
+                <div className="flex space-x-2 border-b border-transparent overflow-x-auto no-scrollbar max-w-full">
+                    {currentSquads.map(squad => (
+                        <button 
+                            key={squad} 
+                            onClick={() => setActiveSquadTab(squad)} 
+                            className={`px-4 py-2 text-sm font-bold rounded-md whitespace-nowrap transition-colors ${activeSquadTab === squad ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"}`}
+                        >
+                            {squad}
+                        </button>
+                    ))}
+                </div>
+                
+                <div className="flex flex-wrap items-center gap-2">
+                    <Button onClick={handleClearLineup} variant="outline" className="h-9 text-xs shadow-sm" title="Clear Pitch">
+                        <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button onClick={handleAutoFillLastLineup} variant="outline" className="h-9 text-xs shadow-sm" title="Fill Last Lineup">
+                        <RefreshCw className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button onClick={handleCopyToWhatsApp} className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white border-none shadow-sm flex">
+                        <MessageCircle className="h-3.5 w-3.5 mr-2" />
+                        Share
+                    </Button>
+                    <Button onClick={handleExportPDF} variant="outline" className="h-9 text-xs shadow-sm">
+                        <FileDown className="h-3.5 w-3.5 mr-2" />
+                        PDF
+                    </Button>
                     <Button onClick={async () => {
                         if (!selectedMatchId) return;
                         await saveLineup(lineup);
@@ -1048,87 +1128,26 @@ export default function MatchdayXIPage() {
                         const matchObj = matches.find(m => m.id === selectedMatchId);
                         const opponentName = matchObj ? matchObj.opponent : "this game";
                         alert(`Lineup saved successfully for vs ${opponentName}!`);
-                    }} className="bg-red-600 hover:bg-red-700 text-white font-bold">
-                        <Save className="h-4 w-4 mr-2" />
-                        Save &amp; Confirm Lineup
-                    </Button>
-                    <Button onClick={handleClearLineup} variant="outline" className="border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Clear Pitch
-                    </Button>
-                    <Button onClick={handleAutoFillLastLineup} variant="outline" className="border-slate-300 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300">
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Fill Last Lineup
-                    </Button>
-                    <Button onClick={handleCopyToWhatsApp} className="bg-emerald-600 hover:bg-emerald-700 text-white border-none flex">
-                        <MessageCircle className="h-4 w-4 mr-2" />
-                        Copy to WhatsApp
-                    </Button>
-                    <Button onClick={handleExportPDF} className="bg-blue-600 hover:bg-blue-700">
-                        <FileDown className="h-4 w-4 mr-2" />
-                        Export PDF
+                    }} className="h-9 text-xs bg-brand text-brand-foreground hover:bg-brand/90 font-bold shadow-sm px-5">
+                        <Save className="h-3.5 w-3.5 mr-2" />
+                        Save Lineup
                     </Button>
                 </div>
             </div>
 
-            <div className="flex space-x-2 border-b border-slate-200 dark:border-slate-800 pb-2 overflow-x-auto no-scrollbar">
-                {currentSquads.map(squad => (
-                    <button 
-                        key={squad} 
-                        onClick={() => setActiveSquadTab(squad)} 
-                        className={`px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-colors ${activeSquadTab === squad ? "bg-red-50 dark:bg-red-950/20 text-red-700 dark:text-red-400" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-900"}`}
-                    >
-                        {squad}
-                    </button>
-                ))}
-            </div>
-
-            {nextMatch && (
-                <Card className="bg-slate-900 text-white border-slate-800">
-                    <CardContent className="flex items-center justify-between p-6">
-                        <div className="space-y-1">
-                            <p className="text-slate-400 text-sm font-medium uppercase tracking-wider">Upcoming Match</p>
-                            <h3 className="text-2xl font-bold flex items-center gap-2">
-                                <span className={nextMatch.isHome ? "text-white" : "text-slate-400"}>{settings.name}</span>
-                                <span className="text-slate-500 text-lg">vs</span>
-                                <span className={!nextMatch.isHome ? "text-white" : "text-slate-400"}>{nextMatch.opponent}</span>
-                            </h3>
-                        </div>
-                        <div className="flex gap-6 text-sm flex-wrap mt-4 sm:mt-0">
-                            <div className="flex items-center gap-2">
-                                <Trophy className="h-4 w-4 text-red-500" />
-                                <span className="font-semibold text-slate-300">{nextMatch.competition || "Match"}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-red-500" />
-                                <span>{new Date(nextMatch.date).toLocaleDateString()}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Clock className="h-4 w-4 text-red-500" />
-                                <span>{nextMatch.time}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-red-500" />
-                                <span>{nextMatch.isHome ? 'Home' : 'Away'}</span>
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:h-[650px]">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 lg:h-[700px]">
                 
                 {/* Left Panel - Squad */}
-                <Card 
-                    className="lg:col-span-1 h-[400px] lg:h-full flex flex-col border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md order-2 lg:order-1 min-h-0 overflow-hidden"
+                <div 
+                    className="lg:col-span-1 h-[400px] lg:h-full flex flex-col bg-slate-50/50 dark:bg-slate-900/50 rounded-xl border border-slate-200/60 dark:border-slate-800/60 order-2 lg:order-1 min-h-0 overflow-hidden"
                     onDragOver={handleDragOver}
                     onDrop={handleDropOnSquad}
                 >
-                    <div className="p-3 bg-slate-100 dark:bg-slate-950 font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                        <span>Available Squad</span>
-                        <span className="bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded-full text-[10px]">{players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p)).length}</span>
+                    <div className="p-4 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between shrink-0">
+                        <span className="font-bold text-sm text-slate-700 dark:text-slate-300">Available Players</span>
+                        <span className="text-xs font-semibold text-slate-500">{players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p)).length} Available</span>
                     </div>
-                    <div className="p-2 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex gap-1 overflow-x-auto no-scrollbar shrink-0 shadow-sm z-10">
+                    <div className="p-2 border-b border-slate-200/60 dark:border-slate-800/60 bg-white/30 dark:bg-slate-950/30 flex gap-1 overflow-x-auto no-scrollbar shrink-0 z-10">
                         {(["All", "GK", "DEF", "MID", "FWD"] as const).map(f => (
                             <button
                                 key={f}
@@ -1167,12 +1186,15 @@ export default function MatchdayXIPage() {
                             </div>
                         )}
                     </div>
-                </Card>
+                </div>
 
                 {/* Center Content - Formation Display */}
-                <Card className="lg:col-span-2 h-auto lg:h-full flex flex-col border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md order-1 lg:order-2 min-h-0 overflow-hidden">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0 border-b border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 z-10 shrink-0">
-                        <CardTitle className="text-sm font-bold text-slate-900 dark:text-white">Starting XI</CardTitle>
+                <div className="lg:col-span-3 h-auto lg:h-full flex flex-col order-1 lg:order-2 min-h-0 overflow-hidden rounded-xl">
+                    <div className="flex flex-row items-center justify-between pb-3 space-y-0 z-10 shrink-0">
+                        <div className="flex flex-col">
+                            <span className="font-bold text-lg text-slate-900 dark:text-white">Starting XI</span>
+                            <span className="text-xs font-semibold text-slate-500">{Object.values(lineup.starters).filter(Boolean).length} / 11 Selected</span>
+                        </div>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider hidden sm:inline">Formation</span>
                             <select
@@ -1296,15 +1318,18 @@ export default function MatchdayXIPage() {
                                 );
                             })}
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
 
                 {/* Right Panel - Bench */}
-                <Card className="lg:col-span-1 h-[400px] lg:h-full flex flex-col border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-md bg-slate-50/30 dark:bg-slate-950/20 order-3 min-h-0 overflow-hidden">
-                    <div className="p-3 bg-slate-100 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 font-bold text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 flex justify-between items-center">
-                        <span>Bench ({lineup.substitutes.filter(Boolean).length})</span>
+                <div className="lg:col-span-1 h-[400px] lg:h-full flex flex-col bg-slate-50/50 dark:bg-slate-900/50 rounded-xl border border-slate-200/60 dark:border-slate-800/60 order-3 min-h-0 overflow-hidden">
+                    <div className="p-4 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between shrink-0">
+                        <div className="flex flex-col">
+                            <span className="font-bold text-sm text-slate-700 dark:text-slate-300">Bench</span>
+                            <span className="text-xs font-semibold text-slate-500">{lineup.substitutes.filter(Boolean).length} / {lineup.substitutes.length} Selected</span>
+                        </div>
                         <button onClick={handleAddSub} className="text-red-600 hover:text-red-700 font-bold text-[10px] flex items-center px-2 py-1 rounded bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/35 transition-colors">
-                            <Plus className="h-3 w-3 mr-0.5" /> ADD SLOT
+                            <Plus className="h-3 w-3 mr-0.5" /> ADD
                         </button>
                     </div>
                     <div className="p-3 space-y-2 overflow-y-auto flex-1">
@@ -1434,24 +1459,7 @@ export default function MatchdayXIPage() {
                             );
                         })}
                     </div>
-                    <div className="p-3 border-t border-slate-200 dark:border-slate-800 bg-slate-100 dark:bg-slate-950 flex items-center justify-end">
-                        <Button 
-                            onClick={async () => {
-                                if (!selectedMatchId) return;
-                                await saveLineup(lineup);
-                                const { error } = await supabase.from('matches').update({ is_squad_confirmed: true }).eq('id', selectedMatchId);
-                                if (error) console.error("Error confirming squad", error);
-                                const matchObj = matches.find(m => m.id === selectedMatchId);
-                                const opponentName = matchObj ? matchObj.opponent : "this game";
-                                alert(`Lineup saved successfully for vs ${opponentName}!`);
-                            }} 
-                            className="bg-red-600 hover:bg-red-700 text-white font-bold w-full text-xs h-9"
-                        >
-                            <Save className="h-4 w-4 mr-1.5" />
-                            Save Lineup for Game
-                        </Button>
-                    </div>
-                </Card>
+                </div>
             </div>
 
             {/* Assign Player Modal/Drawer */}
