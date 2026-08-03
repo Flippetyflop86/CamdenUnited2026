@@ -180,7 +180,7 @@ export function FootballDataImportCentre({ clubId, clubName, clubSettings, onImp
 
             {/* Paste Modal */}
             <Dialog open={isPasteModalOpen} onOpenChange={setIsPasteModalOpen}>
-                <DialogContent className="sm:max-w-xl bg-surface-1 border-border">
+                <DialogContent className="sm:max-w-xl bg-surface-1 border-border" onInteractOutside={(e) => e.preventDefault()}>
                     <DialogHeader>
                         <DialogTitle>Paste Fixture List</DialogTitle>
                         <DialogDescription>
@@ -206,7 +206,7 @@ export function FootballDataImportCentre({ clubId, clubName, clubSettings, onImp
 
             {/* Gmail-Style Review Modal */}
             <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
-                <DialogContent className="max-w-4xl bg-surface-1 border-border max-h-[90vh] flex flex-col">
+                <DialogContent className="max-w-4xl bg-surface-1 border-border max-h-[90vh] flex flex-col" onInteractOutside={(e) => e.preventDefault()}>
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             Review Import
@@ -287,7 +287,7 @@ export function FootballDataImportCentre({ clubId, clubName, clubSettings, onImp
 
             {/* Success Summary */}
             <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
-                <DialogContent className="sm:max-w-md bg-surface-1 border-border text-center pb-8">
+                <DialogContent className="sm:max-w-md bg-surface-1 border-border text-center pb-8" onInteractOutside={(e) => e.preventDefault()}>
                     <div className="flex justify-center mt-6 mb-4">
                         <div className="h-16 w-16 rounded-full bg-emerald-500/20 flex items-center justify-center">
                             <CheckCircle2 className="h-8 w-8 text-emerald-500" />
