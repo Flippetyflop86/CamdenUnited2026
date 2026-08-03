@@ -23,8 +23,8 @@ export function PageGuard({ children }: PageGuardProps) {
         setIsMounted(true);
     }, []);
 
-    // While auth is loading or component has not mounted yet, render nothing (prevents flash & hydration warnings)
-    if (!isMounted || isLoading) return null;
+    // While auth is loading AND we don't have a role yet, render nothing
+    if (!isMounted || (isLoading && role === undefined)) return null;
 
     // Check access
     if (!canAccess(pathname, role, pagePermissions)) {
