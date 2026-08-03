@@ -402,7 +402,8 @@ export default function DashboardPage() {
             : false;
         if (nextMatch && !isMatchConfirmed) list.push({ label: `Confirm Matchday Squad vs ${nextMatch.opponent}`, category: "Matchday" });
         
-        if (injuredPlayers.length > 0) list.push({ label: `Update Injury Recovery Status for ${injuredPlayers.length} Squad Members`, category: "Medical" });
+        if (injuredPlayers.length > 0) list.push({ label: `Review recovery timeline for ${injuredPlayers.length} injured player(s)`, category: "Medical" });
+        if (suspendedPlayers.length > 0) list.push({ label: `${suspendedPlayers.length} player(s) currently serving suspensions`, category: "Discipline" });
         if (settings.leagueUrl && !settings.leaguePosition) list.push({ label: "Sync League Table Standings", category: "Operations" });
         
         return list.filter(task => !dismissedPriorities.includes(task.label)).slice(0, 5);
@@ -669,28 +670,6 @@ export default function DashboardPage() {
                                 <span className="text-[10px] font-bold uppercase tracking-widest text-status-warning px-2 py-1 bg-background rounded border border-border">Priority</span>
                             </div>
                         ))}
-                        {injuredPlayers.map((player, idx) => (
-                            <div key={`inj-${idx}`} className="flex items-center justify-between p-3.5 bg-status-error/5 border border-status-error/20 rounded-lg text-sm transition-colors hover:bg-status-error/10 shadow-sm">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-1.5 rounded-full bg-background text-status-error shadow-sm">
-                                        <AlertCircle className="h-4 w-4" />
-                                    </div>
-                                    <span className="font-medium text-foreground">{player.firstName} {player.lastName} requires injury update.</span>
-                                </div>
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-status-error px-2 py-1 bg-background rounded border border-border">Medical</span>
-                            </div>
-                        ))}
-                        {suspendedPlayers.length > 0 && (
-                            <div className="flex items-center justify-between p-3.5 bg-status-error/5 border border-status-error/20 rounded-lg text-sm transition-colors hover:bg-status-error/10 shadow-sm">
-                                <div className="flex items-center gap-3">
-                                    <div className="p-1.5 rounded-full bg-background text-status-error shadow-sm">
-                                        <ShieldAlert className="h-4 w-4" />
-                                    </div>
-                                    <span className="font-medium text-foreground">{suspendedPlayers.length} player(s) currently suspended.</span>
-                                </div>
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-status-error px-2 py-1 bg-background rounded border border-border">Discipline</span>
-                            </div>
-                        )}
                     </div>
                 ) : (
                     <div className="bg-card border border-border rounded-lg p-6 flex flex-col items-center justify-center text-center shadow-sm">
