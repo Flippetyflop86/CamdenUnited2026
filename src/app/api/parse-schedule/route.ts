@@ -84,7 +84,7 @@ export async function POST(request: Request) {
                         }
                         
                         // Split by large gaps
-                        const columns = cleanLine.split(/\s{2,}|\t/).filter(c => c.trim().length > 0);
+                        const columns = cleanLine.split(/\s{2,}|\t/).filter((c: string) => c.trim().length > 0);
                         if (columns.length >= 2) {
                             const isHome = columns[0].toLowerCase().includes(clubName.toLowerCase());
                             const opponent = isHome ? columns[1] : columns[0];

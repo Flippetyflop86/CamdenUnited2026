@@ -1545,21 +1545,10 @@ export default function MatchesPage() {
                 </div>
             </div>
 
-            <LeagueSync 
-                isSyncing={isSyncing}
-                leagueUrl={settings.leagueUrl || null}
-                tempUrl={tempUrl}
-                isEditingUrl={isEditingUrl}
-                setTempUrl={setTempUrl}
-                setIsEditingUrl={setIsEditingUrl}
-                onSaveUrl={() => {
-                    if (tempUrl.trim()) {
-                        updateSettings({ leagueUrl: tempUrl.trim() });
-                        setIsEditingUrl(false);
-                    }
-                }}
-                onSync={handleSyncFixtures}
-                fixturesCount={upcomingMatches.length}
+            <FootballDataImportCentre 
+                clubName={settings.name} 
+                clubSettings={settings}
+                onImportComplete={fetchMatches}
             />
 
             {upcomingMatches.length > 0 && (
