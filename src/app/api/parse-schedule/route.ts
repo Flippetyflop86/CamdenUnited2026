@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { rawText, clubName } = body;
+        const { rawText, clubName, defaultKickOff } = body;
 
         if (!rawText || !clubName) {
             return NextResponse.json({ success: false, error: 'Missing rawText or clubName' }, { status: 400 });
@@ -109,8 +109,12 @@ export async function POST(request: Request) {
             let warnings = [];
             
             if (!f.time) {
-                status = 'warning';
-                warnings.push('missing_time');
+                if (defaultKickOff) {
+                    f.time = defaultKickOff;
+                } else {
+                    status = 'warning';
+                    warnings.push('missing_time');
+                }
             }
             if (!f.date) {
                 status = 'warning';

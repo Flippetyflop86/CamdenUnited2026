@@ -62,7 +62,7 @@ export function FootballDataImportCentre({ clubName, clubSettings, onImportCompl
             const res = await fetch('/api/parse-schedule', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rawText, clubName })
+                body: JSON.stringify({ rawText, clubName, defaultKickOff: clubSettings?.defaultHomeKickOff })
             });
             const data = await res.json();
             if (data.success) {
@@ -80,18 +80,27 @@ export function FootballDataImportCentre({ clubName, clubSettings, onImportCompl
     };
 
     const handleImport = async () => {
-        // Send to supabase /api/import-fixtures
-        // For now, we simulate success
-        setImportStats({
-            imported: parsedItems.filter(i => i.status === 'ready').length,
-            skipped: parsedItems.filter(i => i.status === 'duplicate').length,
-            reviews: parsedItems.filter(i => i.status === 'warning').length
-        });
+        const readyFixtures = parsedItems.filter(i => i.status === 'ready');
         
-        setIsReviewOpen(false);
-        setIsSuccessOpen(true);
-        // Call onImportComplete to refresh parent
-        onImportComplete();
+        try {
+            await fetch('/api/import-fixtures', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fixtures: readyFixtures, clubName })
+            });
+            
+            setImportStats({
+                imported: readyFixtures.length,
+                skipped: parsedItems.filter(i => i.status === 'duplicate').length,
+                reviews: parsedItems.filter(i => i.status === 'warning').length
+            });
+            
+            setIsReviewOpen(false);
+            setIsSuccessOpen(true);
+            onImportComplete();
+        } catch (e) {
+            console.error(e);
+        }
     };
 
     const removeItem = (id: string) => {
@@ -218,9 +227,20 @@ export function FootballDataImportCentre({ clubName, clubSettings, onImportCompl
                                         {/* Kick Off resolution */}
                                         <div className="w-32">
                                             {item.warnings.includes('missing_time') ? (
-                                                <div className="text-amber-500 text-xs flex items-center gap-1 bg-amber-500/10 px-2 py-1 rounded">
-                                                    Missing time
-                                                </div>
+                                                <Input 
+                                                    type="time" 
+                                                    className="h-8 w-24 bg-amber-500/10 border-amber-500/50 text-amber-500" 
+                                                    onChange={(e) => {
+                                                        const newItems = [...parsedItems];
+                                                        const idx = newItems.findIndex(i => i.id === item.id);
+                                                        if (idx > -1 && e.target.value) {
+                                                            newItems[idx].time = e.target.value;
+                                                            newItems[idx].warnings = newItems[idx].warnings.filter(w => w !== 'missing_time');
+                                                            if (newItems[idx].warnings.length === 0) newItems[idx].status = 'ready';
+                                                            setParsedItems(newItems);
+                                                        }
+                                                    }}
+                                                />
                                             ) : (
                                                 <span className="font-mono">{item.time}</span>
                                             )}
