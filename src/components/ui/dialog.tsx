@@ -42,12 +42,14 @@ const DialogTrigger = ({ asChild, children, ...props }: any) => {
     return <button onClick={handleClick} {...props}>{children}</button>;
 };
 
-const DialogContent = ({ className, children, onInteractOutside, ...props }: any) => {
+const DialogContent = ({ className, children, onInteractOutside, preventCloseOnOutsideClick, ...props }: any) => {
     const context = React.useContext(DialogContext);
     if (!context) throw new Error("DialogContent must be used within Dialog");
     if (!context.open) return null;
 
     const handleBackdropClick = (e: React.MouseEvent) => {
+        if (preventCloseOnOutsideClick) return;
+        
         if (onInteractOutside) {
             // Create a fake event that can be prevented
             const event = { preventDefault: () => { event.defaultPrevented = true; }, defaultPrevented: false };
