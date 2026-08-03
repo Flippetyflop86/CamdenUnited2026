@@ -65,7 +65,7 @@ export function NextMatchHero({ match, onManageMatch, onShareMatch }: NextMatchH
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <MapPin className="h-4 w-4" />
-                                {isHome ? "Home" : "Away"}
+                                {isHome ? "Home" : "Away"} {match.location ? `- ${match.location}` : ""} {match.surface ? `(${match.surface})` : ""}
                             </div>
                         </div>
                     </div>

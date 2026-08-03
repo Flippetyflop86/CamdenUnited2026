@@ -62,6 +62,7 @@ export default function MatchdayXIPage() {
         if (s === 'CDM') return p === 'CDM' || p === 'CM' || p === 'MID';
         if (s === 'CM') return p === 'CM' || p === 'CDM' || p === 'CAM' || p === 'MID';
         if (s === 'CAM') return p === 'CAM' || p === 'CM' || p === 'MID';
+        if (s === 'LAM' || s === 'RAM') return p === 'LAM' || p === 'RAM' || p === 'CAM' || p === 'CM' || p === 'MID';
         if (s === 'RM') return p === 'RM' || p === 'RW' || p === 'MID';
         if (s === 'LM') return p === 'LM' || p === 'LW' || p === 'MID';
         if (s === 'RW') return p === 'RW' || p === 'RM' || p === 'FWD';
@@ -968,8 +969,9 @@ export default function MatchdayXIPage() {
             : [];
         const activeTabClean = activeSquadTab.toLowerCase().replace(/\s+/g, '');
         const matchesSquad = playerSquads.includes(activeTabClean);
+        const isDual = playerSquads.includes("dualregistration");
         const isFirstTeamTab = activeTabClean === 'firstteam';
-        return matchesSquad || (isFirstTeamTab && p.isInMatchdayTracker === true);
+        return matchesSquad || isDual || (isFirstTeamTab && p.isInMatchdayTracker === true);
     };
 
     const availablePlayers = players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p));
@@ -1041,7 +1043,8 @@ export default function MatchdayXIPage() {
                     <Button onClick={async () => {
                         if (!selectedMatchId) return;
                         await saveLineup(lineup);
-                        localStorage.setItem("matchday_squad_confirmed_" + selectedMatchId, "true");
+                        const { error } = await supabase.from('matches').update({ is_squad_confirmed: true }).eq('id', selectedMatchId);
+                        if (error) console.error("Error confirming squad", error);
                         const matchObj = matches.find(m => m.id === selectedMatchId);
                         const opponentName = matchObj ? matchObj.opponent : "this game";
                         alert(`Lineup saved successfully for vs ${opponentName}!`);
@@ -1436,7 +1439,8 @@ export default function MatchdayXIPage() {
                             onClick={async () => {
                                 if (!selectedMatchId) return;
                                 await saveLineup(lineup);
-                                localStorage.setItem("matchday_squad_confirmed_" + selectedMatchId, "true");
+                                const { error } = await supabase.from('matches').update({ is_squad_confirmed: true }).eq('id', selectedMatchId);
+                                if (error) console.error("Error confirming squad", error);
                                 const matchObj = matches.find(m => m.id === selectedMatchId);
                                 const opponentName = matchObj ? matchObj.opponent : "this game";
                                 alert(`Lineup saved successfully for vs ${opponentName}!`);

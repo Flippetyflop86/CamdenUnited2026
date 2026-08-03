@@ -838,7 +838,7 @@ export default function MatchesPage() {
             case "Win": return "text-green-600 bg-green-50 border-green-200";
             case "Loss": return "text-red-600 bg-red-50 border-red-200";
             case "Draw": return "text-amber-600 bg-amber-50 border-amber-200";
-            default: return "text-slate-500 bg-slate-50 border-slate-200";
+            default: return "text-muted-foreground bg-surface-2 border-border";
         }
     };
 
@@ -873,18 +873,19 @@ export default function MatchesPage() {
         return type === filterType;
     });
 
-    const now = new Date();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
     // Upcoming: Date is in future (or today pending)
     const upcomingMatches = filteredMatches.filter(m => {
         const d = new Date(m.date);
-        return d >= new Date(now.setHours(0, 0, 0, 0)) && m.result === "Pending";
+        return d >= today && (!m.result || m.result === "Pending");
     }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // Ascending (Soonest first)
 
     // Past: Date is in past OR result is documented
     const pastMatches = filteredMatches.filter(m => {
         const d = new Date(m.date);
-        return d < new Date(now.setHours(0, 0, 0, 0)) || m.result !== "Pending";
+        return d < today || (m.result && m.result !== "Pending");
     }).sort((a, b) => {
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
@@ -941,15 +942,15 @@ export default function MatchesPage() {
             <Card className="overflow-hidden hover:shadow-md transition-shadow border-border bg-surface-1">
                 <CardHeader className="py-4 bg-surface-2/50 border-border border-b flex flex-row items-center justify-between">
                     <div className="flex items-center gap-3 flex-wrap">
-                        <Badge variant="outline" className={`bg-white ${match.competition.toLowerCase().includes("cup") ? "border-amber-200 text-amber-700" : "border-slate-200"
+                        <Badge variant="outline" className={`bg-surface-2 ${match.competition.toLowerCase().includes("cup") ? "border-amber-200 text-amber-700" : "border-border"
                             }`}>
                             {match.competition}
                         </Badge>
-                        <span className="text-sm text-slate-500 flex items-center gap-1">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1">
                             <CalendarDays className="h-3 w-3" /> {new Date(match.date).toLocaleDateString()}
                         </span>
                         {dayWeather && !isPast && (
-                            <span className="text-xs text-slate-500 flex items-center gap-1 bg-slate-100/80 border border-slate-200/60 px-2 py-0.5 rounded-full" title={`Temp: ${dayWeather.tempMin}°C to ${dayWeather.tempMax}°C, Rain: ${dayWeather.rain}mm`}>
+                            <span className="text-xs text-muted-foreground flex items-center gap-1 bg-surface-2/80 border border-border px-2 py-0.5 rounded-full" title={`Temp: ${dayWeather.tempMin}°C to ${dayWeather.tempMax}°C, Rain: ${dayWeather.rain}mm`}>
                                 {weatherIcon} <span>{weatherLabel} ({dayWeather.tempMin}° - {dayWeather.tempMax}°)</span>
                             </span>
                         )}
@@ -1020,7 +1021,7 @@ export default function MatchesPage() {
                             <span className={`font-bold text-lg ${match.isHome ? 'text-foreground' : 'text-muted-foreground'}`}>
                                 {match.isHome ? settings.name : match.opponent}
                             </span>
-                            {match.isHome && <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded shrink-0">H</span>}
+                            {match.isHome && <span className="text-xs px-1.5 py-0.5 bg-surface-3 text-muted-foreground rounded shrink-0">H</span>}
                         </div>
  
                         {/* Score / VS */}
@@ -1042,7 +1043,7 @@ export default function MatchesPage() {
                                 </Badge>
                             )}
                             {match.location && (
-                                <span className="text-xs text-slate-500 mt-1.5 flex items-center justify-center gap-1 bg-slate-100/80 px-2 py-0.5 rounded-full font-medium">
+                                <span className="text-xs text-muted-foreground mt-1.5 flex items-center justify-center gap-1 bg-surface-2/80 px-2 py-0.5 rounded-full font-medium">
                                     <MapPin className="h-3 w-3 text-slate-400 shrink-0" /> {match.location}
                                 </span>
                             )}
@@ -1050,7 +1051,7 @@ export default function MatchesPage() {
  
                         {/* Away Team */}
                         <div className="flex-1 flex items-center justify-start gap-3 text-left">
-                            {!match.isHome && <span className="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-500 rounded shrink-0">A</span>}
+                            {!match.isHome && <span className="text-xs px-1.5 py-0.5 bg-surface-3 text-muted-foreground rounded shrink-0">A</span>}
                             <span className={`font-bold text-lg flex items-center gap-2 ${!match.isHome ? 'text-foreground' : 'text-muted-foreground'}`}>
                                 {!match.isHome && settings.logo && (
                                     <img src={settings.logo} alt="Club Logo" className="h-6 w-6 object-contain shrink-0 rounded-full" />
@@ -1074,13 +1075,13 @@ export default function MatchesPage() {
                         {(match.goalscorers || match.assists) && (
                             <div className="space-y-1">
                                 {match.goalscorers && (
-                                    <div className="flex items-start gap-2 text-sm text-slate-600">
+                                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
                                         <Activity className="h-4 w-4 mt-0.5 text-green-600 shrink-0" />
                                         <span>{match.goalscorers}</span>
                                     </div>
                                 )}
                                 {match.assists && (
-                                    <div className="flex items-start gap-2 text-sm text-slate-600">
+                                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
                                         <span className="h-4 w-4 mt-0.5 flex items-center justify-center text-xs font-bold shrink-0">🅰️</span>
                                         <span>{match.assists}</span>
                                     </div>
@@ -1089,18 +1090,18 @@ export default function MatchesPage() {
                         )}
 
                         {match.lineup && (
-                            <div className="w-full mt-3 pt-3 border-t border-slate-100 flex flex-col items-center">
+                            <div className="w-full mt-3 pt-3 border-t border-border flex flex-col items-center">
                                 <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => setShowLineup(!showLineup)}
-                                    className="text-xs font-bold bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 px-3 py-1 flex items-center gap-1.5 h-8 transition-colors shadow-sm"
+                                    className="text-xs font-bold bg-surface-2 hover:bg-surface-3 text-foreground border border-border px-3 py-1 flex items-center gap-1.5 h-8 transition-colors shadow-sm"
                                 >
                                     <span>📋</span> {showLineup ? "Hide Saved Lineup" : `Show Saved Lineup (${match.lineup.formation})`}
                                 </Button>
                                 
                                 {showLineup && (
-                                    <div className="w-full mt-2.5 p-3 rounded-xl bg-slate-50/80 border border-slate-100 text-left space-y-2.5">
+                                    <div className="w-full mt-2.5 p-3 rounded-xl bg-surface-2/80 border border-border text-left space-y-2.5">
                                         <div>
                                             <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Starting XI</span>
                                             <div className="mt-1.5 flex flex-wrap gap-1.5">
@@ -1110,7 +1111,7 @@ export default function MatchesPage() {
                                                         const p = players.find(x => x.id === id);
                                                         const name = p ? `${p.first_name[0]}.${p.last_name}` : "Unknown";
                                                         return (
-                                                            <span key={pos} className="inline-flex items-center bg-white border border-slate-200 px-2 py-0.5 rounded-full shadow-sm text-[11px]">
+                                                            <span key={pos} className="inline-flex items-center bg-surface-2 border border-border px-2 py-0.5 rounded-full shadow-sm text-[11px]">
                                                                 <span className="text-[9px] uppercase font-extrabold text-slate-400 mr-1">{pos}:</span>
                                                                 <span className="font-semibold text-slate-800">{name}</span>
                                                             </span>
@@ -1120,7 +1121,7 @@ export default function MatchesPage() {
                                         </div>
                                         
                                         {match.lineup.substitutes && match.lineup.substitutes.filter(id => id).length > 0 && (
-                                            <div className="border-t border-slate-200/60 pt-2.5">
+                                            <div className="border-t border-border pt-2.5">
                                                 <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Substitutes</span>
                                                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                                                     {match.lineup.substitutes
@@ -1129,7 +1130,7 @@ export default function MatchesPage() {
                                                             const p = players.find(x => x.id === id);
                                                             const name = p ? `${p.first_name[0]}.${p.last_name}` : "Unknown";
                                                             return (
-                                                                <span key={index} className="inline-flex items-center bg-white border border-slate-200 px-2 py-0.5 rounded-full shadow-sm text-[11px]">
+                                                                <span key={index} className="inline-flex items-center bg-surface-2 border border-border px-2 py-0.5 rounded-full shadow-sm text-[11px]">
                                                                     <span className="font-semibold text-slate-750 text-slate-800">{name}</span>
                                                                 </span>
                                                             );
@@ -1152,11 +1153,11 @@ export default function MatchesPage() {
                 )}
             </CardContent>
             {isPast && (
-                <div className="p-4 bg-slate-50 border-t grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="p-4 bg-surface-2 border-t grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <Button 
                         variant="outline" 
                         onClick={() => router.push(`/analysis?matchId=${match.id}`)}
-                        className="w-full text-xs font-bold border-slate-200 text-slate-755 text-slate-700 hover:bg-slate-100 flex items-center justify-center gap-1.5"
+                        className="w-full text-xs font-bold border-border text-foreground text-foreground hover:bg-surface-3 flex items-center justify-center gap-1.5"
                     >
                         <BarChart3 className="h-3.5 w-3.5" /> 
                         Visual Board Analysis
@@ -1179,7 +1180,7 @@ export default function MatchesPage() {
             <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight text-slate-900">Fixtures & Results</h2>
-                    <p className="text-slate-500">Track fixtures, results, and match statistics.</p>
+                    <p className="text-muted-foreground">Track fixtures, results, and match statistics.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <Dialog open={isAddOpen} onOpenChange={(open: boolean) => {
@@ -1207,15 +1208,15 @@ export default function MatchesPage() {
                                     <TabsContent value="fixture" className="space-y-3 mt-0 py-1">
                                         <div className="grid grid-cols-3 gap-3">
                                             <div className="col-span-1 space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Date</Label>
+                                                <Label className="text-xs font-bold text-muted-foreground">Date</Label>
                                                 <Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="h-9 text-xs" />
                                             </div>
                                             <div className="col-span-1 space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Time (Kick Off)</Label>
+                                                <Label className="text-xs font-bold text-muted-foreground">Time (Kick Off)</Label>
                                                 <Input type="time" value={formData.time} onChange={e => handleKickoffChange(e.target.value)} className="h-9 text-xs" />
                                             </div>
                                             <div className="col-span-1 space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500 flex items-center justify-between">
+                                                <Label className="text-xs font-bold text-muted-foreground flex items-center justify-between">
                                                     <span>Meet Time</span>
                                                     <span className="text-[9px] text-slate-400 font-normal lowercase">(auto)</span>
                                                 </Label>
@@ -1225,7 +1226,7 @@ export default function MatchesPage() {
                                         
                                         <div className="grid grid-cols-3 gap-3">
                                             <div className="col-span-1 space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Venue</Label>
+                                                <Label className="text-xs font-bold text-muted-foreground">Venue</Label>
                                                 <Select
                                                     value={formData.isHome ? "Home" : "Away"}
                                                     onValueChange={(v: string) => handleVenueChange(v === "Home")}
@@ -1240,7 +1241,7 @@ export default function MatchesPage() {
                                                 </Select>
                                             </div>
                                             <div className="col-span-2 space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Opponent</Label>
+                                                <Label className="text-xs font-bold text-muted-foreground">Opponent</Label>
                                                 <Input
                                                     list="league-teams-list"
                                                     placeholder="Type opponent name"
@@ -1269,7 +1270,7 @@ export default function MatchesPage() {
 
                                         <div className="grid grid-cols-2 gap-3">
                                             <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Competition</Label>
+                                                <Label className="text-xs font-bold text-muted-foreground">Competition</Label>
                                                 <Select
                                                     value={formData.competition}
                                                     onValueChange={(v: string) => setFormData({ ...formData, competition: v })}
@@ -1290,7 +1291,7 @@ export default function MatchesPage() {
                                                 </Select>
                                             </div>
                                             <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Surface</Label>
+                                                <Label className="text-xs font-bold text-muted-foreground">Surface</Label>
                                                 <Select
                                                     value={formData.surface || "4G"}
                                                     onValueChange={(v) => setFormData({ ...formData, surface: v as "4G" | "Grass" })}
@@ -1307,7 +1308,7 @@ export default function MatchesPage() {
                                         </div>
 
                                         <div className="space-y-1">
-                                            <Label className="text-xs font-bold text-slate-500">Location / Venue Address</Label>
+                                            <Label className="text-xs font-bold text-muted-foreground">Location / Venue Address</Label>
                                             <Input
                                                 placeholder="e.g. Market Road Pitches, N7 9PL"
                                                 value={formData.location || ""}
@@ -1317,7 +1318,7 @@ export default function MatchesPage() {
                                         </div>
 
                                         {formData.opponent && (
-                                            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 space-y-2 mt-1">
+                                            <div className="bg-surface-2 p-2.5 rounded-lg border border-border space-y-2 mt-1">
                                                 <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Opponent Info</h4>
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <div className="space-y-0.5">
@@ -1345,7 +1346,7 @@ export default function MatchesPage() {
                                                         onDragOver={e => e.preventDefault()}
                                                         onDrop={handleBadgeDrop}
                                                         onPaste={handleBadgePaste}
-                                                        className="border border-dashed border-slate-200 rounded-lg p-2 flex items-center justify-center bg-white cursor-pointer hover:border-indigo-400 transition-colors relative"
+                                                        className="border border-dashed border-border rounded-lg p-2 flex items-center justify-center bg-surface-2 cursor-pointer hover:border-indigo-400 transition-colors relative"
                                                     >
                                                         <input 
                                                             type="file" 
@@ -1354,12 +1355,12 @@ export default function MatchesPage() {
                                                             className="absolute inset-0 opacity-0 cursor-pointer"
                                                         />
                                                         <Upload className="h-4 w-4 text-slate-400 mr-1.5" />
-                                                        <span className="text-[10px] text-slate-500 font-medium">
+                                                        <span className="text-[10px] text-muted-foreground font-medium">
                                                             {isUploadingBadge ? "Uploading..." : "Upload or paste opponent badge"}
                                                         </span>
                                                     </div>
                                                     {opponentBadgeUrl && (
-                                                        <div className="flex items-center gap-2 mt-1.5 bg-white p-1.5 rounded border border-slate-105">
+                                                        <div className="flex items-center gap-2 mt-1.5 bg-surface-2 p-1.5 rounded border border-border">
                                                             <img src={opponentBadgeUrl} alt="Badge Preview" className="h-6 w-6 object-contain rounded" />
                                                             <span className="text-[10px] text-slate-400 truncate flex-1">{opponentBadgeUrl}</span>
                                                             <Button type="button" variant="ghost" size="sm" className="h-5 text-red-500 hover:text-red-650 p-1 text-[10px]" onClick={() => setOpponentBadgeUrl("")}>Remove</Button>
@@ -1372,10 +1373,10 @@ export default function MatchesPage() {
 
                                     <TabsContent value="result" className="space-y-3 mt-0 py-1">
                                         <div className="space-y-1">
-                                            <Label className="text-xs font-bold text-slate-500">Scoreline</Label>
+                                            <Label className="text-xs font-bold text-muted-foreground">Scoreline</Label>
                                             <div className="flex items-center gap-3">
                                                 <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-slate-500 w-10 text-right">Home</span>
+                                                    <span className="text-xs font-bold text-muted-foreground w-10 text-right">Home</span>
                                                     <Input
                                                         className="w-14 h-8 text-center font-bold text-sm"
                                                         placeholder="0"
@@ -1399,14 +1400,14 @@ export default function MatchesPage() {
                                                             setFormData({ ...formData, scoreline: `${home}-${away}` });
                                                         }}
                                                     />
-                                                    <span className="text-xs font-bold text-slate-500 w-10">Away</span>
+                                                    <span className="text-xs font-bold text-muted-foreground w-10">Away</span>
                                                 </div>
                                                                     </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3">
                                             <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Yellow Cards</Label>
+                                                <Label className="text-xs font-bold text-muted-foreground">Yellow Cards</Label>
                                                 <Textarea
                                                     placeholder="e.g. J.Smith, P.Maldini"
                                                     value={formData.yellow_cards}
@@ -1415,7 +1416,7 @@ export default function MatchesPage() {
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Red Cards</Label>
+                                                <Label className="text-xs font-bold text-muted-foreground">Red Cards</Label>
                                                 <Textarea
                                                     placeholder="e.g. S.Ramos"
                                                     value={formData.red_cards}
@@ -1425,9 +1426,9 @@ export default function MatchesPage() {
                                             </div>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-3 mt-2 pb-2 border-b border-dashed border-slate-100">
+                                        <div className="grid grid-cols-2 gap-3 mt-2 pb-2 border-b border-dashed border-border">
                                             <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-slate-500">Availability Lock</Label>
+                                                <Label className="text-xs font-bold text-muted-foreground">Availability Lock</Label>
                                                 <Select
                                                     value={formData.lockType || "Never"}
                                                     onValueChange={(v) => setFormData({ ...formData, lockType: v })}
@@ -1446,7 +1447,7 @@ export default function MatchesPage() {
                                             </div>
                                             {formData.lockType === "Custom" && (
                                                 <div className="space-y-1">
-                                                    <Label className="text-xs font-bold text-slate-500">Custom Lock Time</Label>
+                                                    <Label className="text-xs font-bold text-muted-foreground">Custom Lock Time</Label>
                                                     <Input
                                                         type="datetime-local"
                                                         value={formData.lockTime || ""}
@@ -1458,7 +1459,7 @@ export default function MatchesPage() {
                                         </div>
 
                                         <div className="space-y-1">
-                                            <Label className="text-xs font-bold text-slate-500">Notes / Adjustments</Label>
+                                            <Label className="text-xs font-bold text-muted-foreground">Notes / Adjustments</Label>
                                             <Textarea
                                                 className="min-h-[50px] text-xs"
                                                 placeholder="Any special notes (e.g. Points adjustment)"
@@ -1470,13 +1471,13 @@ export default function MatchesPage() {
                                 </div>
                             </Tabs>
 
-                            <DialogFooter className="gap-2 sm:gap-0 p-4 border-t bg-slate-50 shrink-0">
+                            <DialogFooter className="gap-2 sm:gap-0 p-4 border-t bg-surface-2 shrink-0">
                                 {editingId && formData.scoreline && (
                                     <Button
                                         type="button"
                                         variant="outline"
                                         onClick={() => setFormData({ ...formData, scoreline: "", goalscorers: "", assists: "", yellow_cards: "", red_cards: "", notes: "" })}
-                                        className="h-9 text-xs text-slate-600 bg-amber-50 hover:bg-amber-100 border border-amber-200 mr-auto"
+                                        className="h-9 text-xs text-muted-foreground bg-amber-50 hover:bg-amber-100 border border-amber-200 mr-auto"
                                     >
                                         Reset to Upcoming
                                     </Button>
@@ -1492,7 +1493,7 @@ export default function MatchesPage() {
             </div>
 
             {/* Filters */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-100">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
                 <div className="flex flex-wrap items-center gap-2">
                     <Button
                         variant={filterType === "all" ? "secondary" : "ghost"}
@@ -1529,7 +1530,7 @@ export default function MatchesPage() {
                 </div>
                 
                 <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-slate-500 hidden sm:inline-block">Season:</span>
+                    <span className="text-sm font-semibold text-muted-foreground hidden sm:inline-block">Season:</span>
                     <Select value={seasonFilter} onValueChange={setSeasonFilter}>
                         <SelectTrigger className="h-9 w-[160px] text-sm bg-surface-1 border-border shadow-sm font-medium">
                             <SelectValue placeholder="Select Season" />
@@ -1544,7 +1545,22 @@ export default function MatchesPage() {
                 </div>
             </div>
 
-            <LeagueSync />
+            <LeagueSync 
+                isSyncing={isSyncing}
+                leagueUrl={settings.leagueUrl || null}
+                tempUrl={tempUrl}
+                isEditingUrl={isEditingUrl}
+                setTempUrl={setTempUrl}
+                setIsEditingUrl={setIsEditingUrl}
+                onSaveUrl={() => {
+                    if (tempUrl.trim()) {
+                        updateSettings({ leagueUrl: tempUrl.trim() });
+                        setIsEditingUrl(false);
+                    }
+                }}
+                onSync={handleSyncFixtures}
+                fixturesCount={upcomingMatches.length}
+            />
 
             {upcomingMatches.length > 0 && (
                 <>
@@ -1583,10 +1599,10 @@ export default function MatchesPage() {
                     {activeShareMatch && (
                         <div className="grid gap-4 py-2 text-slate-800">
                             {/* Toggle switches/checkboxes */}
-                            <div className="space-y-2 border-b border-slate-100 pb-3">
-                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Include Details:</Label>
+                            <div className="space-y-2 border-b border-border pb-3">
+                                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Include Details:</Label>
                                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                    <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer p-1.5 hover:bg-surface-2 rounded">
                                         <input
                                             type="checkbox"
                                             checked={includeOpponent}
@@ -1595,7 +1611,7 @@ export default function MatchesPage() {
                                         />
                                         <span>Opponent</span>
                                     </label>
-                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                    <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer p-1.5 hover:bg-surface-2 rounded">
                                         <input
                                             type="checkbox"
                                             checked={includeCompetition}
@@ -1604,7 +1620,7 @@ export default function MatchesPage() {
                                         />
                                         <span>Competition</span>
                                     </label>
-                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                    <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer p-1.5 hover:bg-surface-2 rounded">
                                         <input
                                             type="checkbox"
                                             checked={includeVenue}
@@ -1613,7 +1629,7 @@ export default function MatchesPage() {
                                         />
                                         <span>Venue Location</span>
                                     </label>
-                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                    <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer p-1.5 hover:bg-surface-2 rounded">
                                         <input
                                             type="checkbox"
                                             checked={includeKickoff}
@@ -1622,7 +1638,7 @@ export default function MatchesPage() {
                                         />
                                         <span>Kick Off Time</span>
                                     </label>
-                                    <label className="flex items-center gap-2 text-sm text-slate-700 cursor-pointer p-1.5 hover:bg-slate-50 rounded">
+                                    <label className="flex items-center gap-2 text-sm text-foreground cursor-pointer p-1.5 hover:bg-surface-2 rounded">
                                         <input
                                             type="checkbox"
                                             checked={includeMeetTime}
@@ -1636,14 +1652,14 @@ export default function MatchesPage() {
 
                             {/* Meet Details Fields */}
                             {includeMeetTime && (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50 p-3 rounded-lg border border-slate-100">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-surface-2 p-3 rounded-lg border border-border">
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-semibold">Meet Time</Label>
                                         <Input
                                             type="time"
                                             value={meetTime}
                                             onChange={(e) => setMeetTime(e.target.value)}
-                                            className="text-sm bg-white border-slate-200"
+                                            className="text-sm bg-surface-2 border-border"
                                         />
                                         <p className="text-[10px] text-slate-400">Prefilled to 60 mins before kickoff ({activeShareMatch.time})</p>
                                     </div>
@@ -1653,7 +1669,7 @@ export default function MatchesPage() {
                                             value={meetLocation}
                                             onChange={(e) => setMeetLocation(e.target.value)}
                                             placeholder="e.g. Market Road"
-                                            className="text-sm bg-white border-slate-200"
+                                            className="text-sm bg-surface-2 border-border"
                                         />
                                     </div>
                                 </div>
@@ -1666,25 +1682,25 @@ export default function MatchesPage() {
                                     value={additionalNotes}
                                     onChange={(e) => setAdditionalNotes(e.target.value)}
                                     placeholder="e.g. ⚠ Bring running trainers."
-                                    className="text-xs min-h-[60px] border-slate-200"
+                                    className="text-xs min-h-[60px] border-border"
                                 />
                             </div>
 
                             {/* Live Preview block */}
-                            <div className="space-y-1.5 border-t border-slate-100 pt-3">
-                                <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Live Preview</Label>
+                            <div className="space-y-1.5 border-t border-border pt-3">
+                                <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Live Preview</Label>
                                 <div className="relative">
                                     <Textarea
                                         value={getGeneratedPollText()}
                                         readOnly
-                                        className="text-xs min-h-[200px] font-mono bg-slate-50 border-slate-200 text-slate-600 focus-visible:ring-0 cursor-default"
+                                        className="text-xs min-h-[200px] font-mono bg-surface-2 border-border text-muted-foreground focus-visible:ring-0 cursor-default"
                                     />
                                 </div>
                             </div>
                         </div>
                     )}
 
-                    <DialogFooter className="gap-2 sm:gap-0 border-t border-slate-100 pt-3">
+                    <DialogFooter className="gap-2 sm:gap-0 border-t border-border pt-3">
                         <Button variant="outline" onClick={() => setActiveShareMatch(null)}>
                             Cancel
                         </Button>
@@ -1694,7 +1710,7 @@ export default function MatchesPage() {
                             className={`font-semibold min-w-[160px] transition-all ${
                                 copyStatus === "copied" 
                                     ? "bg-green-600 hover:bg-green-600 text-white" 
-                                    : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                                    : "bg-surface-3 hover:bg-surface-4 text-foreground"
                             }`}
                         >
                             {copyStatus === "copied" ? "✓ Copied Successfully" : "Copy to Clipboard"}
@@ -1724,15 +1740,15 @@ export default function MatchesPage() {
                     {selectedConfirmMatch && (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-2 text-slate-800">
                             {/* Left Column: Settings Form */}
-                            <div className="space-y-4 pr-0 md:pr-4 md:border-r border-slate-100">
-                                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Matchday Variables</h4>
+                            <div className="space-y-4 pr-0 md:pr-4 md:border-r border-border">
+                                <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Matchday Variables</h4>
                                 
                                 <div className="space-y-1.5">
                                     <Label className="text-xs font-semibold">Stadium / Home Ground Address</Label>
                                     <Input 
                                         value={confirmStadiumAddress}
                                         onChange={(e) => setConfirmStadiumAddress(e.target.value)}
-                                        className="text-xs border-slate-200"
+                                        className="text-xs border-border"
                                         placeholder="Enter stadium address"
                                     />
                                 </div>
@@ -1741,7 +1757,7 @@ export default function MatchesPage() {
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-semibold">Pitch Surface</Label>
                                         <Select value={confirmSurfaceType} onValueChange={setConfirmSurfaceType}>
-                                            <SelectTrigger className="text-xs border-slate-200">
+                                            <SelectTrigger className="text-xs border-border">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -1755,7 +1771,7 @@ export default function MatchesPage() {
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-semibold">Meet Time (Offset)</Label>
                                         <Select value={confirmMeetTimeOffset} onValueChange={setConfirmMeetTimeOffset}>
-                                            <SelectTrigger className="text-xs border-slate-200">
+                                            <SelectTrigger className="text-xs border-border">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -1774,7 +1790,7 @@ export default function MatchesPage() {
                                     <Input 
                                         value={confirmKitColors}
                                         onChange={(e) => setConfirmKitColors(e.target.value)}
-                                        className="text-xs border-slate-200"
+                                        className="text-xs border-border"
                                         placeholder="e.g. Red Shirts, Black Shorts"
                                     />
                                 </div>
@@ -1784,19 +1800,19 @@ export default function MatchesPage() {
                                     <Input 
                                         value={confirmDietaryDetails}
                                         onChange={(e) => setConfirmDietaryDetails(e.target.value)}
-                                        className="text-xs border-slate-200"
+                                        className="text-xs border-border"
                                         placeholder="e.g. Food provided at the pub"
                                     />
                                 </div>
 
-                                <div className="border-t border-slate-100 pt-3 space-y-3">
-                                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">Referee Settings</h4>
+                                <div className="border-t border-border pt-3 space-y-3">
+                                    <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Referee Settings</h4>
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-semibold">Referee Name</Label>
                                         <Input 
                                             value={confirmRefName}
                                             onChange={(e) => setConfirmRefName(e.target.value)}
-                                            className="text-xs border-slate-200"
+                                            className="text-xs border-border"
                                             placeholder="e.g. Mark, Sir, etc."
                                         />
                                     </div>
@@ -1806,14 +1822,14 @@ export default function MatchesPage() {
                                             <Input 
                                                 value={confirmRefFee}
                                                 onChange={(e) => setConfirmRefFee(e.target.value)}
-                                                className="text-xs border-slate-200"
+                                                className="text-xs border-border"
                                                 placeholder="e.g. 45"
                                             />
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold">Payment Method</Label>
                                             <Select value={confirmPaymentMethod} onValueChange={setConfirmPaymentMethod}>
-                                                <SelectTrigger className="text-xs border-slate-200">
+                                                <SelectTrigger className="text-xs border-border">
                                                     <SelectValue />
                                                 </SelectTrigger>
                                                 <SelectContent>
@@ -1830,17 +1846,17 @@ export default function MatchesPage() {
                             {/* Right Column: Previews and Share Buttons */}
                             <div className="space-y-4">
                                 <Tabs defaultValue="opponent" className="w-full">
-                                    <TabsList className="grid w-full grid-cols-2 bg-slate-100">
+                                    <TabsList className="grid w-full grid-cols-2 bg-surface-3">
                                         <TabsTrigger value="opponent" className="text-xs font-semibold">Opponent Manager</TabsTrigger>
                                         <TabsTrigger value="referee" className="text-xs font-semibold">Referee</TabsTrigger>
                                     </TabsList>
 
                                     <TabsContent value="opponent" className="space-y-3 pt-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Opponent Message Preview</Label>
+                                        <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Opponent Message Preview</Label>
                                         <Textarea
                                             value={getOpponentConfirmText()}
                                             readOnly
-                                            className="text-xs min-h-[220px] font-mono bg-slate-50 border-slate-200 text-slate-600 focus-visible:ring-0 cursor-default"
+                                            className="text-xs min-h-[220px] font-mono bg-surface-2 border-border text-muted-foreground focus-visible:ring-0 cursor-default"
                                         />
                                         <div className="flex gap-2">
                                             <Button
@@ -1849,7 +1865,7 @@ export default function MatchesPage() {
                                                 className={`text-xs font-semibold flex-1 transition-all ${
                                                     confirmCopyStatus === "opp_copied" 
                                                         ? "bg-green-600 hover:bg-green-600 text-white" 
-                                                        : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                                                        : "bg-surface-3 hover:bg-surface-4 text-foreground"
                                                 }`}
                                             >
                                                 {confirmCopyStatus === "opp_copied" ? "✓ Copied" : "Copy Message"}
@@ -1864,11 +1880,11 @@ export default function MatchesPage() {
                                     </TabsContent>
 
                                     <TabsContent value="referee" className="space-y-3 pt-2">
-                                        <Label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Referee Message Preview</Label>
+                                        <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Referee Message Preview</Label>
                                         <Textarea
                                             value={getRefConfirmText()}
                                             readOnly
-                                            className="text-xs min-h-[220px] font-mono bg-slate-50 border-slate-200 text-slate-600 focus-visible:ring-0 cursor-default"
+                                            className="text-xs min-h-[220px] font-mono bg-surface-2 border-border text-muted-foreground focus-visible:ring-0 cursor-default"
                                         />
                                         <div className="flex gap-2">
                                             <Button
@@ -1877,7 +1893,7 @@ export default function MatchesPage() {
                                                 className={`text-xs font-semibold flex-1 transition-all ${
                                                     confirmCopyStatus === "ref_copied" 
                                                         ? "bg-green-600 hover:bg-green-600 text-white" 
-                                                        : "bg-slate-100 hover:bg-slate-200 text-slate-700"
+                                                        : "bg-surface-3 hover:bg-surface-4 text-foreground"
                                                 }`}
                                             >
                                                 {confirmCopyStatus === "ref_copied" ? "✓ Copied" : "Copy Message"}
@@ -1895,7 +1911,7 @@ export default function MatchesPage() {
                         </div>
                     )}
 
-                    <DialogFooter className="border-t border-slate-100 pt-3">
+                    <DialogFooter className="border-t border-border pt-3">
                         <Button variant="outline" onClick={() => setSelectedConfirmMatch(null)}>
                             Close
                         </Button>
@@ -1917,7 +1933,7 @@ export default function MatchesPage() {
 
                     <div className="space-y-4 py-2 text-slate-900">
                         <div className="space-y-1">
-                            <Label htmlFor="expenseAmount" className="text-xs font-bold text-slate-500">Amount (£)</Label>
+                            <Label htmlFor="expenseAmount" className="text-xs font-bold text-muted-foreground">Amount (£)</Label>
                             <Input
                                 id="expenseAmount"
                                 type="number"
@@ -1929,7 +1945,7 @@ export default function MatchesPage() {
                         </div>
 
                         <div className="space-y-1">
-                            <Label htmlFor="expenseCategory" className="text-xs font-bold text-slate-500">Category</Label>
+                            <Label htmlFor="expenseCategory" className="text-xs font-bold text-muted-foreground">Category</Label>
                             <select
                                 id="expenseCategory"
                                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -1945,7 +1961,7 @@ export default function MatchesPage() {
                         </div>
 
                         <div className="space-y-1">
-                            <Label htmlFor="expenseNotes" className="text-xs font-bold text-slate-500">Notes (Optional)</Label>
+                            <Label htmlFor="expenseNotes" className="text-xs font-bold text-muted-foreground">Notes (Optional)</Label>
                             <Input
                                 id="expenseNotes"
                                 placeholder="e.g. Cash paid to ref John"

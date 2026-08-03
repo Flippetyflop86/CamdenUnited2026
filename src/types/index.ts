@@ -114,6 +114,7 @@ export interface Match {
     event_token?: string;
     lock_type?: string;
     lock_time?: string;
+    is_squad_confirmed?: boolean;
     lineup?: {
         formation: string;
         starters: Record<string, string>;
