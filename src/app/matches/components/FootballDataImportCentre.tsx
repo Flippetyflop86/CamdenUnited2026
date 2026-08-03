@@ -63,10 +63,9 @@ export function FootballDataImportCentre({ clubId, clubName, clubSettings, onImp
         };
     }, []);
 
-    useEffect(() => {
-        console.log(`[DEBUG] FootballDataImportCentre re-rendered. isPasteModalOpen is now: ${isPasteModalOpen}`);
-    });
-
+    // Paste Import State
+    const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
+    const [isBrowserIntegrationModalOpen, setIsBrowserIntegrationModalOpen] = useState(false);
     const [rawText, setRawText] = useState("");
     const [isParsing, setIsParsing] = useState(false);
     
@@ -184,12 +183,12 @@ export function FootballDataImportCentre({ clubId, clubName, clubSettings, onImp
                         </p>
                     </div>
                     <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <Button variant="outline" className="font-bold border-brand/30 text-brand bg-brand/10 hover:bg-brand/20">
+                        <Button variant="outline" className="font-bold border-brand/30 text-brand bg-brand/10 hover:bg-brand/20" onClick={() => setIsBrowserIntegrationModalOpen(true)}>
                             Install Extension
                         </Button>
-                        <a href="#" className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline">
+                        <button onClick={() => setIsBrowserIntegrationModalOpen(true)} className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline text-left">
                             Learn More
-                        </a>
+                        </button>
                     </div>
                 </Card>
             </div>
@@ -204,6 +203,37 @@ export function FootballDataImportCentre({ clubId, clubName, clubSettings, onImp
                     <span className="opacity-50">({new Date(clubSettings.lastImportHistory.date).toLocaleDateString()})</span>
                 </div>
             )}
+
+            {/* Browser Integration Modal */}
+            <Dialog open={isBrowserIntegrationModalOpen} onOpenChange={setIsBrowserIntegrationModalOpen}>
+                <DialogContent className="sm:max-w-md bg-surface-1 border-border">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Puzzle className="h-5 w-5 text-brand" />
+                            Browser Integration
+                        </DialogTitle>
+                        <DialogDescription>
+                            Import fixtures with a single click.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4 text-sm text-foreground">
+                        <p>
+                            The <strong>ClubFlow Browser Extension</strong> (for Chrome & Edge) is currently in development.
+                        </p>
+                        <p>
+                            Once released, it will sit in your browser toolbar. When you visit a supported league website (like FA Full-Time), you can click it to automatically extract all fixtures and send them directly into the ClubFlow Import Engine.
+                        </p>
+                        <p className="text-muted-foreground">
+                            For now, please continue using the <strong className="text-foreground">Paste Fixture List</strong> method, which uses AI to instantly parse any text you copy from those websites.
+                        </p>
+                    </div>
+                    <div className="flex justify-end">
+                        <Button onClick={() => setIsBrowserIntegrationModalOpen(false)} className="bg-brand hover:bg-brand/90 text-primary-foreground">
+                            Got it
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
 
             {/* Paste Modal */}
             <Dialog open={isPasteModalOpen} onOpenChange={setIsPasteModalOpen}>
