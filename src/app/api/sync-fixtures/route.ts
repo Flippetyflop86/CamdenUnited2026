@@ -11,7 +11,7 @@ export async function POST(request: Request) {
         }
 
         // Fetch the league fixtures page with full browser headers to bypass bot protection
-        const response = await fetch(url, {
+        let response = await fetch(url, {
             headers: {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
@@ -31,8 +31,15 @@ export async function POST(request: Request) {
         });
 
         if (!response.ok) {
-            console.error(`Sync failed. URL: ${url}, Status: ${response.status} ${response.statusText}`);
-            return NextResponse.json({ success: false, error: `Failed to access the league website (HTTP ${response.status}). Ensure the URL is correct and public.` }, { status: 400 });
+            console.warn(`Direct fetch failed. URL: ${url}, Status: ${response.status}. Attempting proxy...`);
+            // Fallback: If Vercel IPs are blocked by Cloudflare (HTTP 403), try a public open CORS proxy
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+            response = await fetch(proxyUrl, { cache: 'no-store' });
+            
+            if (!response.ok) {
+                console.error(`Proxy fetch also failed. Status: ${response.status}`);
+                return NextResponse.json({ success: false, error: `Failed to access the league website (HTTP ${response.status}). The site might be actively blocking scrapers.` }, { status: 400 });
+            }
         }
 
         const html = await response.text();
