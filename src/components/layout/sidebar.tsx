@@ -51,7 +51,7 @@ const navSections = [
             { href: "/training",    label: "Training",   icon: CalendarDays },
             { href: "/matches",     label: "Fixtures",   icon: Activity },
             { href: "/matchday-xi", label: "Matchday XI", icon: Shield },
-            { href: "/squad-depth", label: "Squad Depth", icon: Shield },
+            { href: "/squad-planner", label: "Squad Planner", icon: Shield },
         ]
     },
     {
