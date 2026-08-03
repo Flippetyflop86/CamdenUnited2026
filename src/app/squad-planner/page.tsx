@@ -11,19 +11,17 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import {
     Shield,
-    CheckCircle2,
-    X,
-    Info,
     GripVertical,
     Star,
     AlertCircle,
-    UserX,
     TrendingUp,
     Wand2,
     Save,
     Trash2,
     Plus,
-    Clock
+    Clock,
+    ChevronDown,
+    ChevronUp
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
@@ -107,8 +105,10 @@ export default function SquadPlannerPage() {
     const [isScenarioMode, setIsScenarioMode] = useState(false);
     const [scenarioUnavailability, setScenarioUnavailability] = useState<Set<string>>(new Set());
 
-    // Depth Editor Modal
+    // Pitch Interactions
     const [selectedPos, setSelectedPos] = useState<string | null>(null);
+    const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
+    const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
     const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
 
     const activePositions = FORMATIONS[formation] || FORMATIONS["4-3-3"];
@@ -117,7 +117,6 @@ export default function SquadPlannerPage() {
     const fetchData = async () => {
         setLoading(true);
         try {
-            // Fetch Players
             const { data: pData } = await supabase.from("players").select("*");
             let filteredPlayers: Player[] = [];
             if (pData) {
@@ -157,17 +156,12 @@ export default function SquadPlannerPage() {
                 setPlayers(filteredPlayers);
             }
 
-            // Fetch Squad Depth Chart
             const { data: dData, error: dErr } = await supabase
                 .from("squad_depths")
                 .select("*")
                 .eq("squad", activeSquadTab)
                 .limit(1);
             
-            if (dErr && dErr.code !== 'PGRST116') {
-                // Ignore missing table during local dev/migration window, fall back to empty
-            }
-
             if (dData && dData.length > 0) {
                 setDepthChart(dData[0].depth_chart || {});
                 setFormation(dData[0].formation || "4-3-3");
@@ -196,7 +190,6 @@ export default function SquadPlannerPage() {
         setFormation(newFormation);
         setIsSaving(true);
         try {
-            // Upsert based on squad
             const { data: existing } = await supabase.from("squad_depths").select("id").eq("squad", activeSquadTab).limit(1);
             if (existing && existing.length > 0) {
                 await supabase.from("squad_depths").update({
@@ -222,14 +215,11 @@ export default function SquadPlannerPage() {
         saveToDatabase(depthChart, newFormation);
     };
 
-    // Intelligence Engine: Build Initial Planner
     const buildIntelligently = async () => {
         setLoading(true);
         setShowOnboarding(false);
         try {
             const newChart: Record<string, string[]> = {};
-            
-            // 1. Fetch most recent Matchday XI for this squad
             const { data: mxData } = await supabase
                 .from("matchday_xis")
                 .select("*")
@@ -241,10 +231,8 @@ export default function SquadPlannerPage() {
             const activeFormPositions = FORMATIONS[formation] || FORMATIONS["4-3-3"];
             const formLabels = Array.from(new Set(activeFormPositions.map(pos => pos.label)));
 
-            // Initialize empty arrays
             formLabels.forEach(l => { newChart[l] = []; });
 
-            // Assign First Choices from Matchday XI
             if (mxData && mxData.length > 0) {
                 const starters = mxData[0].starters;
                 const matchFormationStr = mxData[0].formation;
@@ -265,14 +253,11 @@ export default function SquadPlannerPage() {
                 });
             }
 
-            // Helper to see if player fits role
             const fits = (p: Player, role: string, strict: boolean) => {
                 const pShort = getShortPosition(p.position);
                 const rShort = getShortPosition(role);
                 if (pShort === rShort) return true;
                 if (!strict && p.secondaryPositions?.some(sp => getShortPosition(sp) === rShort)) return true;
-                
-                // Versatility matching (non-strict)
                 if (!strict) {
                     if (["CB", "LCB", "RCB"].includes(rShort) && ["CB", "LB", "RB", "LWB", "RWB", "CDM"].includes(pShort)) return true;
                     if (["LB", "LWB"].includes(rShort) && ["LB", "LWB", "LM", "CB"].includes(pShort)) return true;
@@ -285,11 +270,8 @@ export default function SquadPlannerPage() {
                 return false;
             };
 
-            // 2. Assign remaining naturally fitting players (who don't have a primary role yet)
             players.forEach(p => {
                 if (primaryAssigned.has(p.id)) return;
-                
-                // Find a slot they fit strictly
                 for (const label of formLabels) {
                     if (fits(p, label, true) && newChart[label].length < 3) {
                         newChart[label].push(p.id);
@@ -297,7 +279,6 @@ export default function SquadPlannerPage() {
                         return;
                     }
                 }
-                // If not strict, find a secondary slot
                 for (const label of formLabels) {
                     if (fits(p, label, false) && newChart[label].length < 3) {
                         newChart[label].push(p.id);
@@ -320,7 +301,6 @@ export default function SquadPlannerPage() {
         saveToDatabase({}, formation);
     };
 
-    // Primary Ownership logic
     const getPrimaryAssignment = (playerId: string): string | null => {
         for (const label of uniqueFormationLabels) {
             if (depthChart[label] && depthChart[label].length > 0 && depthChart[label][0] === playerId) {
@@ -334,6 +314,30 @@ export default function SquadPlannerPage() {
         }
         return null;
     };
+    
+    const getPlayerCoverage = (player: Player) => {
+        const primary = getPrimaryAssignment(player.id);
+        const alsoCovers: string[] = [];
+        const emergency: string[] = [];
+
+        uniqueFormationLabels.forEach(label => {
+            if (depthChart[label] && depthChart[label].includes(player.id)) {
+                if (label !== primary) {
+                    const pShort = getShortPosition(player.position);
+                    const lShort = getShortPosition(label);
+                    const isNat = pShort === lShort;
+                    const isSec = player.secondaryPositions?.some(sp => getShortPosition(sp) === lShort);
+                    if (isNat || isSec) {
+                        alsoCovers.push(label);
+                    } else {
+                        emergency.push(label);
+                    }
+                }
+            }
+        });
+
+        return { primary, alsoCovers, emergency };
+    };
 
     const toggleScenarioAvailability = (playerId: string, e: React.MouseEvent) => {
         e.stopPropagation();
@@ -345,16 +349,20 @@ export default function SquadPlannerPage() {
         }
         setScenarioUnavailability(newSet);
     };
+    
+    const toggleNodeExpansion = (e: React.MouseEvent, label: string) => {
+        e.stopPropagation();
+        const next = new Set(expandedNodes);
+        if(next.has(label)) next.delete(label);
+        else next.add(label);
+        setExpandedNodes(next);
+    };
 
     const getActivePosPlayers = (posLabel: string) => {
         const ids = depthChart[posLabel] || [];
         return ids
             .map(id => players.find(p => p.id === id))
             .filter((p): p is Player => !!p && p.availability && !scenarioUnavailability.has(p.id));
-    };
-
-    const isOutofPosition = (p: Player, targetLabel: string) => {
-        return getShortPosition(p.position) !== getShortPosition(targetLabel);
     };
 
     const evaluateUnitBalance = (unit: "GK" | "DEF" | "MID" | "ATT") => {
@@ -397,20 +405,29 @@ export default function SquadPlannerPage() {
             else if (!hasNat) issues.push(`No natural cover for ${label}`);
         });
 
-        let grade = "Adequate";
-        let color = "text-yellow-600 bg-yellow-50 border-yellow-200";
+        const numberToText = (num: number) => ["No", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"][num] || num.toString();
+
+        let title = "Adequate Cover";
         if (issues.length > 0) {
-            grade = "Thin";
-            color = "text-red-600 bg-red-50 border-red-200";
+            title = "Limited Depth";
         } else if (totalNaturalCover >= totalSlots * 2) {
-            grade = "Excellent";
-            color = "text-emerald-600 bg-emerald-50 border-emerald-200";
+            title = "Well Covered";
         } else if (totalNaturalCover + totalSecondaryCover > totalSlots) {
-            grade = "Good";
-            color = "text-green-600 bg-green-50 border-green-200";
+            title = "Good Options";
         }
 
-        return { grade, color, issues, totalNaturalCover, totalSecondaryCover, totalEmergencyCover };
+        const natText = totalNaturalCover === 0 ? "No natural options" : 
+                        totalNaturalCover === 1 ? "One recognised starter" : 
+                        `${numberToText(totalNaturalCover)} recognised options`;
+                        
+        const secText = totalSecondaryCover > 0 ? `${numberToText(totalSecondaryCover).toLowerCase()} secondary backup${totalSecondaryCover > 1?'s':''}` : "";
+        const emgText = totalEmergencyCover > 0 ? "Additional emergency cover available" : "";
+
+        const insights = [natText];
+        if (secText) insights.push(secText);
+        if (emgText) insights.push(emgText);
+
+        return { title, insights, totalNaturalCover, totalSecondaryCover, totalEmergencyCover };
     };
 
     const getRecruitmentPriorities = () => {
@@ -467,7 +484,6 @@ export default function SquadPlannerPage() {
 
     const recruitmentPriorities = getRecruitmentPriorities();
 
-    // Depth Editor Logic
     const handleDragStart = (e: React.DragEvent, id: string) => {
         setDraggedPlayerId(id);
     };
@@ -480,7 +496,6 @@ export default function SquadPlannerPage() {
         const sourceIndex = currentList.indexOf(draggedPlayerId);
         
         if (sourceIndex > -1) {
-            // Reordering
             currentList.splice(sourceIndex, 1);
             currentList.splice(targetIndex, 0, draggedPlayerId);
             saveToDatabase({ ...depthChart, [selectedPos]: currentList }, formation);
@@ -520,16 +535,13 @@ export default function SquadPlannerPage() {
             <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center">
                 <div className="max-w-xl w-full bg-white rounded-3xl border shadow-xl p-10 relative overflow-hidden">
                     <div className="absolute top-0 left-0 w-full h-2 bg-brand" />
-                    
                     <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
                         <Wand2 className="h-8 w-8 text-brand" />
                     </div>
-                    
                     <h1 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Welcome to Squad Planner</h1>
                     <p className="text-slate-600 leading-relaxed mb-10">
                         To build your squad depth, we first need to understand your strongest team. We can intelligently generate a first draft using your club's recent match history, allowing you to simply refine it over time.
                     </p>
-
                     <div className="space-y-4">
                         <Button 
                             onClick={buildIntelligently} 
@@ -558,7 +570,7 @@ export default function SquadPlannerPage() {
             {/* Header & Vision */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b pb-6">
                 <div className="max-w-3xl">
-                    <h1 className="text-3xl font-black tracking-tight mb-2">Season Planning</h1>
+                    <h1 className="text-3xl font-black tracking-tight mb-2">Squad Structure</h1>
                     <p className="text-sm text-slate-500 leading-relaxed max-w-2xl">
                         Evaluate squad balance, test formations, and identify long-term recruitment needs to ensure the squad is structurally prepared to compete across the entire season.
                     </p>
@@ -650,13 +662,8 @@ export default function SquadPlannerPage() {
                             const positionIndex = renderedCounts[pos.label] || 0;
                             renderedCounts[pos.label] = positionIndex + 1;
 
-                            // Primary Ownership Logic for Pitch Render
-                            // Only render a player if this is their primary assignment, OR if they are the ONLY cover.
-                            // To keep it simple, we just render the raw depth chart, but visual dupes are handled by the Depth Editor.
-                            // The user requested: "The tactical pitch should display the player only in their primary assignment. Other positions should reference them as Also Covers rather than duplicating the full player card."
                             const rawPositionPlayers = depthChart[pos.label] || [];
                             
-                            // Filter logic for Pitch Display
                             const primaryPlayers: Player[] = [];
                             const alsoCovers: Player[] = [];
 
@@ -674,66 +681,96 @@ export default function SquadPlannerPage() {
                             const adjustedY = 12 + (pos.y * 0.76);
                             const adjustedX = pos.x;
 
+                            const isExpanded = expandedNodes.has(pos.label);
+                            const visiblePrimary = isExpanded ? primaryPlayers : primaryPlayers.slice(0, 3);
+
                             return (
                                 <div
                                     key={zoneKey}
-                                    onClick={() => setSelectedPos(pos.label)}
-                                    className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center min-w-[140px] max-w-[160px] z-10 cursor-pointer group hover:z-30 transition-transform hover:scale-105"
+                                    className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center min-w-[140px] max-w-[160px] z-10 group hover:z-30 transition-transform"
                                     style={{ left: `${adjustedX}%`, top: `${adjustedY}%` }}
                                 >
-                                    <div className="px-3 py-1 rounded-t-lg bg-slate-900 border-x border-t border-slate-700/80 text-[11px] font-black text-slate-200 shadow-md group-hover:bg-brand group-hover:border-brand transition-colors w-full text-center tracking-widest uppercase">
+                                    <div 
+                                        onClick={() => setSelectedPos(pos.label)}
+                                        className="px-3 py-1 rounded-t-lg bg-slate-900 border-x border-t border-slate-700/80 text-[11px] font-black text-slate-200 shadow-md group-hover:bg-brand group-hover:border-brand transition-colors w-full text-center tracking-widest uppercase cursor-pointer"
+                                        title="Click to edit position depth"
+                                    >
                                         {pos.label}
                                     </div>
 
                                     <div className="w-full bg-slate-900/95 border-x border-b border-slate-700/80 rounded-b-lg shadow-2xl overflow-hidden backdrop-blur-md">
                                         {primaryPlayers.length > 0 ? (
                                             <div className="flex flex-col">
-                                                {primaryPlayers.map((player, idx) => {
-                                                    const choiceLabel = idx === 0 ? "1st" : idx === 1 ? "2nd" : "3rd";
+                                                {visiblePrimary.map((player, idx) => {
+                                                    const choiceLabel = isExpanded && idx >= 3 
+                                                        ? "Cover" 
+                                                        : (idx === 0 ? "Starter" : idx === 1 ? "Competition" : "Rotation");
+                                                        
                                                     const isUnavail = isScenarioMode && scenarioUnavailability.has(player.id);
                                                     const isRealUnavail = !player.availability;
                                                     
                                                     return (
                                                         <div 
                                                             key={player.id} 
-                                                            className={`px-2 py-1.5 flex items-center justify-between border-b border-slate-800 last:border-b-0 hover:bg-slate-800 transition-colors ${(isUnavail || isRealUnavail) ? 'opacity-40 grayscale' : ''}`}
+                                                            onClick={(e) => { e.stopPropagation(); setSelectedPlayerId(player.id); }}
+                                                            className={`px-2 py-2 flex flex-col border-b border-slate-800 last:border-b-0 hover:bg-slate-800 transition-colors cursor-pointer ${(isUnavail || isRealUnavail) ? 'opacity-40 grayscale' : ''}`}
+                                                            title="Click to view player coverage"
                                                         >
-                                                            <div className="flex items-center gap-1.5 overflow-hidden">
-                                                                <span className="text-[9px] font-bold text-slate-500 w-4">{choiceLabel}</span>
+                                                            <div className="text-[8px] font-black text-slate-500 tracking-wider uppercase mb-0.5">{choiceLabel}</div>
+                                                            <div className="flex items-center justify-between">
                                                                 <span className={`truncate text-[11px] font-semibold ${idx === 0 ? 'text-white' : 'text-slate-300'}`}>
                                                                     {player.firstName[0]}. {player.lastName}
                                                                 </span>
+                                                                {isScenarioMode && (
+                                                                    <button 
+                                                                        onClick={(e) => toggleScenarioAvailability(player.id, e)}
+                                                                        className={`h-2.5 w-2.5 rounded-full shrink-0 ml-1 hover:scale-150 transition-transform ${isUnavail ? 'bg-red-500' : 'bg-green-500'}`} 
+                                                                    />
+                                                                )}
+                                                                {(!isScenarioMode && isRealUnavail) && (
+                                                                    <AlertCircle className="h-2.5 w-2.5 text-red-500 shrink-0 ml-1" />
+                                                                )}
                                                             </div>
-                                                            {isScenarioMode && (
-                                                                <button 
-                                                                    onClick={(e) => toggleScenarioAvailability(player.id, e)}
-                                                                    className={`h-2.5 w-2.5 rounded-full shrink-0 ml-1 hover:scale-150 transition-transform ${isUnavail ? 'bg-red-500' : 'bg-green-500'}`} 
-                                                                />
-                                                            )}
-                                                            {(!isScenarioMode && isRealUnavail) && (
-                                                                <AlertCircle className="h-2.5 w-2.5 text-red-500 shrink-0 ml-1" />
-                                                            )}
                                                         </div>
                                                     )
                                                 })}
                                             </div>
                                         ) : (
-                                            <div className="flex flex-col items-center justify-center h-10 text-slate-600 text-[10px] font-bold uppercase tracking-wider bg-slate-950">
-                                                <span>No Starter</span>
+                                            <div className="flex flex-col items-center justify-center h-12 text-slate-600 text-[10px] font-bold uppercase tracking-wider bg-slate-950">
+                                                <span>No Options</span>
                                             </div>
+                                        )}
+                                        
+                                        {/* Expand Toggle */}
+                                        {primaryPlayers.length > 3 && (
+                                            <button 
+                                                onClick={(e) => toggleNodeExpansion(e, pos.label)}
+                                                className="w-full py-1.5 bg-slate-800 hover:bg-slate-700 text-[9px] font-bold text-slate-400 tracking-widest uppercase transition-colors flex items-center justify-center gap-1 border-t border-slate-700/50"
+                                            >
+                                                {isExpanded ? (
+                                                    <><ChevronUp className="h-3 w-3" /> Hide</>
+                                                ) : (
+                                                    <><ChevronDown className="h-3 w-3" /> +{primaryPlayers.length - 3} More Players</>
+                                                )}
+                                            </button>
                                         )}
                                         
                                         {/* Also Covers Snippet */}
                                         {alsoCovers.length > 0 && (
-                                            <div className="bg-slate-950 px-2 py-1.5 border-t border-slate-800">
-                                                <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Also Covers</div>
-                                                <div className="flex flex-wrap gap-1">
+                                            <div className="bg-slate-950 px-2 py-2 border-t border-slate-800/80">
+                                                <div className="text-[8px] font-black text-slate-600 uppercase tracking-widest mb-1">Also Covers</div>
+                                                <div className="flex flex-wrap gap-x-1.5 gap-y-0.5">
                                                     {alsoCovers.slice(0, 3).map(p => (
-                                                        <span key={p.id} className="text-[9px] text-slate-400 font-medium">
+                                                        <span 
+                                                            key={p.id} 
+                                                            onClick={(e) => { e.stopPropagation(); setSelectedPlayerId(p.id); }}
+                                                            className="text-[9px] text-slate-400 font-medium hover:text-white cursor-pointer transition-colors"
+                                                            title="Click to view player coverage"
+                                                        >
                                                             {p.firstName[0]}. {p.lastName}{alsoCovers.length > 1 ? ',' : ''}
                                                         </span>
                                                     ))}
-                                                    {alsoCovers.length > 3 && <span className="text-[9px] text-slate-500">+{alsoCovers.length - 3}</span>}
+                                                    {alsoCovers.length > 3 && <span className="text-[9px] text-slate-600">+{alsoCovers.length - 3}</span>}
                                                 </div>
                                             </div>
                                         )}
@@ -753,28 +790,17 @@ export default function SquadPlannerPage() {
                     </h2>
                     <div className="grid gap-3">
                         {squadBalance.map((item, idx) => (
-                            <Card key={idx} className="border shadow-sm">
-                                <div className="p-4 flex items-start justify-between gap-4">
-                                    <div>
-                                        <h3 className="font-bold text-slate-900 mb-1">{item.unit}</h3>
-                                        {item.data?.issues.length === 0 ? (
-                                            <p className="text-sm text-slate-500 leading-tight">Well covered. {item.data.totalNaturalCover} natural options available across the unit.</p>
-                                        ) : (
-                                            <ul className="text-sm text-slate-500 leading-tight space-y-1 list-disc pl-4">
-                                                {item.data?.issues.map((issue, i) => <li key={i}>{issue}</li>)}
-                                            </ul>
-                                        )}
-                                        <div className="mt-3 flex gap-2">
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded">Nat: {item.data?.totalNaturalCover}</span>
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded">Sec: {item.data?.totalSecondaryCover}</span>
-                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded">Emg: {item.data?.totalEmergencyCover}</span>
-                                        </div>
-                                    </div>
-                                    <Badge variant="outline" className={`shrink-0 ${item.data?.color} font-bold px-3 py-1`}>
-                                        {item.data?.grade}
-                                    </Badge>
+                            <div key={idx} className="border-b pb-4 last:border-0 last:pb-0">
+                                <h3 className="font-bold text-slate-900 mb-1">{item.unit}</h3>
+                                <div className="text-sm font-semibold text-slate-700 mb-1">{item.data?.title}</div>
+                                <div className="space-y-0.5">
+                                    {item.data?.insights.map((insight, i) => (
+                                        <p key={i} className="text-sm text-slate-500 leading-tight">
+                                            {insight}
+                                        </p>
+                                    ))}
                                 </div>
-                            </Card>
+                            </div>
                         ))}
                     </div>
                 </div>
@@ -783,39 +809,30 @@ export default function SquadPlannerPage() {
                     <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
                         <TrendingUp className="h-5 w-5 text-brand" /> Recruitment Priorities
                     </h2>
-                    <div className="grid gap-3">
+                    <div className="grid gap-4">
                         {recruitmentPriorities.length === 0 ? (
-                            <Card className="border shadow-sm bg-slate-50">
-                                <div className="p-6 text-center text-slate-500 font-medium">
-                                    No pressing recruitment priorities based on the current depth chart.
-                                </div>
-                            </Card>
+                            <div className="text-slate-500 font-medium">
+                                No pressing recruitment priorities based on the current depth chart.
+                            </div>
                         ) : (
                             recruitmentPriorities.map((item, idx) => (
-                                <Card key={idx} className="border shadow-sm overflow-hidden flex">
-                                    <div className={`w-1.5 shrink-0 ${item.severity === 'Critical' ? 'bg-red-500' : item.severity === 'High' ? 'bg-orange-500' : 'bg-yellow-400'}`} />
-                                    <div className="p-4 flex-1">
-                                        <div className="flex items-center justify-between mb-1.5">
-                                            <h3 className="font-bold text-slate-900">{item.title}</h3>
-                                            <div className="flex gap-0.5">
-                                                {Array.from({ length: item.severity === 'Critical' ? 5 : item.severity === 'High' ? 4 : 3 }).map((_, i) => (
-                                                    <Star key={i} className={`h-3.5 w-3.5 fill-current ${item.severity === 'Critical' ? 'text-red-500' : item.severity === 'High' ? 'text-orange-500' : 'text-yellow-400'}`} />
-                                                ))}
-                                            </div>
-                                        </div>
-                                        <p className="text-sm text-slate-600 mb-2 font-medium">{item.reason}</p>
-                                        <div className="bg-slate-50 rounded p-2 border border-slate-100 text-xs text-slate-500">
-                                            <strong className="text-slate-700">Current backup:</strong> {item.backup}
+                                <div key={idx} className="border-b pb-4 last:border-0 last:pb-0 flex gap-3">
+                                    <div className={`w-1 shrink-0 rounded-full ${item.severity === 'Critical' ? 'bg-slate-800' : item.severity === 'High' ? 'bg-slate-400' : 'bg-slate-200'}`} />
+                                    <div>
+                                        <h3 className="font-bold text-slate-900 mb-0.5">{item.title}</h3>
+                                        <p className="text-sm text-slate-600 mb-1.5">{item.reason}</p>
+                                        <div className="text-xs text-slate-500">
+                                            <strong className="font-semibold text-slate-700">Backup scenario:</strong> {item.backup}
                                         </div>
                                     </div>
-                                </Card>
+                                </div>
                             ))
                         )}
                     </div>
                 </div>
             </div>
 
-            {/* Depth Editor Modal */}
+            {/* Position Depth Editor Modal */}
             <Dialog open={!!selectedPos} onOpenChange={(open) => !open && setSelectedPos(null)}>
                 <DialogContent className="sm:max-w-2xl bg-slate-50 border-border p-0 overflow-hidden">
                     <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
@@ -869,12 +886,12 @@ export default function SquadPlannerPage() {
                                             <div className="flex-1">
                                                 <div className="flex items-center justify-between">
                                                     <span className="font-bold text-sm text-slate-900">{p.firstName} {p.lastName}</span>
-                                                    {!isPrimaryHere && <Badge variant="secondary" className="text-[9px] bg-orange-100 text-orange-700">Also Covers</Badge>}
+                                                    {!isPrimaryHere && <Badge variant="secondary" className="text-[9px] bg-slate-100 text-slate-600">Also Covers</Badge>}
                                                 </div>
                                                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1 flex gap-2">
-                                                    <span>{idx === 0 ? "1st Choice" : `${idx+1} Choice`}</span>
+                                                    <span>{idx === 0 ? "Starter" : idx === 1 ? "Competition" : idx === 2 ? "Rotation" : "Cover"}</span>
                                                     <span className="text-slate-300">•</span>
-                                                    <span className={fit === 'Natural' ? 'text-emerald-600' : fit === 'Secondary' ? 'text-blue-600' : 'text-red-500'}>
+                                                    <span className={fit === 'Natural' ? 'text-slate-700' : fit === 'Secondary' ? 'text-slate-500' : 'text-slate-400'}>
                                                         {fit}
                                                     </span>
                                                 </div>
@@ -915,7 +932,7 @@ export default function SquadPlannerPage() {
                                             <div>
                                                 <div className="font-bold text-sm text-slate-900">{p.firstName} {p.lastName}</div>
                                                 <div className="flex items-center gap-2 mt-0.5">
-                                                    <span className={`text-[9px] font-bold uppercase tracking-wider ${fit === 'Natural' ? 'text-emerald-600' : fit === 'Secondary' ? 'text-blue-600' : 'text-slate-400'}`}>
+                                                    <span className={`text-[9px] font-bold uppercase tracking-wider ${fit === 'Natural' ? 'text-slate-700' : fit === 'Secondary' ? 'text-slate-500' : 'text-slate-400'}`}>
                                                         {fit}
                                                     </span>
                                                     {pPrimary && <span className="text-[9px] text-slate-400">(Primary: {pPrimary})</span>}
@@ -935,6 +952,70 @@ export default function SquadPlannerPage() {
                             </div>
                         </div>
                     </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Player Coverage Modal */}
+            <Dialog open={!!selectedPlayerId} onOpenChange={(open) => !open && setSelectedPlayerId(null)}>
+                <DialogContent className="sm:max-w-md bg-white border-border">
+                    {selectedPlayerId && (() => {
+                        const player = players.find(p => p.id === selectedPlayerId);
+                        if (!player) return null;
+                        
+                        const coverage = getPlayerCoverage(player);
+
+                        return (
+                            <div className="py-2">
+                                <DialogHeader className="mb-6">
+                                    <DialogTitle className="text-2xl font-black text-slate-900">
+                                        {player.firstName} {player.lastName}
+                                    </DialogTitle>
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">Player Coverage</p>
+                                </DialogHeader>
+                                
+                                <div className="space-y-6">
+                                    <div>
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 border-b pb-2">Primary Role</h4>
+                                        {coverage.primary ? (
+                                            <div className="font-bold text-lg text-slate-900">{POSITION_FULL_NAMES[coverage.primary] || coverage.primary}</div>
+                                        ) : (
+                                            <div className="text-sm text-slate-500 italic">No primary role assigned</div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 border-b pb-2">Also Covers</h4>
+                                        {coverage.alsoCovers.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {coverage.alsoCovers.map(role => (
+                                                    <Badge key={role} variant="secondary" className="bg-slate-100 text-slate-700 font-bold hover:bg-slate-200">
+                                                        {POSITION_FULL_NAMES[role] || role}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm text-slate-500 italic">No secondary cover assigned</div>
+                                        )}
+                                    </div>
+
+                                    <div>
+                                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2 border-b pb-2">Emergency Cover</h4>
+                                        {coverage.emergency.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {coverage.emergency.map(role => (
+                                                    <Badge key={role} variant="outline" className="text-slate-500 font-medium">
+                                                        {POSITION_FULL_NAMES[role] || role}
+                                                    </Badge>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-sm text-slate-500 italic">No emergency cover assigned</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )
+                    })()}
                 </DialogContent>
             </Dialog>
 
