@@ -12,6 +12,7 @@ import { supabase } from "@/lib/supabase";
 import { formatPlayerName } from "@/lib/utils";
 import { calculateMeetTime } from "@/lib/whatsapp-utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 
 const POSITION_ORDER: { [key: string]: number } = {
     'GK': 1,
@@ -1050,6 +1051,9 @@ export default function MatchdayXIPage() {
     return (
         <div className="pb-16 text-slate-900 dark:text-slate-100 flex flex-col gap-8">
             
+            {/* LEVEL 0: Football Week */}
+            <WeeklyFootballCalendar />
+
             {/* Match Identity & Fixture Selection */}
             <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 md:p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
                 {/* Subtle Pitch Pattern Background */}

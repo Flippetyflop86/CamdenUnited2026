@@ -18,7 +18,9 @@ import { useSearchParams } from "next/navigation";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSection } from "@/components/layout/page-section";
+import { PageSection } from "@/components/layout/page-section";
 import { SectionHeader } from "@/components/ui/section-header";
+import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 
 
 // I'll stick to native date formatting for zero-dep speed unless complex.
@@ -625,6 +627,9 @@ export default function TrainingPage() {
                 title="Training Schedule" 
                 description="Plan the week and prepare your squad for the next football activity." 
             />
+
+            {/* LEVEL 0: Football Week */}
+            <WeeklyFootballCalendar />
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-3">

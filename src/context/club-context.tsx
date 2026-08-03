@@ -46,6 +46,7 @@ interface ClubSettings {
     defaultCompetition?: string | null;
     timezone?: string;
     lastImportHistory?: any;
+    useMatchdayNumbering: boolean;
 }
 
 interface ClubContextType {
@@ -100,7 +101,8 @@ const defaultSettings: ClubSettings = {
     seasonEnd: null,
     defaultCompetition: "League",
     timezone: "Europe/London",
-    lastImportHistory: null
+    lastImportHistory: null,
+    useMatchdayNumbering: false
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -259,7 +261,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         trainingFeePerSession: Number(data.training_fee_per_session) || 0,
                         contractsEnabled: data.contracts_enabled !== undefined ? !!data.contracts_enabled : false,
                         subsEnabled: data.subs_enabled !== undefined ? !!data.subs_enabled : true,
-                        measurementUnit: (typeof window !== "undefined" ? localStorage.getItem("clubflow_measurement_unit") : "metric") as any || "metric",
+                        measurementUnit: data.measurement_unit || "metric",
                         defaultHomeKickOff: data.default_home_kick_off || "14:00",
                         defaultTrainingVenue: data.default_training_venue || null,
                         preferredSurface: data.preferred_surface || null,
@@ -269,7 +271,8 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         seasonEnd: data.season_end || null,
                         defaultCompetition: data.default_competition || "League",
                         timezone: data.timezone || "Europe/London",
-                        lastImportHistory: data.last_import_history || null
+                        lastImportHistory: data.last_import_history || null,
+                        useMatchdayNumbering: data.use_matchday_numbering || false
                     };
                     setSettings(loadedSettings);
                     if (typeof window !== 'undefined') {

@@ -85,6 +85,11 @@ export default function AdminPage() {
     });
     const [notificationEmail, setNotificationEmail] = useState(() => getCached("notificationEmail") ?? settings.notificationEmail ?? "");
     const [measurementUnit, setMeasurementUnit] = useState<"metric" | "imperial">(() => (getCached("measurementUnit") ?? settings.measurementUnit ?? "metric") as "metric" | "imperial");
+    const [useMatchdayNumbering, setUseMatchdayNumbering] = useState(() => {
+        const cached = getCached("useMatchdayNumbering");
+        if (cached !== null) return cached === "true";
+        return settings.useMatchdayNumbering || false;
+    });
 
     const [isMigrating, setIsMigrating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -249,6 +254,9 @@ export default function AdminPage() {
             const cachedUnit = getCached("measurementUnit");
             setMeasurementUnit((cachedUnit ?? settings.measurementUnit ?? "metric") as "metric" | "imperial");
 
+            const cachedUseMatchdayNumbering = getCached("useMatchdayNumbering");
+            setUseMatchdayNumbering(cachedUseMatchdayNumbering !== null ? cachedUseMatchdayNumbering === "true" : (settings.useMatchdayNumbering || false));
+
             const cachedTraining = getCached("trainingTemplate");
             const cachedMatch = getCached("matchTemplate");
             
@@ -304,7 +312,8 @@ export default function AdminPage() {
             managerName,
             trainingTemplate,
             matchTemplate,
-            measurementUnit
+            measurementUnit,
+            useMatchdayNumbering: String(useMatchdayNumbering)
         };
 
         Object.entries(cache).forEach(([key, val]) => {
@@ -314,7 +323,7 @@ export default function AdminPage() {
         name, squads, homeGround, foundingYear, twitterUrl, instagramUrl, primaryColor,
         homeKitShirt, homeKitShorts, homeKitSocks, awayKitShirt, awayKitShorts, awayKitSocks,
         leagueUrl, leaguePosition, monthlySubs, subsEnabled, contractsEnabled, finesEnabled,
-        fineCategories, notificationsEnabled, notificationEmail, managerName, trainingTemplate, matchTemplate, measurementUnit
+        fineCategories, notificationsEnabled, notificationEmail, managerName, trainingTemplate, matchTemplate, measurementUnit, useMatchdayNumbering
     ]);
 
     const fetchTeamAccess = async () => {
@@ -671,6 +680,7 @@ export default function AdminPage() {
                 notificationEmail,
                 sponsorLogo: finalSponsor,
                 measurementUnit,
+                useMatchdayNumbering,
                 whatsappPollMessage: JSON.stringify({
                     training: trainingTemplate,
                     match: matchTemplate
@@ -684,7 +694,7 @@ export default function AdminPage() {
                 "name", "squads", "homeGround", "foundingYear", "twitterUrl", "instagramUrl", "primaryColor",
                 "homeKitShirt", "homeKitShorts", "homeKitSocks", "awayKitShirt", "awayKitShorts", "awayKitSocks",
                 "leagueUrl", "leaguePosition", "monthlySubs", "subsEnabled", "contractsEnabled", "finesEnabled",
-                "fineCategories", "notificationsEnabled", "notificationEmail", "managerName", "trainingTemplate", "matchTemplate", "measurementUnit"
+                "fineCategories", "notificationsEnabled", "notificationEmail", "managerName", "trainingTemplate", "matchTemplate", "measurementUnit", "useMatchdayNumbering"
             ];
             ADMIN_CACHE_KEYS.forEach(key => sessionStorage.removeItem(`clubflow_admin_${key}`));
         } catch (error) {
@@ -862,6 +872,19 @@ export default function AdminPage() {
                                     <option value="metric">Metric (kg / cm)</option>
                                     <option value="imperial">Imperial (lbs / ft & in)</option>
                                 </select>
+                            </div>
+
+                            <div className="flex items-center justify-between border rounded-md p-4 bg-slate-50 border-slate-200">
+                                <div className="space-y-0.5">
+                                    <Label className="text-base font-semibold">Use Matchday Numbering</Label>
+                                    <p className="text-sm text-slate-500">
+                                        Calculate the days relative to matchday (e.g. MD-2, MD-1, Matchday, Recovery) across the platform.
+                                    </p>
+                                </div>
+                                <Switch
+                                    checked={useMatchdayNumbering}
+                                    onCheckedChange={setUseMatchdayNumbering}
+                                />
                             </div>
 
                             <div className="space-y-2">

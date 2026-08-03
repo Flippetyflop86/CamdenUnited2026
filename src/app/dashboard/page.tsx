@@ -32,6 +32,7 @@ import {
     UserCheck,
     FileText
 } from "lucide-react";
+import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 import { useClub } from "@/context/club-context";
 import { supabase } from "@/lib/supabase";
 import { formatPlayerName } from "@/lib/utils";
@@ -556,6 +557,11 @@ export default function DashboardPage() {
                     Sync Standings
                 </button>
             </PageHeader>
+
+            {/* LEVEL 0: Football Week */}
+            <PageSection>
+                <WeeklyFootballCalendar />
+            </PageSection>
 
             {/* LEVEL 1: The Next Event (Football First) */}
             <PageSection>

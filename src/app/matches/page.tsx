@@ -25,6 +25,7 @@ import { NextMatchHero } from "./components/NextMatchHero";
 import { MatchPreparation } from "./components/MatchPreparation";
 import { UpcomingFixtures } from "./components/UpcomingFixtures";
 import { RecentResults } from "./components/RecentResults";
+import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 
 export default function MatchesPage() {
     const router = useRouter();
@@ -1491,6 +1492,9 @@ export default function MatchesPage() {
                     </Dialog>
                 </div>
             </div>
+
+            {/* LEVEL 0: Football Week */}
+            <WeeklyFootballCalendar />
 
             {/* Filters */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
