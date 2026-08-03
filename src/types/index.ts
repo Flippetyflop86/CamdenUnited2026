@@ -154,6 +154,15 @@ export interface MatchdayXI {
     updatedAt: string;
 }
 
+export interface SquadDepth {
+    id: string;
+    squad: string;
+    formation: string;
+    depth_chart: Record<string, string[]>; // Position label -> Array of player IDs (Primary only)
+    created_at?: string;
+    updated_at?: string;
+}
+
 export interface Recruit {
     id: string;
     name: string;

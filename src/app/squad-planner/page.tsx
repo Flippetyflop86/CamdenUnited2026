@@ -1,11 +1,14 @@
+
 "use client";
 
 import { useState, useEffect } from "react";
-import { Player, Position } from "@/types";
+import { Player, Position, MatchdayXI, SquadDepth } from "@/types";
 import { FORMATIONS, FORMATION_NAMES } from "@/lib/formations";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
     Shield,
     CheckCircle2,
@@ -15,7 +18,12 @@ import {
     Star,
     AlertCircle,
     UserX,
-    TrendingUp
+    TrendingUp,
+    Wand2,
+    Save,
+    Trash2,
+    Plus,
+    Clock
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
@@ -76,7 +84,7 @@ const getShortPosition = (pos: string): string => {
     if (p === "left winger" || p === "left wing" || p === "lw") return "LW";
     if (p === "right winger" || p === "right wing" || p === "rw") return "RW";
     if (p === "striker" || p === "forward" || p === "st" || p === "centre forward" || p === "cf") return "ST";
-    return "CM"; // default fallback
+    return "CM";
 };
 
 export default function SquadPlannerPage() {
@@ -89,26 +97,31 @@ export default function SquadPlannerPage() {
     const [players, setPlayers] = useState<Player[]>([]);
     const [loading, setLoading] = useState(true);
     
-    // Drag and drop tracking
-    const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
-    const [draggedSourcePos, setDraggedSourcePos] = useState<string | null>(null);
+    // DB State
+    const [depthChart, setDepthChart] = useState<Record<string, string[]>>({});
+    const [hasLoadedConfig, setHasLoadedConfig] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
 
-    // Scenario Planning state: local set of unavailable player IDs
+    // Planner Mode
+    const [isScenarioMode, setIsScenarioMode] = useState(false);
     const [scenarioUnavailability, setScenarioUnavailability] = useState<Set<string>>(new Set());
 
-    // Position Details Modal
+    // Depth Editor Modal
     const [selectedPos, setSelectedPos] = useState<string | null>(null);
+    const [draggedPlayerId, setDraggedPlayerId] = useState<string | null>(null);
 
-    // Depth chart map: { [positionLabel]: playerId[] }
-    const [depthChart, setDepthChart] = useState<Record<string, string[]>>({});
+    const activePositions = FORMATIONS[formation] || FORMATIONS["4-3-3"];
+    const uniqueFormationLabels = Array.from(new Set(activePositions.map(pos => pos.label)));
 
-    const fetchPlayers = async () => {
+    const fetchData = async () => {
         setLoading(true);
         try {
-            const { data, error } = await supabase.from("players").select("*");
-
-            if (data) {
-                const mapped: Player[] = data.map((p: any) => ({
+            // Fetch Players
+            const { data: pData } = await supabase.from("players").select("*");
+            let filteredPlayers: Player[] = [];
+            if (pData) {
+                const mapped: Player[] = pData.map((p: any) => ({
                     id: p.id,
                     firstName: p.first_name,
                     lastName: p.last_name,
@@ -128,7 +141,7 @@ export default function SquadPlannerPage() {
                     secondaryPositions: p.secondary_position ? p.secondary_position.split(",").map((s: string) => s.trim() as Position) : []
                 }));
 
-                const filteredBySquad = mapped.filter(p => {
+                filteredPlayers = mapped.filter(p => {
                     const playerSquads = Array.isArray(p.squad) 
                         ? p.squad 
                         : typeof p.squad === "string" 
@@ -141,123 +154,185 @@ export default function SquadPlannerPage() {
                         return squadClean === tabClean;
                     });
                 });
-
-                setPlayers(filteredBySquad);
-                initializeDepthChart(filteredBySquad);
+                setPlayers(filteredPlayers);
             }
+
+            // Fetch Squad Depth Chart
+            const { data: dData, error: dErr } = await supabase
+                .from("squad_depths")
+                .select("*")
+                .eq("squad", activeSquadTab)
+                .limit(1);
+            
+            if (dErr && dErr.code !== 'PGRST116') {
+                // Ignore missing table during local dev/migration window, fall back to empty
+            }
+
+            if (dData && dData.length > 0) {
+                setDepthChart(dData[0].depth_chart || {});
+                setFormation(dData[0].formation || "4-3-3");
+                setShowOnboarding(false);
+            } else {
+                setDepthChart({});
+                setShowOnboarding(true);
+            }
+
+            setHasLoadedConfig(true);
         } catch (err) {
-            console.error("Error fetching players:", err);
+            console.error("Error fetching planner data:", err);
         } finally {
             setLoading(false);
         }
     };
 
-    const playerCanPlayPosition = (p: Player, posLabel: string): boolean => {
-        const checkMatch = (pos: string, targetLabel: string): boolean => {
-            const pShort = getShortPosition(pos);
-            if (pShort === targetLabel) return true;
-            
-            if (pShort === "CB" && (targetLabel === "LCB" || targetLabel === "RCB")) return true;
-            if (pShort === "CM" && (targetLabel === "LCM" || targetLabel === "RCM")) return true;
-            if (pShort === "CAM" && (targetLabel === "LAM" || targetLabel === "RAM")) return true;
-            if (pShort === "CDM" && (targetLabel === "LDM" || targetLabel === "RDM")) return true;
-            
-            if ((pShort === "LCB" || pShort === "RCB") && targetLabel === "CB") return true;
-            if ((pShort === "LCM" || pShort === "RCM") && targetLabel === "CM") return true;
-            if ((pShort === "LAM" || pShort === "RAM") && targetLabel === "CAM") return true;
-            if ((pShort === "LDM" || pShort === "RDM") && targetLabel === "CDM") return true;
-            
-            return false;
-        };
-
-        if (checkMatch(p.position, posLabel)) return true;
-        if (p.secondaryPositions && p.secondaryPositions.length > 0) {
-            return p.secondaryPositions.some(secPos => checkMatch(secPos, posLabel));
-        }
-        return false;
-    };
-
-    const initializeDepthChart = (squadPlayers: Player[]) => {
-        const saved = localStorage.getItem(`clubflow_squad_planner_chart_${activeSquadTab}`);
-        let loadedChart: Record<string, string[]> = {};
-        if (saved) {
-            try {
-                loadedChart = JSON.parse(saved);
-            } catch (e) {
-                loadedChart = {};
-            }
-        }
-
-        const currentIds = new Set(squadPlayers.map(p => p.id));
-        Object.keys(loadedChart).forEach(pos => {
-            loadedChart[pos] = (loadedChart[pos] || []).filter(id => currentIds.has(id));
-        });
-
-        const allPossibleLabels = ["GK", "LB", "CB", "LCB", "RCB", "RB", "LWB", "RWB", "CDM", "LDM", "RDM", "CM", "LCM", "RCM", "CAM", "LAM", "RAM", "LM", "RM", "LW", "RW", "ST", "CF"];
-
-        squadPlayers.forEach(p => {
-            allPossibleLabels.forEach(label => {
-                if (playerCanPlayPosition(p, label)) {
-                    if (!loadedChart[label]) {
-                        loadedChart[label] = [];
-                    }
-                    if (!loadedChart[label].includes(p.id)) {
-                        loadedChart[label].push(p.id);
-                    }
-                }
-            });
-        });
-
-        setDepthChart(loadedChart);
-        localStorage.setItem(`clubflow_squad_planner_chart_${activeSquadTab}`, JSON.stringify(loadedChart));
-    };
-
     useEffect(() => {
         if (isClubLoaded) {
-            fetchPlayers();
-            
-            const savedFormation = localStorage.getItem(`clubflow_squad_planner_formation_${activeSquadTab}`);
-            if (savedFormation) {
-                setFormation(savedFormation);
-            } else {
-                setFormation("4-3-3");
-            }
+            fetchData();
         }
     }, [activeSquadTab, isClubLoaded]);
 
-    const saveDepthChart = (newChart: Record<string, string[]>) => {
+    const saveToDatabase = async (newChart: Record<string, string[]>, newFormation: string) => {
         setDepthChart(newChart);
-        localStorage.setItem(`clubflow_squad_planner_chart_${activeSquadTab}`, JSON.stringify(newChart));
+        setFormation(newFormation);
+        setIsSaving(true);
+        try {
+            // Upsert based on squad
+            const { data: existing } = await supabase.from("squad_depths").select("id").eq("squad", activeSquadTab).limit(1);
+            if (existing && existing.length > 0) {
+                await supabase.from("squad_depths").update({
+                    formation: newFormation,
+                    depth_chart: newChart,
+                    updated_at: new Date().toISOString()
+                }).eq("id", existing[0].id);
+            } else {
+                await supabase.from("squad_depths").insert({
+                    squad: activeSquadTab,
+                    formation: newFormation,
+                    depth_chart: newChart
+                });
+            }
+        } catch (e) {
+            console.error("Failed to save depth chart", e);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleFormationChange = (newFormation: string) => {
-        setFormation(newFormation);
-        localStorage.setItem(`clubflow_squad_planner_formation_${activeSquadTab}`, newFormation);
+        saveToDatabase(depthChart, newFormation);
     };
 
-    const handleDragStart = (playerId: string, posKey: string) => {
-        setDraggedPlayerId(playerId);
-        setDraggedSourcePos(posKey);
+    // Intelligence Engine: Build Initial Planner
+    const buildIntelligently = async () => {
+        setLoading(true);
+        setShowOnboarding(false);
+        try {
+            const newChart: Record<string, string[]> = {};
+            
+            // 1. Fetch most recent Matchday XI for this squad
+            const { data: mxData } = await supabase
+                .from("matchday_xis")
+                .select("*")
+                .eq("squad", activeSquadTab)
+                .order("created_at", { ascending: false })
+                .limit(1);
+
+            let primaryAssigned = new Set<string>();
+            const activeFormPositions = FORMATIONS[formation] || FORMATIONS["4-3-3"];
+            const formLabels = Array.from(new Set(activeFormPositions.map(pos => pos.label)));
+
+            // Initialize empty arrays
+            formLabels.forEach(l => { newChart[l] = []; });
+
+            // Assign First Choices from Matchday XI
+            if (mxData && mxData.length > 0) {
+                const starters = mxData[0].starters;
+                const matchFormationStr = mxData[0].formation;
+                const matchPositions = FORMATIONS[matchFormationStr] || FORMATIONS["4-3-3"];
+                
+                Object.keys(starters).forEach(posIndex => {
+                    const playerId = starters[posIndex];
+                    const posDef = matchPositions[parseInt(posIndex)];
+                    if (posDef && playerId) {
+                        const label = posDef.label;
+                        if (newChart[label]) {
+                            if (!newChart[label].includes(playerId)) {
+                                newChart[label].push(playerId);
+                                primaryAssigned.add(playerId);
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Helper to see if player fits role
+            const fits = (p: Player, role: string, strict: boolean) => {
+                const pShort = getShortPosition(p.position);
+                const rShort = getShortPosition(role);
+                if (pShort === rShort) return true;
+                if (!strict && p.secondaryPositions?.some(sp => getShortPosition(sp) === rShort)) return true;
+                
+                // Versatility matching (non-strict)
+                if (!strict) {
+                    if (["CB", "LCB", "RCB"].includes(rShort) && ["CB", "LB", "RB", "LWB", "RWB", "CDM"].includes(pShort)) return true;
+                    if (["LB", "LWB"].includes(rShort) && ["LB", "LWB", "LM", "CB"].includes(pShort)) return true;
+                    if (["RB", "RWB"].includes(rShort) && ["RB", "RWB", "RM", "CB"].includes(pShort)) return true;
+                    if (["CM", "CDM", "CAM", "LDM", "RDM", "LCM", "RCM", "LAM", "RAM"].includes(rShort) && ["CM", "CDM", "CAM", "LM", "RM"].includes(pShort)) return true;
+                    if (["LM", "LW"].includes(rShort) && ["LM", "LW", "LB", "LWB", "ST", "CAM"].includes(pShort)) return true;
+                    if (["RM", "RW"].includes(rShort) && ["RM", "RW", "RB", "RWB", "ST", "CAM"].includes(pShort)) return true;
+                    if (["ST", "CF"].includes(rShort) && ["ST", "CF", "LW", "RW", "CAM"].includes(pShort)) return true;
+                }
+                return false;
+            };
+
+            // 2. Assign remaining naturally fitting players (who don't have a primary role yet)
+            players.forEach(p => {
+                if (primaryAssigned.has(p.id)) return;
+                
+                // Find a slot they fit strictly
+                for (const label of formLabels) {
+                    if (fits(p, label, true) && newChart[label].length < 3) {
+                        newChart[label].push(p.id);
+                        primaryAssigned.add(p.id);
+                        return;
+                    }
+                }
+                // If not strict, find a secondary slot
+                for (const label of formLabels) {
+                    if (fits(p, label, false) && newChart[label].length < 3) {
+                        newChart[label].push(p.id);
+                        primaryAssigned.add(p.id);
+                        return;
+                    }
+                }
+            });
+
+            await saveToDatabase(newChart, formation);
+        } catch (e) {
+            console.error("Auto build failed", e);
+        } finally {
+            setLoading(false);
+        }
     };
 
-    const handleDropOnPosition = (targetPos: string, targetIndex?: number) => {
-        if (!draggedPlayerId || !draggedSourcePos) return;
+    const handleSkipOnboarding = () => {
+        setShowOnboarding(false);
+        saveToDatabase({}, formation);
+    };
 
-        let newChart = { ...depthChart };
-        
-        if (draggedSourcePos === targetPos) {
-            const list = [...(newChart[targetPos] || [])];
-            const sourceIndex = list.indexOf(draggedPlayerId);
-            if (sourceIndex > -1 && targetIndex !== undefined && sourceIndex !== targetIndex) {
-                list.splice(sourceIndex, 1);
-                list.splice(targetIndex, 0, draggedPlayerId);
-                newChart[targetPos] = list;
+    // Primary Ownership logic
+    const getPrimaryAssignment = (playerId: string): string | null => {
+        for (const label of uniqueFormationLabels) {
+            if (depthChart[label] && depthChart[label].length > 0 && depthChart[label][0] === playerId) {
+                return label;
             }
         }
-
-        saveDepthChart(newChart);
-        setDraggedPlayerId(null);
-        setDraggedSourcePos(null);
+        for (const label of uniqueFormationLabels) {
+            if (depthChart[label] && depthChart[label].includes(playerId)) {
+                return label;
+            }
+        }
+        return null;
     };
 
     const toggleScenarioAvailability = (playerId: string, e: React.MouseEvent) => {
@@ -271,9 +346,6 @@ export default function SquadPlannerPage() {
         setScenarioUnavailability(newSet);
     };
 
-    const activePositions = FORMATIONS[formation] || FORMATIONS["4-3-3"];
-    const uniqueFormationLabels = Array.from(new Set(activePositions.map(pos => pos.label)));
-
     const getActivePosPlayers = (posLabel: string) => {
         const ids = depthChart[posLabel] || [];
         return ids
@@ -281,16 +353,11 @@ export default function SquadPlannerPage() {
             .filter((p): p is Player => !!p && p.availability && !scenarioUnavailability.has(p.id));
     };
 
-    const getAllPosPlayers = (posLabel: string) => {
-        const ids = depthChart[posLabel] || [];
-        return ids.map(id => players.find(p => p.id === id)).filter((p): p is Player => !!p);
-    };
-
     const isOutofPosition = (p: Player, targetLabel: string) => {
         return getShortPosition(p.position) !== getShortPosition(targetLabel);
     };
 
-    const getUnitLabels = (unit: "GK" | "DEF" | "MID" | "ATT") => {
+    const evaluateUnitBalance = (unit: "GK" | "DEF" | "MID" | "ATT") => {
         const unitLabels: string[] = [];
         uniqueFormationLabels.forEach(label => {
             const p = getShortPosition(label);
@@ -299,26 +366,35 @@ export default function SquadPlannerPage() {
             if (unit === "MID" && ["CM", "LCM", "RCM", "CDM", "LDM", "RDM", "CAM", "LAM", "RAM", "LM", "RM"].includes(p)) unitLabels.push(label);
             if (unit === "ATT" && ["ST", "CF", "LW", "RW"].includes(p)) unitLabels.push(label);
         });
-        return unitLabels;
-    };
-
-    const evaluateUnitBalance = (unit: "GK" | "DEF" | "MID" | "ATT") => {
-        const labels = getUnitLabels(unit);
-        if (labels.length === 0) return null;
         
-        let totalSlots = labels.length;
+        if (unitLabels.length === 0) return null;
+        
+        let totalSlots = unitLabels.length;
         let totalNaturalCover = 0;
-        let totalCover = 0;
+        let totalSecondaryCover = 0;
+        let totalEmergencyCover = 0;
         let issues: string[] = [];
 
-        labels.forEach(label => {
+        unitLabels.forEach(label => {
             const active = getActivePosPlayers(label);
-            const natural = active.filter(p => !isOutofPosition(p, label));
-            totalNaturalCover += natural.length;
-            totalCover += active.length;
+            let hasNat = false;
+            let hasSec = false;
+
+            active.forEach(p => {
+                if (getShortPosition(p.position) === getShortPosition(label)) {
+                    totalNaturalCover++;
+                    hasNat = true;
+                } else if (p.secondaryPositions?.some(sp => getShortPosition(sp) === getShortPosition(label))) {
+                    totalSecondaryCover++;
+                    hasSec = true;
+                } else {
+                    totalEmergencyCover++;
+                }
+            });
             
             if (active.length === 0) issues.push(`No cover for ${label}`);
-            else if (natural.length === 0) issues.push(`No natural cover for ${label}`);
+            else if (!hasNat && !hasSec) issues.push(`Relying on Emergency cover for ${label}`);
+            else if (!hasNat) issues.push(`No natural cover for ${label}`);
         });
 
         let grade = "Adequate";
@@ -329,12 +405,12 @@ export default function SquadPlannerPage() {
         } else if (totalNaturalCover >= totalSlots * 2) {
             grade = "Excellent";
             color = "text-emerald-600 bg-emerald-50 border-emerald-200";
-        } else if (totalNaturalCover > totalSlots) {
+        } else if (totalNaturalCover + totalSecondaryCover > totalSlots) {
             grade = "Good";
             color = "text-green-600 bg-green-50 border-green-200";
         }
 
-        return { grade, color, issues, totalCover, totalNaturalCover };
+        return { grade, color, issues, totalNaturalCover, totalSecondaryCover, totalEmergencyCover };
     };
 
     const getRecruitmentPriorities = () => {
@@ -342,7 +418,8 @@ export default function SquadPlannerPage() {
 
         uniqueFormationLabels.forEach(label => {
             const activeList = getActivePosPlayers(label);
-            const naturalList = activeList.filter(p => !isOutofPosition(p, label));
+            const naturalList = activeList.filter(p => getShortPosition(p.position) === getShortPosition(label));
+            const secList = activeList.filter(p => p.secondaryPositions?.some(sp => getShortPosition(sp) === getShortPosition(label)));
             
             if (activeList.length === 0) {
                 priorities.push({
@@ -351,18 +428,25 @@ export default function SquadPlannerPage() {
                     backup: "None available.",
                     severity: "Critical"
                 });
+            } else if (naturalList.length === 0 && secList.length === 0) {
+                priorities.push({
+                    title: `Natural ${POSITION_FULL_NAMES[label] || label}`,
+                    reason: `No recognised natural or secondary options for this role.`,
+                    backup: `Relying on ${activeList[0].firstName} ${activeList[0].lastName} (Emergency Cover).`,
+                    severity: "High"
+                });
             } else if (naturalList.length === 0) {
                 priorities.push({
                     title: `Natural ${POSITION_FULL_NAMES[label] || label}`,
-                    reason: `No recognised natural options for this role.`,
-                    backup: `Relying on ${activeList[0].firstName} ${activeList[0].lastName} (Out of Position).`,
-                    severity: "High"
+                    reason: `Relying purely on secondary position cover.`,
+                    backup: `Relying on ${activeList[0].firstName} ${activeList[0].lastName} (Secondary Cover).`,
+                    severity: "Medium"
                 });
-            } else if (naturalList.length === 1) {
+            } else if (naturalList.length === 1 && activeList.length === 1) {
                 priorities.push({
                     title: `Backup ${POSITION_FULL_NAMES[label] || label}`,
-                    reason: `Only one recognised natural player covering this position.`,
-                    backup: activeList.length > 1 ? `Makeshift cover: ${activeList[1].firstName} ${activeList[1].lastName} (${getShortPosition(activeList[1].position)})` : "No backups available.",
+                    reason: `Only one player available covering this position.`,
+                    backup: "No backups available.",
                     severity: "Medium"
                 });
             }
@@ -374,11 +458,6 @@ export default function SquadPlannerPage() {
         }).slice(0, 4);
     };
 
-    const getDisplayLabel = (label: string) => {
-        const map: Record<string, string> = { 'LCB': 'CB', 'RCB': 'CB', 'LDM': 'DM', 'RDM': 'DM', 'LAM': 'CAM', 'RAM': 'CAM' };
-        return map[label] || label;
-    };
-
     const squadBalance = [
         { unit: "Goalkeepers", data: evaluateUnitBalance("GK") },
         { unit: "Defensive Depth", data: evaluateUnitBalance("DEF") },
@@ -388,58 +467,157 @@ export default function SquadPlannerPage() {
 
     const recruitmentPriorities = getRecruitmentPriorities();
 
+    // Depth Editor Logic
+    const handleDragStart = (e: React.DragEvent, id: string) => {
+        setDraggedPlayerId(id);
+    };
+
+    const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+        e.preventDefault();
+        if (!selectedPos || !draggedPlayerId) return;
+
+        const currentList = [...(depthChart[selectedPos] || [])];
+        const sourceIndex = currentList.indexOf(draggedPlayerId);
+        
+        if (sourceIndex > -1) {
+            // Reordering
+            currentList.splice(sourceIndex, 1);
+            currentList.splice(targetIndex, 0, draggedPlayerId);
+            saveToDatabase({ ...depthChart, [selectedPos]: currentList }, formation);
+        }
+        setDraggedPlayerId(null);
+    };
+
+    const removeFromPos = (playerId: string) => {
+        if (!selectedPos) return;
+        const currentList = [...(depthChart[selectedPos] || [])];
+        const newChart = { ...depthChart, [selectedPos]: currentList.filter(id => id !== playerId) };
+        saveToDatabase(newChart, formation);
+    };
+
+    const addToPos = (playerId: string) => {
+        if (!selectedPos) return;
+        const currentList = [...(depthChart[selectedPos] || [])];
+        if (!currentList.includes(playerId)) {
+            currentList.push(playerId);
+            saveToDatabase({ ...depthChart, [selectedPos]: currentList }, formation);
+        }
+    };
+
+    if (loading && !hasLoadedConfig) {
+        return (
+            <div className="flex items-center justify-center min-h-[400px]">
+                <div className="flex flex-col items-center gap-4">
+                    <Clock className="h-8 w-8 text-slate-300 animate-spin" />
+                    <p className="text-sm font-bold text-slate-400 uppercase tracking-wider">Loading Planner...</p>
+                </div>
+            </div>
+        )
+    }
+
+    if (showOnboarding) {
+        return (
+            <div className="min-h-[80vh] flex flex-col items-center justify-center p-6 text-center">
+                <div className="max-w-xl w-full bg-white rounded-3xl border shadow-xl p-10 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 w-full h-2 bg-brand" />
+                    
+                    <div className="h-16 w-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <Wand2 className="h-8 w-8 text-brand" />
+                    </div>
+                    
+                    <h1 className="text-3xl font-black text-slate-900 mb-4 tracking-tight">Welcome to Squad Planner</h1>
+                    <p className="text-slate-600 leading-relaxed mb-10">
+                        To build your squad depth, we first need to understand your strongest team. We can intelligently generate a first draft using your club's recent match history, allowing you to simply refine it over time.
+                    </p>
+
+                    <div className="space-y-4">
+                        <Button 
+                            onClick={buildIntelligently} 
+                            disabled={loading}
+                            className="w-full h-14 text-lg font-bold bg-brand hover:bg-brand-dark text-white rounded-xl shadow-md hover:shadow-lg transition-all"
+                        >
+                            {loading ? "Generating..." : "✅ Use Saved Matchday XI (Recommended)"}
+                        </Button>
+                        <Button 
+                            onClick={handleSkipOnboarding}
+                            disabled={loading}
+                            variant="outline" 
+                            className="w-full h-14 text-lg font-bold border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl"
+                        >
+                            Build depth manually
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-8 text-slate-900 pb-16 max-w-[1400px] mx-auto">
             
             {/* Header & Vision */}
-            <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 border-b pb-6">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b pb-6">
                 <div className="max-w-3xl">
                     <h1 className="text-3xl font-black tracking-tight mb-2">Season Planning</h1>
                     <p className="text-sm text-slate-500 leading-relaxed max-w-2xl">
-                        This module is the strategic planning workspace for the club. Evaluate squad balance, test formations, and identify long-term recruitment needs to ensure the squad is structurally prepared to compete across the entire season.
+                        Evaluate squad balance, test formations, and identify long-term recruitment needs to ensure the squad is structurally prepared to compete across the entire season.
                     </p>
                 </div>
                 
                 <div className="flex flex-col items-end gap-3 shrink-0">
-                    <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
-                        {currentSquads.map((sq) => (
-                            <button
-                                key={sq}
-                                onClick={() => setActiveSquadTab(sq)}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                                    activeSquadTab === sq ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
-                                }`}
-                            >
-                                {sq}
-                            </button>
-                        ))}
+                    <div className="flex items-center gap-4">
+                        {isSaving && <span className="text-xs font-bold text-slate-400 flex items-center gap-1"><Save className="h-3 w-3" /> Saving...</span>}
+                        <div className="flex items-center gap-2 bg-white border shadow-sm rounded-lg p-1.5 px-3">
+                            <Label htmlFor="scenario-mode" className="text-xs font-bold text-slate-600 cursor-pointer">
+                                Planning Mode: <span className={isScenarioMode ? "text-orange-500" : "text-brand"}>{isScenarioMode ? "Scenario" : "Normal"}</span>
+                            </Label>
+                            <Switch 
+                                id="scenario-mode" 
+                                checked={isScenarioMode}
+                                onCheckedChange={setIsScenarioMode}
+                            />
+                        </div>
                     </div>
-                    
-                    <div className="flex items-center gap-2 bg-white border shadow-sm rounded-lg p-1.5 pr-3">
-                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-2">Formation</span>
-                        <select
-                            value={formation}
-                            onChange={(e) => handleFormationChange(e.target.value)}
-                            className="bg-slate-50 border border-slate-200 rounded-md font-bold py-1.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand cursor-pointer"
-                        >
-                            {FORMATION_NAMES.map(f => (
-                                <option key={f} value={f}>{f}</option>
+
+                    <div className="flex items-center gap-2">
+                        <div className="flex bg-slate-100 p-1 rounded-xl w-fit">
+                            {currentSquads.map((sq) => (
+                                <button
+                                    key={sq}
+                                    onClick={() => setActiveSquadTab(sq)}
+                                    className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                        activeSquadTab === sq ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800"
+                                    }`}
+                                >
+                                    {sq}
+                                </button>
                             ))}
-                        </select>
+                        </div>
+                        
+                        <div className="flex items-center gap-2 bg-white border shadow-sm rounded-lg p-1.5 pr-3">
+                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider pl-2">Formation</span>
+                            <select
+                                value={formation}
+                                onChange={(e) => handleFormationChange(e.target.value)}
+                                className="bg-slate-50 border border-slate-200 rounded-md font-bold py-1.5 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand cursor-pointer"
+                            >
+                                {FORMATION_NAMES.map(f => (
+                                    <option key={f} value={f}>{f}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
 
             {/* Tactical Pitch (Hero Centerpiece) */}
             <div className="relative bg-emerald-800/95 rounded-2xl border-[6px] border-emerald-900/40 p-6 min-h-[760px] shadow-2xl flex flex-col justify-between overflow-hidden select-none mb-12">
-                {/* Grass Stripe Overlays */}
                 <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-[0.03]">
                     {Array.from({ length: 10 }).map((_, idx) => (
                         <div key={idx} className={`h-[76px] w-full ${idx % 2 === 0 ? 'bg-black' : 'bg-transparent'}`} />
                     ))}
                 </div>
 
-                {/* Pitch Markings */}
                 <div className="absolute inset-8 border-2 border-white/20 pointer-events-none">
                     <div className="absolute top-1/2 left-0 right-0 border-t-2 border-white/20" />
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 border-2 border-white/20 rounded-full" />
@@ -447,22 +625,22 @@ export default function SquadPlannerPage() {
                     <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-72 h-32 border-2 border-white/20 border-b-0" />
                 </div>
                 
-                {/* Subtle Watermark */}
                 {settings.logo && (
                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
                         <img src={settings.logo} alt="Watermark" className="w-64 h-64 object-contain grayscale brightness-125" />
                     </div>
                 )}
 
-                {/* Scenario Planning Toggle Helper */}
-                <div className="absolute top-4 left-4 z-20 bg-black/40 backdrop-blur-sm rounded-lg p-3 border border-white/10 max-w-xs text-white/80 text-[11px] leading-tight">
-                    <div className="flex items-center gap-1.5 mb-1 text-white font-bold">
-                        <AlertCircle className="h-3.5 w-3.5 text-orange-400" /> Scenario Planning
+                {isScenarioMode && (
+                    <div className="absolute top-4 left-4 z-20 bg-black/60 backdrop-blur-md rounded-lg p-3 border border-orange-500/30 max-w-xs text-white/90 text-xs leading-tight shadow-xl">
+                        <div className="flex items-center gap-1.5 mb-1.5 text-orange-400 font-black tracking-wider uppercase">
+                            <AlertCircle className="h-4 w-4" /> Scenario Mode Active
+                        </div>
+                        Click the dots next to players to simulate injuries or suspensions. The depth chart will instantly recalculate without affecting your database.
                     </div>
-                    Click the dot next to a player's name to temporarily mark them unavailable (e.g. injured). The pitch will instantly recalculate your depth.
-                </div>
+                )}
 
-                {/* Visual Position Nodes on the Pitch */}
+                {/* Visual Position Nodes */}
                 <div className="absolute inset-0 p-10 flex flex-col justify-between">
                     {(() => {
                         const renderedCounts: Record<string, number> = {};
@@ -472,8 +650,26 @@ export default function SquadPlannerPage() {
                             const positionIndex = renderedCounts[pos.label] || 0;
                             renderedCounts[pos.label] = positionIndex + 1;
 
-                            const positionPlayers = getActivePosPlayers(pos.label);
-                            const topPlayers = positionPlayers.slice(0, 3);
+                            // Primary Ownership Logic for Pitch Render
+                            // Only render a player if this is their primary assignment, OR if they are the ONLY cover.
+                            // To keep it simple, we just render the raw depth chart, but visual dupes are handled by the Depth Editor.
+                            // The user requested: "The tactical pitch should display the player only in their primary assignment. Other positions should reference them as Also Covers rather than duplicating the full player card."
+                            const rawPositionPlayers = depthChart[pos.label] || [];
+                            
+                            // Filter logic for Pitch Display
+                            const primaryPlayers: Player[] = [];
+                            const alsoCovers: Player[] = [];
+
+                            rawPositionPlayers.forEach(id => {
+                                const p = players.find(x => x.id === id);
+                                if (!p) return;
+                                const pPrimary = getPrimaryAssignment(p.id);
+                                if (pPrimary === pos.label) {
+                                    primaryPlayers.push(p);
+                                } else {
+                                    alsoCovers.push(p);
+                                }
+                            });
 
                             const adjustedY = 12 + (pos.y * 0.76);
                             const adjustedX = pos.x;
@@ -482,30 +678,25 @@ export default function SquadPlannerPage() {
                                 <div
                                     key={zoneKey}
                                     onClick={() => setSelectedPos(pos.label)}
-                                    className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center min-w-[140px] max-w-[150px] z-10 cursor-pointer group hover:z-30"
+                                    className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center min-w-[140px] max-w-[160px] z-10 cursor-pointer group hover:z-30 transition-transform hover:scale-105"
                                     style={{ left: `${adjustedX}%`, top: `${adjustedY}%` }}
                                 >
-                                    {/* Zone Label Header */}
                                     <div className="px-3 py-1 rounded-t-lg bg-slate-900 border-x border-t border-slate-700/80 text-[11px] font-black text-slate-200 shadow-md group-hover:bg-brand group-hover:border-brand transition-colors w-full text-center tracking-widest uppercase">
-                                        {getDisplayLabel(pos.label)}
+                                        {pos.label}
                                     </div>
 
-                                    {/* Placed Card (Stack) */}
-                                    <div className="w-full bg-slate-900/90 border-x border-b border-slate-700/80 rounded-b-lg shadow-xl overflow-hidden backdrop-blur-md">
-                                        {topPlayers.length > 0 ? (
+                                    <div className="w-full bg-slate-900/95 border-x border-b border-slate-700/80 rounded-b-lg shadow-2xl overflow-hidden backdrop-blur-md">
+                                        {primaryPlayers.length > 0 ? (
                                             <div className="flex flex-col">
-                                                {topPlayers.map((player, idx) => {
+                                                {primaryPlayers.map((player, idx) => {
                                                     const choiceLabel = idx === 0 ? "1st" : idx === 1 ? "2nd" : "3rd";
-                                                    const isUnavail = scenarioUnavailability.has(player.id);
+                                                    const isUnavail = isScenarioMode && scenarioUnavailability.has(player.id);
+                                                    const isRealUnavail = !player.availability;
                                                     
                                                     return (
                                                         <div 
                                                             key={player.id} 
-                                                            draggable
-                                                            onDragStart={(e) => { e.stopPropagation(); handleDragStart(player.id, pos.label); }}
-                                                            onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
-                                                            onDrop={(e) => { e.preventDefault(); e.stopPropagation(); handleDropOnPosition(pos.label, idx); }}
-                                                            className={`px-2 py-1.5 flex items-center justify-between border-b border-slate-800 last:border-b-0 hover:bg-slate-800 transition-colors ${isUnavail ? 'opacity-40 grayscale' : ''}`}
+                                                            className={`px-2 py-1.5 flex items-center justify-between border-b border-slate-800 last:border-b-0 hover:bg-slate-800 transition-colors ${(isUnavail || isRealUnavail) ? 'opacity-40 grayscale' : ''}`}
                                                         >
                                                             <div className="flex items-center gap-1.5 overflow-hidden">
                                                                 <span className="text-[9px] font-bold text-slate-500 w-4">{choiceLabel}</span>
@@ -513,23 +704,37 @@ export default function SquadPlannerPage() {
                                                                     {player.firstName[0]}. {player.lastName}
                                                                 </span>
                                                             </div>
-                                                            <button 
-                                                                onClick={(e) => toggleScenarioAvailability(player.id, e)}
-                                                                className={`h-2 w-2 rounded-full shrink-0 ml-1 hover:scale-150 transition-transform ${isUnavail ? 'bg-red-500' : 'bg-green-500'}`} 
-                                                                title={isUnavail ? "Mark Available" : "Mark Unavailable (Scenario)"}
-                                                            />
+                                                            {isScenarioMode && (
+                                                                <button 
+                                                                    onClick={(e) => toggleScenarioAvailability(player.id, e)}
+                                                                    className={`h-2.5 w-2.5 rounded-full shrink-0 ml-1 hover:scale-150 transition-transform ${isUnavail ? 'bg-red-500' : 'bg-green-500'}`} 
+                                                                />
+                                                            )}
+                                                            {(!isScenarioMode && isRealUnavail) && (
+                                                                <AlertCircle className="h-2.5 w-2.5 text-red-500 shrink-0 ml-1" />
+                                                            )}
                                                         </div>
                                                     )
                                                 })}
-                                                {positionPlayers.length > 3 && (
-                                                    <div className="px-2 py-1 bg-slate-950 text-center text-[9px] text-slate-500 font-bold uppercase tracking-wider">
-                                                        +{positionPlayers.length - 3} More
-                                                    </div>
-                                                )}
                                             </div>
                                         ) : (
-                                            <div className="flex flex-col items-center justify-center h-12 text-slate-600 text-[10px] font-bold uppercase tracking-wider bg-slate-950">
-                                                <span>No Options</span>
+                                            <div className="flex flex-col items-center justify-center h-10 text-slate-600 text-[10px] font-bold uppercase tracking-wider bg-slate-950">
+                                                <span>No Starter</span>
+                                            </div>
+                                        )}
+                                        
+                                        {/* Also Covers Snippet */}
+                                        {alsoCovers.length > 0 && (
+                                            <div className="bg-slate-950 px-2 py-1.5 border-t border-slate-800">
+                                                <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Also Covers</div>
+                                                <div className="flex flex-wrap gap-1">
+                                                    {alsoCovers.slice(0, 3).map(p => (
+                                                        <span key={p.id} className="text-[9px] text-slate-400 font-medium">
+                                                            {p.firstName[0]}. {p.lastName}{alsoCovers.length > 1 ? ',' : ''}
+                                                        </span>
+                                                    ))}
+                                                    {alsoCovers.length > 3 && <span className="text-[9px] text-slate-500">+{alsoCovers.length - 3}</span>}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -542,8 +747,6 @@ export default function SquadPlannerPage() {
 
             {/* Strategic Insights Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                
-                {/* Squad Balance (Replaces Position Rankings) */}
                 <div className="space-y-4">
                     <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
                         <Shield className="h-5 w-5 text-brand" /> Squad Balance
@@ -561,6 +764,11 @@ export default function SquadPlannerPage() {
                                                 {item.data?.issues.map((issue, i) => <li key={i}>{issue}</li>)}
                                             </ul>
                                         )}
+                                        <div className="mt-3 flex gap-2">
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded">Nat: {item.data?.totalNaturalCover}</span>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded">Sec: {item.data?.totalSecondaryCover}</span>
+                                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-50 px-2 py-1 rounded">Emg: {item.data?.totalEmergencyCover}</span>
+                                        </div>
                                     </div>
                                     <Badge variant="outline" className={`shrink-0 ${item.data?.color} font-bold px-3 py-1`}>
                                         {item.data?.grade}
@@ -571,7 +779,6 @@ export default function SquadPlannerPage() {
                     </div>
                 </div>
 
-                {/* Intelligent Recruitment Priorities */}
                 <div className="space-y-4">
                     <h2 className="text-xl font-black tracking-tight flex items-center gap-2">
                         <TrendingUp className="h-5 w-5 text-brand" /> Recruitment Priorities
@@ -606,68 +813,127 @@ export default function SquadPlannerPage() {
                         )}
                     </div>
                 </div>
-
             </div>
 
-            {/* Position Breakdown Modal */}
+            {/* Depth Editor Modal */}
             <Dialog open={!!selectedPos} onOpenChange={(open) => !open && setSelectedPos(null)}>
-                <DialogContent className="sm:max-w-md bg-surface-1 border-border">
-                    <DialogHeader>
-                        <DialogTitle className="text-xl font-black">
-                            {selectedPos ? (POSITION_FULL_NAMES[selectedPos] || selectedPos) : ''} Depth
-                        </DialogTitle>
-                    </DialogHeader>
+                <DialogContent className="sm:max-w-2xl bg-slate-50 border-border p-0 overflow-hidden">
+                    <div className="bg-white border-b px-6 py-4 flex items-center justify-between">
+                        <div>
+                            <DialogTitle className="text-xl font-black text-slate-900">
+                                {selectedPos ? (POSITION_FULL_NAMES[selectedPos] || selectedPos) : ''}
+                            </DialogTitle>
+                            <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-1">Depth Editor</p>
+                        </div>
+                    </div>
                     
-                    <div className="py-4 space-y-4 max-h-[60vh] overflow-y-auto pr-2">
-                        {selectedPos && (() => {
-                            const allPlayers = getAllPosPlayers(selectedPos);
+                    <div className="flex h-[60vh]">
+                        {/* Current Assignments */}
+                        <div className="w-1/2 border-r bg-white p-4 overflow-y-auto">
+                            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider mb-4">Assigned Players</h4>
                             
-                            if (allPlayers.length === 0) {
-                                return <p className="text-slate-500 text-sm text-center py-8">No players assigned to this role.</p>
-                            }
-
-                            return allPlayers.map((player, idx) => {
-                                const roleLabel = idx === 0 ? "First Choice" : idx === 1 ? "Competing" : idx === 2 ? "Development" : "Emergency Cover";
-                                const isUnavail = scenarioUnavailability.has(player.id);
-                                const isRealUnavail = !player.availability;
-                                const oop = isOutofPosition(player, selectedPos);
-
-                                return (
-                                    <div key={player.id} className={`flex items-center justify-between p-3 rounded-lg border ${isUnavail || isRealUnavail ? 'bg-slate-50 opacity-60 grayscale' : 'bg-white shadow-sm'}`}>
-                                        <div className="flex items-center gap-3">
-                                            <div className="h-10 w-10 rounded-full bg-slate-200 overflow-hidden shrink-0">
-                                                {player.imageUrl ? (
-                                                    <img src={player.imageUrl} alt="Profile" className="h-full w-full object-cover" />
-                                                ) : (
-                                                    <div className="h-full w-full flex items-center justify-center text-slate-400 font-bold bg-slate-100">
-                                                        {player.firstName[0]}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <div className="font-bold text-sm text-slate-900 flex items-center gap-1.5">
-                                                    {player.firstName} {player.lastName}
-                                                    {(isUnavail || isRealUnavail) && <span title="Unavailable"><AlertCircle className="h-3 w-3 text-red-500" /></span>}
-                                                </div>
-                                                <div className="text-xs text-slate-500 flex items-center gap-2 mt-0.5">
-                                                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 rounded font-black tracking-wider bg-slate-100">{roleLabel}</Badge>
-                                                    {oop && <span className="text-orange-500 font-medium text-[10px]">Out of position</span>}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <Button 
-                                            variant="ghost" 
-                                            size="sm" 
-                                            className={`text-[10px] h-7 px-2 font-bold ${isUnavail ? 'text-green-600 hover:bg-green-50' : 'text-slate-500 hover:text-red-500 hover:bg-red-50'}`}
-                                            onClick={(e) => toggleScenarioAvailability(player.id, e)}
+                            {selectedPos && (() => {
+                                const assignedIds = depthChart[selectedPos] || [];
+                                if (assignedIds.length === 0) {
+                                    return (
+                                        <div 
+                                            onDragOver={(e) => e.preventDefault()}
+                                            onDrop={(e) => handleDrop(e, 0)}
+                                            className="h-32 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center text-slate-400 text-xs font-bold"
                                         >
-                                            {isUnavail ? "Mark Available" : "Simulate Injury"}
-                                        </Button>
-                                    </div>
-                                );
-                            });
-                        })()}
+                                            Drag players here
+                                        </div>
+                                    )
+                                }
+                                
+                                return assignedIds.map((id, idx) => {
+                                    const p = players.find(x => x.id === id);
+                                    if (!p) return null;
+                                    
+                                    const primaryRole = getPrimaryAssignment(p.id);
+                                    const isPrimaryHere = primaryRole === selectedPos;
+                                    const fit = getShortPosition(p.position) === getShortPosition(selectedPos) ? 'Natural' 
+                                              : p.secondaryPositions?.some(sp => getShortPosition(sp) === getShortPosition(selectedPos)) ? 'Secondary' 
+                                              : 'Emergency';
+
+                                    return (
+                                        <div 
+                                            key={p.id}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, p.id)}
+                                            onDragOver={(e) => e.preventDefault()}
+                                            onDrop={(e) => handleDrop(e, idx)}
+                                            className="flex items-center gap-3 p-3 bg-white border shadow-sm rounded-xl mb-2 cursor-grab active:cursor-grabbing hover:border-slate-300 transition-all group"
+                                        >
+                                            <GripVertical className="h-4 w-4 text-slate-300" />
+                                            <div className="flex-1">
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-bold text-sm text-slate-900">{p.firstName} {p.lastName}</span>
+                                                    {!isPrimaryHere && <Badge variant="secondary" className="text-[9px] bg-orange-100 text-orange-700">Also Covers</Badge>}
+                                                </div>
+                                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mt-1 flex gap-2">
+                                                    <span>{idx === 0 ? "1st Choice" : `${idx+1} Choice`}</span>
+                                                    <span className="text-slate-300">•</span>
+                                                    <span className={fit === 'Natural' ? 'text-emerald-600' : fit === 'Secondary' ? 'text-blue-600' : 'text-red-500'}>
+                                                        {fit}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <button 
+                                                onClick={() => removeFromPos(p.id)}
+                                                className="h-8 w-8 rounded flex items-center justify-center text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors opacity-0 group-hover:opacity-100"
+                                            >
+                                                <Trash2 className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    )
+                                })
+                            })()}
+                        </div>
+
+                        {/* Available Squad */}
+                        <div className="w-1/2 bg-slate-50 p-4 overflow-y-auto">
+                            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider mb-4">Squad Options</h4>
+                            <div className="space-y-2">
+                                {selectedPos && players.filter(p => !(depthChart[selectedPos] || []).includes(p.id)).sort((a,b) => {
+                                    const aFit = getShortPosition(a.position) === getShortPosition(selectedPos) ? 3 : a.secondaryPositions?.some(sp => getShortPosition(sp) === getShortPosition(selectedPos)) ? 2 : 1;
+                                    const bFit = getShortPosition(b.position) === getShortPosition(selectedPos) ? 3 : b.secondaryPositions?.some(sp => getShortPosition(sp) === getShortPosition(selectedPos)) ? 2 : 1;
+                                    return bFit - aFit;
+                                }).map(p => {
+                                    const fit = getShortPosition(p.position) === getShortPosition(selectedPos) ? 'Natural' 
+                                              : p.secondaryPositions?.some(sp => getShortPosition(sp) === getShortPosition(selectedPos)) ? 'Secondary' 
+                                              : 'Out of position';
+                                    const pPrimary = getPrimaryAssignment(p.id);
+
+                                    return (
+                                        <div 
+                                            key={p.id}
+                                            draggable
+                                            onDragStart={(e) => handleDragStart(e, p.id)}
+                                            className="flex items-center justify-between p-2.5 bg-white border border-transparent rounded-lg hover:border-slate-200 transition-colors"
+                                        >
+                                            <div>
+                                                <div className="font-bold text-sm text-slate-900">{p.firstName} {p.lastName}</div>
+                                                <div className="flex items-center gap-2 mt-0.5">
+                                                    <span className={`text-[9px] font-bold uppercase tracking-wider ${fit === 'Natural' ? 'text-emerald-600' : fit === 'Secondary' ? 'text-blue-600' : 'text-slate-400'}`}>
+                                                        {fit}
+                                                    </span>
+                                                    {pPrimary && <span className="text-[9px] text-slate-400">(Primary: {pPrimary})</span>}
+                                                </div>
+                                            </div>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="sm" 
+                                                className="h-7 w-7 p-0 rounded-full text-slate-400 hover:text-brand hover:bg-brand/10"
+                                                onClick={() => addToPos(p.id)}
+                                            >
+                                                <Plus className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
                     </div>
                 </DialogContent>
             </Dialog>
