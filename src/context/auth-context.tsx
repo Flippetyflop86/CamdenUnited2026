@@ -39,7 +39,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUserState(u);
     };
     const [session, setSession] = useState<Session | null>(null);
-    const [clubId, setClubId] = useState<string | null>(() => getCachedVal('clubId', null));
+    const [clubId, setClubId] = useState<string | null>(() => {
+        const val = getCachedVal('clubId', null);
+        if (val) setGlobalClubId(val); // Initialize proxy immediately to prevent data leaks on mount
+        return val;
+    });
     const [role, setRole] = useState<string | null>(() => getCachedVal('role', null));
     const [pagePermissions, setPagePermissions] = useState<string[]>(() => getCachedVal('pagePermissions', []));
     const [displayName, setDisplayName] = useState<string | null>(() => getCachedVal('displayName', null));
@@ -84,8 +88,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const fetchClubMembership = async (userId: string, userEmail?: string) => {
-        setIsLoading(true);
-        setGlobalClubId(null);
+        // Only set loading to true if we don't already have a cached club ID
+        if (!clubId) {
+            setIsLoading(true);
+        }
+        
         try {
             const { data: { session } } = await supabase.auth.getSession();
             const token = session?.access_token;
