@@ -449,7 +449,8 @@ export default function SquadPage() {
     }
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure?")) return;
+        if (!confirm("Are you sure you want to permanently delete this player? This will also wipe all their match stats and payment records forever.")) return;
+        
         const player = players.find(p => p.id === id);
         
         // Store previous state for rollback
@@ -458,15 +459,22 @@ export default function SquadPage() {
         // Optimistic update
         setPlayers((prev) => prev.filter((p) => p.id !== id));
         
+        // 1. Manually cascade delete match stats
+        await supabase.from("match_player_stats").delete().eq("player_id", id);
+        
+        // 2. Manually cascade delete payment records
+        await supabase.from("player_payments").delete().eq("player_id", id);
+        
+        // 3. Delete the player
         const { error } = await supabase.from("players").delete().eq("id", id);
         
         if (error) {
             console.error("Delete player error:", error);
-            alert(`Failed to delete player: ${error.message}\n\nIf this player has played in matches, you cannot delete them without deleting their match stats first (or the database needs ON DELETE CASCADE).`);
+            alert(`Failed to delete player: ${error.message}`);
             // Rollback
             setPlayers(previousPlayers);
         } else if (player) {
-            logActivity("Deleted Player", `Removed ${player.firstName} ${player.lastName} from the squad.`);
+            logActivity("Deleted Player", `Permanently removed ${player.firstName} ${player.lastName} and all their records from the system.`);
         }
     };
 
