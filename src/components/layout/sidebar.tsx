@@ -35,7 +35,8 @@ import {
     Mail,
     History,
     Sun,
-    Moon
+    Moon,
+    Layers
 } from "lucide-react";
 
 import { useClub } from "@/context/club-context";
@@ -51,7 +52,7 @@ const navSections = [
             { href: "/training",    label: "Training",   icon: CalendarDays },
             { href: "/matches",     label: "Fixtures",   icon: Activity },
             { href: "/matchday-xi", label: "Matchday XI", icon: Shield },
-            { href: "/squad-planner", label: "Squad Planner", icon: Shield },
+            { href: "/squad-planner", label: "Squad Planner", icon: Layers },
         ]
     },
     {
