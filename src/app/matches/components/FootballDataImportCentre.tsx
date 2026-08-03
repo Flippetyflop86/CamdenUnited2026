@@ -179,7 +179,7 @@ export function FootballDataImportCentre({ clubId, clubName, clubSettings, onImp
             )}
 
             {/* Paste Modal */}
-            <Dialog open={isPasteModalOpen} onOpenChange={setIsPasteModalOpen}>
+            <Dialog open={isPasteModalOpen}>
                 <DialogContent className="sm:max-w-xl bg-surface-1 border-border" preventCloseOnOutsideClick={true}>
                     <DialogHeader>
                         <DialogTitle>Paste Fixture List</DialogTitle>
