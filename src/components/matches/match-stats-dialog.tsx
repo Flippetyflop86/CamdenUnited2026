@@ -579,7 +579,7 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                         <BarChart3 className="h-4 w-4" />
                     </Button>
                 ) : (
-                    <Button variant="outline" className={`w-full font-bold transition-colors ${stats.length > 0 ? "border-emerald-500/20 text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20" : "border-brand/30 text-brand bg-brand/10 hover:bg-brand/20"}`}>
+                    <Button className={`w-full font-bold transition-colors shadow-sm ${stats.length > 0 ? "bg-emerald-600 hover:bg-emerald-700 text-white" : "bg-brand text-brand-foreground hover:bg-brand/90"}`}>
                         <BarChart3 className="h-4 w-4 mr-2" /> 
                         {stats.length > 0 ? `View Match Stats (${stats.length} players)` : "Log Match Stats"}
                     </Button>

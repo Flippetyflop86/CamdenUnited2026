@@ -167,10 +167,10 @@ export function FootballDataImportCentre({ clubId, clubName, clubSettings, onImp
                         </p>
                     </div>
                     <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <Button variant="outline" className="font-bold border-brand/30 text-brand bg-brand/10 hover:bg-brand/20" onClick={() => setIsBrowserIntegrationModalOpen(true)}>
+                        <Button type="button" variant="outline" className="font-bold border-brand/30 text-brand bg-brand/10 hover:bg-brand/20" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsBrowserIntegrationModalOpen(true); }}>
                             Install Extension
                         </Button>
-                        <button onClick={() => setIsBrowserIntegrationModalOpen(true)} className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline text-left">
+                        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsBrowserIntegrationModalOpen(true); }} className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline text-left">
                             Learn More
                         </button>
                     </div>

@@ -1207,8 +1207,8 @@ export default function MatchdayXIPage() {
                                 ))}
                             </select>
                         </div>
-                    </CardHeader>
-                    <CardContent className="flex-1 flex items-center justify-center p-4 bg-slate-50/50">
+                    </div>
+                    <div className="flex-1 flex items-center justify-center p-4 bg-slate-50/50">
                         <div className="relative w-full h-[500px] md:h-full max-w-[500px] mx-auto bg-green-600 rounded-lg shadow-xl border-4 border-slate-200">
                             {/* Pitch markings */}
                             <div className="absolute inset-0 overflow-hidden rounded-sm pointer-events-none">
