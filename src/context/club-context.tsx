@@ -194,11 +194,10 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
     // Initial Fetch
     useEffect(() => {
         if (authLoading) {
-            if (typeof window !== 'undefined') {
+            // Never unmount the app if it's already loaded, just wait silently
+            if (!isLoaded && typeof window !== 'undefined') {
                 const cached = localStorage.getItem("clubflow_cache_clubSettings");
                 if (!cached) setIsLoaded(false);
-            } else {
-                setIsLoaded(false);
             }
             return;
         }
