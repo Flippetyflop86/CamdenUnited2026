@@ -20,7 +20,7 @@ import { RefreshCw } from "lucide-react";
 import { MatchStatsDialog } from "@/components/matches/match-stats-dialog";
 import { FORMATIONS } from "@/lib/formations";
 import { calculateMeetTime, generateWhatsAppMessage } from "@/lib/whatsapp-utils";
-import { LeagueSync } from "./components/LeagueSync";
+import { FootballDataImportCentre } from "./components/FootballDataImportCentre";
 import { NextMatchHero } from "./components/NextMatchHero";
 import { MatchPreparation } from "./components/MatchPreparation";
 import { UpcomingFixtures } from "./components/UpcomingFixtures";

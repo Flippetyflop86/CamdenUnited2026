@@ -36,6 +36,16 @@ interface ClubSettings {
     contractsEnabled: boolean;
     subsEnabled: boolean;
     measurementUnit?: "metric" | "imperial";
+    defaultHomeKickOff?: string | null;
+    defaultTrainingVenue?: string | null;
+    preferredSurface?: string | null;
+    primaryKit?: string | null;
+    secondaryKit?: string | null;
+    seasonStart?: string | null;
+    seasonEnd?: string | null;
+    defaultCompetition?: string | null;
+    timezone?: string;
+    lastImportHistory?: any;
 }
 
 interface ClubContextType {
@@ -80,7 +90,17 @@ const defaultSettings: ClubSettings = {
     trainingFeePerSession: 0,
     contractsEnabled: false,
     subsEnabled: true,
-    measurementUnit: "metric"
+    measurementUnit: "metric",
+    defaultHomeKickOff: "14:00",
+    defaultTrainingVenue: null,
+    preferredSurface: null,
+    primaryKit: null,
+    secondaryKit: null,
+    seasonStart: null,
+    seasonEnd: null,
+    defaultCompetition: "League",
+    timezone: "Europe/London",
+    lastImportHistory: null
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -237,7 +257,17 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         trainingFeePerSession: Number(data.training_fee_per_session) || 0,
                         contractsEnabled: data.contracts_enabled !== undefined ? !!data.contracts_enabled : false,
                         subsEnabled: data.subs_enabled !== undefined ? !!data.subs_enabled : true,
-                        measurementUnit: (typeof window !== "undefined" ? localStorage.getItem("clubflow_measurement_unit") : "metric") as any || "metric"
+                        measurementUnit: (typeof window !== "undefined" ? localStorage.getItem("clubflow_measurement_unit") : "metric") as any || "metric",
+                        defaultHomeKickOff: data.default_home_kick_off || "14:00",
+                        defaultTrainingVenue: data.default_training_venue || null,
+                        preferredSurface: data.preferred_surface || null,
+                        primaryKit: data.primary_kit || null,
+                        secondaryKit: data.secondary_kit || null,
+                        seasonStart: data.season_start || null,
+                        seasonEnd: data.season_end || null,
+                        defaultCompetition: data.default_competition || "League",
+                        timezone: data.timezone || "Europe/London",
+                        lastImportHistory: data.last_import_history || null
                     };
                     setSettings(loadedSettings);
                     if (typeof window !== 'undefined') {
@@ -296,7 +326,17 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             registration_fee: newSettings.registrationFee ?? settings.registrationFee,
             training_fee_per_session: newSettings.trainingFeePerSession ?? settings.trainingFeePerSession,
             contracts_enabled: newSettings.contractsEnabled ?? settings.contractsEnabled,
-            subs_enabled: newSettings.subsEnabled ?? settings.subsEnabled
+            subs_enabled: newSettings.subsEnabled ?? settings.subsEnabled,
+            default_home_kick_off: newSettings.defaultHomeKickOff ?? settings.defaultHomeKickOff,
+            default_training_venue: newSettings.defaultTrainingVenue ?? settings.defaultTrainingVenue,
+            preferred_surface: newSettings.preferredSurface ?? settings.preferredSurface,
+            primary_kit: newSettings.primaryKit ?? settings.primaryKit,
+            secondary_kit: newSettings.secondaryKit ?? settings.secondaryKit,
+            season_start: newSettings.seasonStart ?? settings.seasonStart,
+            season_end: newSettings.seasonEnd ?? settings.seasonEnd,
+            default_competition: newSettings.defaultCompetition ?? settings.defaultCompetition,
+            timezone: newSettings.timezone ?? settings.timezone,
+            last_import_history: newSettings.lastImportHistory ?? settings.lastImportHistory
         };
         if ('squads' in newSettings) updates.squads = newSettings.squads;
 
