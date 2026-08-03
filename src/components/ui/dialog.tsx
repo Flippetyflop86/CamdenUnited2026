@@ -42,16 +42,26 @@ const DialogTrigger = ({ asChild, children, ...props }: any) => {
     return <button onClick={handleClick} {...props}>{children}</button>;
 };
 
-const DialogContent = ({ className, children, ...props }: any) => {
+const DialogContent = ({ className, children, onInteractOutside, ...props }: any) => {
     const context = React.useContext(DialogContext);
     if (!context) throw new Error("DialogContent must be used within Dialog");
     if (!context.open) return null;
+
+    const handleBackdropClick = (e: React.MouseEvent) => {
+        if (onInteractOutside) {
+            // Create a fake event that can be prevented
+            const event = { preventDefault: () => { event.defaultPrevented = true; }, defaultPrevented: false };
+            onInteractOutside(event);
+            if (event.defaultPrevented) return;
+        }
+        context.setOpen(false);
+    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-start justify-center sm:items-center">
             <div
                 className="fixed inset-0 bg-black/50 backdrop-blur-sm transition-opacity animate-in fade-in"
-                onClick={() => context.setOpen(false)}
+                onClick={handleBackdropClick}
             />
             <div className={cn(
                 "z-50 grid w-full max-w-lg scale-100 gap-4 border bg-popover text-popover-foreground p-6 cf-elevated duration-200 animate-in fade-in-90 rounded md:w-full",
