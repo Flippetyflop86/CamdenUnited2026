@@ -36,9 +36,8 @@ export async function POST(request: Request) {
             opponent: f.opponent,
             is_home: f.is_home,
             competition: f.competition,
-            venue_name: f.venue,
             result: 'Pending',
-            status: 'Upcoming'
+            notes: f.venue ? `[Location: ${f.venue}]\n` : ''
         }));
 
         const { data, error } = await supabase
