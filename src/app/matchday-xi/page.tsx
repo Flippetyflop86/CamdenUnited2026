@@ -1052,7 +1052,7 @@ export default function MatchdayXIPage() {
         <div className="pb-16 text-slate-900 dark:text-slate-100 flex flex-col gap-8">
             
             {/* LEVEL 0: Football Week */}
-            <WeeklyFootballCalendar />
+            <WeeklyFootballCalendar title="Match Preparation" />
 
             {/* Match Identity & Fixture Selection */}
             <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 md:p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">

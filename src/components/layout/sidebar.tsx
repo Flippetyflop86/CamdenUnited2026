@@ -48,10 +48,11 @@ const navSections = [
     {
         title: "On the Pitch",
         items: [
-            { href: "/squad",       label: "Squad",      icon: Users },
-            { href: "/training",    label: "Training",   icon: CalendarDays },
-            { href: "/matches",     label: "Fixtures",   icon: Activity },
+            { href: "/calendar",    label: "Calendar",   icon: CalendarDays },
+            { href: "/training",    label: "Training",   icon: Activity },
+            { href: "/matches",     label: "Fixtures",   icon: CalendarDays },
             { href: "/matchday-xi", label: "Matchday XI", icon: Shield },
+            { href: "/squad",       label: "Squad",      icon: Users },
             { href: "/squad-planner", label: "Squad Planner", icon: Layers },
         ]
     },

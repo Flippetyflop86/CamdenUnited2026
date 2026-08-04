@@ -1494,7 +1494,7 @@ export default function MatchesPage() {
             </div>
 
             {/* LEVEL 0: Football Week */}
-            <WeeklyFootballCalendar />
+            <WeeklyFootballCalendar title="Next 14 Days" />
 
             {/* Filters */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">

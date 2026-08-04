@@ -628,7 +628,7 @@ export default function TrainingPage() {
             />
 
             {/* LEVEL 0: Football Week */}
-            <WeeklyFootballCalendar />
+            <WeeklyFootballCalendar title="Training Week" />
 
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-3">

@@ -569,6 +569,12 @@ export default function DashboardPage() {
 
             {/* LEVEL 0: Football Week */}
             <PageSection>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-black text-slate-800 tracking-wide uppercase">Operational Timeline</h3>
+                    <a href="/calendar" className="text-xs font-bold text-brand hover:underline flex items-center gap-1 bg-brand/5 px-2 py-1 rounded">
+                        Open Calendar &rarr;
+                    </a>
+                </div>
                 <WeeklyFootballCalendar />
             </PageSection>
 

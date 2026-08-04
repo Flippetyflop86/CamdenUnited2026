@@ -10,9 +10,10 @@ interface WeeklyFootballCalendarProps {
     matches?: Match[];
     trainingSessions?: TrainingSession[];
     initialDate?: Date;
+    title?: string;
 }
 
-export function WeeklyFootballCalendar({ matches: propMatches, trainingSessions: propTrainingSessions, initialDate = new Date() }: WeeklyFootballCalendarProps) {
+export function WeeklyFootballCalendar({ matches: propMatches, trainingSessions: propTrainingSessions, initialDate = new Date(), title = "This Week" }: WeeklyFootballCalendarProps) {
     const { settings } = useClub();
     const [weekOffset, setWeekOffset] = useState(0);
     const [fetchedMatches, setFetchedMatches] = useState<Match[]>([]);
@@ -122,21 +123,7 @@ export function WeeklyFootballCalendar({ matches: propMatches, trainingSessions:
             <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
                 <div className="flex items-center gap-2">
                     <CalendarIcon className="h-4 w-4 text-slate-500" />
-                    <h3 className="font-bold text-slate-800 text-sm tracking-wide uppercase">This Week</h3>
-                </div>
-                <div className="flex items-center gap-1">
-                    <button onClick={prevWeek} className="p-1.5 rounded-md hover:bg-slate-200 text-slate-600 transition-colors">
-                        <ChevronLeft className="h-4 w-4" />
-                    </button>
-                    <button 
-                        onClick={currentWeek} 
-                        className={`px-3 py-1 text-xs font-semibold rounded-md transition-colors ${isCurrentWeek ? 'bg-slate-200 text-slate-800' : 'text-slate-600 hover:bg-slate-200'}`}
-                    >
-                        Current Week
-                    </button>
-                    <button onClick={nextWeek} className="p-1.5 rounded-md hover:bg-slate-200 text-slate-600 transition-colors">
-                        <ChevronRight className="h-4 w-4" />
-                    </button>
+                    <h3 className="font-bold text-slate-800 text-sm tracking-wide uppercase">{title}</h3>
                 </div>
             </div>
 
