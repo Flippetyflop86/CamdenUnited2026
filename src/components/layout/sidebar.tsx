@@ -396,11 +396,11 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 <div className="flex items-center justify-between mt-auto">
                     <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-bold text-xs shadow-sm">
-                            {userInitials}
+                            {avatarLetter}
                         </div>
                         <div className="flex flex-col">
-                            <span className="text-xs font-medium text-zinc-200">{userName}</span>
-                            <span className="text-[10px] text-zinc-500 capitalize">{userRole}</span>
+                            <span className="text-xs font-medium text-zinc-200">{shownName}</span>
+                            <span className="text-[10px] text-zinc-500 capitalize">{role}</span>
                         </div>
                     </div>
 
