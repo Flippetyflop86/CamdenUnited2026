@@ -451,6 +451,54 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                         })}
                     </div>
                 </div>
+            </nav>
+
+            <div className="border-t border-white/5 p-6">
+                {(settings.twitterUrl || settings.instagramUrl) && (
+                    <div className="flex flex-col gap-2 mb-4">
+                        {settings.instagramUrl && (
+                            <a href={settings.instagramUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-2">
+                                <Instagram className="h-3.5 w-3.5" /> @{settings.instagramUrl.split('/').pop() || 'Instagram'}
+                            </a>
+                        )}
+                        {settings.twitterUrl && (
+                            <a href={settings.twitterUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] text-zinc-500 hover:text-zinc-300 transition-colors flex items-center gap-2">
+                                <Twitter className="h-3.5 w-3.5" /> @{settings.twitterUrl.split('/').pop() || 'Twitter'}
+                            </a>
+                        )}
+                    </div>
+                )}
+
+                <div className="flex items-center justify-between mt-auto">
+                    <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-brand/20 text-brand flex items-center justify-center font-bold text-xs shadow-sm">
+                            {userInitials}
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-xs font-medium text-zinc-200">{userName}</span>
+                            <span className="text-[10px] text-zinc-500 capitalize">{userRole}</span>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <button 
+                            onClick={toggleTheme}
+                            className="p-1.5 rounded hover:bg-white/10 text-zinc-500 hover:text-zinc-200 transition-colors"
+                            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+                        >
+                            {theme === "dark" ? (
+                                <Sun className="h-3.5 w-3.5" />
+                            ) : (
+                                <Moon className="h-3.5 w-3.5" />
+                            )}
+                        </button>
+                        <button onClick={signOut} className="text-[11px] text-zinc-500 hover:text-red-400 transition-colors p-1" title="Sign out">
+                            Logout
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             {/* Paywall Upgrade Dialog */}
             <Dialog open={upgradeModalOpen} onOpenChange={setUpgradeModalOpen}>
                 <DialogContent className="max-w-md bg-white rounded-2xl p-6 text-slate-900">
