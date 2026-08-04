@@ -18,7 +18,6 @@ import { useSearchParams } from "next/navigation";
 
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSection } from "@/components/layout/page-section";
-import { PageSection } from "@/components/layout/page-section";
 import { SectionHeader } from "@/components/ui/section-header";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 
