@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { getSubscription } from "@/lib/subscription-utils";
 import {
+    ChevronDown,
+    ChevronRight,
     Copy,
     Check,
     LayoutDashboard,
@@ -44,50 +46,113 @@ import { useAuth } from "@/context/auth-context";
 import { canAccess } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 
-const navSections = [
+
+type NavItem = {
+    label: string;
+    href?: string;
+    icon?: any;
+    isComingSoon?: boolean;
+    subItems?: {
+        label: string;
+        href: string;
+        isComingSoon?: boolean;
+    }[];
+};
+
+const navItems: NavItem[] = [
+    { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+    { label: "Calendar", href: "/calendar", icon: CalendarDays },
     {
-        title: "On the Pitch",
-        items: [
-            { href: "/calendar",    label: "Calendar",   icon: CalendarDays },
-            { href: "/training",    label: "Training",   icon: Activity },
-            { href: "/matches",     label: "Fixtures",   icon: CalendarDays },
-            { href: "/matchday-xi", label: "Matchday XI", icon: Shield },
-            { href: "/squad",       label: "Squad",      icon: Users },
-            { href: "/squad-planner", label: "Squad Planner", icon: Layers },
+        label: "Squad",
+        icon: Users,
+        href: "/squad",
+        subItems: [
+            { label: "Players", href: "/squad" },
+            { label: "Matchday XI", href: "/matchday-xi" },
+            { label: "Squad Planner", href: "/squad-planner" },
+        ]
+    },
+    { label: "Training", href: "/training", icon: Activity },
+    { label: "Fixtures", href: "/matches", icon: CalendarDays },
+    { label: "League Table", href: "/league", icon: Trophy },
+    {
+        label: "Analysis",
+        icon: Target,
+        href: "/analysis",
+        subItems: [
+            { label: "Match Analysis", href: "/analysis" },
+            { label: "Opposition Reports", href: "/opposition" },
+            { label: "Statistics", href: "/stats" },
+        ]
+    },
+    { label: "Recruitment", href: "/recruitment", icon: UserPlus },
+    {
+        label: "Club",
+        icon: Briefcase,
+        href: "/finance",
+        subItems: [
+            { label: "Finance", href: "/finance" },
+            { label: "Player Budgets", href: "/budgets" },
+            { label: "Player Payments", href: "/player-payments" },
+            { label: "Sponsorships", href: "/sponsors" },
+            { label: "Inventory", href: "/inventory" },
         ]
     },
     {
-        title: "Analysis",
-        items: [
-            { href: "/analysis",   label: "Match Analysis",     icon: Target },
-            { href: "/opposition", label: "Opposition Reports", icon: ShieldHalf },
-            { href: "/league",     label: "League Table",        icon: Trophy },
-            { href: "/stats",      label: "Stats",               icon: BarChart },
-        ]
-    },
-    {
-        title: "Off the Pitch",
-        items: [
-            { href: "/sponsors",      label: "Sponsorships",   icon: Briefcase },
-            { href: "/recruitment",   label: "Recruitment",    icon: UserPlus },
-            { href: "/finance",       label: "Finance",        icon: Coins },
-            { href: "/player-payments", label: "Player Payments", icon: Wallet },
-            { href: "/budgets",       label: "Player Budgets", icon: Wallet },
-            { href: "/inventory",     label: "Inventory",      icon: Clipboard },
-            { href: "/staff",         label: "Staff",          icon: Users },
-            { href: "/documents",     label: "Documents",      icon: FileText },
-        ]
-    },
-    {
-        title: "App",
-        items: [
-            { href: "/dashboard/billing", label: "Billing & Subs", icon: CreditCard, isComingSoon: true },
-            { href: "/admin",         label: "Admin",          icon: Settings },
+        label: "Administration",
+        icon: Settings,
+        href: "/admin",
+        subItems: [
+            { label: "Documents", href: "/documents" },
+            { label: "Staff", href: "/staff" },
+            { label: "Settings", href: "/admin" },
+            { label: "Billing & Subscriptions", href: "/dashboard/billing" },
         ]
     }
 ];
 
 export function Sidebar({ onClose }: { onClose?: () => void }) {
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        try {
+            const saved = localStorage.getItem("clubflow-sidebar-expanded");
+            if (saved) {
+                setExpandedGroups(JSON.parse(saved));
+            }
+        } catch (e) {}
+    }, []);
+
+    // Automatically expand parent group if a child is active, but only if not already initialized
+    useEffect(() => {
+        setExpandedGroups(prev => {
+            const next = { ...prev };
+            let changed = false;
+            navItems.forEach(item => {
+                if (item.subItems) {
+                    const hasActiveChild = item.subItems.some(sub => typeof window !== "undefined" && window.location.pathname.startsWith(sub.href));
+                    if (hasActiveChild && next[item.label] === undefined) {
+                        next[item.label] = true;
+                        changed = true;
+                    }
+                }
+            });
+            if (changed) {
+                localStorage.setItem("clubflow-sidebar-expanded", JSON.stringify(next));
+                return next;
+            }
+            return prev;
+        });
+    }, []);
+
+    const toggleGroup = (label: string) => {
+        setExpandedGroups(prev => {
+            const next = { ...prev, [label]: !prev[label] };
+            localStorage.setItem("clubflow-sidebar-expanded", JSON.stringify(next));
+            return next;
+        });
+    };
+
     const pathname = usePathname();
     const router = useRouter();
     const { settings } = useClub();
@@ -209,83 +274,106 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                         </button>
                     </div>
 
-                    {/* Dashboard — always visible */}
-                    <div>
-                        <ul className="space-y-1" role="list">
-                            <li>
-                                <Link
-                                    href="/dashboard"
-                                    onClick={(e) => handleItemClick(e, "/dashboard")}
-                                    aria-current={pathname === "/dashboard" ? "page" : undefined}
-                                    title="Dashboard Overview"
-                                    className={cn(
-                                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-500 group relative",
-                                        pathname === "/dashboard"
-                                            ? "bg-card text-foreground font-semibold border-l-2 border-primary rounded-l-none"
-                                            : "text-muted-foreground hover:bg-card/50 hover:text-foreground",
-                                        isRouteLocked("/dashboard") && "opacity-60"
+                    
+                    <div className="space-y-1 mt-4">
+                        {navItems.map((item) => {
+                            // Determine if this entire group or item should be visible based on permissions
+                            const canAccessTop = item.href ? canAccess(item.href, role, pagePermissions) : false;
+                            
+                            let visibleSubItems: typeof item.subItems = undefined;
+                            let canAccessAnyChild = false;
+
+                            if (item.subItems) {
+                                visibleSubItems = item.subItems.filter(sub => canAccess(sub.href, role, pagePermissions));
+                                canAccessAnyChild = visibleSubItems.length > 0;
+                            }
+
+                            // If we can't access the top link and we can't access any children, hide it
+                            if (!canAccessTop && !canAccessAnyChild) return null;
+
+                            const isGroup = !!item.subItems;
+                            const isExpanded = !!expandedGroups[item.label];
+                            const isActiveTop = item.href && (pathname === item.href || pathname?.startsWith(`${item.href}/`));
+                            const hasActiveChild = visibleSubItems?.some(sub => pathname === sub.href || pathname?.startsWith(`${sub.href}/`));
+
+                            const locked = item.href ? isRouteLocked(item.href) : false;
+                            
+                            return (
+                                <div key={item.label} className="mb-0.5">
+                                    <div className="flex items-center gap-1">
+                                        <Link
+                                            href={item.href || "#"}
+                                            onClick={(e) => {
+                                                if (!item.href) {
+                                                    e.preventDefault();
+                                                    toggleGroup(item.label);
+                                                    return;
+                                                }
+                                                handleItemClick(e, item.href, !!item.isComingSoon);
+                                            }}
+                                            aria-current={isActiveTop || hasActiveChild ? "page" : undefined}
+                                            className={cn(
+                                                "flex flex-1 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-500 group relative",
+                                                (isActiveTop || hasActiveChild) && !isGroup
+                                                    ? "bg-card text-foreground font-semibold border-l-2 border-primary rounded-l-none"
+                                                    : "text-muted-foreground hover:bg-card/50 hover:text-foreground",
+                                                locked && "opacity-60 cursor-not-allowed"
+                                            )}
+                                        >
+                                            {item.icon && <item.icon className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110 group-hover:translate-x-0.5" aria-hidden="true" />}
+                                            <span className={cn("truncate flex-1", (isActiveTop || hasActiveChild) && isGroup && "font-semibold text-foreground")}>{item.label}</span>
+                                            {locked && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
+                                        </Link>
+                                        
+                                        {isGroup && (
+                                            <button
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    toggleGroup(item.label);
+                                                }}
+                                                className="p-1.5 rounded text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors shrink-0"
+                                            >
+                                                {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                                            </button>
+                                        )}
+                                    </div>
+                                    
+                                    {isGroup && isExpanded && visibleSubItems && visibleSubItems.length > 0 && (
+                                        <div className="ml-6 mt-1 space-y-1 border-l border-slate-800 pl-2">
+                                            {visibleSubItems.map(sub => {
+                                                const subLocked = isRouteLocked(sub.href);
+                                                const isBilling = sub.href === "/dashboard/billing";
+                                                const labelOverride = isBilling ? "Billing & Subs (Soon)" : sub.label;
+                                                const linkHref = isBilling ? "/dashboard/billing" : sub.href;
+                                                const subActive = pathname === linkHref || pathname?.startsWith(`${linkHref}/`);
+                                                
+                                                return (
+                                                    <Link
+                                                        key={sub.label}
+                                                        href={linkHref}
+                                                        onClick={(e) => handleItemClick(e, linkHref, !!sub.isComingSoon)}
+                                                        className={cn(
+                                                            "flex items-center gap-3 rounded-md px-3 py-1.5 text-xs font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-500 group relative",
+                                                            subActive
+                                                                ? "text-primary font-semibold"
+                                                                : "text-slate-400 hover:text-slate-200 hover:bg-card/50",
+                                                            subLocked && "opacity-60 cursor-not-allowed"
+                                                        )}
+                                                    >
+                                                        <span className="truncate flex-1">{labelOverride}</span>
+                                                        {subLocked && <Lock className="h-3 w-3 text-slate-500 shrink-0" />}
+                                                    </Link>
+                                                )
+                                            })}
+                                        </div>
                                     )}
-                                >
-                                    <LayoutDashboard className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110 group-hover:translate-x-0.5" aria-hidden="true" />
-                                    <span className="truncate flex-1">Dashboard</span>
-                                    {isRouteLocked("/dashboard") && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
-                                </Link>
-                            </li>
-                        </ul>
+                                </div>
+                            );
+                        })}
                     </div>
- 
-                    {navSections.map((section) => {
-                        // Filter items the current user can access
-                        const visibleItems = section.items.filter(item =>
-                            canAccess(item.href, role, pagePermissions)
-                        );
- 
-                        // Don't render the section header if all items are hidden
-                        if (visibleItems.length === 0) return null;
- 
-                        return (
-                            <div key={section.title}>
-                                <h3 className="px-3 cf-label mb-2.5 mt-2">
-                                    {section.title}
-                                </h3>
-                                <ul className="space-y-1" role="list">
-                                    {visibleItems.map((item) => {
-                                        const locked = isRouteLocked(item.href);
-                                        const isBillingItem = item.href === "/dashboard/billing";
-                                        // The billing tab can use a specific link label depending on subscription status
-                                        const labelOverride = isBillingItem ? "Billing & Subs (Coming Soon)" : item.label;
-                                        const linkHref = isBillingItem ? billingHref : item.href;
-                                         
-                                        // We map the link to keep user active status
-                                        const isActive = pathname === linkHref || pathname?.startsWith(`${linkHref}/`);
-                                        return (
-                                            <li key={item.label}>
-                                                <Link
-                                                    href={linkHref}
-                                                    onClick={(e) => handleItemClick(e, linkHref, !!item.isComingSoon)}
-                                                    aria-current={isActive ? "page" : undefined}
-                                                    title={labelOverride}
-                                                    className={cn(
-                                                        "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-500 group relative",
-                                                        isActive
-                                                            ? "bg-card text-foreground font-semibold border-l-2 border-primary rounded-l-none"
-                                                            : "text-muted-foreground hover:bg-card/50 hover:text-foreground",
-                                                        locked && "opacity-60 cursor-not-allowed"
-                                                    )}
-                                                >
-                                                    <item.icon className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110 group-hover:translate-x-0.5" aria-hidden="true" />
-                                                    <span className="truncate flex-1">{labelOverride}</span>
-                                                    {locked && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
-                                                </Link>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            </div>
-                        );
-                    })}
                 </div>
-            </nav>
+</nav>
 
             <div className="border-t border-border p-4">
                 {(settings.twitterUrl || settings.instagramUrl) && (
