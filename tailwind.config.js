@@ -69,12 +69,14 @@ module.exports = {
                 },
             },
             borderRadius: {
-                lg: "var(--radius)",
-                md: "calc(var(--radius) - 1px)",
-                sm: "calc(var(--radius) - 2px)",
+                lg: "1rem", // 16px
+                md: "0.875rem", // 14px
+                sm: "0.5rem", // 8px
             },
             boxShadow: {
-                'cf-elevated': '0 10px 15px -3px rgba(0,0,0,0.5)',
+                'cf-elevated': '0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03)',
+                'cf-card': '0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px 0 rgba(0, 0, 0, 0.01)',
+                'none': 'none',
             }
         },
     },

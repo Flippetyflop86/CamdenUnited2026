@@ -8,61 +8,61 @@
 
 @layer base {
   :root {
-    /* ── Core (Zinc 85/10/5) ─────────────────────── */
-    /* Background: Zinc 950 */
-    --background: 240 10% 4%;
-    /* Foreground: Zinc 50 */
-    --foreground: 0 0% 98%;
+    /* ── Core (Light Theme) ─────────────────────── */
+    /* Background: Near-white canvas (#FCFCFD) */
+    --background: 210 20% 98%;
+    /* Foreground: Deep grey/charcoal (#171717) */
+    --foreground: 240 10% 9%;
 
-    /* Card/Surface: Zinc 900 */
-    --card: 240 6% 10%;
-    --card-foreground: 0 0% 98%;
+    /* Card/Surface: Pure white (#FFFFFF) */
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 9%;
 
-    /* Elevated/Popover: Zinc 800 */
-    --popover: 240 4% 16%;
-    --popover-foreground: 0 0% 98%;
+    /* Elevated/Popover: Pure white */
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 9%;
 
     /* Primary: Brand Crimson */
     --primary: 347 77% 50%;
     --primary-foreground: 0 0% 100%;
 
-    /* Secondary: Zinc 900 (used for standard actions) */
-    --secondary: 240 6% 10%;
-    --secondary-foreground: 0 0% 98%;
+    /* Secondary: Light grey for neutral actions */
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 10% 9%;
 
-    /* Muted: Zinc 800 for bg, Zinc 400 for text */
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
+    /* Muted: Soft grey */
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
 
-    /* Accent: Zinc 800 */
-    --accent: 240 4% 16%;
-    --accent-foreground: 0 0% 98%;
+    /* Accent: Very light grey hover */
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 10% 9%;
 
     /* Destructive: Crimson/Red */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
 
-    /* Borders: Zinc 700 */
-    --border: 240 5% 26%;
-    /* Inputs: Zinc 950 */
-    --input: 240 10% 4%;
-    /* Focus Ring: Zinc 400 */
-    --ring: 240 5% 65%;
+    /* Borders: Subtle light grey (#EAEAEA) */
+    --border: 0 0% 92%;
+    /* Inputs: Pure white */
+    --input: 0 0% 100%;
+    /* Focus Ring: Brand Crimson or Soft grey */
+    --ring: 240 5% 80%;
     
-    /* Strict Base Radius: 4px */
-    --radius: 0.25rem;
+    /* Base Radius: 16px for a softer SaaS look */
+    --radius: 1rem;
 
     /* ── ClubFlow Brand ──────────────────────────────────── */
     --cf-brand: 347 77% 50%;
     --cf-brand-hover: 347 77% 43%;
-    --cf-brand-subtle: 347 50% 12%;
+    --cf-brand-subtle: 347 50% 95%; /* Light pink for subtle backgrounds */
     --cf-brand-foreground: 0 0% 100%;
 
     /* ── Surfaces (layered depth) ────────────────────────── */
-    --surface-0: 240 10% 4%; /* Base */
-    --surface-1: 240 6% 10%; /* Cards */
-    --surface-2: 240 4% 16%; /* Modals/Elevated */
-    --surface-3: 240 5% 26%; /* Borders */
+    --surface-0: 210 20% 98%; /* Base Canvas */
+    --surface-1: 0 0% 100%; /* Cards */
+    --surface-2: 0 0% 100%; /* Modals/Elevated */
+    --surface-3: 0 0% 92%; /* Borders */
 
     /* ── Semantic Status ─────────────────────────────────── */
     --status-success: 142 71% 45%;
@@ -72,34 +72,36 @@
   }
 
   .dark {
-    /* Keep identical to :root since this is dark mode native */
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
-    --card: 240 6% 10%;
-    --card-foreground: 0 0% 98%;
-    --popover: 240 4% 16%;
-    --popover-foreground: 0 0% 98%;
+    /* Fallback to :root to essentially disable dark mode for now, or keep dark mode as is? 
+       The brief says "Update .dark variables to act merely as a fallback or remove them completely". 
+       I will point them to the root variables to ensure no flashing of the old dark theme. */
+    --background: 210 20% 98%;
+    --foreground: 240 10% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 10% 9%;
     --primary: 347 77% 50%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 240 6% 10%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 240 4% 16%;
-    --accent-foreground: 0 0% 98%;
+    --secondary: 240 5% 96%;
+    --secondary-foreground: 240 10% 9%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 240 10% 9%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --border: 240 5% 26%;
-    --input: 240 10% 4%;
-    --ring: 240 5% 65%;
+    --border: 0 0% 92%;
+    --input: 0 0% 100%;
+    --ring: 240 5% 80%;
     --cf-brand: 347 77% 50%;
     --cf-brand-hover: 347 77% 43%;
-    --cf-brand-subtle: 347 50% 12%;
+    --cf-brand-subtle: 347 50% 95%;
     --cf-brand-foreground: 0 0% 100%;
-    --surface-0: 240 10% 4%;
-    --surface-1: 240 6% 10%;
-    --surface-2: 240 4% 16%;
-    --surface-3: 240 5% 26%;
+    --surface-0: 210 20% 98%;
+    --surface-1: 0 0% 100%;
+    --surface-2: 0 0% 100%;
+    --surface-3: 0 0% 92%;
     --status-success: 142 71% 45%;
     --status-warning: 38 92% 50%;
     --status-error: 0 84% 60%;
@@ -127,47 +129,47 @@
 @layer utilities {
   .cf-page-title {
     font-size: 24px;
-    font-weight: 600; /* SemiBold */
+    font-weight: 700; /* Bold */
     letter-spacing: -0.01em;
-    color: #FAFAFA;
+    color: hsl(var(--foreground));
   }
   .cf-section-title {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 500; /* Medium */
-    color: #FAFAFA;
+    color: hsl(var(--foreground));
   }
   .cf-card-title {
     font-size: 16px;
     font-weight: 600; /* SemiBold */
-    color: #FAFAFA;
+    color: hsl(var(--foreground));
   }
   .cf-body {
     font-size: 14px;
     font-weight: 400; /* Regular */
     line-height: 1.5;
-    color: #E4E4E7;
+    color: hsl(var(--foreground));
   }
   .cf-metadata {
     font-size: 13px;
     font-weight: 400; /* Regular */
-    color: #A1A1AA;
+    color: hsl(var(--muted-foreground));
   }
   .cf-label {
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500; /* Medium */
-    color: #A1A1AA;
+    color: hsl(var(--foreground));
   }
   .cf-table-header {
     font-size: 12px;
-    font-weight: 600; /* SemiBold */
+    font-weight: 500; /* Medium */
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    color: #A1A1AA;
+    color: hsl(var(--muted-foreground));
   }
   .cf-helper-text {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 400; /* Regular */
-    color: #71717A;
+    color: hsl(var(--muted-foreground));
   }
 }
 

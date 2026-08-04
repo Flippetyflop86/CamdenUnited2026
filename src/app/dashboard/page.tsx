@@ -549,303 +549,218 @@ export default function DashboardPage() {
 
     return (
         <div className="pb-16 bg-background min-h-screen">
-            <PageHeader 
-                title="Dashboard" 
-                description="Operations Command Centre"
-            >
-                <a href="/matches" className="px-3.5 py-2 rounded-lg bg-secondary text-secondary-foreground text-xs font-bold hover:bg-accent transition-all border border-border">
-                    + New Fixture
-                </a>
-                <a href="/training" className="px-3.5 py-2 rounded-lg bg-secondary text-secondary-foreground text-xs font-bold hover:bg-accent transition-all border border-border">
-                    + New Session
-                </a>
-                <a href="/squad" className="px-3.5 py-2 rounded-lg bg-secondary text-secondary-foreground text-xs font-bold hover:bg-accent transition-all border border-border">
-                    + Add Player
-                </a>
-                <button onClick={syncLeague} className="px-4 py-2 rounded-lg bg-brand text-brand-foreground text-xs font-bold hover:bg-brand/90 transition-all shadow">
-                    Sync Standings
-                </button>
-            </PageHeader>
+            {/* LEVEL 1: Club Overview (Hero) */}
+            <div className="bg-card border-b border-border px-6 py-10 mb-8 shadow-sm">
+                <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-8 justify-between items-start md:items-end">
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            {settings.logo && (
+                                <img src={settings.logo} alt={settings.name} className="h-12 w-12 object-contain" />
+                            )}
+                            <div>
+                                <h1 className="cf-page-title text-3xl">{settings.name || "Club Dashboard"}</h1>
+                                <p className="text-sm font-medium text-muted-foreground mt-1">{leagueNameState} • {displayLeaguePosition}</p>
+                            </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-6 mt-6 pt-4 border-t border-border">
+                            {/* Recent Form */}
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Recent Form</span>
+                                <div className="flex gap-1.5">
+                                    {recentForm.map(m => (
+                                        <div key={m.id} className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${m.result === "Win" ? "bg-status-success text-white" : m.result === "Loss" ? "bg-status-error text-white" : "bg-muted text-muted-foreground"}`} title={`vs ${m.opponent} (${m.result})`}>
+                                            {m.result?.[0] || "-"}
+                                        </div>
+                                    ))}
+                                    {recentForm.length === 0 && <span className="text-sm text-muted-foreground">N/A</span>}
+                                </div>
+                            </div>
 
-            {/* LEVEL 0: Football Week */}
-            <PageSection>
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-black text-slate-800 tracking-wide uppercase">Operational Timeline</h3>
-                    <a href="/calendar" className="text-xs font-bold text-brand hover:underline flex items-center gap-1 bg-brand/5 px-2 py-1 rounded">
-                        Open Calendar &rarr;
-                    </a>
-                </div>
-                <WeeklyFootballCalendar />
-            </PageSection>
+                            {/* Training Attendance */}
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Avg Attendance</span>
+                                <span className="text-sm font-bold text-foreground">{averageTrainingAttendance}%</span>
+                            </div>
 
-            {/* LEVEL 1: The Next Event (Football First) */}
-            <PageSection>
-                <SectionHeader title="Next Match" className="border-l-4 border-brand pl-3 mb-4" />
-                <div className="grid gap-4 md:grid-cols-3">
-                    {/* Next Fixture (Primary) */}
-                    <div className="md:col-span-2 bg-surface-2 border border-border/80 p-8 rounded-xl shadow-sm flex flex-col justify-between">
-                        <div className="flex justify-between items-start mb-6">
-                            <Badge className="bg-background text-muted-foreground border-border uppercase tracking-widest text-[10px] font-bold px-3 py-1">
-                                {nextMatch?.competition || "Friendly"}
-                            </Badge>
-                            {nextMatch && timeLeft && (
-                                <div className="text-xs font-medium text-muted-foreground bg-background px-3 py-1.5 rounded border border-border flex items-center gap-1.5">
-                                    <Clock className="w-3.5 h-3.5" />
-                                    {timeLeft.days > 0 ? `In ${timeLeft.days} days` : 'Today'}
+                            {/* Next Fixture Quick Status */}
+                            {nextMatch && (
+                                <div className="flex flex-col gap-1">
+                                    <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Next Fixture</span>
+                                    <span className="text-sm font-medium text-foreground">
+                                        vs {nextMatch.opponent} ({nextMatch.isHome ? "H" : "A"})
+                                    </span>
                                 </div>
                             )}
                         </div>
-                        
-                        <div className="mb-8">
-                            <div className="text-sm font-semibold text-muted-foreground mb-1">
-                                {nextMatch?.isHome ? "Home vs" : "Away vs"}
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                        {priorities.length > 0 && (
+                            <div className="bg-status-warning/10 border border-status-warning/20 text-status-warning-foreground px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4 text-status-warning" />
+                                {priorities.length} Action{priorities.length !== 1 && "s"} Required
                             </div>
-                            <div className="text-4xl md:text-5xl font-black text-foreground tracking-tight leading-none flex items-center gap-3">
-                                {nextMatch ? (
-                                    <>
-                                        {leagueTeams.find(t => t.name.toLowerCase() === nextMatch.opponent.toLowerCase())?.badge_url && (
-                                            <img src={leagueTeams.find(t => t.name.toLowerCase() === nextMatch.opponent.toLowerCase())?.badge_url} alt="Badge" className="h-10 w-10 md:h-12 md:w-12 object-contain" />
-                                        )}
-                                        {nextMatch.opponent}
-                                    </>
-                                ) : "TBC"}
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="max-w-7xl mx-auto px-6 space-y-12">
+                {/* LEVEL 2: Quick Actions */}
+                <div className="flex flex-wrap gap-3">
+                    <a href="/matches" className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-sm">
+                        + New Fixture
+                    </a>
+                    <a href="/training" className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-all border border-border shadow-sm">
+                        + New Session
+                    </a>
+                    <a href="/squad" className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-all border border-border shadow-sm">
+                        + Add Player
+                    </a>
+                    <button onClick={syncLeague} className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-all border border-border shadow-sm">
+                        Sync Standings
+                    </button>
+                </div>
+
+                {/* LEVEL 3: This Week (Timeline) */}
+                <section>
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="cf-section-title">This Week</h2>
+                        <a href="/calendar" className="text-sm font-medium text-primary hover:underline">Open Calendar &rarr;</a>
+                    </div>
+                    <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
+                        <WeeklyFootballCalendar />
+                    </div>
+                </section>
+
+                {/* LEVEL 4: Next Match & Next Training */}
+                <section className="grid gap-6 md:grid-cols-2">
+                    {/* Next Match */}
+                    <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col justify-between">
+                        <div>
+                            <div className="flex justify-between items-start mb-6">
+                                <h3 className="text-sm uppercase font-semibold text-muted-foreground tracking-wider">Next Match</h3>
+                                <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary font-medium px-2.5 py-0.5 rounded-md border-transparent">
+                                    {nextMatch?.competition || "Friendly"}
+                                </Badge>
+                            </div>
+                            
+                            <div className="mb-8">
+                                <div className="text-3xl md:text-4xl font-bold text-foreground tracking-tight flex items-center gap-3">
+                                    {nextMatch ? (
+                                        <>
+                                            {leagueTeams.find(t => t.name.toLowerCase() === nextMatch.opponent.toLowerCase())?.badge_url && (
+                                                <img src={leagueTeams.find(t => t.name.toLowerCase() === nextMatch.opponent.toLowerCase())?.badge_url} alt="Badge" className="h-8 w-8 object-contain" />
+                                            )}
+                                            {nextMatch.opponent}
+                                        </>
+                                    ) : "TBC"}
+                                </div>
+                                <div className="text-sm font-medium text-muted-foreground mt-2">
+                                    {nextMatch?.isHome ? "Home" : "Away"}
+                                </div>
                             </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-t border-border/50 pt-5 mt-auto">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-5 border-t border-border mt-auto">
                             {nextMatch ? (
-                                <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-muted-foreground">
-                                    <div className="flex items-center gap-2">
-                                        <Calendar className="h-4 w-4" />
-                                        <span className="font-medium text-foreground">{formatDate(nextMatch.date)}</span>
+                                <div className="flex flex-wrap items-center gap-4 text-sm text-foreground">
+                                    <div className="flex items-center gap-1.5 font-medium">
+                                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                                        {formatDate(nextMatch.date)}
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <Clock className="h-4 w-4" />
-                                        <span className="font-medium text-foreground">{nextMatch.time || "TBC"}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <MapPin className="h-4 w-4" />
-                                        <span className="font-medium text-foreground">{nextMatch.location || (nextMatch.isHome ? "Home" : "Away")}</span>
+                                    <div className="flex items-center gap-1.5 font-medium">
+                                        <Clock className="h-4 w-4 text-muted-foreground" />
+                                        {nextMatch.time || "TBC"}
                                     </div>
                                 </div>
                             ) : (
-                                <div className="text-sm text-muted-foreground">No upcoming fixtures scheduled.</div>
+                                <div className="text-sm text-muted-foreground">No upcoming fixtures.</div>
                             )}
                             
-                            <a href="/matchday-xi" className="inline-flex items-center justify-center px-5 py-2.5 rounded-lg bg-brand text-brand-foreground text-sm font-bold hover:bg-brand/90 transition-colors shadow">
+                            <a href="/matchday-xi" className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm">
                                 Matchday Hub
                             </a>
                         </div>
                     </div>
 
-                    {/* Next Training (Secondary) */}
-                    <div className="bg-card border-border p-6 rounded-xl flex flex-col justify-between shadow-sm">
+                    {/* Next Training */}
+                    <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col justify-between">
                         <div>
-                            <div className="cf-label text-muted-foreground uppercase tracking-wider mb-2">Next Training</div>
-                            <div className="text-xl font-bold text-foreground leading-tight">
-                                {nextTrainingSession ? nextTrainingSession.focus || "Team Session" : "No Session Scheduled"}
+                            <div className="flex justify-between items-start mb-6">
+                                <h3 className="text-sm uppercase font-semibold text-muted-foreground tracking-wider">Next Training</h3>
                             </div>
-                            
-                            {nextTrainingSession && (
-                                <div className="space-y-2 mt-4 text-sm text-muted-foreground">
-                                    <div className="flex items-center gap-2">
-                                        <Calendar className="h-4 w-4" />
-                                        <span>{formatDate(nextTrainingSession.date)} - {nextTrainingSession.time || "TBC"}</span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <MapPin className="h-4 w-4" />
-                                        <span>{nextTrainingSession.location || "Training Ground"}</span>
-                                    </div>
+                            <div className="mb-8">
+                                <div className="text-2xl font-bold text-foreground leading-tight">
+                                    {nextTrainingSession ? nextTrainingSession.focus || "Team Session" : "No Session Scheduled"}
                                 </div>
-                            )}
+                                {nextTrainingSession && (
+                                    <div className="space-y-2 mt-4 text-sm text-foreground font-medium">
+                                        <div className="flex items-center gap-2">
+                                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                                            <span>{formatDate(nextTrainingSession.date)} - {nextTrainingSession.time || "TBC"}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <MapPin className="h-4 w-4 text-muted-foreground" />
+                                            <span>{nextTrainingSession.location || "Training Ground"}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                         
-                        <div className="mt-6 pt-4 border-t border-border">
+                        <div className="pt-5 border-t border-border mt-auto">
                             {nextTrainingSession ? (
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                                         <Users className="h-4 w-4 text-muted-foreground" />
                                         {nextTrainingSession.attendance?.filter((a: any) => a.status === 'Present' || a.status === 'Late').length || 0} Confirmed
                                     </div>
-                                    <a href="/training" className="text-xs font-bold text-brand hover:underline">Manage</a>
+                                    <a href="/training" className="text-sm font-medium text-primary hover:underline">Manage</a>
                                 </div>
                             ) : (
-                                <a href="/training" className="text-xs font-bold text-muted-foreground hover:text-foreground">Schedule Session</a>
+                                <a href="/training" className="text-sm font-medium text-muted-foreground hover:text-foreground">Schedule Session</a>
                             )}
                         </div>
                     </div>
-                </div>
-            </PageSection>
+                </section>
 
-            {/* LEVEL 2: Action Required (Operational Strips) */}
-            <PageSection>
-                <SectionHeader title="Action Required" />
-                
-                {priorities.length > 0 || injuredPlayers.length > 0 || suspendedPlayers.length > 0 ? (
-                    <div className="space-y-2">
-                        {priorities.map((task, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3.5 bg-status-warning/5 border border-status-warning/20 rounded-lg text-sm transition-colors hover:bg-status-warning/10 shadow-sm">
-                                <div className="flex items-center gap-3">
-                                    <button
-                                        onClick={() => handleDismissPriority(task.label)}
-                                        className="p-1.5 rounded-full bg-background hover:bg-status-success/20 text-muted-foreground hover:text-status-success transition-colors shadow-sm"
-                                        title="Mark as Resolved"
-                                    >
-                                        <Check className="h-4 w-4" />
-                                    </button>
-                                    <span className="font-medium text-foreground">{task.label}</span>
-                                </div>
-                                <span className="text-[10px] font-bold uppercase tracking-widest text-status-warning px-2 py-1 bg-background rounded border border-border">Priority</span>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="bg-card border border-border rounded-lg p-6 flex flex-col items-center justify-center text-center shadow-sm">
-                        <CheckCircle2 className="h-8 w-8 text-status-success mb-2 opacity-50" />
-                        <h4 className="text-sm font-bold text-foreground">All clear</h4>
-                        <p className="text-xs text-muted-foreground mt-1">No immediate operational tasks.</p>
-                    </div>
-                )}
-            </PageSection>
-
-            {/* LEVEL 3: Core Readiness & Club Status */}
-            <PageSection>
-                <SectionHeader title="Club Status" />
-                <div className="grid gap-4 md:grid-cols-4">
-                    {/* Anchor Metric */}
-                    <div className="md:col-span-2 bg-surface-2 border border-border/80 p-6 rounded-xl shadow-sm flex flex-col justify-center relative overflow-hidden">
-                        <div className="absolute top-0 right-0 p-4 opacity-5">
-                            <Trophy className="w-24 h-24" />
-                        </div>
-                        <div className="cf-label text-muted-foreground mb-2 uppercase tracking-wider relative z-10">League Position</div>
-                        <div className="flex items-baseline gap-3 relative z-10">
-                            <span className="text-5xl font-black text-foreground tracking-tight">{displayLeaguePosition}</span>
-                            <span className="text-sm font-medium text-muted-foreground">{leagueNameState || "No League Configured"}</span>
-                        </div>
-                    </div>
-                    
-                    {/* Authentic Form Guide */}
-                    <div className="bg-card border border-border p-6 rounded-xl shadow-sm flex flex-col justify-center">
-                        <div className="cf-label text-muted-foreground mb-3 uppercase tracking-wider">Recent Form</div>
-                        <div className="flex gap-1.5">
-                            {recentForm.map(m => (
-                                <div 
-                                    key={m.id}
-                                    className={`w-7 h-7 rounded flex items-center justify-center text-[11px] font-bold ${
-                                        m.result === "Win" ? "bg-status-success text-status-success-foreground" :
-                                        m.result === "Loss" ? "bg-status-error text-status-error-foreground" :
-                                        "bg-muted text-muted-foreground"
-                                    }`}
-                                    title={`vs ${m.opponent} (${m.result})`}
-                                >
-                                    {m.result?.[0] || "-"}
+                {/* LEVEL 5: Operational Alerts */}
+                {priorities.length > 0 && (
+                    <section>
+                        <h2 className="cf-section-title mb-4">Operational Alerts</h2>
+                        <div className="space-y-2">
+                            {priorities.map((task, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-4 bg-card border border-border rounded-xl text-sm transition-colors hover:bg-accent shadow-sm">
+                                    <div className="flex items-center gap-3">
+                                        <button
+                                            onClick={() => handleDismissPriority(task.label)}
+                                            className="p-1.5 rounded-md bg-secondary hover:bg-status-success/10 text-muted-foreground hover:text-status-success transition-colors border border-border"
+                                            title="Mark as Resolved"
+                                        >
+                                            <Check className="h-4 w-4" />
+                                        </button>
+                                        <span className="font-medium text-foreground">{task.label}</span>
+                                    </div>
                                 </div>
                             ))}
-                            {recentForm.length === 0 && (
-                                <span className="text-sm text-muted-foreground italic">No matches played</span>
-                            )}
+                        </div>
+                    </section>
+                )}
+
+                {/* LEVEL 6: League Snapshot */}
+                <section>
+                    <h2 className="cf-section-title mb-4">League Snapshot</h2>
+                    <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col justify-center max-w-sm">
+                        <div className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mb-2">Current Position</div>
+                        <div className="flex items-baseline gap-3">
+                            <span className="text-5xl font-bold text-foreground tracking-tight">{displayLeaguePosition}</span>
+                            <span className="text-sm font-medium text-muted-foreground truncate">{leagueNameState || "No League"}</span>
                         </div>
                     </div>
-
-                    {/* Operational Availability */}
-                    <div className="bg-card border border-border p-6 rounded-xl shadow-sm flex flex-col justify-center">
-                        <div className="cf-label text-muted-foreground mb-3 uppercase tracking-wider">Squad Status</div>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-bold text-foreground">{availablePlayers.length}</span>
-                            <span className="text-xs font-medium text-muted-foreground">/ {players.length} ready</span>
-                        </div>
-                    </div>
-                </div>
-            </PageSection>
-
-            {/* LEVEL 4: Performance Statistics */}
-            <PageSection>
-                <SectionHeader title="Performance Overview" />
-                <div className="grid gap-4 md:grid-cols-4">
-                    <MetricCard 
-                        title="Points"
-                        value={points.toString()}
-                        description={`${wins}W ${draws}D ${losses}L`}
-                    />
-                    <MetricCard 
-                        title="Goal Difference"
-                        value={goalDifference > 0 ? `+${goalDifference}` : goalDifference.toString()}
-                        description={`${goalsScored} For, ${goalsConceded} Against`}
-                    />
-                    <MetricCard 
-                        title="Win Rate"
-                        value={`${winRate}%`}
-                        trend={winRate > 50 ? { value: 5, direction: "up" } : undefined}
-                    />
-                    <MetricCard 
-                        title="Goals Scored"
-                        value={goalsScored.toString()}
-                        description={`${(goalsScored / (wins + draws + losses || 1)).toFixed(1)} per game`}
-                    />
-                </div>
-            </PageSection>
-
-            {/* LEVEL 5: Everything Else (Department Summaries) */}
-            <PageSection>
-                <SectionHeader title="Department Summaries" />
-                <div className="grid gap-4 md:grid-cols-2">
-                    {/* Medical Department */}
-                    <Card className="bg-card border-border shadow-sm">
-                        <CardHeader className="pb-3 border-b border-border">
-                            <CardTitle className="text-sm font-bold flex items-center gap-2">
-                                <Thermometer className="h-4 w-4 text-muted-foreground" />
-                                Medical Update
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-4">
-                            <div className="space-y-3">
-                                {injuredPlayers.length > 0 ? (
-                                    injuredPlayers.map((player) => (
-                                        <div key={player.id} className="flex justify-between items-center text-sm">
-                                            <span className="font-medium text-foreground">{player.firstName} {player.lastName}</span>
-                                            <span className="text-xs font-medium text-status-warning bg-status-warning/10 px-2 py-0.5 rounded">{player.medicalStatus}</span>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="text-sm text-muted-foreground text-center py-4">Squad is fully fit</div>
-                                )}
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Squad Readiness */}
-                    <Card className="bg-card border-border shadow-sm">
-                        <CardHeader className="pb-3 border-b border-border">
-                            <CardTitle className="text-sm font-bold flex items-center gap-2">
-                                <Footprints className="h-4 w-4 text-muted-foreground" />
-                                Physical Availability
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="pt-4">
-                            <div className="space-y-4">
-                                <div>
-                                    <div className="flex justify-between text-xs mb-1.5">
-                                        <span className="text-muted-foreground font-medium">Match Fit</span>
-                                        <span className="font-bold text-foreground">{availablePlayers.length}</span>
-                                    </div>
-                                    <div className="h-2 w-full bg-surface-2 rounded-full overflow-hidden">
-                                        <div className="h-full bg-status-success rounded-full" style={{ width: `${(availablePlayers.length / (players.length || 1)) * 100}%` }}></div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="flex justify-between text-xs mb-1.5">
-                                        <span className="text-muted-foreground font-medium">Injured / Unavailable</span>
-                                        <span className="font-bold text-foreground">{injuredPlayers.length}</span>
-                                    </div>
-                                    <div className="h-2 w-full bg-surface-2 rounded-full overflow-hidden">
-                                        <div className="h-full bg-status-error rounded-full" style={{ width: `${(injuredPlayers.length / (players.length || 1)) * 100}%` }}></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-            </PageSection>
+                </section>
+            </div>
         </div>
     );
 }

@@ -18,10 +18,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const { user, role, isLoading: authLoading, isLoggingOut } = useAuth();
     const [isFabOpen, setIsFabOpen] = useState(false);
-    const [theme, setTheme] = useState<"light" | "dark">("dark");
+    const [theme, setTheme] = useState<"light" | "dark">("light");
 
     useEffect(() => {
-        const currentTheme = (localStorage.getItem("theme") as "light" | "dark") || "dark";
+        const currentTheme = (localStorage.getItem("theme") as "light" | "dark") || "light";
         setTheme(currentTheme);
         if (currentTheme === "dark") {
             document.documentElement.classList.add("dark");

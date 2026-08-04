@@ -230,26 +230,104 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     // The display name shown at the bottom of the sidebar
     const shownName = displayName
         || user?.user_metadata?.full_name
+
+    const pathname = usePathname();
+    const router = useRouter();
+    const { settings } = useClub();
+    const { user, role, pagePermissions, displayName, signOut, isManager } = useAuth();
+    const [copiedEmail, setCopiedEmail] = useState(false);
+    const [theme, setTheme] = useState<"light" | "dark">("dark");
+
+    useEffect(() => {
+        const storedTheme = (localStorage.getItem("theme") as "light" | "dark") || "dark";
+        setTheme(storedTheme);
+    }, []);
+
+    const toggleTheme = () => {
+        const newTheme = theme === "light" ? "dark" : "light";
+        setTheme(newTheme);
+        localStorage.setItem("theme", newTheme);
+        if (newTheme === "dark") {
+            document.documentElement.classList.add("dark");
+        } else {
+            document.documentElement.classList.remove("dark");
+        }
+        window.dispatchEvent(new CustomEvent("theme-changed", { detail: newTheme }));
+    };
+
+    // Subscription & Gating State
+    const [sub, setSub] = useState(() => getSubscription());
+    const [upgradeModalOpen, setUpgradeModalOpen] = useState(false);
+    const [comingSoonModalOpen, setComingSoonModalOpen] = useState(false);
+    const [requiredTier, setRequiredTier] = useState<"Medium" | "High">("Medium");
+
+    useEffect(() => {
+        const handleSubChange = () => {
+            setSub(getSubscription());
+        };
+        window.addEventListener("subscription-changed", handleSubChange);
+        return () => window.removeEventListener("subscription-changed", handleSubChange);
+    }, []);
+
+    const now = new Date();
+    const trialEnds = new Date(sub.trialEndsAt);
+    const daysLeft = Math.max(0, Math.ceil((trialEnds.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)));
+    const isTrialExpired = !sub.isPaymentConfigured && now > trialEnds;
+
+    // Billing route is always dashboard billing
+    const billingHref = "/dashboard/billing";
+
+    const isRouteLocked = (href: string) => {
+        return false;
+    };
+
+    const handleItemClick = (e: React.MouseEvent, href: string, isComingSoon?: boolean) => {
+        if (isComingSoon) {
+            e.preventDefault();
+            setComingSoonModalOpen(true);
+            return;
+        }
+        if (isRouteLocked(href)) {
+            e.preventDefault();
+            if (isTrialExpired) {
+                router.push(billingHref);
+                if (onClose) onClose();
+            } else {
+                if (["/opposition"].includes(href)) {
+                    setRequiredTier("High");
+                } else {
+                    setRequiredTier("Medium");
+                }
+                setUpgradeModalOpen(true);
+            }
+        } else {
+            if (onClose) onClose();
+        }
+    };
+
+    // The display name shown at the bottom of the sidebar
+    const shownName = displayName
+        || user?.user_metadata?.full_name
         || user?.email?.split("@")[0]
         || "Club Member";
 
     const avatarLetter = shownName.charAt(0).toUpperCase();
 
     return (
-        <div className="flex h-full w-64 flex-col bg-background border-r border-border text-foreground">
-            <div className="flex h-16 items-center px-6 border-b border-border gap-3 shrink-0">
+        <div className="flex h-full w-64 flex-col bg-[#171717] border-r border-[#171717] text-zinc-300">
+            <div className="flex h-16 items-center px-6 border-b border-white/5 gap-3 shrink-0">
                 {settings.logo ? (
                     <img src={settings.logo} alt={settings.name} className="h-8 w-8 object-contain" />
                 ) : (
-                    <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
-                        <span className="text-sm font-bold text-white">{settings.name.charAt(0).toUpperCase()}</span>
+                    <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                        <span className="text-sm font-medium text-zinc-200">{settings.name.charAt(0).toUpperCase()}</span>
                     </div>
                 )}
-                <h1 className="flex-1 text-lg font-bold text-foreground truncate text-ellipsis">{settings.name}</h1>
+                <h1 className="flex-1 text-lg font-medium text-zinc-100 truncate text-ellipsis">{settings.name}</h1>
                 {onClose && (
                     <button
                         onClick={onClose}
-                        className="p-2 text-muted-foreground hover:text-foreground md:hidden"
+                        className="p-2 text-zinc-500 hover:text-zinc-300 md:hidden"
                         aria-label="Close sidebar"
                     >
                         <X className="h-6 w-6" />
@@ -257,18 +335,18 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                 )}
             </div>
 
-            <nav className="flex-1 overflow-y-auto py-4 scrollbar-thin scrollbar-thumb-slate-700">
-                <div className="px-3 space-y-6">
+            <nav className="flex-1 overflow-y-auto py-6 scrollbar-thin scrollbar-thumb-white/10">
+                <div className="px-4 space-y-6">
                     {/* Global Search Button */}
-                    <div className="px-3">
+                    <div className="px-2">
                         <button
                             onClick={() => window.dispatchEvent(new CustomEvent("open-global-search"))}
-                            className="flex w-full items-center gap-2 rounded border border-border bg-card/50 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-card transition-all outline-none focus-visible:ring-1 focus-visible:ring-ring group"
+                            className="flex w-full items-center gap-2 rounded border border-white/5 bg-white/5 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 hover:bg-white/10 transition-all outline-none group"
                             title="Search club database (Ctrl+K)"
                         >
-                            <Search className="h-3.5 w-3.5 shrink-0 text-slate-500 group-hover:text-red-400 transition-colors" />
+                            <Search className="h-3.5 w-3.5 shrink-0 text-zinc-500 group-hover:text-brand transition-colors" />
                             <span className="flex-1 text-left">Search database...</span>
-                            <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded bg-slate-700 px-1.5 font-mono text-[9px] font-medium text-slate-300">
+                            <kbd className="hidden sm:inline-flex items-center gap-0.5 rounded bg-black/20 px-1.5 font-mono text-[9px] font-medium text-zinc-400">
                                 Ctrl+K
                             </kbd>
                         </button>
@@ -313,15 +391,15 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                             }}
                                             aria-current={isActiveTop || hasActiveChild ? "page" : undefined}
                                             className={cn(
-                                                "flex flex-1 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-500 group relative",
+                                                "flex flex-1 items-center gap-3 rounded-md px-4 py-2.5 text-sm font-normal transition-all outline-none group relative",
                                                 (isActiveTop || hasActiveChild) && !isGroup
-                                                    ? "bg-card text-foreground font-semibold border-l-2 border-primary rounded-l-none"
-                                                    : "text-muted-foreground hover:bg-card/50 hover:text-foreground",
+                                                    ? "bg-brand/10 text-brand font-medium border-l-2 border-brand rounded-l-none"
+                                                    : "text-zinc-400 hover:bg-white/5 hover:text-zinc-200",
                                                 locked && "opacity-60 cursor-not-allowed"
                                             )}
                                         >
                                             {item.icon && <item.icon className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110 group-hover:translate-x-0.5" aria-hidden="true" />}
-                                            <span className={cn("truncate flex-1", (isActiveTop || hasActiveChild) && isGroup && "font-semibold text-foreground")}>{item.label}</span>
+                                            <span className={cn("truncate flex-1", (isActiveTop || hasActiveChild) && isGroup && "font-medium text-brand")}>{item.label}</span>
                                             {locked && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
                                         </Link>
                                         
@@ -332,7 +410,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                                     e.stopPropagation();
                                                     toggleGroup(item.label);
                                                 }}
-                                                className="p-1.5 rounded text-slate-500 hover:text-slate-300 hover:bg-slate-800 transition-colors shrink-0"
+                                                className="p-1.5 rounded text-zinc-500 hover:text-zinc-300 hover:bg-white/5 transition-colors shrink-0"
                                             >
                                                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                             </button>
@@ -340,7 +418,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                     </div>
                                     
                                     {isGroup && isExpanded && visibleSubItems && visibleSubItems.length > 0 && (
-                                        <div className="ml-6 mt-1 space-y-1 border-l border-slate-800 pl-2">
+                                        <div className="ml-6 mt-1 space-y-0.5 border-l border-white/5 pl-2">
                                             {visibleSubItems.map(sub => {
                                                 const subLocked = isRouteLocked(sub.href);
                                                 const isBilling = sub.href === "/dashboard/billing";
@@ -354,10 +432,10 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                                         href={linkHref}
                                                         onClick={(e) => handleItemClick(e, linkHref, !!sub.isComingSoon)}
                                                         className={cn(
-                                                            "flex items-center gap-3 rounded-md px-3 py-1.5 text-xs font-medium transition-all outline-none focus-visible:ring-2 focus-visible:ring-red-500 group relative",
+                                                            "flex items-center gap-3 rounded-md px-4 py-2 text-xs font-normal transition-all outline-none group relative",
                                                             subActive
-                                                                ? "text-primary font-semibold"
-                                                                : "text-slate-400 hover:text-slate-200 hover:bg-card/50",
+                                                                ? "text-brand font-medium"
+                                                                : "text-zinc-500 hover:text-zinc-300 hover:bg-white/5",
                                                             subLocked && "opacity-60 cursor-not-allowed"
                                                         )}
                                                     >
@@ -373,81 +451,6 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                         })}
                     </div>
                 </div>
-</nav>
-
-            <div className="border-t border-border p-4">
-                {(settings.twitterUrl || settings.instagramUrl) && (
-                    <div className="flex flex-col gap-2 mb-4">
-                        {settings.instagramUrl && (
-                            <a href={settings.instagramUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-md bg-gradient-to-r from-purple-600 via-pink-600 to-orange-500 text-white hover:opacity-90 transition-opacity font-medium text-xs w-full shadow-md border border-white/10 group">
-                                <Instagram className="h-4 w-4 shrink-0 group-hover:scale-110 transition-transform" />
-                                <span className="truncate">Club Instagram</span>
-                            </a>
-                        )}
-                        {settings.twitterUrl && (
-                            <a href={settings.twitterUrl} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 px-3 py-2 rounded-md bg-[#1DA1F2] text-white hover:opacity-90 transition-opacity font-medium text-xs w-full shadow-md border border-white/10 group">
-                                <Twitter className="h-4 w-4 shrink-0 group-hover:scale-110 transition-transform" />
-                                <span className="truncate">Club Twitter (X)</span>
-                            </a>
-                        )}
-                    </div>
-                )}
-
-                <div className="mb-4 p-3 bg-card/40 rounded-lg border border-border text-xs text-muted-foreground space-y-1">
-                    <p className="font-bold text-foreground">Need Support?</p>
-                    <div className="flex items-center justify-between gap-1 mt-0.5">
-                        <span className="text-[11px] truncate">
-                            Email: <a href="mailto:info@clubflow.org.uk" className="text-red-400 hover:text-red-300 hover:underline font-bold">info@clubflow.org.uk</a>
-                        </span>
-                        <button 
-                            onClick={() => {
-                                navigator.clipboard.writeText("info@clubflow.org.uk");
-                                setCopiedEmail(true);
-                                setTimeout(() => setCopiedEmail(false), 2000);
-                            }}
-                            className="p-1 hover:bg-card rounded transition-colors text-muted-foreground hover:text-foreground shrink-0"
-                            title={copiedEmail ? "Copied to clipboard!" : "Copy email address"}
-                        >
-                            {copiedEmail ? (
-                                <Check className="h-3 w-3 text-emerald-400" />
-                            ) : (
-                                <Copy className="h-3 w-3" />
-                            )}
-                        </button>
-                    </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="h-8 w-8 rounded-full bg-slate-700 flex items-center justify-center shrink-0">
-                            <span className="text-xs font-bold">{avatarLetter}</span>
-                        </div>
-                        <div className="text-sm overflow-hidden">
-                            <p className="font-medium text-white truncate max-w-[90px]" title={shownName}>
-                                {shownName}
-                            </p>
-                            <p className="text-xs text-slate-500 capitalize">{role || "Club Member"}</p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2.5">
-                        <button 
-                            onClick={toggleTheme}
-                            className="p-1.5 rounded bg-card hover:bg-card/80 text-muted-foreground hover:text-foreground transition-colors"
-                            title={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
-                        >
-                            {theme === "dark" ? (
-                                <Sun className="h-3.5 w-3.5" />
-                            ) : (
-                                <Moon className="h-3.5 w-3.5" />
-                            )}
-                        </button>
-                        <button onClick={signOut} className="text-xs text-red-400 hover:text-red-300 transition-colors p-1" title="Sign out">
-                            Logout
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             {/* Paywall Upgrade Dialog */}
             <Dialog open={upgradeModalOpen} onOpenChange={setUpgradeModalOpen}>
                 <DialogContent className="max-w-md bg-white rounded-2xl p-6 text-slate-900">
