@@ -17,6 +17,7 @@ export function WeeklyFootballCalendar({ matches: propMatches, trainingSessions:
     const [weekOffset, setWeekOffset] = useState(0);
     const [fetchedMatches, setFetchedMatches] = useState<Match[]>([]);
     const [fetchedSessions, setFetchedSessions] = useState<TrainingSession[]>([]);
+    const [leagueTeams, setLeagueTeams] = useState<any[]>([]);
 
     useEffect(() => {
         if (!propMatches) {
@@ -24,6 +25,9 @@ export function WeeklyFootballCalendar({ matches: propMatches, trainingSessions:
                 if (data) setFetchedMatches(data);
             });
         }
+        supabase.from('league_teams').select('*').then(({ data }) => {
+            if (data) setLeagueTeams(data);
+        });
     }, [propMatches]);
 
     useEffect(() => {
@@ -190,7 +194,10 @@ export function WeeklyFootballCalendar({ matches: propMatches, trainingSessions:
                             <div className="mt-1 flex-1">
                                 {hasMatch ? (
                                     <div className="space-y-2">
-                                        <div className={`text-xs font-bold ${textClass}`}>
+                                        <div className={`text-xs font-bold flex items-center gap-1.5 ${textClass}`}>
+                                            {leagueTeams.find(t => t.name.toLowerCase() === events.matches[0].opponent.toLowerCase())?.badge_url && (
+                                                <img src={leagueTeams.find(t => t.name.toLowerCase() === events.matches[0].opponent.toLowerCase())?.badge_url} alt="Badge" className="h-4 w-4 object-contain" />
+                                            )}
                                             {events.matches[0].opponent}
                                         </div>
                                         <div className="flex items-center gap-1 text-[10px] text-slate-500">
@@ -212,7 +219,7 @@ export function WeeklyFootballCalendar({ matches: propMatches, trainingSessions:
                                         </div>
                                         <div className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-slate-600 bg-white/60 px-1.5 py-1 rounded inline-block">
                                             <Users className="w-3 h-3 inline-block mr-1" />
-                                            {events.sessions[0].attendance?.length || 0} Confirmed
+                                            {events.sessions[0].attendance?.filter((a: any) => a.status === 'Present' || a.status === 'Late').length || 0} Confirmed
                                         </div>
                                     </div>
                                 ) : eventType === "Recovery" ? (

@@ -58,6 +58,7 @@ export default function DashboardPage() {
     const [isEditingLeagueName, setIsEditingLeagueName] = useState(false);
     const [tempLeagueName, setTempLeagueName] = useState("");
     const [dismissedPriorities, setDismissedPriorities] = useState<string[]>([]);
+    const [leagueTeams, setLeagueTeams] = useState<any[]>([]);
 
     useEffect(() => {
         fetchData();
@@ -116,6 +117,14 @@ export default function DashboardPage() {
         fetchRecruits();
         fetchTrainingSessions();
         fetchPaymentRequests();
+        fetchLeagueTeams();
+    };
+
+    const fetchLeagueTeams = async () => {
+        const { data } = await supabase.from('league_teams').select('*');
+        if (data) {
+            setLeagueTeams(data);
+        }
     };
 
     const fetchLineup = async () => {
@@ -585,8 +594,15 @@ export default function DashboardPage() {
                             <div className="text-sm font-semibold text-muted-foreground mb-1">
                                 {nextMatch?.isHome ? "Home vs" : "Away vs"}
                             </div>
-                            <div className="text-4xl md:text-5xl font-black text-foreground tracking-tight leading-none">
-                                {nextMatch ? nextMatch.opponent : "TBC"}
+                            <div className="text-4xl md:text-5xl font-black text-foreground tracking-tight leading-none flex items-center gap-3">
+                                {nextMatch ? (
+                                    <>
+                                        {leagueTeams.find(t => t.name.toLowerCase() === nextMatch.opponent.toLowerCase())?.badge_url && (
+                                            <img src={leagueTeams.find(t => t.name.toLowerCase() === nextMatch.opponent.toLowerCase())?.badge_url} alt="Badge" className="h-10 w-10 md:h-12 md:w-12 object-contain" />
+                                        )}
+                                        {nextMatch.opponent}
+                                    </>
+                                ) : "TBC"}
                             </div>
                         </div>
 
@@ -643,7 +659,7 @@ export default function DashboardPage() {
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2 text-sm font-medium text-foreground">
                                         <Users className="h-4 w-4 text-muted-foreground" />
-                                        {availablePlayers.length} Available
+                                        {nextTrainingSession.attendance?.filter((a: any) => a.status === 'Present' || a.status === 'Late').length || 0} Confirmed
                                     </div>
                                     <a href="/training" className="text-xs font-bold text-brand hover:underline">Manage</a>
                                 </div>

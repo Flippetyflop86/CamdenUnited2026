@@ -10,16 +10,18 @@ import { useClub } from "@/context/club-context";
 
 interface NextMatchHeroProps {
     match: Match;
+    leagueTeams?: any[];
     onManageMatch: (match: Match) => void;
     onShareMatch: (match: Match) => void;
 }
 
-export function NextMatchHero({ match, onManageMatch, onShareMatch }: NextMatchHeroProps) {
+export function NextMatchHero({ match, leagueTeams = [], onManageMatch, onShareMatch }: NextMatchHeroProps) {
     const { settings } = useClub();
     
     const isHome = match.isHome;
     const homeTeam = isHome ? settings.name : match.opponent;
     const awayTeam = isHome ? match.opponent : settings.name;
+    const opponentTeamInfo = leagueTeams.find(t => t.name.toLowerCase() === match.opponent.toLowerCase());
 
     const dateObj = new Date(match.date);
     const dateFormatted = new Intl.DateTimeFormat("en-GB", { weekday: 'long', day: 'numeric', month: 'long' }).format(dateObj);
@@ -48,10 +50,18 @@ export function NextMatchHero({ match, onManageMatch, onShareMatch }: NextMatchH
                         <Badge variant="outline" className="mb-4 bg-brand/10 text-brand border-brand/20">
                             {match.competition || "Fixture"}
                         </Badge>
-                        <h3 className="text-4xl md:text-5xl font-black tracking-tight text-foreground mb-2">
-                            <span className={isHome ? "text-foreground" : "text-muted-foreground"}>{homeTeam}</span>
-                            <span className="text-muted-foreground mx-4 font-normal text-3xl">vs</span>
-                            <span className={!isHome ? "text-foreground" : "text-muted-foreground"}>{awayTeam}</span>
+                        <h3 className="text-4xl md:text-5xl font-black tracking-tight text-foreground mb-2 flex items-center justify-center md:justify-start gap-4">
+                            <span className={`flex items-center gap-3 ${isHome ? "text-foreground" : "text-muted-foreground"}`}>
+                                {isHome && settings.logo && <img src={settings.logo} alt="Club Logo" className="h-8 w-8 md:h-10 md:w-10 object-contain rounded-full" />}
+                                {!isHome && opponentTeamInfo?.badge_url && <img src={opponentTeamInfo.badge_url} alt="Badge" className="h-8 w-8 md:h-10 md:w-10 object-contain" />}
+                                {homeTeam}
+                            </span>
+                            <span className="text-muted-foreground font-normal text-3xl">vs</span>
+                            <span className={`flex items-center gap-3 ${!isHome ? "text-foreground" : "text-muted-foreground"}`}>
+                                {!isHome && settings.logo && <img src={settings.logo} alt="Club Logo" className="h-8 w-8 md:h-10 md:w-10 object-contain rounded-full" />}
+                                {isHome && opponentTeamInfo?.badge_url && <img src={opponentTeamInfo.badge_url} alt="Badge" className="h-8 w-8 md:h-10 md:w-10 object-contain" />}
+                                {awayTeam}
+                            </span>
                         </h3>
                         
                         <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-6 text-sm text-muted-foreground font-medium">

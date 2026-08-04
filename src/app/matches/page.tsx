@@ -1560,6 +1560,7 @@ export default function MatchesPage() {
                 <>
                     <NextMatchHero 
                         match={upcomingMatches[0]} 
+                        leagueTeams={leagueTeams}
                         onManageMatch={handleEditMatch}
                         onShareMatch={handleOpenShare}
                     />
