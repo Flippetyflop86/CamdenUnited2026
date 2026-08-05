@@ -659,6 +659,16 @@ export default function TrainingPage() {
                             </option>
                         ))}
                     </select>
+
+                    <select
+                        value={timeFilter}
+                        onChange={(e: any) => setTimeFilter(e.target.value)}
+                        className="flex h-9 rounded-md border border-border bg-surface-1 px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand cursor-pointer text-foreground font-medium"
+                    >
+                        <option value="upcoming">Upcoming Sessions</option>
+                        <option value="past">Past Sessions</option>
+                        <option value="all">All Sessions</option>
+                    </select>
                 </div>
 
                 {activeTab === 'sessions' && (
@@ -801,11 +811,13 @@ export default function TrainingPage() {
                     )}
 
                     {/* Historical Record */}
-                    {displaySessions.filter(s => new Date(s.date).toISOString().split("T")[0] < new Date().toISOString().split("T")[0]).length > 0 && (
+                    {displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]).length > 0 && (
                         <PageSection>
                             <SectionHeader title="Historical Record" description="Past sessions and attendance records." />
                             <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 opacity-75">
-                                {displaySessions.filter(s => new Date(s.date).toISOString().split("T")[0] < new Date().toISOString().split("T")[0]).map((session) => (
+                                {displaySessions
+                                    .filter(s => s.date < new Date().toISOString().split("T")[0])
+                                    .map((session) => (
                                     <Card 
                                         key={session.id} 
                                         onClick={() => window.location.href = `/training/${session.id}`}
