@@ -1049,15 +1049,14 @@ export default function MatchdayXIPage() {
 
 
     return (
-        <div className="pb-16 text-slate-900 dark:text-slate-100 flex flex-col gap-8">
+        <div className="pb-16 flex flex-col gap-8">
             
-            {/* LEVEL 0: Football Week */}
-            <WeeklyFootballCalendar title="Match Preparation" />
+            
 
             {/* Match Identity & Fixture Selection */}
-            <div className="bg-slate-900 rounded-xl shadow-lg border border-slate-800 p-6 md:p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
+            <div className="bg-surface-1 rounded-2xl shadow-sm border border-border p-6 md:p-8 flex flex-col items-center justify-center text-center relative overflow-hidden">
                 {/* Subtle Pitch Pattern Background */}
-                <div className="absolute inset-0 opacity-5 pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at center, #ffffff 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
+                <div className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.02]" style={{ backgroundImage: 'radial-gradient(circle at center, currentColor 1px, transparent 1px)', backgroundSize: '24px 24px' }}></div>
                 
                 <div className="relative z-10 w-full max-w-2xl mx-auto flex flex-col items-center">
                     
@@ -1066,12 +1065,12 @@ export default function MatchdayXIPage() {
                         <select
                             value={selectedMatchId}
                             onChange={(e) => setSelectedMatchId(e.target.value)}
-                            className="bg-slate-800/50 hover:bg-slate-800 border border-slate-700 text-slate-300 text-xs md:text-sm rounded-full px-4 py-1.5 transition-colors focus:outline-none focus:ring-1 focus:ring-slate-500 cursor-pointer font-medium max-w-full truncate"
+                            className="bg-surface-2 hover:bg-surface-3 border border-border text-foreground text-xs md:text-sm rounded-full px-4 py-1.5 transition-colors focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-medium max-w-full truncate"
                         >
                             {matches.map(m => {
                                 const formattedDate = new Date(m.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
                                 return (
-                                    <option key={m.id} value={m.id} className="bg-slate-900 text-slate-200">
+                                    <option key={m.id} value={m.id} className="bg-surface-1 text-foreground">
                                         {m.isHome ? "🏠" : "🚌"} vs {m.opponent} ({formattedDate}) {m.result !== "Pending" ? `[${m.result}]` : ""}
                                     </option>
                                 );
@@ -1083,24 +1082,24 @@ export default function MatchdayXIPage() {
                     {nextMatch ? (
                         <div className="flex flex-col items-center gap-2">
                             <div className="flex flex-col items-center justify-center gap-1 md:gap-2 text-4xl md:text-6xl font-black tracking-tight leading-none text-center">
-                                <span className={nextMatch.isHome ? "text-white" : "text-slate-400"}>
+                                <span className={nextMatch.isHome ? "text-foreground" : "text-muted-foreground"}>
                                     {settings.name}
                                 </span>
-                                <span className="text-slate-700/60 text-sm md:text-base font-bold uppercase tracking-widest my-1 md:my-0">vs</span>
-                                <span className={!nextMatch.isHome ? "text-white" : "text-slate-400"}>
+                                <span className="text-muted-foreground text-sm md:text-base font-bold uppercase tracking-widest my-1 md:my-0">vs</span>
+                                <span className={!nextMatch.isHome ? "text-foreground" : "text-muted-foreground"}>
                                     {nextMatch.opponent}
                                 </span>
                             </div>
                             
                             <div className="flex flex-wrap items-center justify-center gap-3 md:gap-6 text-slate-400 text-xs md:text-sm font-semibold tracking-wide uppercase mt-4">
-                                <span className="flex items-center gap-1.5 text-brand/90"><Trophy className="h-4 w-4" /> {nextMatch.competition || "Friendly"}</span>
-                                <span className="flex items-center gap-1.5 text-slate-300"><MapPin className="h-4 w-4" /> {nextMatch.isHome ? (settings.homeGround || 'Home') : 'Away'}</span>
-                                <span className="flex items-center gap-1.5"><Calendar className="h-4 w-4" /> {new Date(nextMatch.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-                                <span className="flex items-center gap-1.5"><Clock className="h-4 w-4" /> {nextMatch.time}</span>
+                                <span className="flex items-center gap-1.5 text-primary"><Trophy className="h-4 w-4" /> {nextMatch.competition || "Friendly"}</span>
+                                <span className="flex items-center gap-1.5 text-muted-foreground"><MapPin className="h-4 w-4" /> {nextMatch.isHome ? (settings.homeGround || 'Home') : 'Away'}</span>
+                                <span className="flex items-center gap-1.5 text-muted-foreground"><Calendar className="h-4 w-4" /> {new Date(nextMatch.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+                                <span className="flex items-center gap-1.5 text-muted-foreground"><Clock className="h-4 w-4" /> {nextMatch.time}</span>
                             </div>
                         </div>
                     ) : (
-                        <h2 className="text-3xl font-black text-white">No Upcoming Matches</h2>
+                        <h2 className="cf-page-title">No Upcoming Matches</h2>
                     )}
                 </div>
             </div>
@@ -1112,7 +1111,7 @@ export default function MatchdayXIPage() {
                         <button 
                             key={squad} 
                             onClick={() => setActiveSquadTab(squad)} 
-                            className={`px-4 py-2 text-sm font-bold rounded-md whitespace-nowrap transition-colors ${activeSquadTab === squad ? "bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-800 hover:bg-slate-100"}`}
+                            className={`px-4 py-2 text-sm font-bold rounded-md whitespace-nowrap transition-colors ${activeSquadTab === squad ? "bg-foreground text-background shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-surface-2"}`}
                         >
                             {squad}
                         </button>
@@ -1120,17 +1119,17 @@ export default function MatchdayXIPage() {
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-2">
-                    <Button onClick={handleClearLineup} variant="outline" className="h-9 text-xs shadow-sm" title="Clear Pitch">
+                    <Button onClick={handleClearLineup} variant="outline" className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2" title="Clear Pitch">
                         <Trash2 className="h-3.5 w-3.5" />
                     </Button>
-                    <Button onClick={handleAutoFillLastLineup} variant="outline" className="h-9 text-xs shadow-sm" title="Fill Last Lineup">
+                    <Button onClick={handleAutoFillLastLineup} variant="outline" className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2" title="Fill Last Lineup">
                         <RefreshCw className="h-3.5 w-3.5" />
                     </Button>
                     <Button onClick={handleCopyToWhatsApp} className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white border-none shadow-sm flex">
                         <MessageCircle className="h-3.5 w-3.5 mr-2" />
                         Share
                     </Button>
-                    <Button onClick={handleExportPDF} variant="outline" className="h-9 text-xs shadow-sm">
+                    <Button onClick={handleExportPDF} variant="outline" className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2">
                         <FileDown className="h-3.5 w-3.5 mr-2" />
                         PDF
                     </Button>
@@ -1157,9 +1156,9 @@ export default function MatchdayXIPage() {
                     onDragOver={handleDragOver}
                     onDrop={handleDropOnSquad}
                 >
-                    <div className="p-4 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between shrink-0">
-                        <span className="font-bold text-sm text-slate-700 dark:text-slate-300">Available Players</span>
-                        <span className="text-xs font-semibold text-slate-500">{players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p)).length} Available</span>
+                    <div className="p-4 border-b border-border flex items-center justify-between shrink-0">
+                        <span className="cf-card-title">Available Players</span>
+                        <span className="cf-metadata mt-0.5">{players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p)).length} Available</span>
                     </div>
                     <div className="p-2 border-b border-slate-200/60 dark:border-slate-800/60 bg-white/30 dark:bg-slate-950/30 flex gap-1 overflow-x-auto no-scrollbar shrink-0 z-10">
                         {(["All", "GK", "DEF", "MID", "FWD"] as const).map(f => (
@@ -1206,15 +1205,15 @@ export default function MatchdayXIPage() {
                 <div className="lg:col-span-3 h-auto lg:h-full flex flex-col order-1 lg:order-2 min-h-0 overflow-hidden rounded-xl">
                     <div className="flex flex-row items-center justify-between pb-3 space-y-0 z-10 shrink-0">
                         <div className="flex flex-col">
-                            <span className="font-bold text-lg text-slate-900 dark:text-white">Starting XI</span>
-                            <span className="text-xs font-semibold text-slate-500">{Object.values(lineup.starters).filter(Boolean).length} / 11 Selected</span>
+                            <span className="cf-section-title">Starting XI</span>
+                            <span className="cf-metadata">{Object.values(lineup.starters).filter(Boolean).length} / 11 Selected</span>
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] text-slate-500 dark:text-slate-400 font-bold uppercase tracking-wider hidden sm:inline">Formation</span>
                             <select
                                 value={lineup.formation}
                                 onChange={(e) => handleFormationChange(e.target.value)}
-                                className="px-2 py-1.5 border border-slate-200 dark:border-slate-800 rounded-md text-xs font-bold focus:ring-2 focus:ring-red-500 focus:outline-none bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100"
+                                className="px-3 py-1.5 border border-border rounded-xl text-xs font-bold focus:ring-2 focus:ring-primary focus:outline-none bg-surface-1 text-foreground shadow-sm hover:border-foreground/30 transition-colors cursor-pointer"
                             >
                                 {FORMATION_NAMES.map(name => (
                                     <option key={name} value={name}>{name}</option>
@@ -1222,8 +1221,8 @@ export default function MatchdayXIPage() {
                             </select>
                         </div>
                     </div>
-                    <div className="flex-1 flex items-center justify-center p-4 bg-slate-50/50">
-                        <div className="relative w-full h-[500px] md:h-full max-w-[500px] mx-auto bg-green-600 rounded-lg shadow-xl border-4 border-slate-200">
+                    <div className="flex-1 flex items-center justify-center">
+                        <div className="relative w-full h-[500px] md:h-full max-w-[500px] mx-auto bg-[#2b7c3d] rounded-2xl shadow-xl overflow-hidden">
                             {/* Pitch markings */}
                             <div className="absolute inset-0 overflow-hidden rounded-sm pointer-events-none">
                                 <div className="absolute inset-2 border-2 border-white/40"></div>
@@ -1309,11 +1308,8 @@ export default function MatchdayXIPage() {
                                         </svg>
                                         
                                         {/* Name Tag */}
-                                        <div className={`
-                                            px-1 sm:px-2 py-0.5 rounded shadow-sm min-w-[52px] sm:min-w-[80px] text-center border relative
-                                            ${playerId ? 'bg-slate-900 border-slate-700' : 'bg-white/90 border-dashed border-slate-400'}
-                                        `}>
-                                            <span className={`text-[9px] sm:text-[12px] font-bold tracking-tight ${playerId ? 'text-white' : 'text-slate-500'}`}>
+                                        <div className={`px-1.5 sm:px-2.5 py-0.5 rounded-full shadow-lg min-w-[56px] sm:min-w-[80px] text-center relative transition-all ${playerId ? 'bg-surface-1/95 border border-border backdrop-blur-sm' : 'bg-black/30 border border-white/20 backdrop-blur-sm'}`}>
+                                            <span className={`text-[9px] sm:text-[11px] font-bold tracking-tight ${playerId ? 'text-foreground' : 'text-white/70'}`}>
                                                 {playerId ? displayName : getDisplayPosition(pos.label)}
                                             </span>
                                             
@@ -1336,17 +1332,17 @@ export default function MatchdayXIPage() {
                 </div>
 
                 {/* Right Panel - Bench */}
-                <div className="lg:col-span-1 h-[400px] lg:h-full flex flex-col bg-slate-50/50 dark:bg-slate-900/50 rounded-xl border border-slate-200/60 dark:border-slate-800/60 order-3 min-h-0 overflow-hidden">
+                <div className="lg:col-span-1 h-[400px] lg:h-full flex flex-col bg-surface-1 rounded-2xl border border-border shadow-sm order-3 min-h-0 overflow-hidden">
                     <div className="p-4 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between shrink-0">
                         <div className="flex flex-col">
-                            <span className="font-bold text-sm text-slate-700 dark:text-slate-300">Bench</span>
-                            <span className="text-xs font-semibold text-slate-500">{lineup.substitutes.filter(Boolean).length} / {lineup.substitutes.length} Selected</span>
+                            <span className="cf-card-title">Bench</span>
+                            <span className="cf-metadata mt-0.5">{lineup.substitutes.filter(Boolean).length} / {lineup.substitutes.length} Selected</span>
                         </div>
-                        <button onClick={handleAddSub} className="text-red-600 hover:text-red-700 font-bold text-[10px] flex items-center px-2 py-1 rounded bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-900/35 transition-colors">
+                        <button onClick={handleAddSub} className="text-primary hover:text-primary font-bold text-[10px] flex items-center px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors">
                             <Plus className="h-3 w-3 mr-0.5" /> ADD
                         </button>
                     </div>
-                    <div className="p-3 space-y-2 overflow-y-auto flex-1">
+                    <div className="p-3 space-y-2 overflow-y-auto flex-1 scrollbar-thin">
                         {lineup.substitutes.map((rawSubId, idx) => {
                             const player = rawSubId ? players.find(p => p.id === rawSubId) : null;
                             const subId = player ? rawSubId : "";
@@ -1354,7 +1350,7 @@ export default function MatchdayXIPage() {
                             const subDetail = lineup.substitutions?.find(s => s.subId === subId);
 
                             return (
-                                <div key={idx} className="space-y-1.5 p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                                <div key={idx} className="space-y-1.5 p-1.5 rounded-xl border border-border bg-surface-1 shadow-sm">
                                     <div 
                                         className="flex items-center gap-2 w-full"
                                         onDragOver={handleDragOver}
@@ -1366,16 +1362,15 @@ export default function MatchdayXIPage() {
                                             draggable={!!subId}
                                             onDragStart={(e) => subId && handleDragStart(e, subId, {type: 'sub', index: idx})}
                                             onClick={() => setActiveSlot({ type: 'sub', index: idx, label: `Bench Slot ${idx + 1}` })}
-                                            className={`flex-1 min-w-0 flex items-center justify-between p-2 border rounded-lg shadow-sm transition-all cursor-pointer hover:border-slate-400
-                                                ${subId ? 'bg-white dark:bg-slate-900 hover:border-red-400 border-slate-200 dark:border-slate-800 group' : 'bg-slate-100 dark:bg-slate-950 border-dashed border-slate-300 dark:border-slate-800 text-slate-400 dark:text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-800'}`}
+                                            className={`flex-1 min-w-0 flex items-center justify-between p-2.5 border rounded-xl shadow-sm transition-all cursor-pointer ${subId ? 'bg-surface-1 hover:border-primary/50 border-border group' : 'bg-surface-2 border-dashed border-border text-muted-foreground hover:bg-surface-3'}`}
                                         >
                                             {subId ? (
                                                 <>
                                                     <div className="flex items-center gap-2 min-w-0 flex-1">
                                                         <GripVertical className="h-4 w-4 text-slate-300 group-hover:text-red-400 transition-colors shrink-0" />
-                                                        <span className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate" title={displayName}>{displayName}</span>
+                                                        <span className="cf-card-title text-sm truncate" title={displayName}>{displayName}</span>
                                                     </div>
-                                                    <span className="text-[9px] uppercase text-slate-500 dark:text-slate-400 font-bold mr-1 shrink-0 ml-2">{player?.position}</span>
+                                                    <span className="text-[10px] uppercase text-muted-foreground font-bold mr-1 shrink-0 ml-2 bg-surface-2 px-1.5 py-0.5 rounded-md">{player?.position}</span>
                                                 </>
                                             ) : (
                                                 <span className="text-[10px] font-medium text-center w-full block">Drag here</span>
@@ -1401,11 +1396,7 @@ export default function MatchdayXIPage() {
                                                     setLineup(updated);
                                                     saveLineup(updated);
                                                 }}
-                                                className={`px-2 py-1 rounded text-[9px] font-bold border transition-colors shrink-0 ${
-                                                    lineup.usedSubstitutes?.includes(subId)
-                                                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/50 hover:bg-emerald-500/30"
-                                                        : "bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700"
-                                                }`}
+                                                className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition-colors shrink-0 ml-2 ${lineup.usedSubstitutes?.includes(subId) ? "bg-status-success/15 text-status-success border-status-success/30 hover:bg-status-success/25" : "bg-surface-2 text-muted-foreground border-border hover:bg-surface-3 hover:text-foreground"}`}
                                             >
                                                 {lineup.usedSubstitutes?.includes(subId) ? "Played" : "Unused"}
                                             </button>
@@ -1421,13 +1412,13 @@ export default function MatchdayXIPage() {
                                         )}
                                     </div>
                                     {subId && lineup.usedSubstitutes?.includes(subId) && (
-                                        <div className="pl-5 pr-1 py-1 flex items-center justify-between gap-1.5 border-t border-slate-100 mt-1 bg-slate-50 p-1.5 rounded">
+                                        <div className="pl-6 pr-2 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-t border-border mt-1.5 bg-surface-2 rounded-lg">
                                             <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Subbed For:</span>
                                             <div className="flex items-center gap-1 flex-1 justify-end">
                                                 <select
                                                     value={subDetail?.replacedId || ""}
                                                     onChange={(e) => handleSubDetailChange(subId, e.target.value, subDetail?.minute || 60)}
-                                                    className="text-[9px] bg-white border border-slate-200 text-slate-800 rounded px-1 py-0.5 h-6 max-w-[110px] outline-none font-medium"
+                                                    className="text-[10px] bg-surface-1 border border-border text-foreground rounded-md px-2 py-1 h-7 max-w-[120px] outline-none font-medium focus:border-primary"
                                                 >
                                                     <option value="">Replaced player...</option>
                                                     <optgroup label="Starters">
@@ -1463,7 +1454,7 @@ export default function MatchdayXIPage() {
                                                         value={subDetail?.minute ?? ""}
                                                         placeholder="60"
                                                         onChange={(e) => handleSubDetailChange(subId, subDetail?.replacedId || "", parseInt(e.target.value) || 60)}
-                                                        className="text-[9px] bg-white border border-slate-200 text-slate-800 rounded px-1 py-0.5 h-6 w-9 text-center outline-none"
+                                                        className="text-[10px] bg-surface-1 border border-border text-foreground rounded-md px-1 py-1 h-7 w-10 text-center outline-none focus:border-primary"
                                                     />
                                                 </div>
                                             </div>
@@ -1483,12 +1474,12 @@ export default function MatchdayXIPage() {
                         className="fixed inset-0" 
                         onClick={() => { setActiveSlot(null); setSearchQuery(""); }}
                     />
-                    <div className="bg-slate-900 border border-slate-800 text-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl z-10 overflow-hidden animate-in slide-in-from-bottom duration-200">
+                    <div className="bg-surface-1 border border-border w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl max-h-[85vh] sm:max-h-[80vh] flex flex-col shadow-2xl z-10 overflow-hidden animate-in slide-in-from-bottom duration-200">
                         {/* Modal Header */}
-                        <div className="p-4 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/50 backdrop-blur-md">
+                        <div className="p-5 border-b border-border flex items-center justify-between shrink-0 bg-surface-1 backdrop-blur-md">
                             <div>
-                                <h3 className="text-base font-bold text-white">Assign Player</h3>
-                                <p className="text-xs text-slate-400">Select player for position: <span className="font-semibold text-red-500">{activeSlot.label}</span></p>
+                                <h3 className="cf-section-title">Assign Player</h3>
+                                <p className="cf-metadata mt-1">Select player for position: <span className="font-bold text-primary">{activeSlot.label}</span></p>
                             </div>
                             <button 
                                 onClick={() => { setActiveSlot(null); setSearchQuery(""); }}
@@ -1499,7 +1490,7 @@ export default function MatchdayXIPage() {
                         </div>
 
                         {/* Search Input */}
-                        <div className="p-3 border-b border-slate-800 bg-slate-950/40 shrink-0">
+                        <div className="p-3 border-b border-border bg-surface-2 shrink-0">
                             <div className="relative">
                                 <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
                                 <input
@@ -1507,22 +1498,22 @@ export default function MatchdayXIPage() {
                                     placeholder="Search player by name or position..."
                                     value={searchQuery}
                                     onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                                    className="w-full pl-9 pr-4 py-2 bg-surface-1 border border-border rounded-xl text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                 />
                             </div>
                         </div>
 
                         {/* Player List */}
-                        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-slate-950/20">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-surface-0">
                             {/* Current Assigned Player */}
                             {activePlayer && (
-                                <div className="p-2.5 border border-red-500/30 rounded-xl bg-red-950/10 flex items-center justify-between">
+                                <div className="p-3 border border-primary/20 rounded-2xl bg-primary/5 flex items-center justify-between mb-2">
                                     <div className="flex flex-col">
-                                        <span className="text-[10px] uppercase font-bold text-red-500 tracking-wider">Currently Assigned</span>
-                                        <span className="text-sm font-bold text-white">
+                                        <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Currently Assigned</span>
+                                        <span className="cf-card-title text-foreground">
                                             {activePlayer.firstName} {activePlayer.lastName}
                                         </span>
-                                        <span className="text-[10px] text-slate-400 font-bold uppercase">{activePlayer.position}</span>
+                                        <span className="text-[10px] text-muted-foreground font-bold uppercase">{activePlayer.position}</span>
                                     </div>
                                     <Button
                                         onMouseDown={(e) => {
@@ -1537,7 +1528,7 @@ export default function MatchdayXIPage() {
                                         }}
                                         variant="destructive"
                                         size="sm"
-                                        className="h-8 text-xs bg-red-600 hover:bg-red-700 font-bold"
+                                        className="h-8 text-xs bg-destructive hover:bg-destructive/90 text-white font-bold rounded-lg px-3"
                                     >
                                         <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
                                     </Button>
@@ -1575,10 +1566,10 @@ export default function MatchdayXIPage() {
                                             }}
                                             className={`w-full flex items-center justify-between p-3 border rounded-xl transition-all text-left group
                                                 ${matchesTarget 
-                                                    ? 'bg-slate-800/80 border-red-500/20 hover:border-red-500/50 hover:bg-slate-800' 
+                                                    ? 'bg-primary/5 border-primary/20 hover:border-primary/50 hover:bg-primary/10' 
                                                     : matchesSecondary
-                                                        ? 'bg-slate-800/50 border-amber-500/20 hover:border-amber-500/50 hover:bg-slate-800'
-                                                        : 'bg-slate-900 border-slate-800 hover:border-slate-700 hover:bg-slate-800'
+                                                        ? 'bg-status-warning/5 border-status-warning/20 hover:border-status-warning/50 hover:bg-status-warning/10'
+                                                        : 'bg-surface-1 border-border hover:border-foreground/30 hover:bg-surface-2'
                                                 }`}
                                         >
                                             <div className="flex flex-col">
@@ -1590,12 +1581,12 @@ export default function MatchdayXIPage() {
                                                 </span>
                                             </div>
                                             {matchesTarget && (
-                                                <span className="bg-red-500/10 text-red-500 border border-red-500/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                                <span className="bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                                                     Ideal Position
                                                 </span>
                                             )}
                                             {!matchesTarget && matchesSecondary && (
-                                                <span className="bg-amber-500/10 text-amber-500 border border-amber-500/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                                                <span className="bg-status-warning/10 text-status-warning border border-status-warning/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider">
                                                     Secondary Option
                                                 </span>
                                             )}
@@ -1610,10 +1601,10 @@ export default function MatchdayXIPage() {
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="p-3 bg-slate-950/60 border-t border-slate-800 flex justify-end shrink-0">
+                        <div className="p-4 bg-surface-2 border-t border-border flex justify-end shrink-0">
                             <Button 
                                 onMouseDown={(e) => { e.preventDefault(); setActiveSlot(null); setSearchQuery(""); }}
-                                className="bg-slate-800 hover:bg-slate-750 text-white border-none font-bold text-xs"
+                                className="bg-surface-3 hover:bg-border text-foreground border-none font-bold text-xs rounded-lg"
                             >
                                 Cancel
                             </Button>

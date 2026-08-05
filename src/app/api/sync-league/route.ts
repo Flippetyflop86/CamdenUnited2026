@@ -18,6 +18,13 @@ export async function POST(request: Request) {
         });
 
         if (!response.ok) {
+            if (response.status === 403 || response.status === 520 || response.status === 503) {
+                return NextResponse.json({ 
+                    success: false, 
+                    errorType: 'BLOCKED',
+                    error: 'The league website is actively blocking automated access (Cloudflare).'
+                }, { status: 403 });
+            }
             return NextResponse.json({ success: false, error: 'Failed to access the league website.' }, { status: 400 });
         }
 
@@ -89,6 +96,20 @@ export async function POST(request: Request) {
 
     } catch (error: any) {
         console.error('League Scraper Error:', error);
+        
+        // Detect Cloudflare blocks (ECONNRESET, fetch failed, etc.)
+        if (
+            error.message === 'fetch failed' || 
+            error.code === 'ECONNRESET' ||
+            (error.message || '').includes('socket hang up')
+        ) {
+            return NextResponse.json({ 
+                success: false, 
+                errorType: 'BLOCKED',
+                error: 'The league website is actively blocking automated access (Cloudflare).'
+            }, { status: 403 });
+        }
+
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 }
