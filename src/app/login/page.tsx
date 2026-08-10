@@ -85,7 +85,7 @@ export default function LoginPage() {
                         )}
                         
                         <div className="space-y-1.5">
-                            <Label htmlFor="email" className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Email address</Label>
+                            <Label htmlFor="email" className="cf-metadata uppercase tracking-wider font-bold">Email address</Label>
                             <Input
                                 id="email"
                                 type="email"
@@ -93,14 +93,14 @@ export default function LoginPage() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-700 focus-visible:ring-red-600 rounded-xl h-10 text-xs transition-all"
+                                className="bg-surface-2 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary rounded-xl h-10 text-xs transition-all"
                             />
                         </div>
                         
                         <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
-                                <Label htmlFor="password" className="text-slate-400 text-[10px] font-bold uppercase tracking-wider">Password</Label>
-                                <Link href="/reset-password" className="text-[10px] font-bold text-slate-400 hover:text-red-500 transition-colors">
+                                <Label htmlFor="password" className="cf-metadata uppercase tracking-wider font-bold">Password</Label>
+                                <Link href="/reset-password" className="text-[10px] font-bold text-muted-foreground hover:text-primary transition-colors">
                                     Forgot?
                                 </Link>
                             </div>
@@ -110,7 +110,7 @@ export default function LoginPage() {
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 required
-                                className="bg-slate-900 border-slate-800 text-white focus-visible:ring-red-600 rounded-xl h-10 text-xs transition-all"
+                                className="bg-surface-2 border-border text-foreground focus-visible:ring-primary rounded-xl h-10 text-xs transition-all"
                             />
                         </div>
                         
