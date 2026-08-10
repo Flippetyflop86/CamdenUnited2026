@@ -1152,7 +1152,7 @@ export default function MatchdayXIPage() {
                 
                 {/* Left Panel - Squad */}
                 <div 
-                    className="lg:col-span-1 h-[400px] lg:h-full flex flex-col bg-slate-50/50 dark:bg-slate-900/50 rounded-xl border border-slate-200/60 dark:border-slate-800/60 order-2 lg:order-1 min-h-0 overflow-hidden"
+                    className="lg:col-span-1 h-[400px] lg:h-full flex flex-col bg-surface-1 rounded-2xl border border-border shadow-sm order-2 lg:order-1 min-h-0 overflow-hidden"
                     onDragOver={handleDragOver}
                     onDrop={handleDropOnSquad}
                 >
@@ -1160,18 +1160,18 @@ export default function MatchdayXIPage() {
                         <span className="cf-card-title">Available Players</span>
                         <span className="cf-metadata mt-0.5">{players.filter(p => !selectedPlayerIds.includes(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p)).length} Available</span>
                     </div>
-                    <div className="p-2 border-b border-slate-200/60 dark:border-slate-800/60 bg-white/30 dark:bg-slate-950/30 flex gap-1 overflow-x-auto no-scrollbar shrink-0 z-10">
+                    <div className="p-2 border-b border-border bg-surface-2 flex gap-1 overflow-x-auto no-scrollbar shrink-0 z-10">
                         {(["All", "GK", "DEF", "MID", "FWD"] as const).map(f => (
                             <button
                                 key={f}
                                 onClick={() => setSquadFilter(f)}
-                                className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all whitespace-nowrap ${squadFilter === f ? 'bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 shadow-sm' : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+                                className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-all whitespace-nowrap ${squadFilter === f ? 'bg-foreground text-background shadow-sm' : 'text-muted-foreground hover:text-foreground hover:bg-surface-3'}`}
                             >
                                 {f}
                             </button>
                         ))}
                     </div>
-                    <div className="p-3 space-y-2 overflow-y-auto flex-1 bg-slate-50/30 dark:bg-slate-950/20">
+                    <div className="p-3 space-y-2 overflow-y-auto flex-1 scrollbar-thin">
                         {sortedPlayers
                             .filter(p => squadFilter === "All" || getPositionCategory(p.position) === squadFilter)
                             .map(player => {
@@ -1182,12 +1182,14 @@ export default function MatchdayXIPage() {
                                         key={player.id}
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, player.id, {type: 'squad'})}
-                                        className="flex items-center gap-3 p-2 border border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-900 shadow-sm cursor-grab active:cursor-grabbing hover:border-red-400 dark:hover:border-red-500 hover:shadow-md transition-all group"
+                                        className="group flex flex-col p-2.5 border border-border rounded-xl cursor-grab active:cursor-grabbing hover:border-foreground/30 bg-surface-1 transition-all shadow-sm relative overflow-hidden"
                                     >
-                                        <GripVertical className="h-4 w-4 text-slate-300 group-hover:text-red-400 transition-colors" />
-                                        <div className="flex flex-col">
-                                            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{displayName}</span>
-                                            <span className="text-[9px] uppercase text-slate-500 dark:text-slate-400 font-black tracking-wider">{player.position}</span>
+                                        <div className="flex items-center gap-3">
+                                            <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="cf-card-title truncate w-full" title={displayName}>{displayName}</span>
+                                                <span className="text-[10px] uppercase text-muted-foreground font-bold mt-0.5">{player.position}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 );
@@ -1367,8 +1369,8 @@ export default function MatchdayXIPage() {
                                             {subId ? (
                                                 <>
                                                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                        <GripVertical className="h-4 w-4 text-slate-300 group-hover:text-red-400 transition-colors shrink-0" />
-                                                        <span className="cf-card-title text-sm truncate" title={displayName}>{displayName}</span>
+                                                        <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                                                        <span className="font-semibold text-sm text-foreground truncate" title={displayName}>{displayName}</span>
                                                     </div>
                                                     <span className="text-[10px] uppercase text-muted-foreground font-bold mr-1 shrink-0 ml-2 bg-surface-2 px-1.5 py-0.5 rounded-md">{player?.position}</span>
                                                 </>
