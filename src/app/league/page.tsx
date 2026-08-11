@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,8 @@ export default function LeagueTablePage() {
     const [importMode, setImportMode] = useState<'url' | 'screenshot' | 'text'>('url');
     const [urlInput, setUrlInput] = useState("");
     const [textInput, setTextInput] = useState("");
+    const [screenshotImage, setScreenshotImage] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     const [isExtracting, setIsExtracting] = useState(false);
     const [extractionStatus, setExtractionStatus] = useState("");
@@ -49,6 +51,46 @@ export default function LeagueTablePage() {
         // For now we leave it empty to show the empty state
         setCurrentTable(null);
     }, []);
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file && file.type.startsWith('image/')) {
+            loadImage(file);
+        }
+    };
+
+    const handlePaste = (e: React.ClipboardEvent) => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.startsWith('image/')) {
+                const file = items[i].getAsFile();
+                if (file) loadImage(file);
+                break;
+            }
+        }
+    };
+
+    const handleDragOver = (e: React.DragEvent) => {
+        e.preventDefault();
+    };
+
+    const handleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        const file = e.dataTransfer.files?.[0];
+        if (file && file.type.startsWith('image/')) {
+            loadImage(file);
+        }
+    };
+
+    const loadImage = (file: File) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            if (e.target?.result) {
+                setScreenshotImage(e.target.result as string);
+            }
+        };
+        reader.readAsDataURL(file);
+    };
 
     const handleExtractUrl = async () => {
         if (!urlInput) return;
@@ -300,17 +342,53 @@ export default function LeagueTablePage() {
                     )}
 
                     {importMode === 'screenshot' && (
-                        <div className="space-y-4 text-center py-8">
-                            <div className="mx-auto w-12 h-12 rounded-full bg-surface-2 flex items-center justify-center mb-2">
-                                <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                            </div>
-                            <div>
-                                <h4 className="font-semibold text-foreground">Upload a screenshot</h4>
-                                <p className="text-sm text-muted-foreground mt-1">Take a screenshot of the league table and drag it here.</p>
-                            </div>
-                            <Button variant="outline" className="mt-4">
-                                Browse Files
-                            </Button>
+                        <div 
+                            className="space-y-4 text-center py-8 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset rounded-xl transition-all"
+                            onPaste={handlePaste}
+                            onDragOver={handleDragOver}
+                            onDrop={handleDrop}
+                            tabIndex={0}
+                        >
+                            <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                ref={fileInputRef}
+                                onChange={handleFileChange}
+                            />
+                            
+                            {screenshotImage ? (
+                                <div className="space-y-4">
+                                    <div className="relative w-full max-h-[300px] overflow-hidden rounded-xl border border-border shadow-sm group">
+                                        <img src={screenshotImage} alt="League Table Screenshot" className="w-full h-auto object-contain" />
+                                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                            <Button variant="secondary" size="sm" onClick={() => {
+                                                setScreenshotImage(null);
+                                                if (fileInputRef.current) fileInputRef.current.value = "";
+                                            }}>
+                                                Remove Image
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <Button 
+                                        className="w-full bg-brand hover:bg-brand/90 text-white font-bold"
+                                        disabled={isExtracting}
+                                    >
+                                        {isExtracting ? "Analysing Image..." : "Extract from Screenshot"}
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-6 px-4 border-2 border-dashed border-border rounded-xl bg-surface-2/50 cursor-pointer hover:bg-surface-2 transition-colors" onClick={() => fileInputRef.current?.click()}>
+                                    <div className="w-12 h-12 rounded-full bg-surface-2 flex items-center justify-center mb-3 shadow-sm border border-border">
+                                        <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                                    </div>
+                                    <h4 className="font-semibold text-foreground">Upload a screenshot</h4>
+                                    <p className="text-sm text-muted-foreground mt-1 max-w-sm">Drag an image here, paste from your clipboard, or click to browse files.</p>
+                                    <Button variant="outline" className="mt-4 border-border bg-surface-1 shadow-sm text-xs font-semibold" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
+                                        Browse Files
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     )}
                 </CardContent>
