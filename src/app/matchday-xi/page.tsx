@@ -1575,10 +1575,10 @@ export default function MatchdayXIPage() {
                                                 }`}
                                         >
                                             <div className="flex flex-col">
-                                                <span className="text-sm font-bold text-white group-hover:text-red-400 transition-colors">
+                                                <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors">
                                                     {player.firstName} {player.lastName}
                                                 </span>
-                                                <span className="text-[10px] text-slate-400 font-semibold uppercase">
+                                                <span className="text-[10px] text-muted-foreground font-semibold uppercase">
                                                     {player.position} {player.secondaryPositions && player.secondaryPositions.length > 0 ? `| Sec: ${player.secondaryPositions.join(", ")}` : ''}
                                                 </span>
                                             </div>
