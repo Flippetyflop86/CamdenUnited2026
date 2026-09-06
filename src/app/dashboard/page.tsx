@@ -577,11 +577,7 @@ export default function DashboardPage() {
                                 </div>
                             </div>
 
-                            {/* Training Attendance */}
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Avg Attendance</span>
-                                <span className="text-sm font-bold text-foreground">{averageTrainingAttendance}%</span>
-                            </div>
+                            {/* Training Attendance removed per user request */}
 
                             {/* Next Fixture Quick Status */}
                             {nextMatch && (

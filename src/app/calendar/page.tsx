@@ -89,9 +89,7 @@ export default function CalendarPage() {
                     
                     <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1 shrink-0">
                         {[
-                            { id: "Month", icon: LayoutGrid },
-                            { id: "Week", icon: CalendarIcon },
-                            { id: "Agenda", icon: List }
+                            { id: "Month", icon: LayoutGrid }
                         ].map(v => (
                             <button
                                 key={v.id}
@@ -122,27 +120,14 @@ export default function CalendarPage() {
                         <div className="animate-spin h-8 w-8 border-4 border-slate-200 border-t-brand rounded-full"></div>
                     </div>
                 ) : (
-                    viewMode === "Month" ? (
-                        <FootballCalendar 
-                            currentDate={currentDate} 
-                            matches={matches} 
-                            trainingSessions={trainingSessions} 
-                            leagueTeams={leagueTeams}
-                            filters={filters}
-                            onDateClick={(d) => setCurrentDate(d)}
-                        />
-                    ) : (
-                        <div className="h-96 w-full flex items-center justify-center bg-slate-900 rounded-xl border border-slate-800 shadow-xl relative overflow-hidden">
-                            <div className="absolute inset-0 pointer-events-none opacity-5">
-                                <div className="absolute top-1/2 left-0 right-0 h-0 border-t-2 border-white"></div>
-                                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 border-2 border-white rounded-full"></div>
-                            </div>
-                            <div className="relative z-10 text-center">
-                                <h3 className="text-xl font-black text-white mb-2">{viewMode} View</h3>
-                                <p className="text-slate-400 text-sm">Contextual {viewMode.toLowerCase()} planner goes here.</p>
-                            </div>
-                        </div>
-                    )
+                    <FootballCalendar 
+                        currentDate={currentDate} 
+                        matches={matches} 
+                        trainingSessions={trainingSessions} 
+                        leagueTeams={leagueTeams}
+                        filters={filters}
+                        onDateClick={(d) => setCurrentDate(d)}
+                    />
                 )}
             </PageSection>
         </div>

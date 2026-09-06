@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { Match, TrainingSession } from "@/types";
-import { Sun, Users } from "lucide-react";
+import { Sun, Cloud, CloudRain, Users } from "lucide-react";
 
 interface FootballCalendarProps {
     currentDate: Date;
@@ -14,6 +14,41 @@ interface FootballCalendarProps {
 }
 
 export function FootballCalendar({ currentDate, matches, trainingSessions, leagueTeams = [], filters, onDateClick }: FootballCalendarProps) {
+    const todayStr = new Date().toISOString().split("T")[0];
+    const [weatherData, setWeatherData] = useState<Record<string, { temp: number; code: number }>>({});
+
+    useEffect(() => {
+        const fetchWeather = async () => {
+            try {
+                // Fetch forecast for Camden, London area (Lat: 51.5363, Lon: -0.1406)
+                const res = await fetch("https://api.open-meteo.com/v1/forecast?latitude=51.5363&longitude=-0.1406&daily=temperature_2m_max,weathercode&timezone=auto&past_days=7&forecast_days=14");
+                const data = await res.json();
+                
+                if (data.daily) {
+                    const weatherMap: Record<string, { temp: number; code: number }> = {};
+                    data.daily.time.forEach((date: string, index: number) => {
+                        weatherMap[date] = {
+                            temp: Math.round(data.daily.temperature_2m_max[index]),
+                            code: data.daily.weathercode[index]
+                        };
+                    });
+                    setWeatherData(weatherMap);
+                }
+            } catch (err) {
+                console.error("Failed to fetch weather:", err);
+            }
+        };
+        fetchWeather();
+    }, [currentDate]);
+
+    const getWeatherIcon = (code: number) => {
+        // Simple WMO weather code mapping
+        if (code <= 3) return <Sun className="h-3 w-3 text-amber-400" />;
+        if (code >= 51 && code <= 67) return <CloudRain className="h-3 w-3 text-sky-400" />;
+        if (code >= 71 && code <= 77) return <Cloud className="h-3 w-3 text-slate-300" />;
+        if (code >= 80 && code <= 82) return <CloudRain className="h-3 w-3 text-sky-400" />;
+        return <Cloud className="h-3 w-3 text-slate-400" />;
+    };
     const todayStr = new Date().toISOString().split("T")[0];
 
     const calendarGrid = useMemo(() => {
@@ -109,10 +144,10 @@ export function FootballCalendar({ currentDate, matches, trainingSessions, leagu
                                         {cell.date.getDate()}
                                     </span>
                                     
-                                    {events.matches.length > 0 && (
+                                    {events.matches.length > 0 && weatherData[dateStr] && (
                                         <div className="flex items-center gap-1 text-[10px] text-slate-400 font-semibold bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700">
-                                            <Sun className="h-3 w-3 text-amber-400" />
-                                            18°
+                                            {getWeatherIcon(weatherData[dateStr].code)}
+                                            {weatherData[dateStr].temp}°
                                         </div>
                                     )}
                                 </div>

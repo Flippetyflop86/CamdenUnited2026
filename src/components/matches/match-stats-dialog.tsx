@@ -17,6 +17,8 @@ interface MatchPlayerStat {
     yellow_cards: number;
     red_cards: number;
     minutes_played: number;
+    participation_type?: 'STARTER' | 'SUB' | 'UNUSED_SUB';
+    sub_events?: { type: 'on' | 'off'; minute: number }[];
 }
 
 export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon' }: { matchId: string, matchDate: string, opponent: string, variant?: 'icon' | 'full' | 'inline' }) {
@@ -121,8 +123,9 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
         if (pData) setPlayers(pData);
 
         // Fetch existing stats for this match
+        let currentStats: MatchPlayerStat[] = [];
         const { data: sData } = await supabase.from('match_player_stats').select('*').eq('match_id', matchId);
-        if (sData) setStats(sData);
+        if (sData) currentStats = sData;
 
         // Fetch raw notes of the match to extract lineup
         const { data: matchData } = await supabase.from('matches').select('notes').eq('id', matchId).single();
@@ -150,6 +153,28 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                                 });
                             }
                             setLineupSubs(subsList);
+                            
+                            // Sprint 13: Auto-initialize Match Stats from Lineup
+                            const missingStats: any[] = [];
+                            for (const sId of startersList) {
+                                if (!currentStats.find(s => s.player_id === sId)) {
+                                    missingStats.push({ match_id: matchId, player_id: sId, goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90, participation_type: 'STARTER', sub_events: [] });
+                                }
+                            }
+                            for (const subId of subsList) {
+                                if (!currentStats.find(s => s.player_id === subId)) {
+                                    missingStats.push({ match_id: matchId, player_id: subId, goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 0, participation_type: 'UNUSED_SUB', sub_events: [] });
+                                }
+                            }
+                            
+                            if (missingStats.length > 0) {
+                                const { data: insertedStats } = await supabase.from('match_player_stats').insert(missingStats).select();
+                                if (insertedStats) {
+                                    currentStats = [...currentStats, ...insertedStats];
+                                    await syncMatchesTable(matchId);
+                                }
+                            }
+                            
                             setRightPanelTab('lineup');
                         }
                     } catch(e) {
@@ -162,6 +187,7 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
         } else {
             setRightPanelTab('all');
         }
+        setStats(currentStats);
         setIsLoading(false);
     };
 
@@ -227,7 +253,7 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
         if (stats.find(s => s.player_id === playerId)) return;
         
         // Optimistic insert
-        const newStat = { match_id: matchId, player_id: playerId, goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90 };
+        const newStat = { match_id: matchId, player_id: playerId, goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90, participation_type: 'STARTER', sub_events: [] };
         const { data, error } = await supabase.from('match_player_stats').insert([newStat]).select().single();
         
         if (error) {
@@ -236,6 +262,65 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
             setStats(prev => [...prev, data]);
             await syncMatchesTable(matchId);
         }
+    };
+
+    const updateParticipation = async (statId: string, participation_type: 'STARTER' | 'SUB' | 'UNUSED_SUB') => {
+        const stat = stats.find(s => s.id === statId);
+        if (!stat) return;
+        
+        let newMinutes = 0;
+        if (participation_type === 'STARTER') newMinutes = 90;
+        if (participation_type === 'UNUSED_SUB') newMinutes = 0;
+        
+        setStats(prev => prev.map(s => s.id === statId ? { ...s, participation_type, sub_events: [], minutes_played: newMinutes } : s));
+        
+        const { error } = await supabase.from('match_player_stats')
+            .update({ participation_type, sub_events: [], minutes_played: newMinutes })
+            .eq('id', statId);
+            
+        if (error) { alert(error.message); fetchData(); }
+    };
+    
+    const updateSubEvent = async (statId: string, type: 'on'|'off', val: string) => {
+        const stat = stats.find(s => s.id === statId);
+        if (!stat) return;
+        
+        const minute = val === '' ? null : parseInt(val);
+        if (val !== '' && (isNaN(minute!) || minute! < 0 || minute! > 120)) return; 
+        
+        let events = [...(stat.sub_events || [])];
+        const existingIdx = events.findIndex(e => e.type === type);
+        
+        if (minute === null) {
+            if (existingIdx >= 0) events.splice(existingIdx, 1);
+        } else {
+            if (existingIdx >= 0) events[existingIdx].minute = minute;
+            else events.push({ type, minute });
+        }
+        
+        let calculatedMinutes = 0;
+        const onEvent = events.find(e => e.type === 'on')?.minute;
+        const offEvent = events.find(e => e.type === 'off')?.minute;
+        
+        if (stat.participation_type === 'STARTER') {
+            calculatedMinutes = offEvent !== undefined ? offEvent : 90;
+        } else if (stat.participation_type === 'SUB') {
+            if (onEvent !== undefined) {
+                calculatedMinutes = offEvent !== undefined ? offEvent - onEvent : 90 - onEvent;
+            } else {
+                calculatedMinutes = 0; 
+            }
+        }
+        
+        calculatedMinutes = Math.max(0, calculatedMinutes);
+        
+        setStats(prev => prev.map(s => s.id === statId ? { ...s, sub_events: events, minutes_played: calculatedMinutes } : s));
+        
+        const { error } = await supabase.from('match_player_stats')
+            .update({ sub_events: events, minutes_played: calculatedMinutes })
+            .eq('id', statId);
+            
+        if (error) { alert(error.message); fetchData(); }
     };
 
     const updateStat = async (statId: string, field: string, increment: number) => {
@@ -401,14 +486,71 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                                     const p = players.find(x => x.id === stat.player_id);
                                     if (!p) return null;
                                     return (
-                                        <div key={stat.id} className="bg-slate-50 border rounded-lg p-2 text-sm flex flex-col gap-2">
-                                            <div className="flex justify-between items-center border-b pb-2">
-                                                <span className="font-bold">{p.first_name} {p.last_name}</span>
+                                        <div key={stat.id} className="bg-slate-50 border rounded-lg p-3 text-sm flex flex-col gap-3">
+                                            <div className="flex justify-between items-center border-b pb-2 border-slate-200">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-slate-800">{p.first_name} {p.last_name}</span>
+                                                    {stat.participation_type === 'STARTER' && <span className="bg-emerald-100 text-emerald-700 text-[10px] px-1.5 py-0.5 rounded font-bold">STARTER</span>}
+                                                    {stat.participation_type === 'SUB' && <span className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded font-bold">SUB</span>}
+                                                    {stat.participation_type === 'UNUSED_SUB' && <span className="bg-slate-200 text-slate-700 text-[10px] px-1.5 py-0.5 rounded font-bold">UNUSED SUB</span>}
+                                                </div>
                                                 <button onClick={() => removePlayerFromMatch(stat.id)} className="text-slate-400 hover:text-red-500 transition-colors">
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>
                                             </div>
-                                            <div className="flex justify-between items-center">
+                                            
+                                            {/* Sprint 13: Sub controls */}
+                                            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded p-1.5 min-h-[40px]">
+                                                {stat.participation_type === 'STARTER' && (
+                                                    <div className="flex items-center gap-2 text-xs w-full">
+                                                        <span className="text-slate-500 font-medium w-8">Off:</span>
+                                                        <Input 
+                                                            className="w-12 h-6 text-xs px-1 text-center font-bold" 
+                                                            placeholder="-" 
+                                                            value={stat.sub_events?.find(e => e.type === 'off')?.minute || ''}
+                                                            onChange={(e) => updateSubEvent(stat.id, 'off', e.target.value)}
+                                                        />
+                                                        <span className="font-bold text-slate-800 ml-auto">{stat.minutes_played} mins</span>
+                                                    </div>
+                                                )}
+                                                
+                                                {stat.participation_type === 'SUB' && (
+                                                    <div className="flex items-center gap-2 text-xs w-full">
+                                                        <span className="text-slate-500 font-medium">On:</span>
+                                                        <Input 
+                                                            className="w-12 h-6 text-xs px-1 text-center font-bold" 
+                                                            placeholder="-" 
+                                                            value={stat.sub_events?.find(e => e.type === 'on')?.minute || ''}
+                                                            onChange={(e) => updateSubEvent(stat.id, 'on', e.target.value)}
+                                                        />
+                                                        <span className="text-slate-500 font-medium ml-1">Off:</span>
+                                                        <Input 
+                                                            className="w-12 h-6 text-xs px-1 text-center font-bold" 
+                                                            placeholder="-" 
+                                                            value={stat.sub_events?.find(e => e.type === 'off')?.minute || ''}
+                                                            onChange={(e) => updateSubEvent(stat.id, 'off', e.target.value)}
+                                                        />
+                                                        <span className="font-bold text-slate-800 ml-auto">{stat.minutes_played} mins</span>
+                                                    </div>
+                                                )}
+                                                
+                                                {(!stat.participation_type || stat.participation_type === 'UNUSED_SUB') && (
+                                                    <div className="flex items-center justify-between w-full">
+                                                        <span className="text-xs font-bold text-slate-400">0 mins</span>
+                                                        <Button size="sm" variant="outline" className="h-6 text-[10px] bg-slate-50 hover:bg-slate-100" onClick={() => updateParticipation(stat.id, 'SUB')}>
+                                                            Bring On
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                                
+                                                {(stat.participation_type === 'STARTER' || stat.participation_type === 'SUB') && (
+                                                    <Button size="sm" variant="ghost" className="h-6 text-[10px] text-slate-400 hover:text-red-500 px-2 ml-1" onClick={() => updateParticipation(stat.id, 'UNUSED_SUB')}>
+                                                        Undo
+                                                    </Button>
+                                                )}
+                                            </div>
+
+                                            <div className="flex justify-between items-center mt-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="w-12 text-xs text-slate-500 font-medium">Goals</span>
                                                     <div className="flex items-center bg-white border rounded-full overflow-hidden">
@@ -654,14 +796,71 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                                     const p = players.find(x => x.id === stat.player_id);
                                     if (!p) return null;
                                     return (
-                                        <div key={stat.id} className="bg-slate-50 border rounded-lg p-2 text-sm flex flex-col gap-2">
-                                            <div className="flex justify-between items-center border-b pb-2">
-                                                <span className="font-bold">{p.first_name} {p.last_name}</span>
+                                        <div key={stat.id} className="bg-slate-50 border rounded-lg p-3 text-sm flex flex-col gap-3">
+                                            <div className="flex justify-between items-center border-b pb-2 border-slate-200">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-slate-800">{p.first_name} {p.last_name}</span>
+                                                    {stat.participation_type === 'STARTER' && <span className="bg-emerald-100 text-emerald-700 text-[10px] px-1.5 py-0.5 rounded font-bold">STARTER</span>}
+                                                    {stat.participation_type === 'SUB' && <span className="bg-blue-100 text-blue-700 text-[10px] px-1.5 py-0.5 rounded font-bold">SUB</span>}
+                                                    {stat.participation_type === 'UNUSED_SUB' && <span className="bg-slate-200 text-slate-700 text-[10px] px-1.5 py-0.5 rounded font-bold">UNUSED SUB</span>}
+                                                </div>
                                                 <button onClick={() => removePlayerFromMatch(stat.id)} className="text-slate-400 hover:text-red-500 transition-colors">
                                                     <Trash2 className="h-4 w-4" />
                                                 </button>
                                             </div>
-                                            <div className="flex justify-between items-center">
+                                            
+                                            {/* Sprint 13: Sub controls */}
+                                            <div className="flex items-center gap-2 bg-white border border-slate-200 rounded p-1.5 min-h-[40px]">
+                                                {stat.participation_type === 'STARTER' && (
+                                                    <div className="flex items-center gap-2 text-xs w-full">
+                                                        <span className="text-slate-500 font-medium w-8">Off:</span>
+                                                        <Input 
+                                                            className="w-12 h-6 text-xs px-1 text-center font-bold" 
+                                                            placeholder="-" 
+                                                            value={stat.sub_events?.find(e => e.type === 'off')?.minute || ''}
+                                                            onChange={(e) => updateSubEvent(stat.id, 'off', e.target.value)}
+                                                        />
+                                                        <span className="font-bold text-slate-800 ml-auto">{stat.minutes_played} mins</span>
+                                                    </div>
+                                                )}
+                                                
+                                                {stat.participation_type === 'SUB' && (
+                                                    <div className="flex items-center gap-2 text-xs w-full">
+                                                        <span className="text-slate-500 font-medium">On:</span>
+                                                        <Input 
+                                                            className="w-12 h-6 text-xs px-1 text-center font-bold" 
+                                                            placeholder="-" 
+                                                            value={stat.sub_events?.find(e => e.type === 'on')?.minute || ''}
+                                                            onChange={(e) => updateSubEvent(stat.id, 'on', e.target.value)}
+                                                        />
+                                                        <span className="text-slate-500 font-medium ml-1">Off:</span>
+                                                        <Input 
+                                                            className="w-12 h-6 text-xs px-1 text-center font-bold" 
+                                                            placeholder="-" 
+                                                            value={stat.sub_events?.find(e => e.type === 'off')?.minute || ''}
+                                                            onChange={(e) => updateSubEvent(stat.id, 'off', e.target.value)}
+                                                        />
+                                                        <span className="font-bold text-slate-800 ml-auto">{stat.minutes_played} mins</span>
+                                                    </div>
+                                                )}
+                                                
+                                                {(!stat.participation_type || stat.participation_type === 'UNUSED_SUB') && (
+                                                    <div className="flex items-center justify-between w-full">
+                                                        <span className="text-xs font-bold text-slate-400">0 mins</span>
+                                                        <Button size="sm" variant="outline" className="h-6 text-[10px] bg-slate-50 hover:bg-slate-100" onClick={() => updateParticipation(stat.id, 'SUB')}>
+                                                            Bring On
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                                
+                                                {(stat.participation_type === 'STARTER' || stat.participation_type === 'SUB') && (
+                                                    <Button size="sm" variant="ghost" className="h-6 text-[10px] text-slate-400 hover:text-red-500 px-2 ml-1" onClick={() => updateParticipation(stat.id, 'UNUSED_SUB')}>
+                                                        Undo
+                                                    </Button>
+                                                )}
+                                            </div>
+
+                                            <div className="flex justify-between items-center mt-1">
                                                 <div className="flex items-center gap-2">
                                                     <span className="w-12 text-xs text-slate-500 font-medium">Goals</span>
                                                     <div className="flex items-center bg-white border rounded-full overflow-hidden">

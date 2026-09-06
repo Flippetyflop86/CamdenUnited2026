@@ -32,6 +32,8 @@ export default function PlayerProfilePage() {
     const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
     const [calculatedStats, setCalculatedStats] = useState({
         apps: 0,
+        starts: 0,
+        subApps: 0,
         goals: 0,
         assists: 0,
         yellow: 0,
@@ -238,6 +240,8 @@ export default function PlayerProfilePage() {
             setAvailableSeasons(Array.from(seasonSet).sort().reverse());
  
             let apps = 0;
+            let starts = 0;
+            let subApps = 0;
             let goals = 0;
             let assists = 0;
             let yellow = 0;
@@ -255,12 +259,28 @@ export default function PlayerProfilePage() {
                 const isFriendly = comp.toLowerCase().includes("friendly") || comp.toLowerCase().includes("trial");
                 if (!includeFriendlies && isFriendly) return;
  
-                apps += 1;
+                // Sprint 13 implementation: accurate participation counting
+                if (s.participation_type === 'STARTER') {
+                    apps += 1;
+                    starts += 1;
+                    minutes += (s.minutes_played !== undefined && s.minutes_played !== null ? s.minutes_played : 90);
+                } else if (s.participation_type === 'SUB') {
+                    apps += 1;
+                    subApps += 1;
+                    minutes += (s.minutes_played || 0);
+                } else if (s.participation_type === 'UNUSED_SUB') {
+                    // 0 apps, 0 mins
+                } else {
+                    // Legacy fallback
+                    apps += 1;
+                    starts += 1;
+                    minutes += (s.minutes_played !== undefined && s.minutes_played !== null ? s.minutes_played : 90);
+                }
+
                 goals += (s.goals || 0);
                 assists += (s.assists || 0);
                 yellow += (s.yellow_cards || 0);
                 red += (s.red_cards || 0);
-                minutes += (s.minutes_played || 90);
 
                 const res = matchResultsMap.get(s.match_id);
                 if (res === "Win") wins++;
@@ -269,7 +289,7 @@ export default function PlayerProfilePage() {
             });
 
             const winRate = apps > 0 ? Math.round((wins / apps) * 100) : 0;
-            setCalculatedStats({ apps, goals, assists, yellow, red, minutes, wins, draws, losses, winRate });
+            setCalculatedStats({ apps, starts, subApps, goals, assists, yellow, red, minutes, wins, draws, losses, winRate });
  
             setLoading(false);
         };
@@ -378,7 +398,12 @@ export default function PlayerProfilePage() {
                 <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
                     {/* Appearances */}
                     <Card className="bg-gradient-to-br from-indigo-50 to-indigo-100/50 border-indigo-200 shadow-sm overflow-hidden">
-                        <CardHeader className="pb-1 pt-4 px-4"><CardTitle className="text-xs uppercase tracking-wider font-bold text-indigo-600">Appearances</CardTitle></CardHeader>
+                        <CardHeader className="pb-1 pt-4 px-4">
+                            <CardTitle className="text-xs uppercase tracking-wider font-bold text-indigo-600 flex justify-between">
+                                <span>Appearances</span>
+                                <span className="text-[10px] text-indigo-500 normal-case font-normal">{calculatedStats.starts} Starts, {calculatedStats.subApps} Subs</span>
+                            </CardTitle>
+                        </CardHeader>
                         <CardContent className="pb-4 px-4"><div className="text-3xl font-extrabold text-indigo-900">{calculatedStats.apps}</div></CardContent>
                     </Card>
 

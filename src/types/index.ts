@@ -25,6 +25,8 @@ export interface Player {
     availability: boolean; // General availability flag
     // Stats summary for cards
     appearances: number;
+    starts?: number;
+    subApps?: number;
     goals: number;
     assists: number;
     yellow_cards?: number;

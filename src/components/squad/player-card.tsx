@@ -146,10 +146,18 @@ export function PlayerCard({ player, onDelete, onEdit, onStatusToggle }: PlayerC
             </CardHeader>
             
             {/* Stats */}
-            <CardContent className="p-3 sm:p-4 grid grid-cols-4 gap-2 text-center text-xs bg-background">
+            <CardContent className="p-3 sm:p-4 grid grid-cols-3 gap-y-3 gap-x-2 text-center text-xs bg-background">
                 <div className="space-y-1">
                     <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Apps</p>
                     <p className="font-bold text-foreground">{player.appearances ?? 0}</p>
+                </div>
+                <div className="space-y-1">
+                    <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Starts</p>
+                    <p className="font-bold text-foreground">{player.starts ?? 0}</p>
+                </div>
+                <div className="space-y-1">
+                    <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Sub Apps</p>
+                    <p className="font-bold text-foreground">{player.subApps ?? 0}</p>
                 </div>
                 <div className="space-y-1">
                     <p className="text-muted-foreground text-[10px] font-semibold uppercase tracking-wider">Goals</p>

@@ -316,7 +316,7 @@ export default function SquadPage() {
             setAvailableSeasons(Array.from(seasonSet).sort().reverse());
 
             // Calculate stats per player for the selected season
-            const playerStats = new Map<string, { apps: number, goals: number, assists: number, yellow: number, red: number, minutes: number, wins: number, draws: number, losses: number }>();
+            const playerStats = new Map<string, { apps: number, starts: number, subApps: number, goals: number, assists: number, yellow: number, red: number, minutes: number, wins: number, draws: number, losses: number }>();
             stats.forEach((s: any) => {
                 const season = matchSeasons.get(s.match_id);
                 if (seasonFilter !== "All" && season !== seasonFilter) return;
@@ -325,13 +325,30 @@ export default function SquadPage() {
                 const isFriendly = comp.toLowerCase().includes("friendly") || comp.toLowerCase().includes("trial");
                 if (!includeFriendlies && isFriendly) return;
 
-                const p = playerStats.get(s.player_id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0, minutes: 0, wins: 0, draws: 0, losses: 0 };
-                p.apps += 1;
+                const p = playerStats.get(s.player_id) || { apps: 0, starts: 0, subApps: 0, goals: 0, assists: 0, yellow: 0, red: 0, minutes: 0, wins: 0, draws: 0, losses: 0 };
+                
+                // Sprint 13 implementation: accurate participation counting
+                if (s.participation_type === 'STARTER') {
+                    p.apps += 1;
+                    p.starts += 1;
+                    p.minutes += (s.minutes_played !== undefined && s.minutes_played !== null ? s.minutes_played : 90);
+                } else if (s.participation_type === 'SUB') {
+                    p.apps += 1;
+                    p.subApps += 1;
+                    p.minutes += (s.minutes_played || 0);
+                } else if (s.participation_type === 'UNUSED_SUB') {
+                    // Do not increment apps, starts, or minutes
+                } else {
+                    // Legacy fallback
+                    p.apps += 1;
+                    p.starts += 1; // legacy default to start
+                    p.minutes += (s.minutes_played !== undefined && s.minutes_played !== null ? s.minutes_played : 90);
+                }
+                
                 p.goals += (s.goals || 0);
                 p.assists += (s.assists || 0);
                 p.yellow += (s.yellow_cards || 0);
                 p.red += (s.red_cards || 0);
-                p.minutes += (s.minutes_played || 90);
 
                 const res = matchResults.get(s.match_id);
                 if (res === "Win") p.wins++;
@@ -407,6 +424,8 @@ export default function SquadPage() {
                     contractExpiry: p.contract_expiry,
                     imageUrl: p.image_url,
                     appearances: s.apps,
+                    starts: s.starts,
+                    subApps: s.subApps,
                     goals: s.goals,
                     assists: s.assists,
                     yellow_cards: s.yellow,
