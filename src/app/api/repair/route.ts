@@ -25,6 +25,23 @@ export async function GET(request: Request) {
 
         const supabase = getAdminClient();
         
+        if (action === "users") {
+            const { data: { users }, error: usersErr } = await supabase.auth.admin.listUsers();
+            if (usersErr) {
+                return NextResponse.json({ error: usersErr.message }, { status: 500 });
+            }
+            return NextResponse.json({
+                success: true,
+                users: users.map((u: any) => ({
+                    id: u.id,
+                    email: u.email,
+                    created_at: u.created_at,
+                    meta: u.raw_user_meta_data,
+                    last_sign_in_at: u.last_sign_in_at
+                }))
+            });
+        }
+        
         if (action === "inspect" && playerName) {
             const { data: players } = await supabase
                 .from('players')
