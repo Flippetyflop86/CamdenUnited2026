@@ -179,6 +179,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
             } else {
                 console.warn("No membership found in club_members table for user_id:", userId, "email:", userEmail);
+                setClubId(null);
+                setGlobalClubId(null);
+                setRole(null);
+                setPagePermissions([]);
+                setDisplayName(null);
+                if (typeof window !== 'undefined') {
+                    try {
+                        localStorage.removeItem("clubflow_cache_clubId");
+                        localStorage.removeItem("clubflow_cache_role");
+                        localStorage.removeItem("clubflow_cache_pagePermissions");
+                        localStorage.removeItem("clubflow_cache_displayName");
+                    } catch (e) {}
+                }
             }
             setIsLoading(false);
         } catch (error: any) {

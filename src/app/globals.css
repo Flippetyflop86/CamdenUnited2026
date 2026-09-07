@@ -157,7 +157,6 @@
     font-size: 14px;
     font-weight: 400; /* Regular */
     line-height: 1.5;
-    color: hsl(var(--foreground));
   }
   .cf-metadata {
     font-size: 13px;
