@@ -49,7 +49,7 @@ export function FootballCalendar({ currentDate, matches, trainingSessions, leagu
         if (code >= 80 && code <= 82) return <CloudRain className="h-3 w-3 text-sky-400" />;
         return <Cloud className="h-3 w-3 text-slate-400" />;
     };
-    const todayStr = new Date().toISOString().split("T")[0];
+
 
     const calendarGrid = useMemo(() => {
         const year = currentDate.getFullYear();

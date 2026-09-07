@@ -392,7 +392,7 @@ export default function SquadPage() {
                         });
 
                         if (matchedPlayer) {
-                            const pStat = playerStats.get(matchedPlayer.id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0, minutes: 0, wins: 0, draws: 0, losses: 0 };
+                            const pStat = playerStats.get(matchedPlayer.id) || { apps: 0, starts: 0, subApps: 0, goals: 0, assists: 0, yellow: 0, red: 0, minutes: 0, wins: 0, draws: 0, losses: 0 };
                             if (type === 'yellow') pStat.yellow += count;
                             if (type === 'red') pStat.red += count;
                             playerStats.set(matchedPlayer.id, pStat);
@@ -406,7 +406,7 @@ export default function SquadPage() {
             });
 
             const formattedPlayers: Player[] = dbPlayers.map((p: any) => {
-                const s = playerStats.get(p.id) || { apps: 0, goals: 0, assists: 0, yellow: 0, red: 0, minutes: 0, wins: 0, draws: 0, losses: 0 };
+                const s = playerStats.get(p.id) || { apps: 0, starts: 0, subApps: 0, goals: 0, assists: 0, yellow: 0, red: 0, minutes: 0, wins: 0, draws: 0, losses: 0 };
                 const winRate = s.apps > 0 ? Math.round((s.wins / s.apps) * 100) : 0;
 
                 return {
