@@ -127,4 +127,4 @@ export const supabase = rawClient;
 export const unproxiedSupabase = {
     ...rawClient,
     from: originalFrom
-} as ReturnType<typeof createClient>;
+} as typeof rawClient;

@@ -41,7 +41,7 @@ export default function LoginPage() {
                     .limit(1)
                     .maybeSingle();
 
-                if (member?.role === "Player") {
+                if ((member as any)?.role === "Player") {
                     router.push("/player");
                 } else {
                     router.push("/dashboard");
