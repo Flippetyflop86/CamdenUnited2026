@@ -1451,7 +1451,7 @@ export default function OnboardingWizard() {
                                                     className="border-slate-800 bg-slate-900/60 text-slate-300 hover:bg-slate-800 text-xs font-semibold"
                                                     disabled={isLoading}
                                                 >
-                                                    {step === totalSteps ? "I'll add this later" : "Skip for now"}
+                                                    {step === totalSteps ? "Skip this step" : "Skip for now"}
                                                 </Button>
                                             )}
                                             <Button 
@@ -1460,7 +1460,7 @@ export default function OnboardingWizard() {
                                                 className="bg-white hover:bg-slate-100 text-slate-950 font-bold px-6 h-10 text-xs"
                                                 disabled={isLoading}
                                             >
-                                                {isLoading ? "Saving..." : step === 0 ? "Get Started" : step === totalSteps ? "Finish Setup" : "Next"}
+                                                {isLoading ? "Saving..." : (step === 0 ? "Get Started" : (step === totalSteps ? (leagueUrl ? "Complete Setup" : "Skip & Complete Setup") : "Next"))}
                                             </Button>
                                         </div>
                                     </CardFooter>
