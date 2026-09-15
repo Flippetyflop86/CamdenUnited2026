@@ -87,22 +87,12 @@ const navItems: NavItem[] = [
     },
     { label: "Recruitment", href: "/recruitment", icon: UserPlus },
     {
-        label: "Club",
-        icon: Briefcase,
-        href: "/finance",
-        subItems: [
-            { label: "Finance", href: "/finance" },
-            { label: "Player Budgets", href: "/budgets" },
-            { label: "Player Payments", href: "/player-payments" },
-            { label: "Sponsorships", href: "/sponsors" },
-            { label: "Inventory", href: "/inventory" },
-        ]
-    },
-    {
         label: "Administration",
         icon: Settings,
         href: "/admin",
         subItems: [
+            { label: "Sponsorships", href: "/sponsors" },
+            { label: "Inventory", href: "/inventory" },
             { label: "Documents", href: "/documents" },
             { label: "Staff", href: "/staff" },
             { label: "Settings", href: "/admin" },

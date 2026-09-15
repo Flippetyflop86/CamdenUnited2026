@@ -95,7 +95,6 @@ export function SearchCommand() {
             { label: 'Squad Management', link: '/squad', subLabel: 'Players & Availability', icon: Users },
             { label: 'Match Hub', link: '/matches', subLabel: 'Fixtures & Results', icon: Trophy },
             { label: 'Recruitment Hub', link: '/recruitment', subLabel: 'Scouting & Targets', icon: Search },
-            { label: 'Finance Hub', link: '/finance', subLabel: 'Budget & Transactions', icon: DollarSign },
             { label: 'Club Sponsors', link: '/sponsors', subLabel: 'Partners & Deals', icon: ShieldCheck },
             { label: 'Documents', link: '/documents', subLabel: 'Club Library', icon: BookOpen },
             { label: 'Inventory', link: '/inventory', subLabel: 'Kit & Equipment', icon: Package },
