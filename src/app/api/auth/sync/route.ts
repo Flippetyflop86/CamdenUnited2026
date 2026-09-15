@@ -36,6 +36,7 @@ export async function POST(request: Request) {
             .from("club_members")
             .select("id, club_id, role, page_permissions, display_name, user_id")
             .or(`user_id.eq.${user.id},email.ilike.${user.email}`)
+            .limit(1)
             .maybeSingle();
 
         if (memberError) {

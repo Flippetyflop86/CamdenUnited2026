@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { supabase, setGlobalClubId } from "@/lib/supabase";
+import { supabase, unproxiedSupabase, setGlobalClubId } from "@/lib/supabase";
 import { Session, User } from "@supabase/supabase-js";
 import { useRouter, usePathname } from "next/navigation";
 
@@ -127,10 +127,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             // Client-side fallback if backend API didn't resolve a membership (e.g. Service Role Key not set on host)
             if (!finalMember) {
                 console.warn("Sync API did not return membership, attempting client-side fallback query...");
-                const { data: fallbackData, error: fallbackError } = await supabase
+                const { data: fallbackData, error: fallbackError } = await unproxiedSupabase
                     .from("club_members")
                     .select("id, club_id, role, page_permissions, display_name, user_id")
                     .or(`user_id.eq.${userId},email.ilike.${userEmail}`)
+                    .limit(1)
                     .maybeSingle();
 
                 if (fallbackError) {
@@ -143,7 +144,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     // Client-side auto-heal update (allowed if RLS email policy is active)
                     if (fallbackData.user_id !== userId) {
                         console.warn("Auto-healing user_id on client for email:", userEmail);
-                        await supabase
+                        await unproxiedSupabase
                             .from("club_members")
                             .update({ user_id: userId })
                             .eq("id", fallbackData.id);

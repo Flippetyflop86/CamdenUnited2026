@@ -120,6 +120,11 @@ const proxiedFrom = new Proxy(rawClient.from, {
 });
 
 // Overwrite the client's from method with our proxy wrapper
-rawClient.from = proxiedFrom;
+const originalFrom = rawClient.from.bind(rawClient);
+rawClient.from = proxiedFrom as any;
 
 export const supabase = rawClient;
+export const unproxiedSupabase = {
+    ...rawClient,
+    from: originalFrom
+} as ReturnType<typeof createClient>;

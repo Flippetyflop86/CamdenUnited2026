@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, unproxiedSupabase } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,11 +34,12 @@ export default function LoginPage() {
             }
 
             if (data.session) {
-                const { data: member } = await supabase
+                const { data: member } = await unproxiedSupabase
                     .from("club_members")
                     .select("role")
                     .eq("user_id", data.session.user.id)
-                    .single();
+                    .limit(1)
+                    .maybeSingle();
 
                 if (member?.role === "Player") {
                     router.push("/player");
