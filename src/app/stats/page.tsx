@@ -330,8 +330,8 @@ export default function StatsPage() {
 
             return Object.values(finalGroups).map(group => {
                 const bestName = Object.entries(group.displayNames).sort((a, b) => b[1] - a[1])[0][0];
-                return { name: bestName, goals: group.total, assists: group.total }; // return both keys for generic use
-            }).sort((a, b) => b.goals - a.goals).slice(0, 5);
+                return { name: bestName, total: group.total };
+            });
         };
 
         const rawScorers: { name: string, count: number }[] = [];
@@ -457,8 +457,37 @@ export default function StatsPage() {
         setSurface4GStats(s4Stats);
 
         // Group & Sort
-        setTopScorers(groupPlayers(rawScorers).map(p => ({ name: p.name, goals: p.goals })));
-        setTopAssisters(groupPlayers(rawAssists).map(p => ({ name: p.name, assists: p.assists })));
+        const groupedScorers = groupPlayers(rawScorers);
+        const groupedAssisters = groupPlayers(rawAssists);
+
+        // Build unified map
+        const unifiedMap = new Map();
+        groupedScorers.forEach(s => {
+            unifiedMap.set(s.name, { name: s.name, goals: s.total, assists: 0 });
+        });
+        groupedAssisters.forEach(a => {
+            if (unifiedMap.has(a.name)) {
+                unifiedMap.get(a.name).assists = a.total;
+            } else {
+                unifiedMap.set(a.name, { name: a.name, goals: 0, assists: a.total });
+            }
+        });
+
+        const unifiedList = Array.from(unifiedMap.values());
+
+        setTopScorers(
+            [...unifiedList]
+                .filter(p => p.goals > 0)
+                .sort((a, b) => b.goals - a.goals || b.assists - a.assists || a.name.localeCompare(b.name))
+                .slice(0, 5)
+        );
+
+        setTopAssisters(
+            [...unifiedList]
+                .filter(p => p.assists > 0)
+                .sort((a, b) => b.assists - a.assists || b.goals - a.goals || a.name.localeCompare(b.name))
+                .slice(0, 5)
+        );
     };
 
     return (
