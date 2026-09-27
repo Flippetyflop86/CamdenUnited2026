@@ -1574,7 +1574,7 @@ export default function MatchesPage() {
             />
 
             <RecentResults 
-                matches={pastMatches.slice(0, 5)} 
+                matches={pastMatches} 
                 renderCard={(match) => <MatchCard key={match.id} match={match} isPast={true} />} 
             />
 
