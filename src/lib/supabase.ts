@@ -9,10 +9,17 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.warn('Supabase URL or Anon Key is missing. Check your .env.local file.');
 }
 
-// Create the client
+// Create the client with a non-blocking lock implementation to prevent browser navigator.locks AbortErrors and deadlocks
 const rawClient = createClient(
     supabaseUrl || 'https://placeholder.supabase.co',
-    supabaseAnonKey || 'placeholder'
+    supabaseAnonKey || 'placeholder',
+    {
+        auth: {
+            lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => {
+                return await fn();
+            }
+        }
+    }
 );
 
 let activeClubId: string | null = null;

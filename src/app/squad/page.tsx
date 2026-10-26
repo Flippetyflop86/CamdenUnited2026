@@ -356,6 +356,27 @@ export default function SquadPage() {
         }
     }, [isClubLoaded, settings.squads, settings.name, activeTab]);
 
+    // Ensure initial tab doesn't hide all players if they belong to another squad or have no squad tag
+    const hasCheckedInitialPlayerMatch = useRef(false);
+    useEffect(() => {
+        if (!hasCheckedInitialPlayerMatch.current && players.length > 0 && activeTab !== "All") {
+            hasCheckedInitialPlayerMatch.current = true;
+            const tabClean = activeTab.toLowerCase().replace(/[\s-_]+/g, '');
+            const anyMatchesTab = players.some((p) => {
+                const pSquads = p.squad ? p.squad.split(',').map((s: string) => s.trim()) : [];
+                return pSquads.some((s: string) => {
+                    const sClean = s.toLowerCase().replace(/[\s-_]+/g, '');
+                    if ((sClean === 'firstteam' || sClean === 'first team') && (tabClean === 'firstteam' || tabClean === 'first team')) return true;
+                    if ((sClean === 'midweek' || sClean === 'midweek team') && (tabClean === 'midweek' || tabClean === 'midweek team')) return true;
+                    return sClean === tabClean;
+                });
+            });
+            if (!anyMatchesTab) {
+                setActiveTab("All");
+            }
+        }
+    }, [players, activeTab]);
+
     // 1. Initial load: Supabase
     useEffect(() => {
         fetchData();
@@ -364,9 +385,9 @@ export default function SquadPage() {
             .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => fetchData())
             .subscribe();
         return () => { supabase.removeChannel(channel); };
-    }, [seasonFilter, includeFriendlies, clubId]);
+    }, [seasonFilter, includeFriendlies, clubId, isAuthLoading]);
 
-    async function fetchData() {
+    async function fetchData(retryCount = 0) {
         try {
             const [playersRes, matchesRes, statsRes] = await Promise.all([
                 supabase.from("players").select("*"),
@@ -374,7 +395,13 @@ export default function SquadPage() {
                 supabase.from("match_player_stats").select("*")
             ]);
 
-            if (playersRes.error) throw playersRes.error;
+            if (playersRes.error) {
+                if (retryCount < 2) {
+                    setTimeout(() => fetchData(retryCount + 1), 400);
+                    return;
+                }
+                throw playersRes.error;
+            }
             const dbPlayers = playersRes.data || [];
             const matches = matchesRes.data || [];
             const stats = statsRes.data || [];
@@ -1046,6 +1073,32 @@ export default function SquadPage() {
         setPreviewImage(player.imageUrl || null); 
     };
 
+    const [editReturnTo, setEditReturnTo] = useState<string | null>(null);
+
+    const closeEditDrawer = () => {
+        setEditingPlayer(null);
+        if (editReturnTo) {
+            const dest = editReturnTo;
+            setEditReturnTo(null);
+            router.push(dest);
+        }
+    };
+
+    useEffect(() => {
+        const editId = searchParams?.get("edit");
+        const returnToParam = searchParams?.get("returnTo");
+        if (editId && players.length > 0) {
+            const target = players.find((p) => p.id === editId);
+            if (target) {
+                if (returnToParam) {
+                    setEditReturnTo(returnToParam);
+                }
+                handleEdit(target);
+                router.replace("/squad", { scroll: false });
+            }
+        }
+    }, [searchParams, players]);
+
     const handleSavePlayer = async (updatedPlayer: Player) => {
         // Find if they had an existing PIN or departure info in local state to preserve it
         const originalPlayer = players.find(p => p.id === updatedPlayer.id);
@@ -1148,7 +1201,7 @@ export default function SquadPage() {
                 `${isNew ? "Created profile for" : "Updated profile of"} ${updatedPlayer.firstName} ${updatedPlayer.lastName} (Position: ${updatedPlayer.position}, Squad: ${updatedPlayer.squad || 'None'}).`
             );
             await fetchData();
-            setEditingPlayer(null);
+            closeEditDrawer();
         } catch (err: any) {
             console.error("Save Player Error:", err);
             alert("Database Error: " + err.message + "\n\nIf it says column 'secondary_position' or 'is_in_matchday_tracker' does not exist, please run this SQL query in your Supabase SQL Editor:\n\nALTER TABLE players ADD COLUMN IF NOT EXISTS secondary_position text;\nALTER TABLE players ADD COLUMN IF NOT EXISTS is_in_matchday_tracker boolean DEFAULT false;\nALTER TABLE players ADD COLUMN IF NOT EXISTS holiday_start date;\nALTER TABLE players ADD COLUMN IF NOT EXISTS holiday_end date;");
@@ -1565,7 +1618,9 @@ export default function SquadPage() {
                                         >
                                             <div className="flex items-center gap-1">Pos {renderSortIcon("position")}</div>
                                         </th>
-                                        <th className="py-3 px-2.5 hidden md:table-cell">Squad</th>
+                                        {activeTab === "All" && (
+                                            <th className="py-3 px-2.5 hidden md:table-cell">Squad</th>
+                                        )}
                                         <th
                                             onClick={() => handleTableSort("status")}
                                             className="py-3 px-2.5 cursor-pointer hover:text-foreground transition-colors"
@@ -1756,23 +1811,25 @@ export default function SquadPage() {
                                                         );
                                                     })()}
                                                 </td>
-                                                <td className="py-2.5 px-2.5 text-muted-foreground hidden md:table-cell truncate max-w-[140px]">
-                                                    {player.squad
-                                                        ? player.squad
-                                                              .split(",")
-                                                              .map((s) => {
-                                                                  const clean = s.trim();
-                                                                  const LEGACY_LABELS: Record<string, string> = {
-                                                                      firstTeam: "First Team",
-                                                                      firstteam: "First Team",
-                                                                      midweek: "Midweek",
-                                                                      youth: "Youth",
-                                                                  };
-                                                                  return LEGACY_LABELS[clean] || clean;
-                                                              })
-                                                              .join(", ")
-                                                        : "—"}
-                                                </td>
+                                                {activeTab === "All" && (
+                                                    <td className="py-2.5 px-2.5 text-muted-foreground hidden md:table-cell truncate max-w-[140px]">
+                                                        {player.squad
+                                                            ? player.squad
+                                                                  .split(",")
+                                                                  .map((s) => {
+                                                                      const clean = s.trim();
+                                                                      const LEGACY_LABELS: Record<string, string> = {
+                                                                          firstTeam: "First Team",
+                                                                          firstteam: "First Team",
+                                                                          midweek: "Midweek",
+                                                                          youth: "Youth",
+                                                                      };
+                                                                      return LEGACY_LABELS[clean] || clean;
+                                                                  })
+                                                                  .join(", ")
+                                                            : "—"}
+                                                    </td>
+                                                )}
                                                 <td className="py-2.5 px-2.5" onClick={(e) => e.stopPropagation()}>
                                                     {isFormer ? (
                                                         <div className="flex flex-col items-start gap-0.5">
@@ -1786,14 +1843,53 @@ export default function SquadPage() {
                                                             )}
                                                         </div>
                                                     ) : (
-                                                        <Badge
-                                                            onClick={() => handleStatusToggle(player)}
-                                                            className={`border cursor-pointer select-none text-[10px] px-2 py-0.5 rounded transition-colors ${getStatusBadgeStyle(
-                                                                player.medicalStatus
-                                                            )}`}
-                                                        >
-                                                            {player.medicalStatus}
-                                                        </Badge>
+                                                        (() => {
+                                                            let statusSubLabel = "";
+                                                            if (player.medicalStatus === "Injured" || player.medicalStatus === "Doubtful") {
+                                                                statusSubLabel = [player.injuryType, player.injuryDuration]
+                                                                    .filter(Boolean)
+                                                                    .join(" • ");
+                                                            } else if (player.medicalStatus === "Holiday") {
+                                                                if (player.holidayEnd) {
+                                                                    const parsedEnd = new Date(player.holidayEnd + "T00:00:00");
+                                                                    const formattedEnd = !isNaN(parsedEnd.getTime())
+                                                                        ? parsedEnd.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+                                                                        : player.holidayEnd;
+                                                                    statusSubLabel = `Back ${formattedEnd}`;
+                                                                } else if (player.holidayStart) {
+                                                                    const parsedStart = new Date(player.holidayStart + "T00:00:00");
+                                                                    const formattedStart = !isNaN(parsedStart.getTime())
+                                                                        ? parsedStart.toLocaleDateString("en-GB", { day: "numeric", month: "short" })
+                                                                        : player.holidayStart;
+                                                                    statusSubLabel = `From ${formattedStart}`;
+                                                                }
+                                                            } else if (player.medicalStatus === "Suspended") {
+                                                                statusSubLabel = [player.suspensionReason, player.suspensionDuration]
+                                                                    .filter(Boolean)
+                                                                    .join(" • ");
+                                                            }
+
+                                                            return (
+                                                                <div className="flex flex-col items-start gap-0.5">
+                                                                    <Badge
+                                                                        onClick={() => handleStatusToggle(player)}
+                                                                        className={`border cursor-pointer select-none text-[10px] px-2 py-0.5 rounded transition-colors ${getStatusBadgeStyle(
+                                                                            player.medicalStatus
+                                                                        )}`}
+                                                                    >
+                                                                        {player.medicalStatus}
+                                                                    </Badge>
+                                                                    {statusSubLabel && (
+                                                                        <span
+                                                                            className="text-[10px] text-muted-foreground font-medium leading-tight max-w-[150px] truncate"
+                                                                            title={statusSubLabel}
+                                                                        >
+                                                                            {statusSubLabel}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })()
                                                     )}
                                                 </td>
                                                 <td className="py-2.5 px-2 text-center font-bold text-foreground">
@@ -1961,11 +2057,11 @@ export default function SquadPage() {
 
             {editingPlayer && (
                 <div className="fixed inset-0 z-50 flex justify-end">
-                    <div className="absolute inset-0 bg-background/50 backdrop-blur-sm" onClick={() => setEditingPlayer(null)} />
+                    <div className="absolute inset-0 bg-background/50 backdrop-blur-sm" onClick={closeEditDrawer} />
                     <div className="relative h-full w-full max-w-[450px] bg-surface-1 shadow-2xl border-l border-border flex flex-col animate-in slide-in-from-right duration-300">
                         <div className="p-3 border-b border-border flex items-center justify-between shrink-0 bg-surface-2">
                             <h2 className="text-lg font-semibold text-foreground">{editingPlayer.firstName ? "Edit Player" : "Add Player"}</h2>
-                            <button onClick={() => setEditingPlayer(null)} className="text-sm text-muted-foreground hover:text-foreground p-2">✕</button>
+                            <button onClick={closeEditDrawer} className="text-sm text-muted-foreground hover:text-foreground p-2">✕</button>
                         </div>
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
                             <div className="grid grid-cols-2 gap-3">
@@ -2582,7 +2678,7 @@ export default function SquadPage() {
                             ) : <div />}
                             <div className="flex gap-2">
                                 <button
-                                    onClick={() => setEditingPlayer(null)}
+                                    onClick={closeEditDrawer}
                                     className="px-4 py-1.5 text-xs border border-border rounded hover:bg-muted text-muted-foreground transition-colors"
                                 >
                                     Cancel

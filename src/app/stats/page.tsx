@@ -69,7 +69,7 @@ export default function StatsPage() {
     };
 
     const [seasonFilter, setSeasonFilter] = useState<string>("All");
-    const [matchTypeFilter, setMatchTypeFilter] = useState<"All" | "Competitive" | "Friendly">("All");
+    const [matchTypeFilter, setMatchTypeFilter] = useState<"All" | "Competitive" | "Friendly">("Competitive");
     const [uniqueSeasons, setUniqueSeasons] = useState<string[]>([]);
     const [availableSeasons, setAvailableSeasons] = useState<string[]>([]);
 

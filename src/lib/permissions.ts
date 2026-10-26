@@ -48,6 +48,11 @@ export const PERMISSION_GROUPS = [...new Set(ALL_PAGE_PERMISSIONS.map(p => p.gro
 export function canAccess(href: string, role: string | null, pagePermissions: string[]): boolean {
     const isManager = role === "manager";
 
+    // While auth role is still hydrating (role is null and no explicit restrictions loaded), allow standard items so SSR & client match
+    if (!role && (!pagePermissions || pagePermissions.length === 0)) {
+        return true;
+    }
+
     // Admin is accessible to managers, or anyone with 'admin' permission
     if (href.startsWith("/admin")) {
         return isManager || pagePermissions.includes("admin");

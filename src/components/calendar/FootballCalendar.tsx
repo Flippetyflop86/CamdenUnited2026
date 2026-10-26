@@ -186,7 +186,7 @@ export function FootballCalendar({ currentDate, matches, trainingSessions, leagu
                                                         </div>
                                                         <div className="bg-slate-900 p-1.5 rounded">
                                                             <div className="text-slate-500 text-[9px] uppercase tracking-wider">Status</div>
-                                                            <div className="text-emerald-400 font-semibold">{match.is_squad_confirmed ? "XI Saved" : "Prep Reqd"}</div>
+                                                            <div className="text-emerald-400 font-semibold">{(match.is_squad_confirmed || match.notes?.includes("[Lineup: ") || (match.lineup && Object.values(match.lineup.starters || {}).some(Boolean))) ? "XI Saved" : "Prep Reqd"}</div>
                                                         </div>
                                                     </div>
                                                 </div>

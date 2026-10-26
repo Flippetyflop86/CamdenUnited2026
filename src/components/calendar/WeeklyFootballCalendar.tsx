@@ -192,7 +192,7 @@ export function WeeklyFootballCalendar({ matches: propMatches, trainingSessions:
                                             {events.matches[0].time || "TBC"}
                                         </div>
                                         <div className="mt-2 text-[10px] font-semibold text-slate-600 bg-white/60 px-1.5 py-1 rounded inline-block">
-                                            {events.matches[0].is_squad_confirmed ? "XI Saved" : "Prep Required"}
+                                            {(events.matches[0].is_squad_confirmed || events.matches[0].notes?.includes("[Lineup: ") || (events.matches[0].lineup && Object.values(events.matches[0].lineup.starters || {}).some(Boolean))) ? "XI Saved" : "Prep Required"}
                                         </div>
                                     </div>
                                 ) : hasTraining ? (

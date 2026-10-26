@@ -1,13 +1,21 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-function getAdminClient() {
+function getAdminClient(token?: string) {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!key) {
-        console.warn("SUPABASE_SERVICE_ROLE_KEY environment variable is missing on the server. Falling back to Anon Key.");
         return createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
-            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+            process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            token
+                ? {
+                      global: {
+                          headers: {
+                              Authorization: `Bearer ${token}`,
+                          },
+                      },
+                  }
+                : undefined
         );
     }
     return createClient(
@@ -18,12 +26,12 @@ function getAdminClient() {
 
 export async function POST(request: Request) {
     try {
-        const supabase = getAdminClient();
         const authHeader = request.headers.get("Authorization");
         const token = authHeader?.split(" ")[1];
         if (!token) {
             return NextResponse.json({ success: false, error: "Unauthorized: Missing token" }, { status: 401 });
         }
+        const supabase = getAdminClient(token);
 
         // 1. Verify user token
         const { data: { user }, error: authError } = await supabase.auth.getUser(token);

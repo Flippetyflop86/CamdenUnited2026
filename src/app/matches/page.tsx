@@ -325,7 +325,8 @@ export default function MatchesPage() {
                 rawNotes: m.notes || "",
                 surface: surface,
                 location: location,
-                lineup: parsedLineup
+                lineup: parsedLineup,
+                is_squad_confirmed: Boolean(m.is_squad_confirmed || (parsedLineup && Object.values(parsedLineup.starters || {}).some(Boolean)))
             } as any;
         });
 

@@ -263,9 +263,23 @@ export function PlayerCard({
                             )}
                         </div>
                     ) : (
-                        player.medicalStatus === "Holiday" && player.holidayStart && player.holidayEnd && (
-                            <p className="text-status-info text-[10px] sm:text-xs mt-2 font-medium">Holiday: {player.holidayStart} to {player.holidayEnd}</p>
-                        )
+                        <>
+                            {player.medicalStatus === "Holiday" && (player.holidayStart || player.holidayEnd) && (
+                                <p className="text-status-info text-[10px] sm:text-xs mt-2 font-medium">
+                                    Holiday: {player.holidayStart && player.holidayEnd ? `${player.holidayStart} to ${player.holidayEnd}` : player.holidayEnd ? `Back ${player.holidayEnd}` : `From ${player.holidayStart}`}
+                                </p>
+                            )}
+                            {(player.medicalStatus === "Injured" || player.medicalStatus === "Doubtful") && (player.injuryType || player.injuryDuration) && (
+                                <p className="text-status-danger text-[10px] sm:text-xs mt-2 font-medium">
+                                    {[player.injuryType, player.injuryDuration].filter(Boolean).join(" • ")}
+                                </p>
+                            )}
+                            {player.medicalStatus === "Suspended" && (player.suspensionReason || player.suspensionDuration) && (
+                                <p className="text-muted-foreground text-[10px] sm:text-xs mt-2 font-medium">
+                                    {[player.suspensionReason, player.suspensionDuration].filter(Boolean).join(" • ")}
+                                </p>
+                            )}
+                        </>
                     )}
                 </div>
             </CardHeader>

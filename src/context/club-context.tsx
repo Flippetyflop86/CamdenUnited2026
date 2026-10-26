@@ -107,7 +107,7 @@ const defaultSettings: ClubSettings = {
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
 
-import { supabase } from "@/lib/supabase";
+import { supabase, unproxiedSupabase } from "@/lib/supabase";
 
 function getDarkerColor(hex: string, percent = 15): string {
     let r = parseInt(hex.slice(1, 3), 16);
@@ -176,61 +176,44 @@ function generateSecondaryColor(hex: string): string {
 export function ClubProvider({ children }: { children: React.ReactNode }) {
     const { user, clubId, isLoading: authLoading } = useAuth();
     const [isMounted, setIsMounted] = useState(false);
-    const [settings, setSettings] = useState<ClubSettings>(() => {
-        if (typeof window === 'undefined') return defaultSettings;
-        try {
-            const cached = localStorage.getItem("clubflow_cache_clubSettings");
-            return cached ? JSON.parse(cached) : defaultSettings;
-        } catch (e) {
-            return defaultSettings;
-        }
-    });
-    const [isLoaded, setIsLoaded] = useState(() => {
-        if (typeof window === 'undefined') return false;
-        try {
-            return !!localStorage.getItem("clubflow_cache_clubSettings");
-        } catch (e) {
-            return false;
-        }
-    });
+    const [settings, setSettings] = useState<ClubSettings>(defaultSettings);
+    const [isLoaded, setIsLoaded] = useState(false);
 
     useEffect(() => {
         setIsMounted(true);
+        try {
+            const cached = localStorage.getItem("clubflow_cache_clubSettings");
+            if (cached) {
+                setSettings(JSON.parse(cached));
+                setIsLoaded(true);
+            }
+        } catch (e) {}
     }, []);
 
     // Initial Fetch
     useEffect(() => {
         if (authLoading) {
-            // Never unmount the app if it's already loaded, just wait silently
-            if (!isLoaded && typeof window !== 'undefined') {
-                const cached = localStorage.getItem("clubflow_cache_clubSettings");
-                if (!cached) setIsLoaded(false);
-            }
             return;
         }
 
         if (!user || !clubId) {
-            setSettings(defaultSettings);
             setIsLoaded(true);
             return;
         }
 
         async function fetchSettings() {
-            // Only show full-screen loader if we don't have settings loaded yet
-            if (settings.name === "My Club") {
-                setIsLoaded(false);
-            }
             try {
-                const { data, error } = await supabase
+                const { data, error } = await unproxiedSupabase
                     .from("clubs")
                     .select("*")
                     .eq("id", clubId)
                     .maybeSingle();
 
-                console.warn("fetchSettings resolved:", { clubId, data, error });
-
                 if (error) {
-                    console.error("Postgres error fetching club settings:", error);
+                    const isAbort = (error as any)?.name === "AbortError" || (error as any)?.message?.includes("signal is aborted");
+                    if (!isAbort) {
+                        console.warn("Warning fetching club settings:", (error as any)?.message || (error as any)?.code || error);
+                    }
                 }
 
                 if (data) {
@@ -425,25 +408,9 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         setSettings(updated);
     };
 
-    useEffect(() => {
-        console.log(`[DEBUG] ClubProvider isLoaded: ${isLoaded}`);
-    }, [isLoaded]);
-
-    if (!isMounted || !isLoaded) {
-        console.log(`[DEBUG] ClubProvider returning loading spinner. children will unmount!`);
-        return (
-            <div className="min-h-screen bg-slate-50 flex items-center justify-center">
-                <div className="flex flex-col items-center gap-3">
-                    <div className="h-8 w-8 rounded-full border-4 border-red-600 border-t-transparent animate-spin" />
-                    <p className="text-slate-500 text-sm font-medium">Loading...</p>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <ClubContext.Provider value={{ settings, isLoaded, updateSettings }}>
-            {settings.primaryColor && (
+            {isMounted && settings.primaryColor && (
                 <style dangerouslySetInnerHTML={{ __html: `
                     .bg-red-600 { background-color: ${settings.primaryColor} !important; }
                     .hover\\:bg-red-700:hover { background-color: ${getDarkerColor(settings.primaryColor)} !important; }

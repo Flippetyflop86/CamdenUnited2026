@@ -32,31 +32,18 @@ const getCachedVal = (key: string, fallback: any) => {
 };
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-    const [user, setUserState] = useState<User | null>(() => getCachedVal('user', null));
-    const userRef = useRef<User | null>(user);
+    const [user, setUserState] = useState<User | null>(null);
+    const userRef = useRef<User | null>(null);
     const setUser = (u: User | null) => {
         userRef.current = u;
         setUserState(u);
     };
     const [session, setSession] = useState<Session | null>(null);
-    const [clubId, setClubId] = useState<string | null>(() => {
-        const val = getCachedVal('clubId', null);
-        if (val) setGlobalClubId(val); // Initialize proxy immediately to prevent data leaks on mount
-        return val;
-    });
-    const [role, setRole] = useState<string | null>(() => getCachedVal('role', null));
-    const [pagePermissions, setPagePermissions] = useState<string[]>(() => getCachedVal('pagePermissions', []));
-    const [displayName, setDisplayName] = useState<string | null>(() => getCachedVal('displayName', null));
-    const [isLoading, setIsLoading] = useState(() => {
-        if (typeof window === 'undefined') return true;
-        try {
-            const cachedUser = localStorage.getItem(`clubflow_cache_user`);
-            const cachedClub = localStorage.getItem(`clubflow_cache_clubId`);
-            return !(cachedUser && cachedClub);
-        } catch (e) {
-            return true;
-        }
-    });
+    const [clubId, setClubId] = useState<string | null>(null);
+    const [role, setRole] = useState<string | null>(null);
+    const [pagePermissions, setPagePermissions] = useState<string[]>([]);
+    const [displayName, setDisplayName] = useState<string | null>(null);
+    const [isLoading, setIsLoading] = useState<boolean>(true);
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     const router = useRouter();
@@ -87,15 +74,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                cleanPath.startsWith("/respond");
     };
 
-    const fetchClubMembership = async (userId: string, userEmail?: string) => {
+    const fetchClubMembership = async (userId: string, userEmail?: string, providedToken?: string) => {
         // Only set loading to true if we don't already have a cached club ID
         if (!clubId) {
             setIsLoading(true);
         }
         
         try {
-            const { data: { session } } = await supabase.auth.getSession();
-            const token = session?.access_token;
+            let token = providedToken;
+            if (!token) {
+                const { data: { session: currentSession } } = await supabase.auth.getSession();
+                token = currentSession?.access_token;
+            }
 
             if (!token) {
                 console.warn("No access token found for membership fetch");
@@ -203,10 +193,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Exposed so the admin panel can trigger a re-fetch after changing permissions
     const refreshPermissions = async () => {
-        if (user) await fetchClubMembership(user.id, user.email);
+        if (user) await fetchClubMembership(user.id, user.email, session?.access_token);
     };
 
     useEffect(() => {
+        // Hydrate cached auth state on client mount (avoids SSR hydration mismatch)
+        const cachedUser = getCachedVal('user', null);
+        const cachedClubId = getCachedVal('clubId', null);
+        const cachedRole = getCachedVal('role', null);
+        const cachedPerms = getCachedVal('pagePermissions', []);
+        const cachedDisplayName = getCachedVal('displayName', null);
+
+        if (cachedUser) setUser(cachedUser);
+        if (cachedClubId) {
+            setClubId(cachedClubId);
+            setGlobalClubId(cachedClubId);
+        }
+        if (cachedRole) setRole(cachedRole);
+        if (Array.isArray(cachedPerms)) setPagePermissions(cachedPerms);
+        if (cachedDisplayName) setDisplayName(cachedDisplayName);
+        if (cachedUser && cachedClubId) {
+            setIsLoading(false);
+        }
+
         // Intercept password recovery or access token fragments and route them immediately to /update-password
         if (typeof window !== 'undefined' && window.location.hash) {
             const hash = window.location.hash;
@@ -221,7 +230,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setSession(session);
             setUser(session?.user ?? null);
             if (session?.user) {
-                fetchClubMembership(session.user.id, session.user.email);
+                if (typeof window !== 'undefined') {
+                    try {
+                        localStorage.setItem("clubflow_cache_user", JSON.stringify(session.user));
+                    } catch (e) {}
+                }
+                fetchClubMembership(session.user.id, session.user.email, session.access_token);
             } else {
                 setIsLoading(false);
                 if (!isPublicPage(pathnameRef.current)) {
@@ -230,9 +244,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
         }).catch(err => {
             const isAbort = err?.name === 'AbortError' || err?.message?.includes('signal is aborted');
-            if (!isAbort) {
-                console.error("Failed to get auth session on mount:", err);
+            if (isAbort) {
+                return;
             }
+            console.error("Failed to get auth session on mount:", err);
             setIsLoading(false);
             if (!isPublicPage(pathnameRef.current)) {
                 router.push("/login");
@@ -240,24 +255,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            console.log(`[DEBUG] supabase.auth.onAuthStateChange fired! event: ${_event}`);
             setSession(session);
             const nextUser = session?.user ?? null;
             const previousUser = userRef.current;
-            const userChanged = (!previousUser && nextUser) || (previousUser && nextUser && previousUser.id !== nextUser.id);
+            const accountSwitched = Boolean(previousUser && nextUser && previousUser.id !== nextUser.id);
+            const isFirstSessionResolve = !previousUser && Boolean(nextUser);
             
             setUser(nextUser);
             
             if (nextUser) {
                 setIsLoggingOut(false);
-                if (typeof window !== 'undefined') {
-                    try {
-                        localStorage.setItem("clubflow_cache_user", JSON.stringify(nextUser));
-                    } catch (e) {}
-                }
                 
-                // Clear any stored browser settings/states when switching user accounts to prevent leaks
-                if (userChanged && typeof window !== 'undefined') {
+                // Clear any stored browser settings/states ONLY when switching between two different user accounts
+                if (accountSwitched && typeof window !== 'undefined') {
                     try {
                         sessionStorage.clear();
                         for (let i = localStorage.length - 1; i >= 0; i--) {
@@ -270,9 +280,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         console.warn("Storage cleanup failed:", e);
                     }
                 }
-                // ALWAYS fetch membership on login/recovery/change to avoid cache mismatch
-                if (userChanged || _event === 'SIGNED_IN') {
-                    fetchClubMembership(nextUser.id, nextUser.email);
+
+                if (typeof window !== 'undefined') {
+                    try {
+                        localStorage.setItem("clubflow_cache_user", JSON.stringify(nextUser));
+                    } catch (e) {}
+                }
+
+                // Fetch membership outside GoTrueClient's synchronous lock
+                if (accountSwitched || isFirstSessionResolve || _event === 'SIGNED_IN') {
+                    const token = session?.access_token;
+                    setTimeout(() => {
+                        fetchClubMembership(nextUser.id, nextUser.email, token);
+                    }, 0);
                 }
             } else {
                 setClubId(null);

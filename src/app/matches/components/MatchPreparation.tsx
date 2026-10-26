@@ -43,7 +43,11 @@ export function MatchPreparation({ nextMatch }: MatchPreparationProps) {
 
     if (!nextMatch) return null;
 
-    const isSquadConfirmed = nextMatch.is_squad_confirmed === true;
+    const isSquadConfirmed = Boolean(
+        nextMatch.is_squad_confirmed ||
+        (nextMatch.lineup && Object.values(nextMatch.lineup.starters || {}).some(Boolean)) ||
+        nextMatch.notes?.includes("[Lineup: ")
+    );
 
     return (
         <div className="space-y-4 mb-12">

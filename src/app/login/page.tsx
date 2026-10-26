@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { supabase, unproxiedSupabase } from "@/lib/supabase";
+import { supabase, unproxiedSupabase, setGlobalClubId } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -34,12 +34,26 @@ export default function LoginPage() {
             }
 
             if (data.session) {
-                const { data: member } = await unproxiedSupabase
+                const userId = data.session.user.id;
+                const userEmail = data.session.user.email;
+                const { data: members } = await unproxiedSupabase
                     .from("club_members")
-                    .select("role")
-                    .eq("user_id", data.session.user.id)
-                    .limit(1)
-                    .maybeSingle();
+                    .select("id, club_id, role, page_permissions, display_name, user_id")
+                    .or(userEmail ? `user_id.eq.${userId},email.ilike.${userEmail}` : `user_id.eq.${userId}`);
+
+                const member = members && members.length > 0
+                    ? (members.find((m: any) => m.user_id === userId) || members[0])
+                    : null;
+
+                if (member) {
+                    setGlobalClubId(member.club_id);
+                    try {
+                        localStorage.setItem("clubflow_cache_clubId", JSON.stringify(member.club_id));
+                        localStorage.setItem("clubflow_cache_role", JSON.stringify(member.role));
+                        localStorage.setItem("clubflow_cache_pagePermissions", JSON.stringify(member.page_permissions || null));
+                        localStorage.setItem("clubflow_cache_displayName", JSON.stringify(member.display_name || null));
+                    } catch {}
+                }
 
                 if ((member as any)?.role === "Player") {
                     router.push("/player");

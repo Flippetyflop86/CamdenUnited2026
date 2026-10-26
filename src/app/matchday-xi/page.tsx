@@ -1154,10 +1154,8 @@ export default function MatchdayXIPage() {
                         PDF
                     </Button>
                     <Button onClick={async () => {
-                        if (!selectedMatchId) return;
+                        if (!selectedMatchId || !lineup) return;
                         await saveLineup(lineup);
-                        const { error } = await supabase.from('matches').update({ is_squad_confirmed: true }).eq('id', selectedMatchId);
-                        if (error) console.error("Error confirming squad", error);
                         const matchObj = matches.find(m => m.id === selectedMatchId);
                         const opponentName = matchObj ? matchObj.opponent : "this game";
                         alert(`Lineup saved successfully for vs ${opponentName}!`);
