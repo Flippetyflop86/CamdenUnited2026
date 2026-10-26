@@ -45,13 +45,31 @@ const CLUSTERED_TABLES = [
 // Helper to determine if we are in browser context
 const isBrowser = typeof window !== 'undefined';
 
+function getEffectiveClubId(): string | null {
+    if (activeClubId) return activeClubId;
+    if (isBrowser) {
+        try {
+            const cached = localStorage.getItem('clubflow_cache_clubId');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (parsed) {
+                    activeClubId = parsed;
+                    return parsed;
+                }
+            }
+        } catch {}
+    }
+    return null;
+}
+
 const proxiedFrom = new Proxy(rawClient.from, {
     apply(target, thisArg, argArray) {
         const relation = argArray[0] as string;
         const builder = Reflect.apply(target, thisArg, argArray);
+        const currentClubId = getEffectiveClubId();
 
-        // Only apply proxy scoping in browser context and when activeClubId is set
-        if (!isBrowser || !activeClubId) {
+        // Only apply proxy scoping in browser context and when currentClubId is set
+        if (!isBrowser || !currentClubId) {
             return builder;
         }
 
@@ -71,22 +89,22 @@ const proxiedFrom = new Proxy(rawClient.from, {
                         if (prop === 'select') {
                             const nextBuilder = value.apply(targetBuilder, args);
                             return isClustered 
-                                ? nextBuilder.eq('club_id', activeClubId) 
-                                : nextBuilder.eq('id', activeClubId);
+                                ? nextBuilder.eq('club_id', currentClubId) 
+                                : nextBuilder.eq('id', currentClubId);
                         }
 
                         if (prop === 'update') {
                             const nextBuilder = value.apply(targetBuilder, args);
                             return isClustered 
-                                ? nextBuilder.eq('club_id', activeClubId) 
-                                : nextBuilder.eq('id', activeClubId);
+                                ? nextBuilder.eq('club_id', currentClubId) 
+                                : nextBuilder.eq('id', currentClubId);
                         }
 
                         if (prop === 'delete') {
                             const nextBuilder = value.apply(targetBuilder, args);
                             return isClustered 
-                                ? nextBuilder.eq('club_id', activeClubId) 
-                                : nextBuilder.eq('id', activeClubId);
+                                ? nextBuilder.eq('club_id', currentClubId) 
+                                : nextBuilder.eq('id', currentClubId);
                         }
 
                         if (prop === 'insert' || prop === 'upsert') {
@@ -96,12 +114,12 @@ const proxiedFrom = new Proxy(rawClient.from, {
                                 if (Array.isArray(data)) {
                                     data = data.map(item => ({
                                         ...item,
-                                        [key]: activeClubId
+                                        [key]: currentClubId
                                     }));
                                 } else if (typeof data === 'object') {
                                     data = {
                                         ...data,
-                                        [key]: activeClubId
+                                        [key]: currentClubId
                                     };
                                 }
                                 args[0] = data;

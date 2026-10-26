@@ -2,7 +2,16 @@ export type Position = "GK" | "DEF" | "MID" | "FWD" | "CB" | "LCB" | "RCB" | "RB
 
 export type SquadType = string;
 
-export type MedicalStatus = "Available" | "Unavailable" | "Holiday" | "Injured" | "Doubtful" | "Suspended";
+export type MedicalStatus = "Available" | "Unavailable" | "Holiday" | "Injured" | "Doubtful" | "Suspended" | "At Parent Club";
+
+export type PlayerDepartureStatus =
+    | "Active"
+    | "Returned to parent club"
+    | "Transferred to another club"
+    | "Released"
+    | "Left club"
+    | "Retired"
+    | "Other";
 
 export interface Player {
     id: string;
@@ -55,10 +64,18 @@ export interface Player {
     preferredFoot?: "Left" | "Right" | "Both";
     registrationType?: "Standard" | "Dual" | "Loan";
     isParentClub?: boolean;
+    loanClub?: string;
+    loanEndDate?: string; // YYYY-MM-DD
     injuryType?: string;
     injuryDuration?: string;
     suspensionReason?: string;
     suspensionDuration?: string;
+
+    // Departure / Historical Retention Info
+    departureStatus?: PlayerDepartureStatus;
+    departureReason?: string;
+    departureDate?: string; // YYYY-MM-DD
+    departureNotes?: string;
 }
 
 export interface Staff {

@@ -23,7 +23,11 @@ create table players (
   notes text,
   is_in_training_squad boolean default true,
   holiday_start date,
-  holiday_end date
+  holiday_end date,
+  club_status text default 'Active',
+  departure_reason text,
+  departure_date date,
+  departure_notes text
 );
 
 -- 2. Matches Table

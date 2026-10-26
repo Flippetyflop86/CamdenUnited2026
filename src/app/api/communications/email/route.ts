@@ -37,12 +37,18 @@ export async function POST(request: Request) {
         let recipients: any[] = [];
 
         // Query all players in the club first
-        const { data: players, error: playersErr } = await supabaseAdmin
+        const { data: rawPlayers, error: playersErr } = await supabaseAdmin
             .from("players")
             .select("*")
             .eq("club_id", clubId);
 
         if (playersErr) throw playersErr;
+
+        const players = (rawPlayers || []).filter((p: any) => {
+            if (p.club_status && p.club_status !== "Active") return false;
+            if (p.notes && /\[LEFT_STATUS:[^\]]+\]/.test(p.notes) && !p.notes.includes("[LEFT_STATUS:Active]")) return false;
+            return true;
+        });
 
         // Query all users/staff in the club members table
         const { data: staff, error: staffErr } = await supabaseAdmin

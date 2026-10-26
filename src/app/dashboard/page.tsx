@@ -35,7 +35,7 @@ import {
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 import { useClub } from "@/context/club-context";
 import { supabase } from "@/lib/supabase";
-import { formatPlayerName } from "@/lib/utils";
+import { formatPlayerName, isFormerPlayer } from "@/lib/utils";
 
 export default function DashboardPage() {
     const { settings, updateSettings } = useClub();
@@ -219,6 +219,7 @@ export default function DashboardPage() {
             const mainSquadClean = mainSquad.toLowerCase().replace(/[\s-_]+/g, '');
             
             const filteredPlayers = data.filter((p: any) => {
+                if (isFormerPlayer(p)) return false;
                 const sClean = (p.squad || "").toLowerCase().replace(/[\s-_]+/g, '');
                 if ((sClean === 'firstteam' || sClean === 'first team') && (mainSquadClean === 'firstteam' || mainSquadClean === 'first team')) return true;
                 return sClean === mainSquadClean;

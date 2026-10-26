@@ -9,7 +9,7 @@ import { Plus, Trash2, Save, FileDown, Calendar, MapPin, Clock, GripVertical, Tr
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
-import { formatPlayerName } from "@/lib/utils";
+import { formatPlayerName, isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
 import { calculateMeetTime } from "@/lib/whatsapp-utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
@@ -193,30 +193,38 @@ export default function MatchdayXIPage() {
     const fetchPlayers = async () => {
         const { data } = await supabase.from('players').select('*');
         if (data) {
-            const mapped = data.map((p: any) => ({
-                id: p.id,
-                firstName: p.first_name,
-                lastName: p.last_name,
-                position: p.position,
-                squad: p.squad,
-                // Default values for required fields not needed for this view
-                squadNumber: p.squad_number || 0,
-                age: p.age || 0,
-                nationality: p.nationality || "Unknown",
-                medicalStatus: p.medical_status || "Available",
-                holidayStart: p.holiday_start,
-                holidayEnd: p.holiday_end,
-                contractExpiry: p.contract_expiry || "",
-                availability: p.availability ?? true,
-                appearances: p.appearances || 0,
-                goals: p.goals || 0,
-                assists: p.assists || 0,
-                imageUrl: p.image_url, // Added mapping
-                isInMatchdayTracker: p.is_in_matchday_tracker,
-                secondaryPositions: p.secondary_position ? p.secondary_position.split(",").map((s: string) => s.trim() as Position) : [],
-                nickname: p.nickname || "",
-                useNickname: p.use_nickname || false
-            }));
+            const mapped = data.map((p: any) => {
+                const dep = parsePlayerDeparture(p);
+                return {
+                    id: p.id,
+                    firstName: p.first_name,
+                    lastName: p.last_name,
+                    position: p.position,
+                    squad: p.squad,
+                    // Default values for required fields not needed for this view
+                    squadNumber: p.squad_number || 0,
+                    age: p.age || 0,
+                    nationality: p.nationality || "Unknown",
+                    medicalStatus: p.medical_status || "Available",
+                    holidayStart: p.holiday_start,
+                    holidayEnd: p.holiday_end,
+                    contractExpiry: p.contract_expiry || "",
+                    availability: p.availability ?? true,
+                    appearances: p.appearances || 0,
+                    goals: p.goals || 0,
+                    assists: p.assists || 0,
+                    imageUrl: p.image_url, // Added mapping
+                    isInMatchdayTracker: p.is_in_matchday_tracker,
+                    secondaryPositions: p.secondary_position ? p.secondary_position.split(",").map((s: string) => s.trim() as Position) : [],
+                    nickname: p.nickname || "",
+                    useNickname: p.use_nickname || false,
+                    notes: p.notes,
+                    departureStatus: dep.departureStatus,
+                    departureReason: dep.departureReason,
+                    departureDate: dep.departureDate,
+                    departureNotes: dep.departureNotes,
+                };
+            });
 
             // Sort logic using global POSITION_ORDER
             setPlayers(mapped.sort((a: any, b: any) => {
@@ -640,11 +648,22 @@ export default function MatchdayXIPage() {
 
             if (!confirm(`Populate pitch with the lineup from previous match using formation ${lastLineup.formation}?`)) return;
 
+            const formerIds = new Set(players.filter(p => isFormerPlayer(p)).map(p => p.id));
+            const cleanedStarters: Record<number, string> = {};
+            Object.entries(lastLineup.starters || {}).forEach(([slotIdx, pid]) => {
+                if (pid && !formerIds.has(String(pid))) {
+                    cleanedStarters[Number(slotIdx)] = String(pid);
+                }
+            });
+            const cleanedSubs = (lastLineup.substitutes || []).map((pid: string) =>
+                pid && !formerIds.has(pid) ? pid : ""
+            );
+
             const updated = {
                 ...lineup,
                 formation: lastLineup.formation,
-                starters: lastLineup.starters || {},
-                substitutes: lastLineup.substitutes || [],
+                starters: cleanedStarters,
+                substitutes: cleanedSubs,
                 updatedAt: new Date().toISOString()
             };
             setLineup(updated as any);
@@ -986,6 +1005,7 @@ export default function MatchdayXIPage() {
     };
 
     const isPlayerAvailable = (p: Player) => {
+        if (isFormerPlayer(p)) return false;
         if (p.medicalStatus === "Available") return true;
         if (p.medicalStatus === "Holiday") {
             if (!p.holidayStart || !p.holidayEnd) return false;
@@ -1354,63 +1374,69 @@ export default function MatchdayXIPage() {
                             return (
                                 <div key={idx} className="space-y-1.5 p-1.5 rounded-xl border border-border bg-surface-1 shadow-sm">
                                     <div 
-                                        className="flex items-center gap-2 w-full"
+                                        className="flex flex-col gap-1.5 w-full"
                                         onDragOver={handleDragOver}
                                         onDrop={(e) => handleDropOnSub(e, idx)}
                                     >
-                                        <span className="text-[10px] font-bold text-slate-450 w-3 shrink-0">{idx + 1}.</span>
-                                        
-                                        <div 
-                                            draggable={!!subId}
-                                            onDragStart={(e) => subId && handleDragStart(e, subId, {type: 'sub', index: idx})}
-                                            onClick={() => setActiveSlot({ type: 'sub', index: idx, label: `Bench Slot ${idx + 1}` })}
-                                            className={`flex-1 min-w-0 flex items-center justify-between p-2.5 border rounded-xl shadow-sm transition-all cursor-pointer ${subId ? 'bg-surface-1 hover:border-primary/50 border-border group' : 'bg-surface-2 border-dashed border-border text-muted-foreground hover:bg-surface-3'}`}
-                                        >
-                                            {subId ? (
-                                                <>
-                                                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                                                        <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-                                                        <span className="font-semibold text-sm text-foreground truncate" title={displayName}>{displayName}</span>
-                                                    </div>
-                                                    <span className="text-[10px] uppercase text-muted-foreground font-bold mr-1 shrink-0 ml-2 bg-surface-2 px-1.5 py-0.5 rounded-md">{player?.position}</span>
-                                                </>
-                                            ) : (
-                                                <span className="text-[10px] font-medium text-center w-full block">Drag here</span>
+                                        <div className="flex items-center gap-1.5 w-full">
+                                            <span className="text-[10px] font-bold text-slate-450 w-3.5 shrink-0">{idx + 1}.</span>
+                                            
+                                            <div 
+                                                draggable={!!subId}
+                                                onDragStart={(e) => subId && handleDragStart(e, subId, {type: 'sub', index: idx})}
+                                                onClick={() => setActiveSlot({ type: 'sub', index: idx, label: `Bench Slot ${idx + 1}` })}
+                                                className={`flex-1 min-w-0 flex items-center justify-between px-2.5 py-2 border rounded-xl shadow-sm transition-all cursor-pointer ${subId ? 'bg-surface-1 hover:border-primary/50 border-border group' : 'bg-surface-2 border-dashed border-border text-muted-foreground hover:bg-surface-3'}`}
+                                            >
+                                                {subId ? (
+                                                    <>
+                                                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                                            <GripVertical className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                                                            <span className="font-semibold text-xs text-foreground truncate" title={displayName}>{displayName}</span>
+                                                        </div>
+                                                        <span className="text-[9px] uppercase text-muted-foreground font-bold shrink-0 ml-1.5 bg-surface-2 px-1.5 py-0.5 rounded">{player?.position}</span>
+                                                    </>
+                                                ) : (
+                                                    <span className="text-[10px] font-medium text-center w-full block">Drag here</span>
+                                                )}
+                                            </div>
+
+                                            {lineup.substitutes.length > 1 && (
+                                                <button
+                                                    onClick={() => handleRemoveSub(idx)}
+                                                    className="p-1 text-slate-400 hover:text-red-600 transition-colors rounded-full hover:bg-red-50 shrink-0"
+                                                    title="Remove slot"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
                                             )}
                                         </div>
-                                        
+
                                         {subId && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    const usedSubs = lineup.usedSubstitutes || [];
-                                                    let nextUsed;
-                                                    let nextSubstitutions = lineup.substitutions || [];
-                                                    if (usedSubs.includes(subId)) {
-                                                        nextUsed = usedSubs.filter(id => id !== subId);
-                                                        nextSubstitutions = nextSubstitutions.filter(s => s.subId !== subId);
-                                                    } else {
-                                                        nextUsed = [...usedSubs, subId];
-                                                    }
-                                                    const updated = { ...lineup, usedSubstitutes: nextUsed, substitutions: nextSubstitutions, updatedAt: new Date().toISOString() };
-                                                    setLineup(updated);
-                                                    saveLineup(updated);
-                                                }}
-                                                className={`px-3 py-1.5 rounded-full text-[10px] font-bold border transition-colors shrink-0 ml-2 ${lineup.usedSubstitutes?.includes(subId) ? "bg-status-success/15 text-status-success border-status-success/30 hover:bg-status-success/25" : "bg-surface-2 text-muted-foreground border-border hover:bg-surface-3 hover:text-foreground"}`}
-                                            >
-                                                {lineup.usedSubstitutes?.includes(subId) ? "Played" : "Unused"}
-                                            </button>
-                                        )}
-                                        
-                                        {lineup.substitutes.length > 1 && (
-                                            <button
-                                                onClick={() => handleRemoveSub(idx)}
-                                                className="p-1.5 text-slate-400 hover:text-red-600 transition-colors rounded-full hover:bg-red-50"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
+                                            <div className="flex items-center justify-between pl-5 pr-1">
+                                                <span className="text-[10px] text-muted-foreground truncate">{player?.firstName} {player?.lastName}</span>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.preventDefault();
+                                                        e.stopPropagation();
+                                                        const usedSubs = lineup.usedSubstitutes || [];
+                                                        let nextUsed;
+                                                        let nextSubstitutions = lineup.substitutions || [];
+                                                        if (usedSubs.includes(subId)) {
+                                                            nextUsed = usedSubs.filter(id => id !== subId);
+                                                            nextSubstitutions = nextSubstitutions.filter(s => s.subId !== subId);
+                                                        } else {
+                                                            nextUsed = [...usedSubs, subId];
+                                                        }
+                                                        const updated = { ...lineup, usedSubstitutes: nextUsed, substitutions: nextSubstitutions, updatedAt: new Date().toISOString() };
+                                                        setLineup(updated);
+                                                        saveLineup(updated);
+                                                    }}
+                                                    className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold border transition-colors shrink-0 ${lineup.usedSubstitutes?.includes(subId) ? "bg-status-success/15 text-status-success border-status-success/30 hover:bg-status-success/25" : "bg-surface-2 text-muted-foreground border-border hover:bg-surface-3 hover:text-foreground"}`}
+                                                >
+                                                    {lineup.usedSubstitutes?.includes(subId) ? "✓ Played" : "Unused"}
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                     {subId && lineup.usedSubstitutes?.includes(subId) && (

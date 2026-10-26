@@ -10,6 +10,7 @@ import { ArrowLeft, CalendarDays, MapPin, Clock, Download, Share2, Link2, Messag
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
+import { isFormerPlayer } from "@/lib/utils";
 
 function formatSquad(squad: string) {
     if (squad === "firstTeam") return "First Team";
@@ -140,6 +141,7 @@ export default function TrainingSessionPage() {
                         };
                         
                         const eligible = allCombined.filter(p => {
+                            if (isFormerPlayer(p)) return false;
                             if (isFirstTeamSession) {
                                 return isFirstTeam(p.squad) || p.isInTrainingSquad;
                             } else {
@@ -151,7 +153,7 @@ export default function TrainingSessionPage() {
                             return existing || { playerId: p.id, status: 'Absent', notes: '' };
                         });
 
-                        // Preserve any existing attendance records for players not in the main eligible squad list (guests, trialists)
+                        // Preserve any existing attendance records for players not in the main eligible squad list (guests, trialists, former players on historical sessions)
                         const nonEligibleExisting = existingAttendance.filter(a => !eligible.some(p => p.id === a.playerId));
                         const finalAttendance = [...prePopulated, ...nonEligibleExisting];
 
@@ -447,9 +449,11 @@ export default function TrainingSessionPage() {
 
     const eligiblePlayers = players
         .filter(p => {
-            // Show player if they have a recorded attendance status for this session (prevents trialists/other squads from being hidden)
+            // Show player if they have a recorded attendance status for this session (prevents trialists/other squads/former players on past sessions from being hidden)
             const hasRecord = session.attendance.some(a => a.playerId === p.id);
             if (hasRecord) return true;
+
+            if (isFormerPlayer(p)) return false;
 
             const matchesSquad = isFirstTeamSession 
                 ? (isFirstTeam(p.squad) || p.isInTrainingSquad)

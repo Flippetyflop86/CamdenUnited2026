@@ -20,6 +20,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PageSection } from "@/components/layout/page-section";
 import { SectionHeader } from "@/components/ui/section-header";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
+import { isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
 
 
 // I'll stick to native date formatting for zero-dep speed unless complex.
@@ -154,7 +155,9 @@ export default function TrainingPage() {
                     imageUrl: p.image_url,
                     position: p.position,
                     squadNumber: p.squad_number,
-                    medicalStatus: p.medical_status
+                    medicalStatus: p.medical_status,
+                    notes: p.notes,
+                    ...parsePlayerDeparture(p)
                 } as any;
             }));
         }
@@ -316,11 +319,13 @@ export default function TrainingPage() {
         const regAttendedCount = session.attendance.filter(a => !a.playerId.startsWith('guest:') && (a.status === 'Present' || a.status === 'Late')).length;
         const trialistAttendedCount = session.attendance.filter(a => a.playerId.startsWith('guest:') && (a.status === 'Present' || a.status === 'Late')).length;
 
-        const eligiblePlayers = players.filter(p => 
-            session.squad === "All" 
+        const eligiblePlayers = players.filter(p => {
+            const hasRecord = session.attendance.some(a => a.playerId === p.id);
+            if (isFormerPlayer(p) && !hasRecord) return false;
+            return session.squad === "All" 
                 ? (isFirstTeamSquad(p.squad) || p.isInTrainingSquad) 
-                : (p.squad === session.squad || (session.squad === "First Team" && isFirstTeamSquad(p.squad)))
-        );
+                : (p.squad === session.squad || (session.squad === "First Team" && isFirstTeamSquad(p.squad)));
+        });
         const totalEligible = eligiblePlayers.length;
         const percentage = totalEligible > 0 ? Math.round((regAttendedCount / totalEligible) * 100) : 0;
         return { regAttendedCount, trialistAttendedCount, totalEligible, percentage };
@@ -481,18 +486,35 @@ export default function TrainingPage() {
 
     const leaderboardSessions = seasonSessions.filter(s => squadFilter === "All" || s.squad === squadFilter);
 
-    const leaderboardPlayers = squadFilter === "All"
+    const leaderboardPlayers = (squadFilter === "All"
         ? players.filter(p => isFirstTeamSquad(p.squad) || p.isInTrainingSquad)
-        : players.filter(p => p.squad === squadFilter || (squadFilter === "First Team" && isFirstTeamSquad(p.squad)));
+        : players.filter(p => p.squad === squadFilter || (squadFilter === "First Team" && isFirstTeamSquad(p.squad)))
+    ).filter(p => {
+        if (!isFormerPlayer(p)) return true;
+        return leaderboardSessions.some(s => {
+            const record = s.attendance.find(a => a.playerId === p.id);
+            return record?.status === 'Present' || record?.status === 'Late';
+        });
+    });
 
     const playerStats = leaderboardPlayers
         .map(player => {
-            const attended = leaderboardSessions.filter(s => {
+            const playerIsFormer = isFormerPlayer(player);
+            const depDate = player.departureDate;
+            const relevantSessions = playerIsFormer
+                ? leaderboardSessions.filter(s => {
+                    const hasRec = s.attendance.some(a => a.playerId === player.id && (a.status === 'Present' || a.status === 'Late'));
+                    if (hasRec) return true;
+                    return depDate ? s.date <= depDate : false;
+                })
+                : leaderboardSessions;
+
+            const attended = relevantSessions.filter(s => {
                 const record = s.attendance.find(a => a.playerId === player.id);
-                return record?.status === 'Present' || record?.status === 'Late'; // Late counts as present? Let's say yes for attendance stats, or maybe distinguish. Usually "Attended" includes late.
+                return record?.status === 'Present' || record?.status === 'Late';
             }).length;
 
-            const total = leaderboardSessions.length;
+            const total = relevantSessions.length;
             const percentage = total > 0 ? Math.round((attended / total) * 100) : 0;
 
             return { ...player, stats: { attended, total, percentage } };

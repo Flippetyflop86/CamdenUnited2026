@@ -110,12 +110,13 @@ export function SearchCommand() {
         searchData.players.forEach(p => {
             const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
             if (fullName.includes(lowerQuery)) {
+                const isFormer = p.notes && /\[LEFT_STATUS:[^\]]+\]/.test(p.notes) && !p.notes.includes("[LEFT_STATUS:Active]");
                 found.push({
                     type: 'player',
                     label: `${p.firstName} ${p.lastName}`,
-                    subLabel: `Squad Player • ${p.position}`,
+                    subLabel: `${isFormer ? "Former Player" : "Squad Player"} • ${p.position}`,
                     id: p.id,
-                    link: `/squad` // Could link to /squad/${p.id} if profile page existed
+                    link: `/squad/${p.id}`
                 });
             }
         });

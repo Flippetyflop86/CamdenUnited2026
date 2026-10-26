@@ -3,12 +3,45 @@
 
 import { useState, useEffect, useRef } from "react";
 import { Player, SquadType, MedicalStatus, Position } from "@/types";
+import {
+    DEPARTURE_REASONS,
+    formatPlayerName,
+    isFormerPlayer,
+    parsePlayerDeparture,
+    serializeDepartureToNotes,
+    stripDepartureTags,
+    getLoanExpiryStatus,
+} from "@/lib/utils";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { PlayerCard } from "@/components/squad/player-card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, Plus, Filter, Settings, Trash2, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import {
+    Search,
+    Plus,
+    Filter,
+    Settings,
+    Trash2,
+    X,
+    UserMinus,
+    RotateCcw,
+    Archive,
+    Users,
+    LayoutGrid,
+    List,
+    CheckSquare,
+    Check,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
+    Download,
+    Building2,
+    Clock,
+    Pencil,
+} from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { PageHeader } from "@/components/ui/page-header";
@@ -18,7 +51,7 @@ import { supabase } from "@/lib/supabase";
 import imageCompression from "browser-image-compression";
 import { UploadCloud, Loader2 } from "lucide-react";
 import { logActivity } from "@/lib/activity";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import Papa from "papaparse";
 
 const getCurrentSeasonStr = () => {
@@ -30,12 +63,70 @@ const getCurrentSeasonStr = () => {
         : `${(year - 1).toString().slice(2)}/${year.toString().slice(2)}`;
 };
 
+type TableSortField = "position" | "squadNumber" | "name" | "age" | "status" | "apps" | "starts" | "subApps" | "goals" | "assists" | "minutes" | "cards";
+type AgeFilterType = "All" | "U18" | "U21" | "U23" | "23-29" | "30+";
+
+const getPlayerAge = (player: Player): number | null => {
+    if (player.dateOfBirth) {
+        const birthDate = new Date(player.dateOfBirth);
+        if (!isNaN(birthDate.getTime())) {
+            const today = new Date();
+            let age = today.getFullYear() - birthDate.getFullYear();
+            const m = today.getMonth() - birthDate.getMonth();
+            if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+                age--;
+            }
+            return age;
+        }
+    }
+    if (typeof player.age === "number" && player.age > 0) {
+        return player.age;
+    }
+    return null;
+};
+
 export default function SquadPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [positionFilter, setPositionFilter] = useState<"All" | "GK" | "DEF" | "MID" | "FWD">("All");
+    const [ageFilter, setAgeFilter] = useState<AgeFilterType>("All");
     const [showAvailableOnly, setShowAvailableOnly] = useState(false);
+    const [showLoanOnly, setShowLoanOnly] = useState(false);
+    const [squadViewMode, setSquadViewMode] = useState<"active" | "former">("active");
+    const [displayLayout, setDisplayLayout] = useState<"grid" | "table">("table");
+    const [tableSortField, setTableSortField] = useState<TableSortField>("position");
+    const [tableSortAsc, setTableSortAsc] = useState<boolean>(true);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const savedLayout = localStorage.getItem("clubflow_squad_display_layout");
+            if (savedLayout === "grid" || savedLayout === "table") {
+                setDisplayLayout(savedLayout);
+            } else {
+                setDisplayLayout(window.innerWidth >= 768 ? "table" : "grid");
+            }
+        }
+    }, []);
+
+    const handleLayoutChange = (layout: "grid" | "table") => {
+        setDisplayLayout(layout);
+        if (typeof window !== "undefined") {
+            localStorage.setItem("clubflow_squad_display_layout", layout);
+        }
+    };
+
+    // Bulk Selection States
+    const [isBulkMode, setIsBulkMode] = useState<boolean>(false);
+    const [selectedPlayerIds, setSelectedPlayerIds] = useState<string[]>([]);
+    const [isBulkUpdating, setIsBulkUpdating] = useState<boolean>(false);
+    const [isBulkDepartOpen, setIsBulkDepartOpen] = useState<boolean>(false);
+
     const [players, setPlayers] = useState<Player[]>([]);
     const [editingPlayer, setEditingPlayer] = useState<Player | null>(null);
+    const [departingPlayer, setDepartingPlayer] = useState<Player | null>(null);
+    const [departureReason, setDepartureReason] = useState<string>("Left club");
+    const [departureDate, setDepartureDate] = useState<string>(() => new Date().toISOString().split("T")[0]);
+    const [departureNotes, setDepartureNotes] = useState<string>("");
+    const [isSavingDeparture, setIsSavingDeparture] = useState(false);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     const hasLoaded = useRef(false);
 
@@ -175,6 +266,7 @@ export default function SquadPage() {
     const { clubId, isLoading: isAuthLoading } = useAuth();
     const currentSquads = settings.squads || ["First Team"];
     const searchParams = useSearchParams();
+    const router = useRouter();
 
     useEffect(() => {
         if (searchParams?.get("add") === "true") {
@@ -247,17 +339,22 @@ export default function SquadPage() {
 
     const hasInitializedTab = useRef(false);
     useEffect(() => {
-        if (isClubLoaded && settings.squads && !hasInitializedTab.current) {
-            const hasFirstTeam = settings.squads.some(s => s.toLowerCase().replace(/[\s-_]+/g, '') === 'firstteam');
-            if (hasFirstTeam) {
-                const ft = settings.squads.find(s => s.toLowerCase().replace(/[\s-_]+/g, '') === 'firstteam') || "First Team";
-                setActiveTab(ft);
-            } else if (settings.squads.length > 0) {
-                setActiveTab(settings.squads[0]);
+        if (isClubLoaded && settings.squads && settings.squads.length > 0) {
+            const tabExists = activeTab === "All" || settings.squads.includes(activeTab);
+            if (!hasInitializedTab.current || !tabExists) {
+                const hasFirstTeam = settings.squads.some(s => s.toLowerCase().replace(/[\s-_]+/g, '') === 'firstteam');
+                if (hasFirstTeam) {
+                    const ft = settings.squads.find(s => s.toLowerCase().replace(/[\s-_]+/g, '') === 'firstteam') || "First Team";
+                    setActiveTab(ft);
+                } else {
+                    setActiveTab(settings.squads[0]);
+                }
+                if (settings.name !== "My Club") {
+                    hasInitializedTab.current = true;
+                }
             }
-            hasInitializedTab.current = true;
         }
-    }, [isClubLoaded, settings.squads]);
+    }, [isClubLoaded, settings.squads, settings.name, activeTab]);
 
     // 1. Initial load: Supabase
     useEffect(() => {
@@ -267,7 +364,7 @@ export default function SquadPage() {
             .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => fetchData())
             .subscribe();
         return () => { supabase.removeChannel(channel); };
-    }, [seasonFilter, includeFriendlies]);
+    }, [seasonFilter, includeFriendlies, clubId]);
 
     async function fetchData() {
         try {
@@ -408,6 +505,7 @@ export default function SquadPage() {
             const formattedPlayers: Player[] = dbPlayers.map((p: any) => {
                 const s = playerStats.get(p.id) || { apps: 0, starts: 0, subApps: 0, goals: 0, assists: 0, yellow: 0, red: 0, minutes: 0, wins: 0, draws: 0, losses: 0 };
                 const winRate = s.apps > 0 ? Math.round((s.wins / s.apps) * 100) : 0;
+                const dep = parsePlayerDeparture(p);
 
                 return {
                     id: p.id,
@@ -441,6 +539,8 @@ export default function SquadPage() {
                     preferredFoot: p.notes && p.notes.includes("[FOOT:Left]") ? "Left" : (p.notes && p.notes.includes("[FOOT:Right]") ? "Right" : (p.notes && p.notes.includes("[FOOT:Both]") ? "Both" : undefined)),
                     registrationType: p.notes && p.notes.includes("[REG:Dual]") ? "Dual" : (p.notes && (p.notes.includes("[REG:LoanParent]") || p.notes.includes("[REG:LoanSub]")) ? "Loan" : "Standard"),
                     isParentClub: p.notes && p.notes.includes("[REG:LoanParent]") ? true : false,
+                    loanClub: p.notes && p.notes.match(/\[LOAN_CLUB:([^\]]+)\]/) ? p.notes.match(/\[LOAN_CLUB:([^\]]+)\]/)![1] : undefined,
+                    loanEndDate: p.notes && p.notes.match(/\[LOAN_END:([^\]]+)\]/) ? p.notes.match(/\[LOAN_END:([^\]]+)\]/)![1] : undefined,
                     injuryType: p.notes && p.notes.match(/\[INJURY:(.*?)\]/) ? p.notes.match(/\[INJURY:(.*?)\]/)![1] : undefined,
                     injuryDuration: p.notes && p.notes.match(/\[OUT_DURATION:(.*?)\]/) ? p.notes.match(/\[OUT_DURATION:(.*?)\]/)![1] : undefined,
                     suspensionReason: p.notes && p.notes.match(/\[SUSPENSION_REASON:(.*?)\]/) ? p.notes.match(/\[SUSPENSION_REASON:(.*?)\]/)![1] : undefined,
@@ -456,7 +556,11 @@ export default function SquadPage() {
                     subsBillingModel: p.subs_billing_model || "Monthly",
                     subsCustomAmount: p.subs_custom_amount !== undefined && p.subs_custom_amount !== null ? Number(p.subs_custom_amount) : 0,
                     nickname: p.nickname || "",
-                    useNickname: p.use_nickname || false
+                    useNickname: p.use_nickname || false,
+                    departureStatus: dep.departureStatus,
+                    departureReason: dep.departureReason,
+                    departureDate: dep.departureDate,
+                    departureNotes: dep.departureNotes,
                 };
             });
 
@@ -467,52 +571,116 @@ export default function SquadPage() {
         }
     }
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to permanently delete this player? This will also wipe all their match stats and payment records forever.")) return;
-        
-        const player = players.find(p => p.id === id);
-        
-        // Store previous state for rollback
-        const previousPlayers = [...players];
-        
-        // Optimistic update
-        setPlayers((prev) => prev.filter((p) => p.id !== id));
-        
-        // 1. Manually cascade delete match stats
-        await supabase.from("match_player_stats").delete().eq("player_id", id);
-        
-        // 2. Manually cascade delete payment records
-        await supabase.from("player_payments").delete().eq("player_id", id);
-        
-        // 3. Delete the player
-        const { error } = await supabase.from("players").delete().eq("id", id);
-        
-        if (error) {
-            console.error("Delete player error:", error);
-            alert(`Failed to delete player: ${error.message}`);
-            // Rollback
-            setPlayers(previousPlayers);
-        } else if (player) {
-            logActivity("Deleted Player", `Permanently removed ${player.firstName} ${player.lastName} and all their records from the system.`);
+    const openDepartureDialog = (player: Player) => {
+        const isLoanOrDual = player.registrationType === "Loan" || player.registrationType === "Dual";
+        setDepartingPlayer(player);
+        setDepartureReason(player.departureReason || (isLoanOrDual ? "Returned to parent club" : "Left club"));
+        setDepartureDate(player.departureDate || new Date().toISOString().split("T")[0]);
+        setDepartureNotes(player.departureNotes || "");
+    };
+
+    const handleMarkPlayerLeft = async () => {
+        if (!departingPlayer) return;
+        setIsSavingDeparture(true);
+        try {
+            const updatedNotes = serializeDepartureToNotes(departingPlayer.notes, {
+                reason: departureReason,
+                date: departureDate,
+                notes: departureNotes,
+            });
+
+            // Update notes & availability (preserves all match_player_stats, training attendance, and payment history)
+            const { error } = await supabase
+                .from("players")
+                .update({
+                    notes: updatedNotes,
+                    availability: false,
+                })
+                .eq("id", departingPlayer.id);
+
+            if (error) throw error;
+
+            // Best-effort update of dedicated columns if sprint_14 migration has been applied
+            await supabase
+                .from("players")
+                .update({
+                    club_status: departureReason,
+                    departure_reason: departureReason,
+                    departure_date: departureDate || null,
+                    departure_notes: departureNotes || null,
+                } as any)
+                .eq("id", departingPlayer.id);
+
+            logActivity(
+                "Player Left Club",
+                `Marked ${departingPlayer.firstName} ${departingPlayer.lastName} as having left the club (${departureReason}${departureDate ? ` on ${departureDate}` : ""}). Historical match and training records preserved.`
+            );
+
+            setDepartingPlayer(null);
+            await fetchData();
+        } catch (err: any) {
+            console.error("Mark player left error:", err);
+            alert(`Failed to update player status: ${err.message}`);
+        } finally {
+            setIsSavingDeparture(false);
+        }
+    };
+
+    const handleRestorePlayer = async (player: Player) => {
+        const restoredNotes = stripDepartureTags(player.notes);
+        try {
+            const { error } = await supabase
+                .from("players")
+                .update({
+                    notes: restoredNotes,
+                    medical_status: "Available",
+                    availability: true,
+                })
+                .eq("id", player.id);
+
+            if (error) throw error;
+
+            // Best-effort clear of dedicated columns if sprint_14 migration has been applied
+            await supabase
+                .from("players")
+                .update({
+                    club_status: "Active",
+                    departure_reason: null,
+                    departure_date: null,
+                    departure_notes: null,
+                } as any)
+                .eq("id", player.id);
+
+            logActivity(
+                "Restored Player to Squad",
+                `Restored ${player.firstName} ${player.lastName} to the active squad.`
+            );
+
+            await fetchData();
+        } catch (err: any) {
+            console.error("Restore player error:", err);
+            alert(`Failed to restore player: ${err.message}`);
         }
     };
 
     const handleStatusToggle = async (player: Player) => {
-        const statuses: MedicalStatus[] = ["Available", "Holiday", "Injured", "Suspended"];
+        if (isFormerPlayer(player)) return;
+        const statuses: MedicalStatus[] = ["Available", "Holiday", "Injured", "Suspended", "At Parent Club"];
         let nextIndex = 0;
         const currentIndex = statuses.indexOf(player.medicalStatus);
         if (currentIndex !== -1) {
             nextIndex = (currentIndex + 1) % statuses.length;
         }
         const nextStatus = statuses[nextIndex];
+        const nextAvailability = nextStatus === "Available";
 
         setPlayers((prev) =>
-            prev.map((p) => (p.id === player.id ? { ...p, medicalStatus: nextStatus } : p))
+            prev.map((p) => (p.id === player.id ? { ...p, medicalStatus: nextStatus, availability: nextAvailability } : p))
         );
 
         const { error } = await supabase
             .from("players")
-            .update({ medical_status: nextStatus })
+            .update({ medical_status: nextStatus, availability: nextAvailability })
             .eq("id", player.id);
 
         if (error) {
@@ -521,12 +689,256 @@ export default function SquadPage() {
         }
     };
 
+    // Bulk Selection Helpers
+    const toggleSelectPlayer = (playerId: string) => {
+        setSelectedPlayerIds((prev) =>
+            prev.includes(playerId) ? prev.filter((id) => id !== playerId) : [...prev, playerId]
+        );
+    };
+
+    const handleBulkMedicalStatus = async (newStatus: MedicalStatus) => {
+        if (selectedPlayerIds.length === 0) return;
+        setIsBulkUpdating(true);
+        try {
+            const { error } = await supabase
+                .from("players")
+                .update({
+                    medical_status: newStatus,
+                    availability: newStatus === "Available",
+                })
+                .in("id", selectedPlayerIds);
+
+            if (error) throw error;
+            logActivity(
+                "Bulk Squad Status Update",
+                `Updated medical status to ${newStatus} for ${selectedPlayerIds.length} player(s).`
+            );
+            await fetchData();
+            setSelectedPlayerIds([]);
+        } catch (err: any) {
+            alert(`Bulk status update failed: ${err.message}`);
+        } finally {
+            setIsBulkUpdating(false);
+        }
+    };
+
+    const handleBulkAssignSquad = async (targetSquad: string) => {
+        if (selectedPlayerIds.length === 0 || !targetSquad) return;
+        setIsBulkUpdating(true);
+        try {
+            const { error } = await supabase
+                .from("players")
+                .update({ squad: targetSquad })
+                .in("id", selectedPlayerIds);
+
+            if (error) throw error;
+            logActivity(
+                "Bulk Squad Assignment",
+                `Assigned ${selectedPlayerIds.length} player(s) to ${targetSquad}.`
+            );
+            await fetchData();
+            setSelectedPlayerIds([]);
+        } catch (err: any) {
+            alert(`Bulk squad assignment failed: ${err.message}`);
+        } finally {
+            setIsBulkUpdating(false);
+        }
+    };
+
+    const handleBulkTrackerUpdate = async (
+        field: "is_in_training_squad" | "is_in_matchday_tracker",
+        value: boolean
+    ) => {
+        if (selectedPlayerIds.length === 0) return;
+        setIsBulkUpdating(true);
+        try {
+            const { error } = await supabase
+                .from("players")
+                .update({ [field]: value })
+                .in("id", selectedPlayerIds);
+
+            if (error) throw error;
+            const label = field === "is_in_training_squad" ? "Training Tracker" : "Matchday XI Tracker";
+            logActivity(
+                "Bulk Tracker Update",
+                `${value ? "Added" : "Removed"} ${selectedPlayerIds.length} player(s) ${value ? "to" : "from"} ${label}.`
+            );
+            await fetchData();
+            setSelectedPlayerIds([]);
+        } catch (err: any) {
+            alert(`Bulk tracker update failed: ${err.message}`);
+        } finally {
+            setIsBulkUpdating(false);
+        }
+    };
+
+    const handleBulkMarkLeft = async () => {
+        if (selectedPlayerIds.length === 0) return;
+        setIsSavingDeparture(true);
+        try {
+            const targetPlayers = players.filter((p) => selectedPlayerIds.includes(p.id));
+            await Promise.all(
+                targetPlayers.map(async (p) => {
+                    const updatedNotes = serializeDepartureToNotes(p.notes, {
+                        reason: departureReason,
+                        date: departureDate,
+                        notes: departureNotes,
+                    });
+                    await supabase
+                        .from("players")
+                        .update({
+                            notes: updatedNotes,
+                            availability: false,
+                        })
+                        .eq("id", p.id);
+                    await supabase
+                        .from("players")
+                        .update({
+                            club_status: departureReason,
+                            departure_reason: departureReason,
+                            departure_date: departureDate || null,
+                            departure_notes: departureNotes || null,
+                        } as any)
+                        .eq("id", p.id);
+                })
+            );
+
+            logActivity(
+                "Bulk Marked Players Left Club",
+                `Marked ${targetPlayers.length} player(s) as having left the club (${departureReason}). Historical records preserved.`
+            );
+            setIsBulkDepartOpen(false);
+            setSelectedPlayerIds([]);
+            await fetchData();
+        } catch (err: any) {
+            alert(`Failed to mark selected players as left: ${err.message}`);
+        } finally {
+            setIsSavingDeparture(false);
+        }
+    };
+
+    const handleBulkRestore = async () => {
+        if (selectedPlayerIds.length === 0) return;
+        setIsBulkUpdating(true);
+        try {
+            const targetPlayers = players.filter((p) => selectedPlayerIds.includes(p.id));
+            await Promise.all(
+                targetPlayers.map(async (p) => {
+                    const restoredNotes = stripDepartureTags(p.notes);
+                    await supabase
+                        .from("players")
+                        .update({
+                            notes: restoredNotes,
+                            medical_status: "Available",
+                            availability: true,
+                        })
+                        .eq("id", p.id);
+                    await supabase
+                        .from("players")
+                        .update({
+                            club_status: "Active",
+                            departure_reason: null,
+                            departure_date: null,
+                            departure_notes: null,
+                        } as any)
+                        .eq("id", p.id);
+                })
+            );
+
+            logActivity(
+                "Bulk Restored Players",
+                `Restored ${targetPlayers.length} player(s) to the active squad.`
+            );
+            setSelectedPlayerIds([]);
+            await fetchData();
+        } catch (err: any) {
+            alert(`Failed to restore selected players: ${err.message}`);
+        } finally {
+            setIsBulkUpdating(false);
+        }
+    };
+
+    const handleExportCSV = (subset?: Player[]) => {
+        const list = subset && subset.length > 0 ? subset : filteredPlayers;
+        if (list.length === 0) {
+            alert("No players to export.");
+            return;
+        }
+        const headers = [
+            "Squad #",
+            "First Name",
+            "Last Name",
+            "Position",
+            "Secondary Positions",
+            "Squad",
+            "Club Status",
+            "Medical Status",
+            "Registration",
+            "Parent/Loan Club",
+            "Loan Expiry",
+            "Apps",
+            "Starts",
+            "Sub Apps",
+            "Goals",
+            "Assists",
+            "Minutes",
+            "Yellow Cards",
+            "Red Cards",
+        ];
+        const rows = list.map((p) => {
+            const dep = parsePlayerDeparture(p);
+            return [
+                p.squadNumber || "",
+                p.firstName,
+                p.lastName,
+                p.position,
+                (p.secondaryPositions || []).join("/"),
+                p.squad || "",
+                dep.isFormer ? dep.departureReason || dep.departureStatus : "Active",
+                p.medicalStatus,
+                p.registrationType || "Standard",
+                p.loanClub || "",
+                p.loanEndDate || "",
+                p.appearances ?? 0,
+                p.starts ?? 0,
+                p.subApps ?? 0,
+                p.goals ?? 0,
+                p.assists ?? 0,
+                (p as any).minutes_played ?? 0,
+                p.yellow_cards ?? 0,
+                p.red_cards ?? 0,
+            ];
+        });
+        const csvContent =
+            "data:text/csv;charset=utf-8," +
+            [headers, ...rows]
+                .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+                .join("\n");
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `squad_export_${new Date().toISOString().split("T")[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
+    const activeSquadPlayers = players.filter((p) => !isFormerPlayer(p));
+    const formerSquadPlayers = players.filter((p) => isFormerPlayer(p));
+
     const filteredPlayers = players.filter((player) => {
+        const playerIsFormer = isFormerPlayer(player);
+        if (squadViewMode === "active" && playerIsFormer) return false;
+        if (squadViewMode === "former" && !playerIsFormer) return false;
+
         const playerSquads = player.squad
             ? player.squad.split(',').map((s: string) => s.trim())
             : [];
         
-        const matchesSearch = player.firstName.toLowerCase().includes(searchTerm.toLowerCase()) || player.lastName.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesSearch =
+            player.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            player.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (player.departureReason || "").toLowerCase().includes(searchTerm.toLowerCase());
         const matchesSquad = activeTab === "All" || playerSquads.some((s: string) => {
             const sClean = s.toLowerCase().replace(/[\s-_]+/g, '');
             const tabClean = activeTab.toLowerCase().replace(/[\s-_]+/g, '');
@@ -535,53 +947,121 @@ export default function SquadPage() {
             if ((sClean === 'midweek' || sClean === 'midweek team') && (tabClean === 'midweek' || tabClean === 'midweek team')) return true;
             return sClean === tabClean;
         });
-        const playerPos = (player.position || "").trim().toUpperCase();
-        const matchesPosition = positionFilter === "All" || (() => {
+        const matchesSinglePos = (posRaw: string) => {
+            const p = (posRaw || "").trim().toUpperCase();
+            if (!p) return false;
             if (positionFilter === "GK") {
-                return playerPos === 'GK' || playerPos.includes('GK') || playerPos.includes('KEEPER') || playerPos.includes('GOAL');
+                return p === 'GK' || p.includes('GK') || p.includes('KEEPER') || p.includes('GOAL');
             }
             if (positionFilter === "DEF") {
-                return ['CB', 'RB', 'LB', 'DEF', 'RWB', 'LWB'].includes(playerPos) || playerPos.includes('DEF') || playerPos.includes('BACK');
+                return ['CB', 'RB', 'LB', 'DEF', 'RWB', 'LWB'].includes(p) || p.includes('DEF') || p.includes('BACK');
             }
             if (positionFilter === "MID") {
-                return ['CM', 'CDM', 'CAM', 'MID', 'RM', 'LM'].includes(playerPos) || playerPos.includes('MID') || playerPos.includes('CENT') || playerPos.includes('RM') || playerPos.includes('LM');
+                return ['CM', 'CDM', 'CAM', 'MID', 'RM', 'LM'].includes(p) || p.includes('MID') || p.includes('CENT') || p.includes('RM') || p.includes('LM');
             }
             if (positionFilter === "FWD") {
-                return ['ST', 'CF', 'RW', 'LW', 'FWD', 'ATT'].includes(playerPos) || playerPos.includes('STRIKER') || playerPos.includes('WING') || playerPos.includes('FWD') || playerPos.includes('FORWARD') || playerPos.includes('ST') || playerPos.includes('CF') || playerPos.includes('RW') || playerPos.includes('LW');
+                return ['ST', 'CF', 'RW', 'LW', 'FWD', 'ATT'].includes(p) || p.includes('STRIKER') || p.includes('WING') || p.includes('FWD') || p.includes('FORWARD') || p.includes('ST') || p.includes('CF') || p.includes('RW') || p.includes('LW');
             }
             return false;
+        };
+        const matchesPosition =
+            positionFilter === "All" ||
+            matchesSinglePos(player.position) ||
+            (player.secondaryPositions || []).some((secPos) => matchesSinglePos(secPos));
+        const matchesAge = ageFilter === "All" || (() => {
+            const playerAge = getPlayerAge(player);
+            if (playerAge === null) return false;
+            if (ageFilter === "U18") return playerAge < 18;
+            if (ageFilter === "U21") return playerAge < 21;
+            if (ageFilter === "U23") return playerAge < 23;
+            if (ageFilter === "23-29") return playerAge >= 23 && playerAge <= 29;
+            if (ageFilter === "30+") return playerAge >= 30;
+            return true;
         })();
-        const matchesAvailability = !showAvailableOnly || player.medicalStatus === "Available";
-        return matchesSearch && matchesSquad && matchesPosition && matchesAvailability;
+        const matchesAvailability = squadViewMode === "former" || !showAvailableOnly || player.medicalStatus === "Available";
+        const matchesLoan = !showLoanOnly || (player.registrationType === "Loan" && !player.isParentClub);
+        return matchesSearch && matchesSquad && matchesPosition && matchesAge && matchesAvailability && matchesLoan;
     });
 
     const positionOrder: Record<string, number> = { "GK": 1, "DEF": 2, "LB": 3, "CB": 4, "LCB": 5, "RCB": 6, "RB": 7, "LWB": 8, "RWB": 9, "CDM": 10, "MID": 11, "CM": 12, "LM": 13, "RM": 14, "CAM": 15, "LW": 16, "RW": 17, "FWD": 18, "CF": 19, "ST": 20 };
     const sortedPlayers = [...filteredPlayers].sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));
 
+    const tableSortedPlayers = [...filteredPlayers].sort((a, b) => {
+        const dir = tableSortAsc ? 1 : -1;
+        switch (tableSortField) {
+            case "position":
+                return ((positionOrder[a.position] || 99) - (positionOrder[b.position] || 99)) * dir;
+            case "squadNumber":
+                return ((a.squadNumber || 999) - (b.squadNumber || 999)) * dir;
+            case "name":
+                return formatPlayerName(a).localeCompare(formatPlayerName(b)) * dir;
+            case "age":
+                return ((getPlayerAge(a) ?? 99) - (getPlayerAge(b) ?? 99)) * dir;
+            case "status":
+                return (a.medicalStatus || "").localeCompare(b.medicalStatus || "") * dir;
+            case "apps":
+                return ((a.appearances ?? 0) - (b.appearances ?? 0)) * dir;
+            case "starts":
+                return ((a.starts ?? 0) - (b.starts ?? 0)) * dir;
+            case "subApps":
+                return ((a.subApps ?? 0) - (b.subApps ?? 0)) * dir;
+            case "goals":
+                return ((a.goals ?? 0) - (b.goals ?? 0)) * dir;
+            case "assists":
+                return ((a.assists ?? 0) - (b.assists ?? 0)) * dir;
+            case "minutes":
+                return (((a as any).minutes_played ?? 0) - ((b as any).minutes_played ?? 0)) * dir;
+            case "cards":
+                return (((a.yellow_cards ?? 0) + (a.red_cards ?? 0) * 3) - ((b.yellow_cards ?? 0) + (b.red_cards ?? 0) * 3)) * dir;
+            default:
+                return 0;
+        }
+    });
+
+    const handleTableSort = (field: TableSortField) => {
+        if (tableSortField === field) {
+            setTableSortAsc((prev) => !prev);
+        } else {
+            setTableSortField(field);
+            // Default numeric stats to descending first click
+            const numericFields: TableSortField[] = ["apps", "starts", "subApps", "goals", "assists", "minutes", "cards"];
+            setTableSortAsc(!numericFields.includes(field));
+        }
+    };
+
     const handleEdit = (player: Player) => { 
-        // Strip PIN and custom V3 tags from notes before showing edit dialog
-        let cleanedNotes = player.notes ? player.notes : "";
+        // Strip PIN, departure tags, loan tags, and custom V3 tags from notes before showing edit dialog
+        let cleanedNotes = stripDepartureTags(player.notes ? player.notes : "");
         cleanedNotes = cleanedNotes.replace(/\[PIN:\d{4}\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[FOOT:(Left|Right|Both)\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[REG:(Standard|Dual|LoanParent|LoanSub)\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[LOAN_CLUB:[^\]]*\]/g, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[LOAN_END:[^\]]*\]/g, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[INJURY:.*?\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[OUT_DURATION:.*?\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[SUSPENSION_REASON:.*?\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[SUSPENSION_DURATION:.*?\]/, "").trim();
 
         setEditingPlayer({ ...player, notes: cleanedNotes }); 
         setPreviewImage(player.imageUrl || null); 
     };
 
     const handleSavePlayer = async (updatedPlayer: Player) => {
-        // Find if they had an existing PIN in local state to preserve it
+        // Find if they had an existing PIN or departure info in local state to preserve it
         const originalPlayer = players.find(p => p.id === updatedPlayer.id);
         const matchPin = originalPlayer?.notes?.match(/\[PIN:(\d{4})\]/);
         const pinVal = matchPin ? matchPin[1] : null;
-        let cleanedNotes = updatedPlayer.notes ? updatedPlayer.notes : "";
+        const origDep = originalPlayer ? parsePlayerDeparture(originalPlayer) : { isFormer: false, departureStatus: "Active" as const };
+        let cleanedNotes = stripDepartureTags(updatedPlayer.notes ? updatedPlayer.notes : "");
         cleanedNotes = cleanedNotes.replace(/\[PIN:\d{4}\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[FOOT:(Left|Right|Both)\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[REG:(Standard|Dual|LoanParent|LoanSub)\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[LOAN_CLUB:[^\]]*\]/g, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[LOAN_END:[^\]]*\]/g, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[INJURY:.*?\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[OUT_DURATION:.*?\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[SUSPENSION_REASON:.*?\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[SUSPENSION_DURATION:.*?\]/, "").trim();
         
         let finalNotes = cleanedNotes;
         if (pinVal) finalNotes = `${finalNotes} [PIN:${pinVal}]`.trim();
@@ -596,6 +1076,16 @@ export default function SquadPage() {
         }
         finalNotes = `${finalNotes} [REG:${regTag}]`.trim();
 
+        if (updatedPlayer.registrationType === "Loan" || updatedPlayer.registrationType === "Dual") {
+            const cleanClub = (updatedPlayer.loanClub || "").trim().replace(/[\[\]]/g, "");
+            if (cleanClub) {
+                finalNotes = `${finalNotes} [LOAN_CLUB:${cleanClub}]`.trim();
+            }
+            if (updatedPlayer.registrationType === "Loan" && updatedPlayer.loanEndDate) {
+                finalNotes = `${finalNotes} [LOAN_END:${updatedPlayer.loanEndDate.trim()}]`.trim();
+            }
+        }
+
         if (updatedPlayer.medicalStatus === "Injured" || updatedPlayer.medicalStatus === "Doubtful") {
             if (updatedPlayer.injuryType) finalNotes = `${finalNotes} [INJURY:${updatedPlayer.injuryType}]`.trim();
             if (updatedPlayer.injuryDuration) finalNotes = `${finalNotes} [OUT_DURATION:${updatedPlayer.injuryDuration}]`.trim();
@@ -603,6 +1093,14 @@ export default function SquadPage() {
         if (updatedPlayer.medicalStatus === "Suspended") {
             if (updatedPlayer.suspensionReason) finalNotes = `${finalNotes} [SUSPENSION_REASON:${updatedPlayer.suspensionReason}]`.trim();
             if (updatedPlayer.suspensionDuration) finalNotes = `${finalNotes} [SUSPENSION_DURATION:${updatedPlayer.suspensionDuration}]`.trim();
+        }
+
+        if (origDep.isFormer) {
+            finalNotes = serializeDepartureToNotes(finalNotes, {
+                reason: origDep.departureReason || origDep.departureStatus,
+                date: origDep.departureDate,
+                notes: origDep.departureNotes,
+            });
         }
 
         const payload: any = {
@@ -721,33 +1219,49 @@ export default function SquadPage() {
         }, 'image/jpeg', 0.9);
     };
 
+    const expiringLoans = activeSquadPlayers.filter((p) => {
+        if (p.registrationType !== "Loan" || !p.loanEndDate) return false;
+        const exp = getLoanExpiryStatus(p.loanEndDate);
+        return exp.status === "expired" || exp.status === "expiring_soon";
+    });
 
-
-
-
-    // Squad Overview demographic calculations (Relocated from Dashboard)
-    const getAverageAge = (roster: Player[]) => {
-        const ages = roster.map(p => {
-            if (p.dateOfBirth) {
-                const dob = new Date(p.dateOfBirth);
-                const diff = new Date().getTime() - dob.getTime();
-                return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
-            }
-            return 24;
-        });
-        return ages.length > 0 ? (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1) : "24.5";
+    const getStatusBadgeStyle = (status: string) => {
+        switch (status) {
+            case "Available": return "bg-status-success/10 text-status-success border-status-success/20 hover:bg-status-success/20";
+            case "Unavailable": return "bg-muted text-muted-foreground border-border hover:bg-muted/80";
+            case "Holiday": return "bg-status-info/10 text-status-info border-status-info/20 hover:bg-status-info/20";
+            case "Injured": return "bg-status-error/10 text-status-error border-status-error/20 hover:bg-status-error/20";
+            case "Suspended": return "bg-status-error/10 text-status-error border-status-error/20 hover:bg-status-error/20";
+            case "Doubtful": return "bg-status-warning/10 text-status-warning border-status-warning/20 hover:bg-status-warning/20";
+            case "At Parent Club": return "bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20 hover:bg-purple-500/20";
+            default: return "bg-muted text-muted-foreground border-border hover:bg-muted/80";
+        }
     };
 
-    const avgSquadAge = getAverageAge(players);
-    const u23Count = players.filter(p => {
-        if (!p.dateOfBirth) return false;
-        const age = Math.floor((new Date().getTime() - new Date(p.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
-        return age < 23;
-    }).length;
-    const homegrownCount = Math.round(players.length * 0.7) || 0;
-    const leftFootedCount = players.filter(p => p.preferredFoot === "Left").length;
-    const rightFootedCount = players.filter(p => p.preferredFoot === "Right").length;
-    const bothFootedCount = players.filter(p => p.preferredFoot === "Both").length;
+    const renderSortIcon = (field: TableSortField) => {
+        if (tableSortField !== field) return <ArrowUpDown className="w-3 h-3 opacity-40" />;
+        return tableSortAsc ? <ArrowUp className="w-3 h-3 text-primary" /> : <ArrowDown className="w-3 h-3 text-primary" />;
+    };
+
+    const allFilteredSelected =
+        filteredPlayers.length > 0 && filteredPlayers.every((p) => selectedPlayerIds.includes(p.id));
+
+    const toggleSelectAllFiltered = () => {
+        if (allFilteredSelected) {
+            const filteredSet = new Set(filteredPlayers.map((p) => p.id));
+            setSelectedPlayerIds((prev) => prev.filter((id) => !filteredSet.has(id)));
+        } else {
+            const merged = new Set([...selectedPlayerIds, ...filteredPlayers.map((p) => p.id)]);
+            setSelectedPlayerIds(Array.from(merged));
+        }
+    };
+
+    const hasAnySquadNumbers = filteredPlayers.some((p) => (p.squadNumber ?? 0) > 0);
+    const activeInjuredCount = activeSquadPlayers.filter((p) => p.medicalStatus === "Injured").length;
+    const activeSuspendedCount = activeSquadPlayers.filter((p) => p.medicalStatus === "Suspended").length;
+    const activeHolidayCount = activeSquadPlayers.filter((p) => p.medicalStatus === "Holiday").length;
+    const activeParentClubCount = activeSquadPlayers.filter((p) => p.medicalStatus === "At Parent Club").length;
+    const activeOnLoanCount = activeSquadPlayers.filter((p) => p.registrationType === "Loan" && !p.isParentClub).length;
 
     return (
         <div className="pb-16 bg-background min-h-screen">
@@ -762,6 +1276,14 @@ export default function SquadPage() {
                 >
                     {includeFriendlies ? "⚽ Including Friendlies" : "🏆 Competitive Only"}
                 </Button>
+                <Button 
+                    variant="outline" 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs h-9 shadow-sm"
+                >
+                    Import CSV
+                </Button>
+                <input type="file" ref={fileInputRef} onChange={handleCSVImport} accept=".csv" className="hidden" />
                 <Button onClick={() => setIsManageSquadsOpen(true)} variant="outline" size="icon" className="h-9 w-9 shadow-sm">
                     <Settings className="w-4 h-4" />
                 </Button>
@@ -772,57 +1294,205 @@ export default function SquadPage() {
 
             <PageSection>
                 {/* Squad Summary & Controls */}
-                <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center mb-6">
-                    {/* Compact Squad Summary */}
-                    <div className="flex items-center gap-4 text-sm bg-surface-1 border border-border px-4 py-2.5 rounded-lg shadow-sm">
+                <div className="flex flex-col xl:flex-row gap-3 justify-between items-stretch xl:items-center mb-6">
+                    {/* Compact Squad Summary (Active Squad Counts - Single Line) */}
+                    <div className="flex items-center gap-3 text-xs sm:text-sm bg-surface-1 border border-border px-3.5 py-2 rounded-lg shadow-sm overflow-x-auto no-scrollbar whitespace-nowrap shrink-0">
                         <div className="flex items-center gap-1.5">
-                            <span className="font-semibold text-foreground">{players.length}</span>
-                            <span className="text-muted-foreground hidden sm:inline">Registered</span>
+                            <span className="font-semibold text-foreground">{activeSquadPlayers.length}</span>
+                            <span className="text-muted-foreground">Active</span>
                         </div>
-                        <div className="w-px h-4 bg-border" />
+                        <div className="w-px h-3.5 bg-border shrink-0" />
                         <div className="flex items-center gap-1.5">
-                            <span className="font-semibold text-status-success">{players.filter(p => p.medicalStatus === "Available").length}</span>
-                            <span className="text-muted-foreground hidden sm:inline">Available</span>
+                            <span className="font-semibold text-status-success">{activeSquadPlayers.filter(p => p.medicalStatus === "Available").length}</span>
+                            <span className="text-muted-foreground">Available</span>
                         </div>
-                        <div className="w-px h-4 bg-border" />
-                        <div className="flex items-center gap-1.5">
-                            <span className="font-semibold text-status-error">{players.filter(p => p.medicalStatus === "Injured").length}</span>
-                            <span className="text-muted-foreground hidden sm:inline">Injured</span>
-                        </div>
-                        <div className="w-px h-4 bg-border" />
-                        <div className="flex items-center gap-1.5">
-                            <span className="font-semibold text-status-warning">{players.filter(p => p.medicalStatus === "Suspended").length}</span>
-                            <span className="text-muted-foreground hidden sm:inline">Suspended</span>
-                        </div>
+                        {activeInjuredCount > 0 && (
+                            <>
+                                <div className="w-px h-3.5 bg-border shrink-0" />
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold text-status-error">{activeInjuredCount}</span>
+                                    <span className="text-muted-foreground">Injured</span>
+                                </div>
+                            </>
+                        )}
+                        {activeSuspendedCount > 0 && (
+                            <>
+                                <div className="w-px h-3.5 bg-border shrink-0" />
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold text-status-warning">{activeSuspendedCount}</span>
+                                    <span className="text-muted-foreground">Suspended</span>
+                                </div>
+                            </>
+                        )}
+                        {activeHolidayCount > 0 && (
+                            <>
+                                <div className="w-px h-3.5 bg-border shrink-0" />
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold text-blue-500">{activeHolidayCount}</span>
+                                    <span className="text-muted-foreground">On Holiday</span>
+                                </div>
+                            </>
+                        )}
+                        {activeParentClubCount > 0 && (
+                            <>
+                                <div className="w-px h-3.5 bg-border shrink-0" />
+                                <div className="flex items-center gap-1.5">
+                                    <span className="font-semibold text-purple-600 dark:text-purple-400">{activeParentClubCount}</span>
+                                    <span className="text-muted-foreground">At Parent Club</span>
+                                </div>
+                            </>
+                        )}
+                        {(activeOnLoanCount > 0 || showLoanOnly) && (
+                            <>
+                                <div className="w-px h-3.5 bg-border shrink-0" />
+                                <button
+                                    onClick={() => setShowLoanOnly(prev => !prev)}
+                                    className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold transition-colors ${showLoanOnly ? "bg-purple-100 text-purple-700 border border-purple-300" : "text-muted-foreground hover:text-foreground"}`}
+                                >
+                                    <span>{activeOnLoanCount}</span>
+                                    <span>On Loan</span>
+                                </button>
+                            </>
+                        )}
                     </div>
 
-                    {/* Actions & Filters */}
-                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
-                        <div className="flex gap-1 overflow-x-auto no-scrollbar shrink-0 w-full sm:w-auto bg-surface-1 p-1 rounded-lg border border-border">
+                    {/* Single-Row Filter Bar */}
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full xl:w-auto overflow-x-auto no-scrollbar">
+                        <div className="relative w-full sm:w-48 shrink-0">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input placeholder="Search players..." className="pl-8 h-9 text-xs bg-background border-border" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+                        </div>
+
+                        <div className="flex gap-1 bg-surface-1 p-1 rounded-lg border border-border shrink-0">
+                            <button
+                                onClick={() => {
+                                    setSquadViewMode("active");
+                                    setSelectedPlayerIds([]);
+                                }}
+                                className={`flex items-center justify-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${
+                                    squadViewMode === "active"
+                                        ? "bg-background shadow-sm text-foreground"
+                                        : "text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                <Users className="w-3.5 h-3.5" />
+                                Active
+                                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-2 text-muted-foreground">
+                                    {activeSquadPlayers.length}
+                                </span>
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setSquadViewMode("former");
+                                    setSelectedPlayerIds([]);
+                                }}
+                                className={`flex items-center justify-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors whitespace-nowrap ${
+                                    squadViewMode === "former"
+                                        ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 shadow-sm"
+                                        : "text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                <Archive className="w-3.5 h-3.5" />
+                                Former
+                                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-surface-2 text-muted-foreground">
+                                    {formerSquadPlayers.length}
+                                </span>
+                            </button>
+                        </div>
+
+                        <div className="flex gap-0.5 shrink-0 bg-surface-1 p-1 rounded-lg border border-border">
                             {(["All", "GK", "DEF", "MID", "FWD"] as const).map((pos) => (
                                 <button 
                                     key={pos} 
                                     onClick={() => setPositionFilter(pos)}
-                                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-colors ${positionFilter === pos ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                                    className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${positionFilter === pos ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                                 >
                                     {pos}
                                 </button>
                             ))}
                         </div>
-                        <div className="relative w-full sm:w-64 shrink-0">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input placeholder="Search players..." className="pl-9 h-10 bg-background border-border" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                        </div>
-                        <Button 
-                            variant="outline" 
-                            onClick={() => fileInputRef.current?.click()}
-                            className="text-xs h-10 shrink-0 w-full sm:w-auto"
+
+                        {/* Age Filter */}
+                        <select
+                            value={ageFilter}
+                            onChange={(e) => setAgeFilter(e.target.value as AgeFilterType)}
+                            className={`h-9 px-2.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer shrink-0 ${
+                                ageFilter !== "All"
+                                    ? "bg-primary/10 border-primary/40 text-foreground"
+                                    : "bg-surface-1 border-border text-muted-foreground hover:text-foreground"
+                            }`}
+                            title="Filter by Age"
                         >
-                            Import CSV
-                        </Button>
-                        <input type="file" ref={fileInputRef} onChange={handleCSVImport} accept=".csv" className="hidden" />
+                            <option value="All">All Ages</option>
+                            <option value="U18">U18 (&lt; 18)</option>
+                            <option value="U21">U21 (&lt; 21)</option>
+                            <option value="U23">U23 (&lt; 23)</option>
+                            <option value="23-29">Ages 23–29</option>
+                            <option value="30+">Ages 30+</option>
+                        </select>
+
+                        {/* View Layout Toggle (Cards vs Compact) */}
+                        <div className="flex gap-1 bg-surface-1 p-1 rounded-lg border border-border shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => handleLayoutChange("grid")}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${
+                                    displayLayout === "grid"
+                                        ? "bg-background shadow-sm text-foreground"
+                                        : "text-muted-foreground hover:text-foreground"
+                                }`}
+                                title="Card Grid View"
+                            >
+                                <LayoutGrid className="w-3.5 h-3.5" />
+                                <span className="hidden 2xl:inline">Cards</span>
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleLayoutChange("table")}
+                                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-md transition-colors ${
+                                    displayLayout === "table"
+                                        ? "bg-background shadow-sm text-foreground"
+                                        : "text-muted-foreground hover:text-foreground"
+                                }`}
+                                title="Compact View"
+                            >
+                                <List className="w-3.5 h-3.5" />
+                                <span className="hidden 2xl:inline">Compact</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
+
+                {/* Loan Expiry Warning Banner */}
+                {squadViewMode === "active" && expiringLoans.length > 0 && (
+                    <div className="mb-4 p-3 rounded-xl border border-purple-500/30 bg-purple-500/5 flex flex-wrap items-center justify-between gap-2 text-xs">
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="inline-flex items-center gap-1 font-bold text-purple-700 dark:text-purple-300">
+                                <Clock className="w-4 h-4" />
+                                Loan Expiry Tracker:
+                            </span>
+                            {expiringLoans.map((lp) => {
+                                const exp = getLoanExpiryStatus(lp.loanEndDate);
+                                return (
+                                    <button
+                                        key={lp.id}
+                                        type="button"
+                                        onClick={() => handleEdit(lp)}
+                                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border font-semibold transition-colors ${
+                                            exp.status === "expired"
+                                                ? "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30 hover:bg-red-500/20"
+                                                : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30 hover:bg-amber-500/20"
+                                        }`}
+                                    >
+                                        <span>{formatPlayerName(lp)}</span>
+                                        {lp.loanClub && <span className="opacity-75">({lp.loanClub})</span>}
+                                        <span>• {exp.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
 
                 {/* Squad Filter Tabs */}
                 <div className="flex space-x-2 border-b border-border pb-px mb-6 overflow-x-auto no-scrollbar">
@@ -832,64 +1502,461 @@ export default function SquadPage() {
                     ))}
                 </div>
 
-                {/* Main Squad Grid - Positional Grouping */}
-                <div className="space-y-10">
-                    {filteredPlayers.length === 0 ? (
-                        <div className="text-center py-12 text-muted-foreground">
-                            <p>No players found matching your criteria.</p>
+                {squadViewMode === "former" && (
+                    <div className="mb-6 p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-0.5">
+                            <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                                <Archive className="w-4 h-4 text-amber-500" />
+                                Former &amp; Archived Players
+                            </h3>
+                            <p className="text-xs text-muted-foreground">
+                                These players have left the club or returned to their parent club. All historical appearances, goals, assists, and training attendance records are preserved. Click the restore button on any player card or profile to return them to the active squad.
+                            </p>
                         </div>
-                    ) : (
-                        <>
-                            {/* Goalkeepers */}
-                            {sortedPlayers.filter(p => ["GK"].includes(p.position)).length > 0 && (
-                                <div>
-                                    <SectionHeader title="Goalkeepers" className="mb-4" />
-                                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-                                        {sortedPlayers.filter(p => ["GK"].includes(p.position)).map(player => (
-                                            <PlayerCard key={player.id} player={player} onDelete={handleDelete} onEdit={handleEdit} onStatusToggle={handleStatusToggle} />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setSquadViewMode("active")}
+                            className="shrink-0 text-xs"
+                        >
+                            Back to Active Squad
+                        </Button>
+                    </div>
+                )}
 
-                            {/* Defenders */}
-                            {sortedPlayers.filter(p => ["DEF", "CB", "LCB", "RCB", "RB", "LB", "RWB", "LWB"].includes(p.position)).length > 0 && (
-                                <div>
-                                    <SectionHeader title="Defenders" className="mb-4" />
-                                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-                                        {sortedPlayers.filter(p => ["DEF", "CB", "LCB", "RCB", "RB", "LB", "RWB", "LWB"].includes(p.position)).map(player => (
-                                            <PlayerCard key={player.id} player={player} onDelete={handleDelete} onEdit={handleEdit} onStatusToggle={handleStatusToggle} />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                {/* Main Squad Content: Grid View vs Compact Table View */}
+                {filteredPlayers.length === 0 ? (
+                    <div className="text-center py-12 text-muted-foreground">
+                        {squadViewMode === "former" ? (
+                            <p>No former players recorded yet.</p>
+                        ) : (
+                            <p>No players found matching your criteria.</p>
+                        )}
+                    </div>
+                ) : displayLayout === "table" ? (
+                    <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left border-collapse">
+                                <thead>
+                                    <tr className="border-b border-border bg-surface-1/80 text-muted-foreground uppercase tracking-wider text-[10px] font-bold select-none">
+                                        {hasAnySquadNumbers && (
+                                            <th
+                                                onClick={() => handleTableSort("squadNumber")}
+                                                className="py-3 pl-4 pr-2 cursor-pointer hover:text-foreground transition-colors w-12"
+                                            >
+                                                <div className="flex items-center gap-1"># {renderSortIcon("squadNumber")}</div>
+                                            </th>
+                                        )}
+                                        <th
+                                            onClick={() => handleTableSort("name")}
+                                            className={`py-3 ${hasAnySquadNumbers ? "px-3" : "pl-4 pr-3"} cursor-pointer hover:text-foreground transition-colors min-w-[200px]`}
+                                        >
+                                            <div className="flex items-center gap-1">Player {renderSortIcon("name")}</div>
+                                        </th>
+                                        <th
+                                            onClick={() => handleTableSort("age")}
+                                            className="py-3 px-2 text-center cursor-pointer hover:text-foreground transition-colors hidden sm:table-cell"
+                                        >
+                                            <div className="flex items-center justify-center gap-1">Age {renderSortIcon("age")}</div>
+                                        </th>
+                                        <th
+                                            onClick={() => handleTableSort("position")}
+                                            className="py-3 px-2.5 cursor-pointer hover:text-foreground transition-colors"
+                                        >
+                                            <div className="flex items-center gap-1">Pos {renderSortIcon("position")}</div>
+                                        </th>
+                                        <th className="py-3 px-2.5 hidden md:table-cell">Squad</th>
+                                        <th
+                                            onClick={() => handleTableSort("status")}
+                                            className="py-3 px-2.5 cursor-pointer hover:text-foreground transition-colors"
+                                        >
+                                            <div className="flex items-center gap-1">Status {renderSortIcon("status")}</div>
+                                        </th>
+                                        <th
+                                            onClick={() => handleTableSort("apps")}
+                                            className="py-3 px-2 text-center cursor-pointer hover:text-foreground transition-colors"
+                                            title="Total Appearances (Starts + Sub)"
+                                        >
+                                            <div className="flex items-center justify-center gap-1">Apps {renderSortIcon("apps")}</div>
+                                        </th>
+                                        <th
+                                            onClick={() => handleTableSort("starts")}
+                                            className="py-3 px-2 text-center cursor-pointer hover:text-foreground transition-colors hidden sm:table-cell"
+                                            title="Starts"
+                                        >
+                                            <div className="flex items-center justify-center gap-1">Starts {renderSortIcon("starts")}</div>
+                                        </th>
+                                        <th
+                                            onClick={() => handleTableSort("subApps")}
+                                            className="py-3 px-2 text-center cursor-pointer hover:text-foreground transition-colors hidden sm:table-cell"
+                                            title="Substitute Appearances"
+                                        >
+                                            <div className="flex items-center justify-center gap-1">Sub {renderSortIcon("subApps")}</div>
+                                        </th>
+                                        <th
+                                            onClick={() => handleTableSort("goals")}
+                                            className="py-3 px-2 text-center cursor-pointer hover:text-foreground transition-colors"
+                                        >
+                                            <div className="flex items-center justify-center gap-1">Goals {renderSortIcon("goals")}</div>
+                                        </th>
+                                        <th
+                                            onClick={() => handleTableSort("assists")}
+                                            className="py-3 px-2 text-center cursor-pointer hover:text-foreground transition-colors"
+                                        >
+                                            <div className="flex items-center justify-center gap-1">Asts {renderSortIcon("assists")}</div>
+                                        </th>
+                                        <th
+                                            onClick={() => handleTableSort("minutes")}
+                                            className="py-3 px-2 text-center cursor-pointer hover:text-foreground transition-colors hidden lg:table-cell"
+                                        >
+                                            <div className="flex items-center justify-center gap-1">Mins {renderSortIcon("minutes")}</div>
+                                        </th>
+                                        <th
+                                            onClick={() => handleTableSort("cards")}
+                                            className="py-3 px-2 text-center cursor-pointer hover:text-foreground transition-colors hidden md:table-cell"
+                                        >
+                                            <div className="flex items-center justify-center gap-1">Cards {renderSortIcon("cards")}</div>
+                                        </th>
+                                        <th className="py-3 pl-2 pr-4 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-border/60">
+                                    {tableSortedPlayers.map((player) => {
+                                        const dep = parsePlayerDeparture(player);
+                                        const isFormer = isFormerPlayer(player);
+                                        const loanExpiry = getLoanExpiryStatus(player.loanEndDate);
+                                        const playerAge = getPlayerAge(player);
 
-                            {/* Midfielders */}
-                            {sortedPlayers.filter(p => ["MID", "CDM", "CM", "CAM", "RM", "LM"].includes(p.position)).length > 0 && (
-                                <div>
-                                    <SectionHeader title="Midfielders" className="mb-4" />
-                                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-                                        {sortedPlayers.filter(p => ["MID", "CDM", "CM", "CAM", "RM", "LM"].includes(p.position)).map(player => (
-                                            <PlayerCard key={player.id} player={player} onDelete={handleDelete} onEdit={handleEdit} onStatusToggle={handleStatusToggle} />
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
+                                        return (
+                                            <tr
+                                                key={player.id}
+                                                onClick={() => router.push(`/squad/${player.id}`)}
+                                                className="transition-colors hover:bg-surface-1/70 cursor-pointer"
+                                            >
+                                                {hasAnySquadNumbers && (
+                                                    <td className="py-2.5 pl-4 pr-2 font-mono text-muted-foreground font-semibold">
+                                                        {player.squadNumber > 0 ? `#${player.squadNumber}` : "—"}
+                                                    </td>
+                                                )}
+                                                <td className={`py-2.5 ${hasAnySquadNumbers ? "px-3" : "pl-4 pr-3"}`}>
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="w-7 h-7 rounded-full bg-surface-2 border border-border flex items-center justify-center text-[10px] font-bold text-muted-foreground shrink-0 overflow-hidden">
+                                                            {player.imageUrl &&
+                                                            player.imageUrl !== "/placeholder-player.png" &&
+                                                            !player.imageUrl.startsWith("idb:") ? (
+                                                                // eslint-disable-next-line @next/next/no-img-element
+                                                                <img
+                                                                    src={player.imageUrl}
+                                                                    alt={formatPlayerName(player)}
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            ) : (
+                                                                <>
+                                                                    {player.firstName?.charAt(0)}
+                                                                    {player.lastName?.charAt(0)}
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <Link
+                                                                    href={`/squad/${player.id}`}
+                                                                    onClick={(e) => e.stopPropagation()}
+                                                                    className="font-bold text-foreground hover:text-primary transition-colors truncate"
+                                                                >
+                                                                    {formatPlayerName(player)}
+                                                                </Link>
+                                                                {(player.registrationType === "Loan" ||
+                                                                    player.registrationType === "Dual") && (
+                                                                    <span className="text-[9px] font-bold px-1.5 py-0.2 bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 rounded uppercase">
+                                                                        {player.registrationType === "Loan"
+                                                                            ? player.isParentClub
+                                                                                ? "Loan Out"
+                                                                                : "Loan In"
+                                                                            : "Dual"}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {/* Loan Club & Expiry Sub-row */}
+                                                            {(player.loanClub ||
+                                                                (player.registrationType === "Loan" &&
+                                                                    loanExpiry.status !== "none")) && (
+                                                                <div className="flex items-center gap-1.5 mt-0.5 text-[10px] text-muted-foreground flex-wrap">
+                                                                    {player.loanClub && (
+                                                                        <span className="inline-flex items-center gap-1 text-purple-600 dark:text-purple-400 font-medium">
+                                                                            <Building2 className="w-2.5 h-2.5" />
+                                                                            {player.loanClub}
+                                                                        </span>
+                                                                    )}
+                                                                    {player.registrationType === "Loan" &&
+                                                                        loanExpiry.status !== "none" && (
+                                                                            <span
+                                                                                className={`font-semibold ${
+                                                                                    loanExpiry.status === "expired"
+                                                                                        ? "text-red-500"
+                                                                                        : loanExpiry.status ===
+                                                                                          "expiring_soon"
+                                                                                        ? "text-amber-500"
+                                                                                        : "text-muted-foreground"
+                                                                                }`}
+                                                                            >
+                                                                                • {loanExpiry.label}
+                                                                            </span>
+                                                                        )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="py-2.5 px-2 text-center text-muted-foreground font-medium hidden sm:table-cell">
+                                                    {playerAge !== null ? playerAge : "—"}
+                                                </td>
+                                                <td className="py-2.5 px-2.5 whitespace-nowrap">
+                                                    {(() => {
+                                                        const p = (player.position || "").trim().toUpperCase();
+                                                        let posBadgeClass = "bg-background text-foreground border-border";
+                                                        if (p === "GK" || p.includes("GK") || p.includes("KEEPER")) {
+                                                            posBadgeClass = "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25";
+                                                        } else if (["CB", "RB", "LB", "DEF", "RWB", "LWB"].includes(p) || p.includes("DEF") || p.includes("BACK")) {
+                                                            posBadgeClass = "bg-sky-500/10 text-sky-600 dark:text-sky-400 border-sky-500/25";
+                                                        } else if (["CM", "CDM", "CAM", "MID", "RM", "LM"].includes(p) || p.includes("MID")) {
+                                                            posBadgeClass = "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25";
+                                                        } else if (["ST", "CF", "RW", "LW", "FWD", "ATT"].includes(p) || p.includes("FWD") || p.includes("WING") || p.includes("STRIKER")) {
+                                                            posBadgeClass = "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25";
+                                                        }
+                                                        const secList = (player.secondaryPositions || []).filter(
+                                                            (s) => s && s.trim().toUpperCase() !== p
+                                                        );
+                                                        const visibleSec = secList.slice(0, 2);
+                                                        const extraSecCount = secList.length - visibleSec.length;
 
-                            {/* Forwards */}
-                            {sortedPlayers.filter(p => ["FWD", "ST", "CF", "RW", "LW"].includes(p.position)).length > 0 && (
-                                <div>
-                                    <SectionHeader title="Forwards" className="mb-4" />
-                                    <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
-                                        {sortedPlayers.filter(p => ["FWD", "ST", "CF", "RW", "LW"].includes(p.position)).map(player => (
-                                            <PlayerCard key={player.id} player={player} onDelete={handleDelete} onEdit={handleEdit} onStatusToggle={handleStatusToggle} />
-                                        ))}
-                                    </div>
+                                                        return (
+                                                            <div
+                                                                className="inline-flex items-center gap-1.5"
+                                                                title={
+                                                                    secList.length > 0
+                                                                        ? `Primary: ${player.position} • Secondary: ${secList.join(", ")}`
+                                                                        : `Primary: ${player.position}`
+                                                                }
+                                                            >
+                                                                <span className={`font-bold px-1.5 py-0.5 border rounded text-[10px] uppercase tracking-tight ${posBadgeClass}`}>
+                                                                    {player.position}
+                                                                </span>
+                                                                {visibleSec.length > 0 && (
+                                                                    <span className="text-[10px] text-muted-foreground font-medium">
+                                                                        {visibleSec.join(", ")}
+                                                                        {extraSecCount > 0 && (
+                                                                            <span className="ml-1 text-[9px] font-semibold opacity-75">
+                                                                                +{extraSecCount}
+                                                                            </span>
+                                                                        )}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })()}
+                                                </td>
+                                                <td className="py-2.5 px-2.5 text-muted-foreground hidden md:table-cell truncate max-w-[140px]">
+                                                    {player.squad
+                                                        ? player.squad
+                                                              .split(",")
+                                                              .map((s) => {
+                                                                  const clean = s.trim();
+                                                                  const LEGACY_LABELS: Record<string, string> = {
+                                                                      firstTeam: "First Team",
+                                                                      firstteam: "First Team",
+                                                                      midweek: "Midweek",
+                                                                      youth: "Youth",
+                                                                  };
+                                                                  return LEGACY_LABELS[clean] || clean;
+                                                              })
+                                                              .join(", ")
+                                                        : "—"}
+                                                </td>
+                                                <td className="py-2.5 px-2.5" onClick={(e) => e.stopPropagation()}>
+                                                    {isFormer ? (
+                                                        <div className="flex flex-col items-start gap-0.5">
+                                                            <Badge className="text-[10px] px-1.5 py-0.2 bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold">
+                                                                {dep.departureReason || dep.departureStatus}
+                                                            </Badge>
+                                                            {dep.departureDate && (
+                                                                <span className="text-[9px] text-muted-foreground">
+                                                                    {dep.departureDate}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <Badge
+                                                            onClick={() => handleStatusToggle(player)}
+                                                            className={`border cursor-pointer select-none text-[10px] px-2 py-0.5 rounded transition-colors ${getStatusBadgeStyle(
+                                                                player.medicalStatus
+                                                            )}`}
+                                                        >
+                                                            {player.medicalStatus}
+                                                        </Badge>
+                                                    )}
+                                                </td>
+                                                <td className="py-2.5 px-2 text-center font-bold text-foreground">
+                                                    {player.appearances ?? 0}
+                                                </td>
+                                                <td className="py-2.5 px-2 text-center text-muted-foreground hidden sm:table-cell">
+                                                    {player.starts ?? 0}
+                                                </td>
+                                                <td className="py-2.5 px-2 text-center text-muted-foreground hidden sm:table-cell">
+                                                    {player.subApps ?? 0}
+                                                </td>
+                                                <td className="py-2.5 px-2 text-center font-bold text-foreground">
+                                                    {player.goals ?? 0}
+                                                </td>
+                                                <td className="py-2.5 px-2 text-center font-bold text-foreground">
+                                                    {player.assists ?? 0}
+                                                </td>
+                                                <td className="py-2.5 px-2 text-center text-muted-foreground hidden lg:table-cell">
+                                                    {(player as any).minutes_played ?? 0}
+                                                </td>
+                                                <td className="py-2.5 px-2 text-center hidden md:table-cell">
+                                                    <div className="flex items-center justify-center gap-1.5">
+                                                        {(player.yellow_cards ?? 0) > 0 && (
+                                                            <span className="inline-flex items-center gap-0.5 font-bold text-muted-foreground">
+                                                                <span className="w-2 h-2.5 bg-yellow-400 rounded-[2px] inline-block" />
+                                                                {player.yellow_cards}
+                                                            </span>
+                                                        )}
+                                                        {(player.red_cards ?? 0) > 0 && (
+                                                            <span className="inline-flex items-center gap-0.5 font-bold text-muted-foreground">
+                                                                <span className="w-2 h-2.5 bg-red-500 rounded-[2px] inline-block" />
+                                                                {player.red_cards}
+                                                            </span>
+                                                        )}
+                                                        {(player.yellow_cards ?? 0) === 0 &&
+                                                            (player.red_cards ?? 0) === 0 && (
+                                                                <span className="text-muted-foreground/40">—</span>
+                                                            )}
+                                                    </div>
+                                                </td>
+                                                <td
+                                                    className="py-2.5 pl-2 pr-4 text-right"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="icon"
+                                                            onClick={() => handleEdit(player)}
+                                                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                                                            title="Edit Player"
+                                                        >
+                                                            <Pencil className="w-3.5 h-3.5" />
+                                                        </Button>
+                                                        {isFormer ? (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="icon"
+                                                                onClick={() => handleRestorePlayer(player)}
+                                                                className="h-7 w-7 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
+                                                                title="Restore to Active Squad"
+                                                            >
+                                                                <RotateCcw className="w-3.5 h-3.5" />
+                                                            </Button>
+                                                        ) : (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="icon"
+                                                                onClick={() => openDepartureDialog(player)}
+                                                                className="h-7 w-7 text-muted-foreground hover:text-amber-600 hover:border-amber-500/40"
+                                                                title="Mark as Left Club"
+                                                            >
+                                                                <UserMinus className="w-3.5 h-3.5" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="space-y-10">
+                        {/* Goalkeepers */}
+                        {sortedPlayers.filter(p => ["GK"].includes(p.position)).length > 0 && (
+                            <div>
+                                <SectionHeader title="Goalkeepers" className="mb-4" />
+                                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                                    {sortedPlayers.filter(p => ["GK"].includes(p.position)).map(player => (
+                                        <PlayerCard
+                                            key={player.id}
+                                            player={player}
+                                            onMarkLeft={openDepartureDialog}
+                                            onRestore={handleRestorePlayer}
+                                            onEdit={handleEdit}
+                                            onStatusToggle={handleStatusToggle}
+                                        />
+                                    ))}
                                 </div>
-                            )}
-                        </>
-                    )}
-                </div>
+                            </div>
+                        )}
+
+                        {/* Defenders */}
+                        {sortedPlayers.filter(p => ["DEF", "CB", "LCB", "RCB", "RB", "LB", "RWB", "LWB"].includes(p.position)).length > 0 && (
+                            <div>
+                                <SectionHeader title="Defenders" className="mb-4" />
+                                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                                    {sortedPlayers.filter(p => ["DEF", "CB", "LCB", "RCB", "RB", "LB", "RWB", "LWB"].includes(p.position)).map(player => (
+                                        <PlayerCard
+                                            key={player.id}
+                                            player={player}
+                                            onMarkLeft={openDepartureDialog}
+                                            onRestore={handleRestorePlayer}
+                                            onEdit={handleEdit}
+                                            onStatusToggle={handleStatusToggle}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Midfielders */}
+                        {sortedPlayers.filter(p => ["MID", "CDM", "CM", "CAM", "RM", "LM"].includes(p.position)).length > 0 && (
+                            <div>
+                                <SectionHeader title="Midfielders" className="mb-4" />
+                                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                                    {sortedPlayers.filter(p => ["MID", "CDM", "CM", "CAM", "RM", "LM"].includes(p.position)).map(player => (
+                                        <PlayerCard
+                                            key={player.id}
+                                            player={player}
+                                            onMarkLeft={openDepartureDialog}
+                                            onRestore={handleRestorePlayer}
+                                            onEdit={handleEdit}
+                                            onStatusToggle={handleStatusToggle}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Forwards */}
+                        {sortedPlayers.filter(p => ["FWD", "ST", "CF", "RW", "LW"].includes(p.position)).length > 0 && (
+                            <div>
+                                <SectionHeader title="Forwards" className="mb-4" />
+                                <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+                                    {sortedPlayers.filter(p => ["FWD", "ST", "CF", "RW", "LW"].includes(p.position)).map(player => (
+                                        <PlayerCard
+                                            key={player.id}
+                                            player={player}
+                                            onMarkLeft={openDepartureDialog}
+                                            onRestore={handleRestorePlayer}
+                                            onEdit={handleEdit}
+                                            onStatusToggle={handleStatusToggle}
+                                        />
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </PageSection>
 
             {editingPlayer && (
@@ -1057,33 +2124,80 @@ export default function SquadPage() {
                                  </div>
                              </div>
 
-                             {editingPlayer.registrationType === "Loan" && (
-                                 <div className="space-y-1 bg-slate-50 p-2.5 rounded-lg border border-slate-200">
-                                     <label className="block text-xs font-medium text-slate-650 mb-1">Loan Direction</label>
-                                     <div className="flex gap-2">
-                                         <button
-                                             type="button"
-                                             onClick={() => setEditingPlayer({ ...editingPlayer, isParentClub: true })}
-                                             className={`flex-1 py-1 text-xs font-bold border rounded transition-all ${
-                                                 editingPlayer.isParentClub
-                                                     ? "bg-slate-900 border-slate-900 text-white"
-                                                     : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                                             }`}
-                                         >
-                                             We are Parent Club
-                                         </button>
-                                         <button
-                                             type="button"
-                                             onClick={() => setEditingPlayer({ ...editingPlayer, isParentClub: false })}
-                                             className={`flex-1 py-1 text-xs font-bold border rounded transition-all ${
-                                                 !editingPlayer.isParentClub
-                                                     ? "bg-slate-900 border-slate-900 text-white"
-                                                     : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
-                                             }`}
-                                         >
-                                             Parent Club (Lender)
-                                         </button>
+                             {(editingPlayer.registrationType === "Loan" || editingPlayer.registrationType === "Dual") && (
+                                 <div className="space-y-3 bg-purple-50/60 p-3 rounded-lg border border-purple-200">
+                                     {editingPlayer.registrationType === "Loan" && (
+                                         <div>
+                                             <label className="block text-xs font-medium text-slate-600 mb-1">Loan Direction</label>
+                                             <div className="flex gap-2">
+                                                 <button
+                                                     type="button"
+                                                     onClick={() => setEditingPlayer({ ...editingPlayer, isParentClub: false })}
+                                                     className={`flex-1 py-1.5 text-xs font-bold border rounded transition-all ${
+                                                         !editingPlayer.isParentClub
+                                                             ? "bg-slate-900 border-slate-900 text-white"
+                                                             : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                                                     }`}
+                                                 >
+                                                     Loaned In (From Parent Club)
+                                                 </button>
+                                                 <button
+                                                     type="button"
+                                                     onClick={() => setEditingPlayer({ ...editingPlayer, isParentClub: true })}
+                                                     className={`flex-1 py-1.5 text-xs font-bold border rounded transition-all ${
+                                                         editingPlayer.isParentClub
+                                                             ? "bg-slate-900 border-slate-900 text-white"
+                                                             : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                                                     }`}
+                                                 >
+                                                     Loaned Out (We Are Parent)
+                                                 </button>
+                                             </div>
+                                         </div>
+                                     )}
+
+                                     <div className="space-y-1">
+                                         <label className="block text-xs font-medium text-slate-600">
+                                             {editingPlayer.registrationType === "Loan"
+                                                 ? editingPlayer.isParentClub
+                                                     ? "Destination Loan Club Name"
+                                                     : "Parent Club Name"
+                                                 : "Dual Registration Club Name"}
+                                         </label>
+                                         <Input
+                                             value={editingPlayer.loanClub || ""}
+                                             onChange={(e) => setEditingPlayer({ ...editingPlayer, loanClub: e.target.value })}
+                                             placeholder={
+                                                 editingPlayer.registrationType === "Loan"
+                                                     ? editingPlayer.isParentClub
+                                                         ? "e.g. Hendon FC"
+                                                         : "e.g. Barnet FC"
+                                                     : "e.g. Wingate & Finchley"
+                                             }
+                                             className="h-8 text-xs bg-white"
+                                         />
                                      </div>
+
+                                     {editingPlayer.registrationType === "Loan" && (
+                                         <div className="space-y-1">
+                                             <div className="flex items-center justify-between">
+                                                 <label className="block text-xs font-medium text-slate-600">
+                                                     Loan Expiry Date
+                                                 </label>
+                                                 {editingPlayer.loanEndDate && (
+                                                     <span className="text-[10px] font-bold text-purple-700">
+                                                         {getLoanExpiryStatus(editingPlayer.loanEndDate).label}
+                                                     </span>
+                                                 )}
+                                             </div>
+                                             <Input
+                                                 type="date"
+                                                 value={editingPlayer.loanEndDate || ""}
+                                                 onChange={(e) => setEditingPlayer({ ...editingPlayer, loanEndDate: e.target.value })}
+                                                 className="h-8 text-xs bg-white"
+                                             />
+                                         </div>
+                                     )}
                                  </div>
                              )}
 
@@ -1220,6 +2334,7 @@ export default function SquadPage() {
                                     <option value="Unavailable">Unavailable</option>
                                     <option value="Doubtful">Doubtful</option>
                                     <option value="Suspended">Suspended</option>
+                                    <option value="At Parent Club">At Parent Club</option>
                                 </select>
                             </div>
 
@@ -1436,17 +2551,35 @@ export default function SquadPage() {
                         </div>
 
                         <div className="p-4 pb-8 sm:pb-4 border-t border-border flex justify-between items-center shrink-0 bg-surface-2">
-                            <button
-                                onClick={() => {
-                                    if (confirm("Delete this player permanently?")) {
-                                        handleDelete(editingPlayer.id);
-                                        setEditingPlayer(null);
-                                    }
-                                }}
-                                className="px-3 py-1.5 text-xs text-status-error hover:bg-status-error/10 rounded transition-colors"
-                            >
-                                Delete Player
-                            </button>
+                            {editingPlayer.id !== "new" ? (
+                                isFormerPlayer(editingPlayer) ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const p = players.find(pl => pl.id === editingPlayer.id) || editingPlayer;
+                                            setEditingPlayer(null);
+                                            handleRestorePlayer(p);
+                                        }}
+                                        className="px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/10 rounded transition-colors flex items-center gap-1.5"
+                                    >
+                                        <RotateCcw className="w-3.5 h-3.5" />
+                                        Restore to Squad
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const p = players.find(pl => pl.id === editingPlayer.id) || editingPlayer;
+                                            setEditingPlayer(null);
+                                            openDepartureDialog(p);
+                                        }}
+                                        className="px-3 py-1.5 text-xs font-semibold text-amber-600 hover:bg-amber-500/10 rounded transition-colors flex items-center gap-1.5"
+                                    >
+                                        <UserMinus className="w-3.5 h-3.5" />
+                                        Mark as Left Club
+                                    </button>
+                                )
+                            ) : <div />}
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setEditingPlayer(null)}
@@ -1465,6 +2598,118 @@ export default function SquadPage() {
                     </div>
                 </div>
             )}
+
+            {/* Mark Player(s) as Left Club Modal */}
+            <Dialog open={!!departingPlayer || isBulkDepartOpen} onOpenChange={(open) => {
+                if (!open) {
+                    setDepartingPlayer(null);
+                    setIsBulkDepartOpen(false);
+                }
+            }}>
+                <DialogContent className="sm:max-w-[460px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <UserMinus className="w-5 h-5 text-amber-500" />
+                            {isBulkDepartOpen
+                                ? `Mark ${selectedPlayerIds.length} Selected Player(s) as Left Club`
+                                : `Mark ${departingPlayer ? formatPlayerName(departingPlayer) : "Player"} as Left Club`}
+                        </DialogTitle>
+                        <DialogDescription>
+                            This will move {isBulkDepartOpen ? "the selected players" : "the player"} out of your active squad into <strong>Former Players</strong>. All historical appearances, goals, assists, and training attendance records will be preserved.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {(departingPlayer || isBulkDepartOpen) && (
+                        <div className="space-y-4 py-2">
+                            {departingPlayer && (departingPlayer.registrationType === "Loan" || departingPlayer.registrationType === "Dual") && (
+                                <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/25 text-xs text-purple-700 dark:text-purple-300 flex items-center justify-between gap-2">
+                                    <span>
+                                        <strong>{departingPlayer.registrationType === "Loan" ? "Loan Player" : "Dual-Registered Player"}:</strong> &ldquo;Returned to parent club&rdquo; is recommended when a loan or dual spell concludes.
+                                    </span>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                    Departure Status / Reason
+                                </label>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    {DEPARTURE_REASONS.map((reason) => {
+                                        const isSelected = departureReason === reason;
+                                        const isRecommended =
+                                            reason === "Returned to parent club" &&
+                                            departingPlayer &&
+                                            (departingPlayer.registrationType === "Loan" || departingPlayer.registrationType === "Dual");
+                                        return (
+                                            <button
+                                                key={reason}
+                                                type="button"
+                                                onClick={() => setDepartureReason(reason)}
+                                                className={`text-left px-3 py-2 rounded-lg border text-xs font-semibold transition-all flex items-center justify-between gap-1.5 ${
+                                                    isSelected
+                                                        ? "bg-amber-500/15 border-amber-500 text-foreground shadow-sm"
+                                                        : "bg-surface-1 border-border text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                                                }`}
+                                            >
+                                                <span className="truncate">{reason}</span>
+                                                {isRecommended && (
+                                                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-600 dark:text-purple-300 font-bold shrink-0">
+                                                        Loan/Dual
+                                                    </span>
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                    Departure Date
+                                </label>
+                                <Input
+                                    type="date"
+                                    value={departureDate}
+                                    onChange={(e) => setDepartureDate(e.target.value)}
+                                    className="h-9 text-sm"
+                                />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                    Departure Note (Optional)
+                                </label>
+                                <textarea
+                                    value={departureNotes}
+                                    onChange={(e) => setDepartureNotes(e.target.value)}
+                                    placeholder="e.g. Recalled by parent club after loan spell, transferred to local side..."
+                                    className="w-full h-20 px-3 py-2 border border-border rounded-md text-xs bg-background text-foreground resize-none focus:ring-2 focus:ring-brand/40 focus:outline-none"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setDepartingPlayer(null);
+                                setIsBulkDepartOpen(false);
+                            }}
+                            disabled={isSavingDeparture}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={isBulkDepartOpen ? handleBulkMarkLeft : handleMarkPlayerLeft}
+                            disabled={isSavingDeparture}
+                            className="bg-amber-600 hover:bg-amber-700 text-white"
+                        >
+                            {isSavingDeparture ? "Archiving..." : "Mark as Left Club"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* Manage Squads Modal */}
             <Dialog open={isManageSquadsOpen} onOpenChange={(open) => {

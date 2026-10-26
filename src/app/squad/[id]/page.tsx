@@ -1,24 +1,41 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { cn, formatPlayerName } from "@/lib/utils";
+import {
+    cn,
+    DEPARTURE_REASONS,
+    formatPlayerName,
+    isFormerPlayer,
+    parsePlayerDeparture,
+    serializeDepartureToNotes,
+    stripDepartureTags,
+    getLoanExpiryStatus,
+} from "@/lib/utils";
 import { notFound, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Edit, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { ArrowLeft, Edit, AlertTriangle, UserMinus, RotateCcw, Archive, Building2, Clock } from "lucide-react";
 import Link from "next/link";
 import { Player } from "@/types";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
 import { Input } from "@/components/ui/input";
+import { logActivity } from "@/lib/activity";
 
 export default function PlayerProfilePage() {
     const params = useParams();
     const id = params?.id as string;
     const [player, setPlayer] = useState<Player | null>(null);
     const [loading, setLoading] = useState(true);
+    const [isDepartureOpen, setIsDepartureOpen] = useState(false);
+    const [departureReason, setDepartureReason] = useState<string>("Left club");
+    const [departureDate, setDepartureDate] = useState<string>(() => new Date().toISOString().split("T")[0]);
+    const [departureNotes, setDepartureNotes] = useState<string>("");
+    const [isSavingDeparture, setIsSavingDeparture] = useState(false);
+
     const getCurrentSeasonStr = () => {
         const d = new Date();
         const year = d.getFullYear();
@@ -151,154 +168,267 @@ export default function PlayerProfilePage() {
     const { settings } = useClub();
     const currentSquads = settings.squads || ["First Team"];
 
-    useEffect(() => {
-        const fetchPlayer = async () => {
-            if (!id) return;
-            
-            const [playerRes, matchesRes, statsRes, sessionsRes] = await Promise.all([
-                supabase.from('players').select('*, email, mobile_number, status, trusted_devices').eq('id', id).single(),
-                supabase.from('matches').select('id, date, competition, result'),
-                supabase.from('match_player_stats').select('*').eq('player_id', id),
-                supabase.from('training_sessions').select('id, date, topic, attendance').order('date', { ascending: false }).limit(10)
-            ]);
- 
-            if (sessionsRes.data) {
-                const playerSessions = sessionsRes.data.map((session: any) => {
-                    const attendanceList = session.attendance || [];
-                    const record = attendanceList.find((a: any) => a.playerId === id);
-                    return {
-                        id: session.id,
-                        date: session.date,
-                        topic: session.topic || "Squad Practice",
-                        status: record?.status || "Unanswered",
-                        notes: record?.notes || ""
-                    };
-                });
-                setRecentActivity(playerSessions);
-            }
- 
-            if (playerRes.data) {
-                const data = playerRes.data;
-                setPlayer({
-                    id: data.id,
-                    firstName: data.first_name,
-                    lastName: data.last_name,
-                    position: data.position,
-                    squadNumber: data.squad_number,
-                    age: data.age,
-                    nationality: data.nationality,
-                    squad: data.squad,
-                    medicalStatus: data.medical_status,
-                    availability: data.availability,
-                    contractExpiry: data.contract_expiry,
-                    imageUrl: data.image_url,
-                    appearances: data.appearances, // fallback
-                    goals: data.goals, // fallback
-                    assists: data.assists, // fallback
-                    dateOfBirth: data.date_of_birth,
-                    notes: data.notes,
-                    isInTrainingSquad: data.is_in_training_squad,
-                    medicalNotes: data.medical_notes,
-                    email: data.email,
-                    mobileNumber: data.mobile_number,
-                    status: data.status || "Pending Activation",
-                    trustedDevices: data.trusted_devices || [],
-                    nickname: data.nickname || "",
-                    useNickname: data.use_nickname || false
-                } as any);
-            }
- 
-            // Calculate dynamic stats
-            const matches = matchesRes.data || [];
-            const stats = statsRes.data || [];
- 
-            const matchSeasons = new Map<string, string>();
-            const matchCompetitions = new Map<string, string>();
-            const matchResultsMap = new Map<string, string>();
-            const seasonSet = new Set<string>();
-            matches.forEach((m: any) => {
-                let seasonStr = "";
-                if (!m.date) {
+    const fetchPlayer = async () => {
+        if (!id) return;
+        
+        const [playerRes, matchesRes, statsRes, sessionsRes] = await Promise.all([
+            supabase.from('players').select('*, email, mobile_number, status, trusted_devices').eq('id', id).single(),
+            supabase.from('matches').select('id, date, competition, result'),
+            supabase.from('match_player_stats').select('*').eq('player_id', id),
+            supabase.from('training_sessions').select('id, date, topic, attendance').order('date', { ascending: false }).limit(25)
+        ]);
+
+        const rawPlayer = playerRes.data;
+        const dep = rawPlayer ? parsePlayerDeparture(rawPlayer) : { isFormer: false, departureStatus: "Active" as const };
+
+        if (sessionsRes.data) {
+            const relevantSessions = sessionsRes.data.filter((session: any) => {
+                const attendanceList = session.attendance || [];
+                const hasRecord = attendanceList.some((a: any) => a.playerId === id);
+                if (hasRecord) return true;
+                if (dep.isFormer) {
+                    return dep.departureDate ? session.date <= dep.departureDate : false;
+                }
+                return true;
+            }).slice(0, 10);
+
+            const playerSessions = relevantSessions.map((session: any) => {
+                const attendanceList = session.attendance || [];
+                const record = attendanceList.find((a: any) => a.playerId === id);
+                return {
+                    id: session.id,
+                    date: session.date,
+                    topic: session.topic || "Squad Practice",
+                    status: record?.status || "Unanswered",
+                    notes: record?.notes || ""
+                };
+            });
+            setRecentActivity(playerSessions);
+        }
+
+        if (rawPlayer) {
+            const regType = rawPlayer.notes && rawPlayer.notes.includes("[REG:Dual]")
+                ? "Dual"
+                : (rawPlayer.notes && (rawPlayer.notes.includes("[REG:LoanParent]") || rawPlayer.notes.includes("[REG:LoanSub]")) ? "Loan" : "Standard");
+            const isParentClub = rawPlayer.notes && rawPlayer.notes.includes("[REG:LoanParent]") ? true : false;
+            const loanClub = rawPlayer.notes && rawPlayer.notes.match(/\[LOAN_CLUB:([^\]]+)\]/) ? rawPlayer.notes.match(/\[LOAN_CLUB:([^\]]+)\]/)![1] : undefined;
+            const loanEndDate = rawPlayer.notes && rawPlayer.notes.match(/\[LOAN_END:([^\]]+)\]/) ? rawPlayer.notes.match(/\[LOAN_END:([^\]]+)\]/)![1] : undefined;
+            setPlayer({
+                id: rawPlayer.id,
+                firstName: rawPlayer.first_name,
+                lastName: rawPlayer.last_name,
+                position: rawPlayer.position,
+                squadNumber: rawPlayer.squad_number,
+                age: rawPlayer.age,
+                nationality: rawPlayer.nationality,
+                squad: rawPlayer.squad,
+                medicalStatus: rawPlayer.medical_status,
+                availability: rawPlayer.availability,
+                contractExpiry: rawPlayer.contract_expiry,
+                imageUrl: rawPlayer.image_url,
+                appearances: rawPlayer.appearances, // fallback
+                goals: rawPlayer.goals, // fallback
+                assists: rawPlayer.assists, // fallback
+                dateOfBirth: rawPlayer.date_of_birth,
+                notes: rawPlayer.notes,
+                isInTrainingSquad: rawPlayer.is_in_training_squad,
+                medicalNotes: rawPlayer.medical_notes,
+                email: rawPlayer.email,
+                mobileNumber: rawPlayer.mobile_number,
+                status: rawPlayer.status || "Pending Activation",
+                trustedDevices: rawPlayer.trusted_devices || [],
+                nickname: rawPlayer.nickname || "",
+                useNickname: rawPlayer.use_nickname || false,
+                registrationType: regType,
+                isParentClub,
+                loanClub,
+                loanEndDate,
+                departureStatus: dep.departureStatus,
+                departureReason: dep.departureReason,
+                departureDate: dep.departureDate,
+                departureNotes: dep.departureNotes,
+            } as any);
+        }
+
+        // Calculate dynamic stats
+        const matches = matchesRes.data || [];
+        const stats = statsRes.data || [];
+
+        const matchSeasons = new Map<string, string>();
+        const matchCompetitions = new Map<string, string>();
+        const matchResultsMap = new Map<string, string>();
+        const seasonSet = new Set<string>();
+        matches.forEach((m: any) => {
+            let seasonStr = "";
+            if (!m.date) {
+                seasonStr = getCurrentSeasonStr();
+            } else {
+                const d = new Date(m.date);
+                if (isNaN(d.getTime())) {
                     seasonStr = getCurrentSeasonStr();
                 } else {
-                    const d = new Date(m.date);
-                    if (isNaN(d.getTime())) {
-                        seasonStr = getCurrentSeasonStr();
-                    } else {
-                        const year = d.getFullYear();
-                        const month = d.getMonth();
-                        if (month >= 5) seasonStr = `${year.toString().slice(2)}/${(year + 1).toString().slice(2)}`;
-                        else seasonStr = `${(year - 1).toString().slice(2)}/${year.toString().slice(2)}`;
-                    }
+                    const year = d.getFullYear();
+                    const month = d.getMonth();
+                    if (month >= 5) seasonStr = `${year.toString().slice(2)}/${(year + 1).toString().slice(2)}`;
+                    else seasonStr = `${(year - 1).toString().slice(2)}/${year.toString().slice(2)}`;
                 }
-                matchSeasons.set(m.id, seasonStr);
-                matchCompetitions.set(m.id, m.competition || "");
-                matchResultsMap.set(m.id, m.result || "Pending");
-                seasonSet.add(seasonStr);
-            });
-            seasonSet.add(getCurrentSeasonStr());
-            setAvailableSeasons(Array.from(seasonSet).sort().reverse());
- 
-            let apps = 0;
-            let starts = 0;
-            let subApps = 0;
-            let goals = 0;
-            let assists = 0;
-            let yellow = 0;
-            let red = 0;
-            let minutes = 0;
-            let wins = 0;
-            let draws = 0;
-            let losses = 0;
-            
-            stats.forEach((s: any) => {
-                const season = matchSeasons.get(s.match_id);
-                if (seasonFilter !== "All" && season !== seasonFilter) return;
+            }
+            matchSeasons.set(m.id, seasonStr);
+            matchCompetitions.set(m.id, m.competition || "");
+            matchResultsMap.set(m.id, m.result || "Pending");
+            seasonSet.add(seasonStr);
+        });
+        seasonSet.add(getCurrentSeasonStr());
+        setAvailableSeasons(Array.from(seasonSet).sort().reverse());
 
-                const comp = matchCompetitions.get(s.match_id) || "";
-                const isFriendly = comp.toLowerCase().includes("friendly") || comp.toLowerCase().includes("trial");
-                if (!includeFriendlies && isFriendly) return;
- 
-                // Sprint 13 implementation: accurate participation counting
-                if (s.participation_type === 'STARTER') {
-                    apps += 1;
-                    starts += 1;
-                    minutes += (s.minutes_played !== undefined && s.minutes_played !== null ? s.minutes_played : 90);
-                } else if (s.participation_type === 'SUB') {
-                    apps += 1;
-                    subApps += 1;
-                    minutes += (s.minutes_played || 0);
-                } else if (s.participation_type === 'UNUSED_SUB') {
-                    // 0 apps, 0 mins
-                } else {
-                    // Legacy fallback
-                    apps += 1;
-                    starts += 1;
-                    minutes += (s.minutes_played !== undefined && s.minutes_played !== null ? s.minutes_played : 90);
-                }
+        let apps = 0;
+        let starts = 0;
+        let subApps = 0;
+        let goals = 0;
+        let assists = 0;
+        let yellow = 0;
+        let red = 0;
+        let minutes = 0;
+        let wins = 0;
+        let draws = 0;
+        let losses = 0;
+        
+        stats.forEach((s: any) => {
+            const season = matchSeasons.get(s.match_id);
+            if (seasonFilter !== "All" && season !== seasonFilter) return;
 
-                goals += (s.goals || 0);
-                assists += (s.assists || 0);
-                yellow += (s.yellow_cards || 0);
-                red += (s.red_cards || 0);
+            const comp = matchCompetitions.get(s.match_id) || "";
+            const isFriendly = comp.toLowerCase().includes("friendly") || comp.toLowerCase().includes("trial");
+            if (!includeFriendlies && isFriendly) return;
 
-                const res = matchResultsMap.get(s.match_id);
-                if (res === "Win") wins++;
-                else if (res === "Draw") draws++;
-                else if (res === "Loss") losses++;
-            });
+            // Sprint 13 implementation: accurate participation counting
+            if (s.participation_type === 'STARTER') {
+                apps += 1;
+                starts += 1;
+                minutes += (s.minutes_played !== undefined && s.minutes_played !== null ? s.minutes_played : 90);
+            } else if (s.participation_type === 'SUB') {
+                apps += 1;
+                subApps += 1;
+                minutes += (s.minutes_played || 0);
+            } else if (s.participation_type === 'UNUSED_SUB') {
+                // 0 apps, 0 mins
+            } else {
+                // Legacy fallback
+                apps += 1;
+                starts += 1;
+                minutes += (s.minutes_played !== undefined && s.minutes_played !== null ? s.minutes_played : 90);
+            }
 
-            const winRate = apps > 0 ? Math.round((wins / apps) * 100) : 0;
-            setCalculatedStats({ apps, starts, subApps, goals, assists, yellow, red, minutes, wins, draws, losses, winRate });
- 
-            setLoading(false);
-        };
+            goals += (s.goals || 0);
+            assists += (s.assists || 0);
+            yellow += (s.yellow_cards || 0);
+            red += (s.red_cards || 0);
+
+            const res = matchResultsMap.get(s.match_id);
+            if (res === "Win") wins++;
+            else if (res === "Draw") draws++;
+            else if (res === "Loss") losses++;
+        });
+
+        const winRate = apps > 0 ? Math.round((wins / apps) * 100) : 0;
+        setCalculatedStats({ apps, starts, subApps, goals, assists, yellow, red, minutes, wins, draws, losses, winRate });
+
+        setLoading(false);
+    };
+
+    useEffect(() => {
         fetchPlayer();
     }, [id, seasonFilter, includeFriendlies]);
+
+    const handleOpenDepartureDialog = () => {
+        if (!player) return;
+        const isLoanOrDual = player.registrationType === "Loan" || player.registrationType === "Dual";
+        setDepartureReason(player.departureReason || (isLoanOrDual ? "Returned to parent club" : "Left club"));
+        setDepartureDate(player.departureDate || new Date().toISOString().split("T")[0]);
+        setDepartureNotes(player.departureNotes || "");
+        setIsDepartureOpen(true);
+    };
+
+    const handleMarkLeft = async () => {
+        if (!player) return;
+        setIsSavingDeparture(true);
+        try {
+            const updatedNotes = serializeDepartureToNotes(player.notes, {
+                reason: departureReason,
+                date: departureDate,
+                notes: departureNotes,
+            });
+            const { error } = await supabase
+                .from("players")
+                .update({
+                    notes: updatedNotes,
+                    availability: false,
+                })
+                .eq("id", player.id);
+            if (error) throw error;
+
+            await supabase
+                .from("players")
+                .update({
+                    club_status: departureReason,
+                    departure_reason: departureReason,
+                    departure_date: departureDate || null,
+                    departure_notes: departureNotes || null,
+                } as any)
+                .eq("id", player.id);
+
+            logActivity(
+                "Player Left Club",
+                `Marked ${player.firstName} ${player.lastName} as having left the club (${departureReason}${departureDate ? ` on ${departureDate}` : ""}). Historical match and training records preserved.`
+            );
+            setIsDepartureOpen(false);
+            await fetchPlayer();
+        } catch (err: any) {
+            alert("Failed to update player status: " + err.message);
+        } finally {
+            setIsSavingDeparture(false);
+        }
+    };
+
+    const handleRestore = async () => {
+        if (!player) return;
+        try {
+            const restoredNotes = stripDepartureTags(player.notes);
+            const { error } = await supabase
+                .from("players")
+                .update({
+                    notes: restoredNotes,
+                    medical_status: "Available",
+                    availability: true,
+                })
+                .eq("id", player.id);
+            if (error) throw error;
+
+            await supabase
+                .from("players")
+                .update({
+                    club_status: "Active",
+                    departure_reason: null,
+                    departure_date: null,
+                    departure_notes: null,
+                } as any)
+                .eq("id", player.id);
+
+            logActivity(
+                "Restored Player to Squad",
+                `Restored ${player.firstName} ${player.lastName} to the active squad.`
+            );
+            await fetchPlayer();
+        } catch (err: any) {
+            alert("Failed to restore player: " + err.message);
+        }
+    };
 
     if (loading) return <div className="p-8 text-center text-slate-500">Loading profile...</div>;
     if (!player) return notFound();
 
+    const isFormer = isFormerPlayer(player);
+    const departureInfo = parsePlayerDeparture(player);
     const SQUAD_LABELS: Record<string, string> = { firstTeam: "First Team", midweek: "Midweek", youth: "Youth" };
     const squadLabel = SQUAD_LABELS[player.squad as string] || player.squad;
 
@@ -334,6 +464,36 @@ export default function PlayerProfilePage() {
                 </Button>
             </div>
 
+            {isFormer && (
+                <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-300">
+                            <Archive className="w-4 h-4" />
+                            <span>Former Player — {departureInfo.departureReason || departureInfo.departureStatus}</span>
+                            {departureInfo.departureDate && (
+                                <span className="text-xs font-normal text-amber-700 dark:text-amber-400">
+                                    (Left on {new Date(departureInfo.departureDate + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })})
+                                </span>
+                            )}
+                        </div>
+                        {departureInfo.departureNotes && (
+                            <p className="text-xs text-amber-700 dark:text-amber-300/90 italic">
+                                Note: &ldquo;{departureInfo.departureNotes}&rdquo;
+                            </p>
+                        )}
+                        <p className="text-xs text-slate-600 dark:text-slate-400">
+                            Historical match statistics and training records are preserved. You can restore this player to the active squad at any time.
+                        </p>
+                    </div>
+                    <Button
+                        onClick={handleRestore}
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 text-xs"
+                    >
+                        <RotateCcw className="h-4 w-4 mr-1.5" /> Restore to Active Squad
+                    </Button>
+                </div>
+            )}
+
             {/* Header Section */}
             <div className="flex flex-col md:flex-row gap-6 items-start bg-white p-6 rounded-lg border shadow-sm">
                 <Avatar className="h-32 w-32 border-4 border-slate-100">
@@ -347,12 +507,69 @@ export default function PlayerProfilePage() {
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div>
                             <h2 className="text-3xl font-bold text-slate-900">{formatPlayerName(player)}</h2>
-                            <div className="flex items-center gap-3 mt-1">
+                            <div className="flex items-center gap-3 mt-1 flex-wrap">
                                 <span className="text-slate-500 font-medium">{player.position}</span>
                                 <Badge className="bg-slate-900">{squadLabel}</Badge>
+                                {(player.registrationType === "Loan" || player.registrationType === "Dual") && (
+                                    <Badge variant="outline" className="border-purple-300 text-purple-700 bg-purple-50">
+                                        {player.registrationType === "Loan"
+                                            ? player.isParentClub
+                                                ? "Loaned Out"
+                                                : "On Loan"
+                                            : "Dual Reg"}
+                                    </Badge>
+                                )}
+                                {player.loanClub && (
+                                    <Badge variant="outline" className="border-purple-300 text-purple-700 bg-purple-50/70 gap-1">
+                                        <Building2 className="w-3 h-3" />
+                                        {player.registrationType === "Loan"
+                                            ? player.isParentClub
+                                                ? `To: ${player.loanClub}`
+                                                : `From: ${player.loanClub}`
+                                            : `Dual: ${player.loanClub}`}
+                                    </Badge>
+                                )}
+                                {player.registrationType === "Loan" && player.loanEndDate && (
+                                    <Badge
+                                        variant="outline"
+                                        className={cn(
+                                            "gap-1",
+                                            getLoanExpiryStatus(player.loanEndDate).status === "expired"
+                                                ? "border-red-300 text-red-700 bg-red-50"
+                                                : getLoanExpiryStatus(player.loanEndDate).status === "expiring_soon"
+                                                ? "border-amber-300 text-amber-700 bg-amber-50"
+                                                : "border-slate-300 text-slate-700 bg-slate-50"
+                                        )}
+                                    >
+                                        <Clock className="w-3 h-3" />
+                                        {getLoanExpiryStatus(player.loanEndDate).label}
+                                    </Badge>
+                                )}
+                                {isFormer && (
+                                    <Badge variant="outline" className="border-amber-400 text-amber-700 bg-amber-50">
+                                        {departureInfo.departureReason || departureInfo.departureStatus}
+                                    </Badge>
+                                )}
                             </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex flex-wrap gap-2">
+                            {isFormer ? (
+                                <Button
+                                    variant="outline"
+                                    onClick={handleRestore}
+                                    className="border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                                >
+                                    <RotateCcw className="h-4 w-4 mr-2" /> Restore to Squad
+                                </Button>
+                            ) : (
+                                <Button
+                                    variant="outline"
+                                    onClick={handleOpenDepartureDialog}
+                                    className="border-amber-300 text-amber-700 hover:bg-amber-50"
+                                >
+                                    <UserMinus className="h-4 w-4 mr-2" /> Mark as Left Club
+                                </Button>
+                            )}
                             <Button asChild className="bg-slate-900 hover:bg-slate-800">
                                 <Link href="/squad">
                                     <Edit className="h-4 w-4 mr-2" /> Edit Profile
@@ -364,18 +581,43 @@ export default function PlayerProfilePage() {
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
                         <div>
                             <p className="text-xs text-slate-500 uppercase font-bold">Nationality</p>
-                            <p className="font-medium">{player.nationality}</p>
+                            <p className="font-medium text-slate-900">{player.nationality}</p>
                         </div>
                         <div>
                             <p className="text-xs text-slate-500 uppercase font-bold">Age</p>
-                            <p className="font-medium">{displayAge}</p>
+                            <p className="font-medium text-slate-900">{displayAge}</p>
                         </div>
                         <div>
                             <p className="text-xs text-slate-500 uppercase font-bold">Status</p>
-                            <p className={`font-medium ${player.medicalStatus === 'Available' ? 'text-green-600' : 'text-red-600'}`}>
-                                {player.medicalStatus}
-                            </p>
+                            {isFormer ? (
+                                <p className="font-medium text-amber-600">
+                                    {departureInfo.departureReason || departureInfo.departureStatus}
+                                </p>
+                            ) : (
+                                <p className={`font-medium ${player.medicalStatus === 'Available' ? 'text-green-600' : 'text-red-600'}`}>
+                                    {player.medicalStatus}
+                                </p>
+                            )}
                         </div>
+                        {isFormer && departureInfo.departureDate ? (
+                            <div>
+                                <p className="text-xs text-slate-500 uppercase font-bold">Departure Date</p>
+                                <p className="font-medium text-slate-900">
+                                    {new Date(departureInfo.departureDate + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+                                </p>
+                            </div>
+                        ) : player.loanClub ? (
+                            <div>
+                                <p className="text-xs text-slate-500 uppercase font-bold">
+                                    {player.registrationType === "Loan"
+                                        ? player.isParentClub
+                                            ? "Loaned To"
+                                            : "Parent Club"
+                                        : "Dual Reg Club"}
+                                </p>
+                                <p className="font-medium text-purple-700">{player.loanClub}</p>
+                            </div>
+                        ) : null}
                     </div>
                 </div>
             </div>
@@ -498,6 +740,103 @@ export default function PlayerProfilePage() {
                     </CardContent>
                 </Card>
             </div>
+
+            <Dialog open={isDepartureOpen} onOpenChange={setIsDepartureOpen}>
+                <DialogContent className="sm:max-w-[460px]">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <UserMinus className="w-5 h-5 text-amber-500" />
+                            Mark {formatPlayerName(player)} as Left Club
+                        </DialogTitle>
+                        <DialogDescription>
+                            This will move the player out of your active squad into <strong>Former Players</strong>. All historical appearances, goals, assists, and training attendance records will be preserved.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-2">
+                        {(player.registrationType === "Loan" || player.registrationType === "Dual") && (
+                            <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/25 text-xs text-purple-700 dark:text-purple-300">
+                                <strong>{player.registrationType === "Loan" ? "Loan Player" : "Dual-Registered Player"}:</strong> &ldquo;Returned to parent club&rdquo; is recommended when a loan or dual spell concludes.
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                Departure Status / Reason
+                            </label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                {DEPARTURE_REASONS.map((reason) => {
+                                    const isSelected = departureReason === reason;
+                                    const isRecommended =
+                                        reason === "Returned to parent club" &&
+                                        (player.registrationType === "Loan" || player.registrationType === "Dual");
+                                    return (
+                                        <button
+                                            key={reason}
+                                            type="button"
+                                            onClick={() => setDepartureReason(reason)}
+                                            className={`text-left px-3 py-2 rounded-lg border text-xs font-semibold transition-all flex items-center justify-between gap-1.5 ${
+                                                isSelected
+                                                    ? "bg-amber-500/15 border-amber-500 text-foreground shadow-sm"
+                                                    : "bg-surface-1 border-border text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                                            }`}
+                                        >
+                                            <span className="truncate">{reason}</span>
+                                            {isRecommended && (
+                                                <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-600 dark:text-purple-300 font-bold shrink-0">
+                                                    Loan/Dual
+                                                </span>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                Departure Date
+                            </label>
+                            <Input
+                                type="date"
+                                value={departureDate}
+                                onChange={(e) => setDepartureDate(e.target.value)}
+                                className="h-9 text-sm"
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                                Departure Note (Optional)
+                            </label>
+                            <textarea
+                                value={departureNotes}
+                                onChange={(e) => setDepartureNotes(e.target.value)}
+                                placeholder="e.g. Recalled by parent club after loan spell, transferred to local side..."
+                                className="w-full h-20 px-3 py-2 border border-border rounded-md text-xs bg-background text-foreground resize-none focus:ring-2 focus:ring-brand/40 focus:outline-none"
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button
+                            variant="outline"
+                            onClick={() => setIsDepartureOpen(false)}
+                            disabled={isSavingDeparture}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleMarkLeft}
+                            disabled={isSavingDeparture}
+                            className="bg-amber-600 hover:bg-amber-700 text-white"
+                        >
+                            {isSavingDeparture ? "Archiving..." : "Mark as Left Club"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
+

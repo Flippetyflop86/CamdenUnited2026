@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart3, Plus, Minus, Search, Trash2, Filter, RefreshCw, Link as LinkIcon, Check } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
+import { isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
 
 interface MatchPlayerStat {
     id: string;
@@ -119,7 +120,7 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
     const fetchData = async () => {
         setIsLoading(true);
         // Fetch all players
-        const { data: pData } = await supabase.from('players').select('id, first_name, last_name, position, squad').order('last_name');
+        const { data: pData } = await supabase.from('players').select('id, first_name, last_name, position, squad, notes').order('last_name');
         if (pData) setPlayers(pData);
 
         // Fetch existing stats for this match
@@ -403,6 +404,13 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
 
     const availablePlayers = players
         .filter(p => !stats.find(s => s.player_id === p.id))
+        .filter(p => {
+            if (!isFormerPlayer(p)) return true;
+            if (search.trim().length > 0) return true;
+            const dep = parsePlayerDeparture(p);
+            if (matchDate && dep.departureDate && matchDate <= dep.departureDate) return true;
+            return false;
+        })
         .filter(p => search === "" || `${p.first_name} ${p.last_name}`.toLowerCase().includes(search.toLowerCase()))
         .filter(p => {
             const mappedSquad = SQUAD_LABELS[p.squad] || p.squad;

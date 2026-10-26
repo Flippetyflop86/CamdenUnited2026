@@ -175,6 +175,7 @@ function generateSecondaryColor(hex: string): string {
 
 export function ClubProvider({ children }: { children: React.ReactNode }) {
     const { user, clubId, isLoading: authLoading } = useAuth();
+    const [isMounted, setIsMounted] = useState(false);
     const [settings, setSettings] = useState<ClubSettings>(() => {
         if (typeof window === 'undefined') return defaultSettings;
         try {
@@ -192,6 +193,10 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             return false;
         }
     });
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     // Initial Fetch
     useEffect(() => {
@@ -424,7 +429,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         console.log(`[DEBUG] ClubProvider isLoaded: ${isLoaded}`);
     }, [isLoaded]);
 
-    if (!isLoaded) {
+    if (!isMounted || !isLoaded) {
         console.log(`[DEBUG] ClubProvider returning loading spinner. children will unmount!`);
         return (
             <div className="min-h-screen bg-slate-50 flex items-center justify-center">

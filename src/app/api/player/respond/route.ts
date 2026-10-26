@@ -100,7 +100,7 @@ export async function GET(request: Request) {
         const [playersRes, recruitsRes] = await Promise.all([
             supabaseAdmin
                 .from("players")
-                .select("id, first_name, last_name, position, squad, pin_hash, is_in_training_squad")
+                .select("id, first_name, last_name, position, squad, pin_hash, is_in_training_squad, notes")
                 .eq("club_id", event.club_id),
             supabaseAdmin
                 .from("recruits")
@@ -112,8 +112,11 @@ export async function GET(request: Request) {
         const squadData = playersRes.data || [];
         const recruitsData = recruitsRes.data || [];
 
-        // Filter squad to First Team only for both matches and training
+        // Filter squad to active First Team players only for both matches and training
         const eligible = squadData.filter((player: any) => {
+            if (player.notes && /\[LEFT_STATUS:[^\]]+\]/.test(player.notes) && !player.notes.includes("[LEFT_STATUS:Active]")) {
+                return false;
+            }
             const playerSquad = player.squad || "";
             const cleanSquad = playerSquad.toLowerCase().replace(/[\s-_]+/g, "");
             return cleanSquad.includes("firstteam") || cleanSquad.includes("first team") || playerSquad === "" || playerSquad === null;

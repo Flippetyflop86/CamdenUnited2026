@@ -24,6 +24,7 @@ import {
     ChevronUp
 } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { isFormerPlayer } from "@/lib/utils";
 import { useClub } from "@/context/club-context";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 import {
@@ -142,6 +143,7 @@ export default function SquadPlannerPage() {
                 }));
 
                 filteredPlayers = mapped.filter(p => {
+                    if (isFormerPlayer(p)) return false;
                     const playerSquads = Array.isArray(p.squad) 
                         ? p.squad 
                         : typeof p.squad === "string" 
