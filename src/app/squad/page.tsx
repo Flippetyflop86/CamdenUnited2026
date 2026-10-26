@@ -64,7 +64,6 @@ const getCurrentSeasonStr = () => {
 };
 
 type TableSortField = "position" | "squadNumber" | "name" | "age" | "status" | "apps" | "starts" | "subApps" | "goals" | "assists" | "minutes" | "cards";
-type AgeFilterType = "All" | "U18" | "U21" | "U23" | "23-29" | "30+";
 
 const getPlayerAge = (player: Player): number | null => {
     if (player.dateOfBirth) {
@@ -88,7 +87,6 @@ const getPlayerAge = (player: Player): number | null => {
 export default function SquadPage() {
     const [searchTerm, setSearchTerm] = useState("");
     const [positionFilter, setPositionFilter] = useState<"All" | "GK" | "DEF" | "MID" | "FWD">("All");
-    const [ageFilter, setAgeFilter] = useState<AgeFilterType>("All");
     const [showAvailableOnly, setShowAvailableOnly] = useState(false);
     const [showLoanOnly, setShowLoanOnly] = useState(false);
     const [squadViewMode, setSquadViewMode] = useState<"active" | "former">("active");
@@ -995,19 +993,9 @@ export default function SquadPage() {
             positionFilter === "All" ||
             matchesSinglePos(player.position) ||
             (player.secondaryPositions || []).some((secPos) => matchesSinglePos(secPos));
-        const matchesAge = ageFilter === "All" || (() => {
-            const playerAge = getPlayerAge(player);
-            if (playerAge === null) return false;
-            if (ageFilter === "U18") return playerAge < 18;
-            if (ageFilter === "U21") return playerAge < 21;
-            if (ageFilter === "U23") return playerAge < 23;
-            if (ageFilter === "23-29") return playerAge >= 23 && playerAge <= 29;
-            if (ageFilter === "30+") return playerAge >= 30;
-            return true;
-        })();
         const matchesAvailability = squadViewMode === "former" || !showAvailableOnly || player.medicalStatus === "Available";
         const matchesLoan = !showLoanOnly || (player.registrationType === "Loan" && !player.isParentClub);
-        return matchesSearch && matchesSquad && matchesPosition && matchesAge && matchesAvailability && matchesLoan;
+        return matchesSearch && matchesSquad && matchesPosition && matchesAvailability && matchesLoan;
     });
 
     const positionOrder: Record<string, number> = { "GK": 1, "DEF": 2, "LB": 3, "CB": 4, "LCB": 5, "RCB": 6, "RB": 7, "LWB": 8, "RWB": 9, "CDM": 10, "MID": 11, "CM": 12, "LM": 13, "RM": 14, "CAM": 15, "LW": 16, "RW": 17, "FWD": 18, "CF": 19, "ST": 20 };
@@ -1410,8 +1398,8 @@ export default function SquadPage() {
                     </div>
 
                     {/* Single-Row Filter Bar */}
-                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full xl:w-auto overflow-x-auto no-scrollbar">
-                        <div className="relative w-full sm:w-48 shrink-0">
+                    <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto xl:justify-end">
+                        <div className="relative w-full sm:w-40 shrink-0">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
                             <Input placeholder="Search players..." className="pl-8 h-9 text-xs bg-background border-border" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                         </div>
@@ -1464,25 +1452,6 @@ export default function SquadPage() {
                                 </button>
                             ))}
                         </div>
-
-                        {/* Age Filter */}
-                        <select
-                            value={ageFilter}
-                            onChange={(e) => setAgeFilter(e.target.value as AgeFilterType)}
-                            className={`h-9 px-2.5 rounded-lg border text-xs font-semibold transition-colors cursor-pointer shrink-0 ${
-                                ageFilter !== "All"
-                                    ? "bg-primary/10 border-primary/40 text-foreground"
-                                    : "bg-surface-1 border-border text-muted-foreground hover:text-foreground"
-                            }`}
-                            title="Filter by Age"
-                        >
-                            <option value="All">All Ages</option>
-                            <option value="U18">U18 (&lt; 18)</option>
-                            <option value="U21">U21 (&lt; 21)</option>
-                            <option value="U23">U23 (&lt; 23)</option>
-                            <option value="23-29">Ages 23–29</option>
-                            <option value="30+">Ages 30+</option>
-                        </select>
 
                         {/* View Layout Toggle (Cards vs Compact) */}
                         <div className="flex gap-1 bg-surface-1 p-1 rounded-lg border border-border shrink-0">
