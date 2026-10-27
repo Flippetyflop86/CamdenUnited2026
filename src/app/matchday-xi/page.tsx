@@ -874,6 +874,23 @@ export default function MatchdayXIPage() {
         saveLineup(updated);
     };
 
+    const handleKickOffTimeChange = async (newTime: string) => {
+        if (!selectedMatchId || !newTime) return;
+        setNextMatch(prev => (prev && prev.id === selectedMatchId ? { ...prev, time: newTime } : prev));
+        setMatches(prev => prev.map(m => (m.id === selectedMatchId ? { ...m, time: newTime } : m)));
+        setSaveStatus("saving");
+        const { error } = await supabase
+            .from("matches")
+            .update({ time: newTime })
+            .eq("id", selectedMatchId);
+        if (error) {
+            console.error("Failed to update match kick-off time:", error);
+            showToast("Failed to save kick-off time", "error");
+        } else {
+            setSaveStatus("saved");
+        }
+    };
+
     const handleKitChange = (kitOverride: "auto" | "home" | "away" | "custom", customKitColor?: string, gkKitColor?: string) => {
         if (!lineup) return;
         const updated: MatchdayXI = {
@@ -1281,6 +1298,14 @@ export default function MatchdayXIPage() {
         }
     };
 
+    const getPlayerReadinessBonus = (p: Player): number => {
+        const rawStats = seasonStatsMap[p.id];
+        const apps = Math.max(rawStats?.apps || 0, p.appearances || 0);
+        const goals = Math.max(rawStats?.goals || 0, p.goals || 0);
+        const assists = Math.max(rawStats?.assists || 0, p.assists || 0);
+        return Math.min(8, apps * 0.5) + Math.min(4, (goals + assists) * 0.3);
+    };
+
     const handleAutoPickXI = async () => {
         if (!lineup) return;
         const currentFormation = FORMATIONS[lineup.formation];
@@ -1314,6 +1339,10 @@ export default function MatchdayXIPage() {
                 else if (getPositionCategory(candidate.position) === slotCat) score = 10;
                 else if (candidate.secondaryPositions?.some(pos => getPositionCategory(pos) === slotCat)) score = 8;
                 else if (slot.label.toUpperCase() !== "GK" && candidate.position.toUpperCase() !== "GK") score = 1;
+
+                if (score > 0) {
+                    score += getPlayerReadinessBonus(candidate);
+                }
 
                 if (score > bestScore) {
                     bestScore = score;
@@ -1356,20 +1385,115 @@ export default function MatchdayXIPage() {
         }
 
         const newSubs = [...lineup.substitutes];
-        let added = 0;
+        const emptyIndices: number[] = [];
+        newSubs.forEach((subId, idx) => {
+            if (!subId) emptyIndices.push(idx);
+        });
 
-        // Only fill the existing empty bench slots (do not add extra slots)
-        for (let i = 0; i < newSubs.length; i++) {
-            if (!newSubs[i] && pool.length > added) {
-                newSubs[i] = pool[added].id;
-                added++;
-            }
-        }
-
-        if (added === 0) {
+        if (emptyIndices.length === 0) {
             showToast("Bench is already full", "info");
             return;
         }
+
+        // Group available pool by unit (DEF, MID, FWD, GK) and rank by appearances/contributions
+        const sortedPool = [...pool].sort((a, b) => getPlayerReadinessBonus(b) - getPlayerReadinessBonus(a));
+        const buckets: Record<"DEF" | "MID" | "FWD" | "GK", Player[]> = {
+            DEF: [],
+            MID: [],
+            FWD: [],
+            GK: []
+        };
+
+        sortedPool.forEach(p => {
+            const cat = getPositionCategory(p.position);
+            if (cat === "GK") buckets.GK.push(p);
+            else if (cat === "DEF") buckets.DEF.push(p);
+            else if (cat === "FWD") buckets.FWD.push(p);
+            else buckets.MID.push(p);
+        });
+
+        // Track current positional counts on the bench so we pick a balanced bench
+        const unitCounts: Record<"DEF" | "MID" | "FWD" | "GK", number> = { DEF: 0, MID: 0, FWD: 0, GK: 0 };
+        const exactPosCounts: Record<string, number> = {};
+        newSubs.forEach(subId => {
+            if (!subId) return;
+            const p = resolvePlayerOrTrialist(subId);
+            if (!p) return;
+            const cat = getPositionCategory(p.position);
+            if (cat === "GK" || cat === "DEF" || cat === "MID" || cat === "FWD") {
+                unitCounts[cat]++;
+            }
+            const exact = p.position.toUpperCase();
+            exactPosCounts[exact] = (exactPosCounts[exact] || 0) + 1;
+        });
+
+        // Pick from a unit while preferring sub-positions not yet represented on the bench (e.g. CB + RB, CDM + CAM, LW + ST)
+        const pickNextFromBucket = (unit: "DEF" | "MID" | "FWD" | "GK"): Player | null => {
+            const list = buckets[unit];
+            if (list.length === 0) return null;
+            let bestIdx = 0;
+            let bestScore = -999;
+            list.forEach((cand, i) => {
+                const exact = cand.position.toUpperCase();
+                const duplicatePenalty = (exactPosCounts[exact] || 0) * 6;
+                const score = getPlayerReadinessBonus(cand) - duplicatePenalty;
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestIdx = i;
+                }
+            });
+            const [chosen] = list.splice(bestIdx, 1);
+            if (chosen) {
+                unitCounts[unit]++;
+                const exact = chosen.position.toUpperCase();
+                exactPosCounts[exact] = (exactPosCounts[exact] || 0) + 1;
+            }
+            return chosen || null;
+        };
+
+        // Ideal bench balance cycle: ensure coverage across DEF, MID, FWD first (e.g. 1-2 DEF, 2 MID, 1-2 FWD)
+        const priorityCycle: Array<"DEF" | "MID" | "FWD"> = ["DEF", "MID", "FWD", "MID", "DEF", "FWD"];
+        const pickedPlayers: Player[] = [];
+
+        for (let slotNum = 0; slotNum < emptyIndices.length; slotNum++) {
+            // Find the outfield unit with the lowest current count on the bench that still has players available
+            const availableOutfieldUnits = (["DEF", "MID", "FWD"] as const).filter(u => buckets[u].length > 0);
+            let chosenPlayer: Player | null = null;
+
+            if (availableOutfieldUnits.length > 0) {
+                // Sort available outfield units by lowest count on bench, breaking ties using priorityCycle order
+                const preferredUnit = [...availableOutfieldUnits].sort((a, b) => {
+                    if (unitCounts[a] !== unitCounts[b]) return unitCounts[a] - unitCounts[b];
+                    return priorityCycle.indexOf(a) - priorityCycle.indexOf(b);
+                })[0];
+                chosenPlayer = pickNextFromBucket(preferredUnit);
+            } else if (buckets.GK.length > 0) {
+                chosenPlayer = pickNextFromBucket("GK");
+            }
+
+            if (chosenPlayer) {
+                pickedPlayers.push(chosenPlayer);
+            }
+        }
+
+        if (pickedPlayers.length === 0) {
+            showToast("Bench is already full", "info");
+            return;
+        }
+
+        // Sort the newly picked bench players in clean positional order (DEF -> MID -> FWD)
+        pickedPlayers.sort((a, b) => {
+            const orderA = POSITION_ORDER[a.position.toUpperCase()] || 99;
+            const orderB = POSITION_ORDER[b.position.toUpperCase()] || 99;
+            return orderA - orderB;
+        });
+
+        pickedPlayers.forEach((p, idx) => {
+            const targetSlotIdx = emptyIndices[idx];
+            if (targetSlotIdx !== undefined) {
+                newSubs[targetSlotIdx] = p.id;
+            }
+        });
 
         const updated: MatchdayXI = {
             ...lineup,
@@ -1378,7 +1502,7 @@ export default function MatchdayXIPage() {
         };
         setLineup(updated);
         await saveLineup(updated);
-        showToast(`Filled bench with ${added} available player${added > 1 ? "s" : ""}`);
+        showToast(`Filled bench with ${pickedPlayers.length} balanced sub${pickedPlayers.length > 1 ? "s" : ""} (DEF / MID / FWD)`);
     };
 
     const handleClearBench = async () => {
@@ -2496,20 +2620,21 @@ export default function MatchdayXIPage() {
                                             <Calendar className="h-3.5 w-3.5" />
                                             {new Date(nextMatch.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
                                         </span>
-                                        <span className="inline-flex items-center gap-1">
-                                            <Clock className="h-3.5 w-3.5" /> KO {nextMatch.time}
-                                        </span>
-                                        {/* Clickable Meet & Venue Pill (expands editor when clicked) */}
+                                        {/* Clickable KO, Meet & Venue Pill (expands editor when clicked) */}
                                         <button
                                             type="button"
                                             onClick={() => setShowLogisticsEditor(prev => !prev)}
-                                            title="Click to edit Meet Time & Venue / Pitch Notes"
+                                            title="Click to edit Kick-Off Time, Meet Time & Venue / Pitch Notes"
                                             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border transition-colors normal-case font-semibold ${
                                                 showLogisticsEditor
                                                     ? "bg-primary/15 text-primary border-primary/40"
                                                     : "bg-surface-2 hover:bg-surface-3 text-foreground border-border"
                                             }`}
                                         >
+                                            <span className="inline-flex items-center gap-1 font-bold text-foreground">
+                                                <Clock className="h-3 w-3 text-muted-foreground" /> KO {nextMatch.time || "14:00"}
+                                            </span>
+                                            <span className="text-muted-foreground">•</span>
                                             <span className="text-amber-500 font-bold">⏱ Meet {getFormattedMeetTime()}</span>
                                             <span className="text-muted-foreground">•</span>
                                             <MapPin className="h-3 w-3 text-primary shrink-0" />
@@ -2545,12 +2670,22 @@ export default function MatchdayXIPage() {
                         </div>
                     </div>
 
-                    {/* Collapsible Editor Row: Only shown when user clicks Meet / Venue pill */}
+                    {/* Collapsible Editor Row: Only shown when user clicks KO / Meet / Venue pill */}
                     {nextMatch && showLogisticsEditor && (
                         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60 text-xs animate-in fade-in duration-150">
                             <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1">
-                                <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Offset:</span>
+                                <Clock className="h-3.5 w-3.5 text-foreground shrink-0" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">KO:</span>
+                                <input
+                                    type="time"
+                                    value={nextMatch.time || "14:00"}
+                                    onChange={(e) => handleKickOffTimeChange(e.target.value)}
+                                    className="bg-transparent text-xs font-extrabold text-foreground focus:outline-none cursor-pointer"
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Meet Offset:</span>
                                 <select
                                     value={lineup.meetOffsetMinutes ?? 60}
                                     onChange={(e) => {
@@ -3436,42 +3571,46 @@ export default function MatchdayXIPage() {
                                                     if (editingNamePlayerId === subId) return;
                                                     setActiveSlot({ type: 'sub', index: idx, label: `Bench Slot ${idx + 1}` });
                                                 }}
-                                                className={`flex-1 min-w-0 flex items-center justify-between px-2.5 py-2 border rounded-xl shadow-sm transition-all cursor-pointer ${subId ? 'bg-surface-1 hover:border-primary/50 border-border group' : 'bg-surface-2 border-dashed border-border text-muted-foreground hover:bg-surface-3'}`}
+                                                className={`flex-1 min-w-0 flex flex-col justify-center px-2.5 py-2 border rounded-xl shadow-sm transition-all cursor-pointer ${subId ? 'bg-surface-1 hover:border-primary/50 border-border group gap-1' : 'bg-surface-2 border-dashed border-border text-muted-foreground hover:bg-surface-3'}`}
                                             >
                                                 {subId ? (
                                                     <>
-                                                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                                            <GripVertical className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-                                                            {editingNamePlayerId === subId ? (
-                                                                <input
-                                                                    type="text"
-                                                                    autoFocus
-                                                                    value={editingNameValue}
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                    onChange={(e) => setEditingNameValue(e.target.value)}
-                                                                    onKeyDown={(e) => {
-                                                                        e.stopPropagation();
-                                                                        if (e.key === "Enter") {
+                                                        {/* Line 1: Full Player Name across the entire card width */}
+                                                        <div className="flex items-center justify-between gap-1 min-w-0 w-full">
+                                                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                                                <GripVertical className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                                                                {editingNamePlayerId === subId ? (
+                                                                    <input
+                                                                        type="text"
+                                                                        autoFocus
+                                                                        value={editingNameValue}
+                                                                        onClick={(e) => e.stopPropagation()}
+                                                                        onChange={(e) => setEditingNameValue(e.target.value)}
+                                                                        onKeyDown={(e) => {
+                                                                            e.stopPropagation();
+                                                                            if (e.key === "Enter") {
+                                                                                handleCustomNameChange(subId, editingNameValue);
+                                                                                setEditingNamePlayerId(null);
+                                                                                showToast("Matchday display name updated");
+                                                                            } else if (e.key === "Escape") {
+                                                                                setEditingNamePlayerId(null);
+                                                                            }
+                                                                        }}
+                                                                        onBlur={() => {
                                                                             handleCustomNameChange(subId, editingNameValue);
                                                                             setEditingNamePlayerId(null);
-                                                                            showToast("Matchday display name updated");
-                                                                        } else if (e.key === "Escape") {
-                                                                            setEditingNamePlayerId(null);
-                                                                        }
-                                                                    }}
-                                                                    onBlur={() => {
-                                                                        handleCustomNameChange(subId, editingNameValue);
-                                                                        setEditingNamePlayerId(null);
-                                                                    }}
-                                                                    placeholder={player ? formatPlayerName(player) : "Display name..."}
-                                                                    className="w-full bg-surface-2 text-foreground text-xs font-semibold rounded px-1.5 py-0.5 outline-none ring-1 ring-primary"
-                                                                />
-                                                            ) : (
-                                                                <div className="flex items-center gap-1 min-w-0">
-                                                                    <span className="font-bold text-xs text-foreground truncate" title={displayName}>{displayName}</span>
-                                                                    <span className="text-[9px] uppercase text-muted-foreground font-bold shrink-0">
-                                                                        {isTrialist ? "GUEST" : player?.position}
+                                                                        }}
+                                                                        placeholder={player ? formatPlayerName(player) : "Display name..."}
+                                                                        className="w-full bg-surface-2 text-foreground text-xs font-semibold rounded px-1.5 py-0.5 outline-none ring-1 ring-primary"
+                                                                    />
+                                                                ) : (
+                                                                    <span className="font-bold text-xs text-foreground leading-tight break-words" title={displayName}>
+                                                                        {displayName}
                                                                     </span>
+                                                                )}
+                                                            </div>
+                                                            {editingNamePlayerId !== subId && (
+                                                                <div className="flex items-center gap-0.5 shrink-0">
                                                                     <button
                                                                         type="button"
                                                                         onClick={(e) => {
@@ -3480,23 +3619,41 @@ export default function MatchdayXIPage() {
                                                                             setEditingNameValue(displayName);
                                                                         }}
                                                                         title="Edit display name for Team Sheet"
-                                                                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-opacity p-0.5 shrink-0"
+                                                                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-opacity p-0.5"
                                                                     >
                                                                         <Pencil className="h-2.5 w-2.5" />
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            handleSubChange(idx, "");
+                                                                        }}
+                                                                        title="Remove player from bench slot"
+                                                                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-opacity p-0.5"
+                                                                    >
+                                                                        <X className="h-3 w-3" />
                                                                     </button>
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <div className="flex items-center gap-1 shrink-0 ml-1">
-                                                            {(isSubMotm || (subEvents && (subEvents.goals > 0 || subEvents.assists > 0 || subEvents.yellowCards > 0 || subEvents.redCards > 0))) && (
-                                                                <span className="text-[9px] font-bold bg-surface-2 px-1 py-0.5 rounded flex items-center gap-0.5">
-                                                                    {isSubMotm && "⭐"}
-                                                                    {subEvents && subEvents.goals > 0 && `⚽${subEvents.goals > 1 ? subEvents.goals : ""}`}
-                                                                    {subEvents && subEvents.assists > 0 && `👟${subEvents.assists > 1 ? subEvents.assists : ""}`}
-                                                                    {subEvents && subEvents.yellowCards > 0 && "🟨"}
-                                                                    {subEvents && subEvents.redCards > 0 && "🟥"}
+
+                                                        {/* Line 2: Position Badge + Events + Unused/Played Toggle */}
+                                                        <div className="flex items-center justify-between gap-1 pl-5 w-full">
+                                                            <div className="flex items-center gap-1 min-w-0">
+                                                                <span className="text-[10px] uppercase text-muted-foreground font-extrabold">
+                                                                    {isTrialist ? "GUEST" : player?.position}
                                                                 </span>
-                                                            )}
+                                                                {(isSubMotm || (subEvents && (subEvents.goals > 0 || subEvents.assists > 0 || subEvents.yellowCards > 0 || subEvents.redCards > 0))) && (
+                                                                    <span className="text-[9px] font-bold bg-surface-2 px-1 py-0.2 rounded flex items-center gap-0.5">
+                                                                        {isSubMotm && "⭐"}
+                                                                        {subEvents && subEvents.goals > 0 && `⚽${subEvents.goals > 1 ? subEvents.goals : ""}`}
+                                                                        {subEvents && subEvents.assists > 0 && `👟${subEvents.assists > 1 ? subEvents.assists : ""}`}
+                                                                        {subEvents && subEvents.yellowCards > 0 && "🟨"}
+                                                                        {subEvents && subEvents.redCards > 0 && "🟥"}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                             <button
                                                                 type="button"
                                                                 onClick={(e) => {
@@ -3527,11 +3684,11 @@ export default function MatchdayXIPage() {
                                                 )}
                                             </div>
 
-                                            {lineup.substitutes.length > 1 && (
+                                            {!subId && lineup.substitutes.length > 5 && (
                                                 <button
                                                     onClick={() => handleRemoveSub(idx)}
                                                     className="p-1 text-slate-400 hover:text-red-600 transition-colors rounded-full hover:bg-red-50 shrink-0"
-                                                    title="Remove slot"
+                                                    title="Remove extra bench slot"
                                                 >
                                                     <Trash2 className="h-3.5 w-3.5" />
                                                 </button>
