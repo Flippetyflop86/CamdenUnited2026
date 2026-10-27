@@ -1,233 +1,288 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, MapPin, Clock, Users } from "lucide-react";
-import { useClub } from "@/context/club-context";
-import { Match, TrainingSession } from "@/types";
+import { useState, useEffect } from "react";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Trophy, Dumbbell, Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
-interface WeeklyFootballCalendarProps {
-    matches?: Match[];
-    trainingSessions?: TrainingSession[];
-    initialDate?: Date;
+interface CalendarProps {
+    matches?: any[];
+    trainings?: any[];
     title?: string;
+    daysToShow?: 7 | 14;
+    onSelectMatch?: (matchId: string) => void;
 }
 
-export function WeeklyFootballCalendar({ matches: propMatches, trainingSessions: propTrainingSessions, initialDate = new Date(), title = "This Week" }: WeeklyFootballCalendarProps) {
-    const { settings } = useClub();
+export function WeeklyFootballCalendar({
+    matches: propMatches,
+    trainings: propTrainings,
+    title = "Next 14 Days",
+    daysToShow = 14,
+    onSelectMatch
+}: CalendarProps) {
+    const [fetchedMatches, setFetchedMatches] = useState<any[]>([]);
+    const [fetchedTrainings, setFetchedTrainings] = useState<any[]>([]);
     const [weekOffset, setWeekOffset] = useState(0);
-    const [fetchedMatches, setFetchedMatches] = useState<Match[]>([]);
-    const [fetchedSessions, setFetchedSessions] = useState<TrainingSession[]>([]);
-    const [leagueTeams, setLeagueTeams] = useState<any[]>([]);
+    const [isCollapsed, setIsCollapsed] = useState(false);
 
     useEffect(() => {
-        if (!propMatches) {
-            supabase.from('matches').select('*').then(({ data }) => {
-                if (data) setFetchedMatches(data);
-            });
+        if (typeof window !== "undefined") {
+            const saved = localStorage.getItem("clubflow_calendar_collapsed");
+            if (saved === "true") setIsCollapsed(true);
         }
-        supabase.from('league_teams').select('*').then(({ data }) => {
-            if (data) setLeagueTeams(data);
-        });
-    }, [propMatches]);
+    }, []);
+
+    const toggleCollapse = () => {
+        const next = !isCollapsed;
+        setIsCollapsed(next);
+        if (typeof window !== "undefined") {
+            localStorage.setItem("clubflow_calendar_collapsed", String(next));
+        }
+    };
 
     useEffect(() => {
-        if (!propTrainingSessions) {
-            supabase.from('training_sessions').select('*').then(({ data }) => {
-                if (data) setFetchedSessions(data);
-            });
-        }
-    }, [propTrainingSessions]);
+        const loadInternalData = async () => {
+            if (!propMatches) {
+                const { data: mData } = await supabase.from('matches').select('*');
+                if (mData) setFetchedMatches(mData);
+            }
+            if (!propTrainings) {
+                const { data: tData } = await supabase.from('training_sessions').select('*');
+                if (tData) setFetchedTrainings(tData);
+            }
+        };
+        loadInternalData();
+    }, [propMatches, propTrainings]);
 
-    const matches = propMatches || fetchedMatches;
-    const trainingSessions = propTrainingSessions || fetchedSessions;
+    const activeMatches = propMatches || fetchedMatches;
+    const activeTrainings = propTrainings || fetchedTrainings;
 
-    const todayStr = new Date().toISOString().split("T")[0];
+    // Generate days starting from Monday of current week + weekOffset
+    const getCalendarDays = () => {
+        const today = new Date();
+        const currentDay = today.getDay(); // 0 is Sun, 1 is Mon
+        const diff = today.getDate() - currentDay + (currentDay === 0 ? -6 : 1) + (weekOffset * 7);
 
-    // Calculate days of the current viewed week
-    const weekDays = useMemo(() => {
-        const date = new Date(initialDate);
-        date.setDate(date.getDate() + weekOffset * 7);
-        const day = date.getDay();
-        const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-        const monday = new Date(date.setDate(diff));
+        const startOfPeriod = new Date(today);
+        startOfPeriod.setDate(diff);
+        startOfPeriod.setHours(0, 0, 0, 0);
 
         const days = [];
-        for (let i = 0; i < 7; i++) {
-            const current = new Date(monday);
-            current.setDate(monday.getDate() + i);
-            days.push(current);
+        for (let i = 0; i < daysToShow; i++) {
+            const d = new Date(startOfPeriod);
+            d.setDate(startOfPeriod.getDate() + i);
+            days.push(d);
         }
         return days;
-    }, [initialDate, weekOffset]);
-
-    const getDayEvents = (date: Date) => {
-        const dateStr = date.toISOString().split("T")[0];
-        
-        // Find match
-        const dayMatches = matches.filter(m => m.date === dateStr);
-        // Find training
-        const daySessions = trainingSessions.filter(s => s.date === dateStr);
-        
-        return {
-            matches: dayMatches,
-            sessions: daySessions
-        };
     };
 
-    // Calculate Matchday numbering
-    // Find next match in this week or future to label MD-X
-    const getMatchdayLabel = (date: Date, events: { matches: Match[], sessions: TrainingSession[] }, dayIndex: number) => {
-        const dayName = date.toLocaleDateString("en-US", { weekday: "long" });
-        if (!settings.useMatchdayNumbering) return dayName;
+    const calendarDays = getCalendarDays();
+    const todayStr = new Date().toISOString().split('T')[0];
 
-        if (events.matches.length > 0) return "Matchday";
+    const getEventsForDate = (dateObj: Date) => {
+        const year = dateObj.getFullYear();
+        const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const day = String(dateObj.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
 
-        // If no match today, find the next match in the future (within a reasonable timeframe, e.g. next 7 days)
-        // For simplicity, we just look at the current week's matches
-        const dateStr = date.toISOString().split("T")[0];
-        const futureMatches = matches.filter(m => m.date >= dateStr).sort((a, b) => a.date.localeCompare(b.date));
-        
-        if (futureMatches.length > 0) {
-            const nextMatch = futureMatches[0];
-            const nextMatchDate = new Date(nextMatch.date);
-            const diffTime = nextMatchDate.getTime() - date.getTime();
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        const dayMatches = activeMatches.filter(m => m.date === dateStr);
+        const dayTrainings = activeTrainings.filter(t => t.date === dateStr);
 
-            if (diffDays === 0) return "Matchday";
-            if (diffDays > 0 && diffDays <= 6) return `MD-${diffDays}`;
-        }
+        const events: any[] = [];
 
-        // Look backwards for recovery
-        const pastMatches = matches.filter(m => m.date < dateStr).sort((a, b) => b.date.localeCompare(a.date));
-        if (pastMatches.length > 0) {
-            const lastMatch = pastMatches[0];
-            const lastMatchDate = new Date(lastMatch.date);
-            const diffTime = date.getTime() - lastMatchDate.getTime();
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            
-            if (diffDays === 1) return "Recovery"; // MD+1
-        }
+        dayMatches.forEach(m => {
+            const isHome = m.isHome !== undefined ? m.isHome : m.is_home;
+            const score = m.scoreline !== undefined ? m.scoreline : (m.result && m.result !== "Pending" ? m.result : "");
+            events.push({
+                type: 'match',
+                id: m.id,
+                title: `${isHome ? 'vs' : '@'} ${m.opponent}`,
+                opponent: m.opponent,
+                time: (m.time || '14:00').slice(0, 5),
+                isHome,
+                score,
+                competition: m.competition || 'League'
+            });
+        });
 
-        return dayName;
+        dayTrainings.forEach(t => {
+            events.push({
+                type: 'training',
+                id: t.id,
+                title: 'Training',
+                time: (t.start_time || t.time || '19:30').slice(0, 5),
+                subtitle: t.location || ''
+            });
+        });
+
+        return { dateStr, events };
     };
 
-    const nextWeek = () => setWeekOffset(prev => prev + 1);
-    const prevWeek = () => setWeekOffset(prev => prev - 1);
-    const currentWeek = () => setWeekOffset(0);
+    // Count upcoming matches & trainings in this window
+    const windowSummary = calendarDays.reduce(
+        (acc, d) => {
+            const { events } = getEventsForDate(d);
+            events.forEach(e => {
+                if (e.type === 'match') acc.matches += 1;
+                if (e.type === 'training') acc.trainings += 1;
+            });
+            return acc;
+        },
+        { matches: 0, trainings: 0 }
+    );
 
-    const isCurrentWeek = weekOffset === 0;
+    const periodStartLabel = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(calendarDays[0]);
+    const periodEndLabel = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short' }).format(calendarDays[calendarDays.length - 1]);
 
     return (
-        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col w-full mb-6">
-            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
-                <div className="flex items-center gap-2">
-                    <CalendarIcon className="h-4 w-4 text-slate-500" />
-                    <h3 className="font-bold text-slate-800 text-sm tracking-wide uppercase">{title}</h3>
+        <div className="space-y-2.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                <div className="flex items-center gap-2.5">
+                    <h2 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase flex items-center gap-2">
+                        <CalendarIcon className="h-4 w-4 text-brand" /> {title}
+                    </h2>
+                    <span className="text-xs font-medium text-muted-foreground bg-surface-2 px-2 py-0.5 rounded-full border border-border">
+                        {periodStartLabel} – {periodEndLabel}
+                    </span>
+                    {isCollapsed && (
+                        <span className="text-xs text-emerald-400 font-semibold">
+                            · {windowSummary.matches} {windowSummary.matches === 1 ? "Match" : "Matches"}
+                            {windowSummary.trainings > 0 ? `, ${windowSummary.trainings} Training` : ""}
+                        </span>
+                    )}
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                    {!isCollapsed && (
+                        <div className="flex items-center bg-surface-1 border border-border rounded-md overflow-hidden">
+                            <button
+                                type="button"
+                                onClick={() => setWeekOffset(w => w - 1)}
+                                className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
+                                title="Previous Week"
+                            >
+                                <ChevronLeft className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setWeekOffset(0)}
+                                className={`px-2.5 py-1 text-[11px] font-semibold border-x border-border transition-colors ${
+                                    weekOffset === 0 ? "text-brand bg-brand/10" : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                                }`}
+                            >
+                                Today
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setWeekOffset(w => w + 1)}
+                                className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
+                                title="Next Week"
+                            >
+                                <ChevronRight className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    )}
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={toggleCollapse}
+                        className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                    >
+                        {isCollapsed ? (
+                            <>Show Calendar <ChevronDown className="h-3.5 w-3.5 ml-1" /></>
+                        ) : (
+                            <>Hide <ChevronUp className="h-3.5 w-3.5 ml-1" /></>
+                        )}
+                    </Button>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-7 divide-y md:divide-y-0 md:divide-x divide-slate-100">
-                {weekDays.map((date, idx) => {
-                    const dateStr = date.toISOString().split("T")[0];
-                    const isToday = dateStr === todayStr;
-                    const events = getDayEvents(date);
-                    const dayLabel = getMatchdayLabel(date, events, idx);
-                    
-                    const hasMatch = events.matches.length > 0;
-                    const hasTraining = events.sessions.length > 0;
-                    
-                    // Determine primary event type and color
-                    let eventType = "Rest";
-                    let typeLabel = "Rest";
-                    let bgClass = "bg-transparent";
-                    let textClass = "text-slate-500";
-                    let borderClass = "border-transparent";
+            {!isCollapsed && (
+                <Card className="bg-surface-1 border-border shadow-sm overflow-hidden">
+                    <div className="grid grid-cols-2 sm:grid-cols-7 divide-y sm:divide-y-0 sm:divide-x divide-border">
+                        {calendarDays.map((dayObj, i) => {
+                            const { dateStr, events } = getEventsForDate(dayObj);
+                            const isToday = dateStr === todayStr;
+                            const dayName = new Intl.DateTimeFormat('en-GB', { weekday: 'short' }).format(dayObj);
+                            const dayNumber = dayObj.getDate();
+                            const monthShort = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(dayObj);
+                            const isSecondWeekRow = i >= 7;
 
-                    if (hasMatch) {
-                        eventType = "Match";
-                        typeLabel = "MATCH";
-                        bgClass = "bg-rose-50/50";
-                        textClass = "text-rose-700";
-                        borderClass = isToday ? "border-rose-400" : "border-rose-200";
-                    } else if (hasTraining) {
-                        eventType = "Training";
-                        typeLabel = "TRAINING";
-                        bgClass = "bg-emerald-50/50";
-                        textClass = "text-emerald-700";
-                        borderClass = isToday ? "border-emerald-400" : "border-emerald-200";
-                    } else if (dayLabel === "Recovery") {
-                        eventType = "Recovery";
-                        typeLabel = "RECOVERY";
-                        bgClass = "bg-sky-50/50";
-                        textClass = "text-sky-700";
-                        borderClass = isToday ? "border-sky-400" : "border-sky-200";
-                    } else {
-                        bgClass = "bg-slate-50/30";
-                        borderClass = isToday ? "border-slate-400" : "border-transparent";
-                    }
+                            return (
+                                <div
+                                    key={dateStr}
+                                    className={`p-2.5 min-h-[82px] flex flex-col transition-colors ${
+                                        isSecondWeekRow ? 'sm:border-t sm:border-border' : ''
+                                    } ${isToday ? 'bg-brand/5' : 'hover:bg-surface-2/40'}`}
+                                >
+                                    <div className="flex items-center justify-between mb-1.5">
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-brand' : 'text-muted-foreground'}`}>
+                                            {dayName}
+                                        </span>
+                                        <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded-full flex items-center justify-center ${
+                                            isToday ? 'bg-brand text-brand-foreground' : 'text-foreground'
+                                        }`}>
+                                            {dayNumber} {(dayNumber === 1 || i === 0) ? monthShort : ''}
+                                        </span>
+                                    </div>
 
-                    return (
-                        <div key={dateStr} className={`flex flex-col min-h-[140px] p-3 transition-colors ${bgClass} ${isToday ? `border-t-4 ${borderClass}` : 'border-t-4 border-transparent'}`}>
-                            <div className="flex justify-between items-start mb-2">
-                                <span className={`text-[10px] font-black uppercase tracking-wider ${isToday ? 'text-slate-900' : 'text-slate-500'}`}>
-                                    {dayLabel}
-                                </span>
-                                <span className={`text-xs font-semibold ${isToday ? 'text-slate-900 bg-slate-200 px-1.5 py-0.5 rounded' : 'text-slate-400'}`}>
-                                    {date.getDate()}
-                                </span>
-                            </div>
-
-                            <div className="mt-1 flex-1">
-                                {hasMatch ? (
-                                    <div className="space-y-2">
-                                        <div className={`text-xs font-bold flex items-center gap-1.5 ${textClass}`}>
-                                            {leagueTeams.find(t => t.name.toLowerCase() === events.matches[0].opponent.toLowerCase())?.badge_url && (
-                                                <img src={leagueTeams.find(t => t.name.toLowerCase() === events.matches[0].opponent.toLowerCase())?.badge_url} alt="Badge" className="h-4 w-4 object-contain" />
-                                            )}
-                                            {events.matches[0].opponent}
-                                        </div>
-                                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                                            <Clock className="w-3 h-3" />
-                                            {events.matches[0].time || "TBC"}
-                                        </div>
-                                        <div className="mt-2 text-[10px] font-semibold text-slate-600 bg-white/60 px-1.5 py-1 rounded inline-block">
-                                            {(events.matches[0].is_squad_confirmed || events.matches[0].notes?.includes("[Lineup: ") || (events.matches[0].lineup && Object.values(events.matches[0].lineup.starters || {}).some(Boolean))) ? "XI Saved" : "Prep Required"}
-                                        </div>
+                                    <div className="flex-1 flex flex-col gap-1 justify-center">
+                                        {events.length === 0 ? (
+                                            <div className="text-center py-1">
+                                                <span className="text-[10px] font-medium text-muted-foreground/30 select-none">—</span>
+                                            </div>
+                                        ) : (
+                                            events.map((ev, idx) => (
+                                                ev.type === 'match' ? (
+                                                    <button
+                                                        type="button"
+                                                        key={`${ev.id}-${idx}`}
+                                                        onClick={() => onSelectMatch && onSelectMatch(ev.id)}
+                                                        title={`${ev.title} (${ev.time}) ${ev.score ? `- Result: ${ev.score}` : ''}`}
+                                                        className={`text-left p-1.5 rounded border flex flex-col gap-0.5 transition-all cursor-pointer ${
+                                                            ev.isHome
+                                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
+                                                                : 'bg-sky-500/10 border-sky-500/30 text-sky-400 hover:bg-sky-500/20'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center justify-between gap-1 text-[10px] font-bold leading-tight">
+                                                            <span className="flex items-center gap-1 truncate">
+                                                                <Trophy className="h-2.5 w-2.5 shrink-0" />
+                                                                <span className="truncate">{ev.title}</span>
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-[9px] opacity-85 font-semibold">
+                                                            <span>{ev.time}</span>
+                                                            {ev.score ? (
+                                                                <span className="bg-black/30 px-1 rounded font-bold">{ev.score}</span>
+                                                            ) : (
+                                                                <span>{ev.isHome ? 'H' : 'A'}</span>
+                                                            )}
+                                                        </div>
+                                                    </button>
+                                                ) : (
+                                                    <div
+                                                        key={`${ev.id}-${idx}`}
+                                                        className="p-1.5 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex flex-col gap-0.5"
+                                                    >
+                                                        <div className="flex items-center gap-1 text-[10px] font-bold leading-tight">
+                                                            <Dumbbell className="h-2.5 w-2.5 shrink-0" />
+                                                            <span className="truncate">{ev.title}</span>
+                                                        </div>
+                                                        <span className="text-[9px] text-indigo-400/80 pl-3.5">{ev.time}</span>
+                                                    </div>
+                                                )
+                                            ))
+                                        )}
                                     </div>
-                                ) : hasTraining ? (
-                                    <div className="space-y-2">
-                                        <div className={`text-xs font-bold ${textClass}`}>
-                                            {events.sessions[0].topic || "Session"}
-                                        </div>
-                                        <div className="flex items-center gap-1 text-[10px] text-slate-500">
-                                            <Clock className="w-3 h-3" />
-                                            {events.sessions[0].time || "TBC"}
-                                        </div>
-                                        <div className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-slate-600 bg-white/60 px-1.5 py-1 rounded inline-block">
-                                            <Users className="w-3 h-3 inline-block mr-1" />
-                                            {events.sessions[0].attendance?.filter((a: any) => a.status === 'Present' || a.status === 'Late').length || 0} Confirmed
-                                        </div>
-                                    </div>
-                                ) : eventType === "Recovery" ? (
-                                    <div className="space-y-2">
-                                        <div className={`text-xs font-bold ${textClass}`}>
-                                            Recovery
-                                        </div>
-                                        <div className="text-[10px] text-slate-500">
-                                            Light Session
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="text-[10px] text-slate-400 font-medium italic mt-1">
-                                        No football activity
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </Card>
+            )}
         </div>
     );
 }

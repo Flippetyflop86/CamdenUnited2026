@@ -1,118 +1,213 @@
 "use client";
 
-import { Match } from "@/types";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { CalendarDays, Clock, MapPin, Share2, Target, Settings, Activity, ShieldHalf } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calendar, Clock, MapPin, Share2, Users, FileText, Settings, Trash2, Trophy, CheckCircle2, Circle } from "lucide-react";
 import Link from "next/link";
+import { Match } from "@/types";
 import { useClub } from "@/context/club-context";
 
 interface NextMatchHeroProps {
-    match: Match;
-    leagueTeams?: any[];
+    match: Match | null;
+    leagueTeams: any[];
     onManageMatch: (match: Match) => void;
     onShareMatch: (match: Match) => void;
+    onDeleteMatch?: (matchId: string) => void;
+    onQuickLogResult?: (match: Match) => void;
 }
 
-export function NextMatchHero({ match, leagueTeams = [], onManageMatch, onShareMatch }: NextMatchHeroProps) {
+export function NextMatchHero({
+    match,
+    leagueTeams,
+    onManageMatch,
+    onShareMatch,
+    onDeleteMatch,
+    onQuickLogResult
+}: NextMatchHeroProps) {
     const { settings } = useClub();
-    
-    const isHome = match.isHome;
-    const homeTeam = isHome ? settings.name : match.opponent;
-    const awayTeam = isHome ? match.opponent : settings.name;
-    const opponentTeamInfo = leagueTeams.find(t => t.name.toLowerCase() === match.opponent.toLowerCase());
 
-    const dateObj = new Date(match.date);
-    const dateFormatted = new Intl.DateTimeFormat("en-GB", { weekday: 'long', day: 'numeric', month: 'long' }).format(dateObj);
+    if (!match) {
+        return null;
+    }
 
-    // Simple countdown logic (Days only for simplicity, could be expanded)
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
     const matchDate = new Date(match.date);
-    matchDate.setHours(0, 0, 0, 0);
-    const diffTime = Math.abs(matchDate.getTime() - today.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    let countdownText = `${diffDays} Days`;
-    if (diffDays === 0) countdownText = "Today";
-    if (diffDays === 1) countdownText = "Tomorrow";
+    const formattedDate = new Intl.DateTimeFormat("en-GB", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+    }).format(matchDate);
+
+    const isHome = match.isHome !== undefined ? match.isHome : (match as any).is_home;
+    const homeTeam = isHome ? settings.name : match.opponent;
+    const awayTeam = !isHome ? settings.name : match.opponent;
+
+    // Fix "Away - Away (4G)" duplicate location display (#8)
+    const rawLoc = (match.location || "").trim();
+    const sideLabel = isHome ? "Home" : "Away";
+    let displayLocation = sideLabel;
+    if (rawLoc) {
+        if (rawLoc.toLowerCase().startsWith(sideLabel.toLowerCase())) {
+            displayLocation = rawLoc;
+        } else {
+            displayLocation = `${sideLabel} · ${rawLoc}`;
+        }
+    }
+
+    // Attempt to find opponent in league table for context
+    const oppLower = (match.opponent || "").toLowerCase();
+    const opponentStats = oppLower
+        ? leagueTeams.find((t) => {
+              const tName = (t.team_name || t.name || "").toLowerCase();
+              return tName && (tName.includes(oppLower) || oppLower.includes(tName));
+          })
+        : undefined;
+
+    const isSquadConfirmed = Boolean(
+        match.is_squad_confirmed ||
+        (match.lineup && Object.values(match.lineup.starters || {}).some(Boolean)) ||
+        match.notes?.includes("[Lineup: ")
+    );
 
     return (
-        <div className="space-y-4 mb-12">
-            <h2 className="text-sm font-semibold tracking-wider text-muted-foreground uppercase">Next Match</h2>
-            
-            <Card className="border-border bg-surface-1 overflow-hidden">
-                <div className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-8 text-center md:text-left">
-                    
-                    {/* Fixture Details */}
-                    <div className="flex-1">
-                        <Badge variant="outline" className="mb-4 bg-brand/10 text-brand border-brand/20">
-                            {match.competition || "Fixture"}
-                        </Badge>
-                        <h3 className="text-4xl md:text-5xl font-black tracking-tight text-foreground mb-2 flex items-center justify-center md:justify-start gap-4">
-                            <span className={`flex items-center gap-3 ${isHome ? "text-foreground" : "text-muted-foreground"}`}>
-                                {isHome && settings.logo && <img src={settings.logo} alt="Club Logo" className="h-8 w-8 md:h-10 md:w-10 object-contain rounded-full" />}
-                                {!isHome && opponentTeamInfo?.badge_url && <img src={opponentTeamInfo.badge_url} alt="Badge" className="h-8 w-8 md:h-10 md:w-10 object-contain" />}
-                                {homeTeam}
+        <Card className="border-border bg-surface-1 overflow-hidden shadow-lg border-l-4 border-l-brand">
+            <div className="p-6 md:p-7">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+                    {/* Left: Metadata & Teams */}
+                    <div className="space-y-3">
+                        <div className="flex flex-wrap items-center gap-2 text-xs font-semibold tracking-wider text-brand uppercase">
+                            <span className="bg-brand/15 px-2 py-0.5 rounded border border-brand/30">Next Match</span>
+                            <span>•</span>
+                            <span>{match.competition || "League"}</span>
+                            <span className="px-2 py-0.5 rounded bg-surface-2 text-muted-foreground border border-border">
+                                {isHome ? "HOME" : "AWAY"}
                             </span>
-                            <span className="text-muted-foreground font-normal text-3xl">vs</span>
-                            <span className={`flex items-center gap-3 ${!isHome ? "text-foreground" : "text-muted-foreground"}`}>
-                                {!isHome && settings.logo && <img src={settings.logo} alt="Club Logo" className="h-8 w-8 md:h-10 md:w-10 object-contain rounded-full" />}
-                                {isHome && opponentTeamInfo?.badge_url && <img src={opponentTeamInfo.badge_url} alt="Badge" className="h-8 w-8 md:h-10 md:w-10 object-contain" />}
-                                {awayTeam}
-                            </span>
-                        </h3>
-                        
-                        <div className="flex flex-wrap items-center justify-center md:justify-start gap-4 mt-6 text-sm text-muted-foreground font-medium">
+                        </div>
+
+                        <div className="space-y-1">
+                            <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+                                <span className={isHome ? "text-foreground" : "text-muted-foreground"}>{homeTeam}</span>
+                                <span className="text-muted-foreground font-light text-xl">vs</span>
+                                <span className={!isHome ? "text-foreground" : "text-muted-foreground"}>{awayTeam}</span>
+                            </h1>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground pt-1">
                             <div className="flex items-center gap-1.5">
-                                <CalendarDays className="h-4 w-4" />
-                                {dateFormatted}
+                                <Calendar className="h-4 w-4 text-muted-foreground/70" />
+                                <span>{formattedDate}</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <Clock className="h-4 w-4" />
-                                {match.time}
+                                <Clock className="h-4 w-4 text-muted-foreground/70" />
+                                <span>{(match.time || "14:00").slice(0, 5)}</span>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <MapPin className="h-4 w-4" />
-                                {isHome ? "Home" : "Away"} {match.location ? `- ${match.location}` : ""} {match.surface ? `(${match.surface})` : ""}
+                                <MapPin className="h-4 w-4 text-muted-foreground/70" />
+                                <span>{displayLocation}</span>
                             </div>
                         </div>
+
+                        {opponentStats && (
+                            <div className="inline-flex items-center gap-3 px-3 py-1.5 rounded-md bg-surface-2 text-xs font-medium text-muted-foreground border border-border">
+                                <span>Opposition Info:</span>
+                                <span className="text-foreground">Pos: #{opponentStats.position}</span>
+                                <span>•</span>
+                                <span className="text-foreground">Pts: {opponentStats.points}</span>
+                                <span>•</span>
+                                <span className="text-foreground">GD: {opponentStats.goal_difference > 0 ? `+${opponentStats.goal_difference}` : opponentStats.goal_difference}</span>
+                            </div>
+                        )}
                     </div>
-                    
-                    {/* Countdown */}
-                    <div className="flex flex-col items-center justify-center p-6 bg-surface-2 rounded-2xl border border-border/50 min-w-[160px]">
-                        <span className="text-sm font-medium text-muted-foreground mb-1">Kick-off in</span>
-                        <span className="text-3xl font-black tracking-tight text-foreground">{countdownText}</span>
-                    </div>
-                </div>
-                
-                {/* Action Bar */}
-                <div className="border-t border-border bg-surface-2/50 p-4">
-                    <div className="flex flex-wrap items-center gap-3">
-                        <Button variant="default" className="bg-brand hover:bg-brand/90" onClick={() => onManageMatch(match)}>
-                            <Settings className="h-4 w-4 mr-2" />
-                            Manage Match
-                        </Button>
-                        <Button variant="outline" className="border-border text-foreground hover:bg-surface-3" asChild>
+
+                    {/* Right: Actions (#6) */}
+                    <div className="flex flex-wrap items-center gap-2 lg:justify-end shrink-0">
+                        <Button asChild size="sm" className="bg-brand hover:bg-brand/90 text-brand-foreground font-semibold">
                             <Link href={`/matchday-xi?match=${match.id}`}>
-                                <ShieldHalf className="h-4 w-4 mr-2" />
+                                <Users className="h-4 w-4 mr-1.5" />
                                 Matchday XI
                             </Link>
                         </Button>
-                        <Button variant="outline" className="border-border text-foreground hover:bg-surface-3" asChild>
-                            <Link href={`/analysis?match=${match.id}`}>
-                                <Activity className="h-4 w-4 mr-2" />
-                                Analysis
-                            </Link>
+
+                        {onQuickLogResult && (
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                className="bg-emerald-100/90 dark:bg-emerald-500/15 hover:bg-emerald-200/80 dark:hover:bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 border border-emerald-400/70 dark:border-emerald-500/30 font-bold"
+                                onClick={() => onQuickLogResult(match)}
+                            >
+                                <Trophy className="h-3.5 w-3.5 mr-1.5" />
+                                Log Result / Scorers
+                            </Button>
+                        )}
+
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            className="bg-surface-2 hover:bg-surface-2/80 text-foreground border border-border"
+                            onClick={() => onManageMatch(match)}
+                        >
+                            <Settings className="h-3.5 w-3.5 mr-1.5" />
+                            Edit
                         </Button>
-                        <Button variant="outline" className="border-border text-foreground hover:bg-surface-3 ml-auto" onClick={() => onShareMatch(match)}>
-                            <Share2 className="h-4 w-4 mr-2" />
+
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                            onClick={() => onShareMatch(match)}
+                            title="Generate WhatsApp Availability Poll"
+                        >
+                            <Share2 className="h-4 w-4 mr-1.5" />
                             Share
                         </Button>
+
+                        {onDeleteMatch && (
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                className="text-rose-500 hover:text-rose-400 hover:bg-rose-500/15 px-2.5"
+                                onClick={() => onDeleteMatch(match.id)}
+                                title="Delete this fixture"
+                            >
+                                <Trash2 className="h-4 w-4" />
+                            </Button>
+                        )}
                     </div>
                 </div>
-            </Card>
-        </div>
+            </div>
+
+            {/* Folded Match Preparation Strip (#12) */}
+            <div className="px-6 py-2.5 bg-surface-2/70 border-t border-border flex flex-wrap items-center justify-between gap-3 text-xs">
+                <div className="flex flex-wrap items-center gap-4">
+                    <span className="font-semibold uppercase tracking-wider text-muted-foreground text-[10px]">Match Prep:</span>
+                    <Link
+                        href={`/matchday-xi?match=${match.id}`}
+                        className="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-brand transition-colors"
+                    >
+                        {isSquadConfirmed ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                        ) : (
+                            <Circle className="h-3.5 w-3.5 text-amber-500" />
+                        )}
+                        <span>{isSquadConfirmed ? "Starting XI Saved" : "Starting XI Not Set"}</span>
+                    </Link>
+
+                    <Link
+                        href="/training"
+                        className="inline-flex items-center gap-1.5 font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        <Circle className="h-3.5 w-3.5 text-indigo-400" />
+                        <span>Training Plan</span>
+                    </Link>
+
+                    <Link
+                        href="/opposition"
+                        className="inline-flex items-center gap-1.5 font-medium text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                        <FileText className="h-3.5 w-3.5 text-sky-400" />
+                        <span>Opposition Analysis</span>
+                    </Link>
+                </div>
+            </div>
+        </Card>
     );
 }

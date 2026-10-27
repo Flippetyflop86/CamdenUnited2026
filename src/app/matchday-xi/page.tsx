@@ -41,6 +41,7 @@ import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
 import { calculateMeetTime } from "@/lib/whatsapp-utils";
+import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, computeMatchOutcome } from "@/lib/match-stats-sync";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 
@@ -111,7 +112,7 @@ function stripLineupFromNotes(notes?: string): string {
 
 export default function MatchdayXIPage() {
     const { settings, isLoaded: isClubLoaded } = useClub();
-    const { isLoading: isAuthLoading } = useAuth();
+    const { isLoading: isAuthLoading, clubId } = useAuth();
     const [lineup, setLineup] = useState<MatchdayXI | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
     const [isEditing, setIsEditing] = useState(false);
@@ -243,7 +244,7 @@ export default function MatchdayXIPage() {
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
-    }, []);
+    }, [clubId]);
 
     useEffect(() => {
         if (currentSquads.length > 0 && !currentSquads.includes(activeSquadTab)) {
@@ -278,6 +279,14 @@ export default function MatchdayXIPage() {
     const fetchCurrentMatchStats = async (matchId: string) => {
         if (!matchId) return;
         try {
+            const [{ data: matchRow }, { data: allP }] = await Promise.all([
+                supabase.from('matches').select('goalscorers, assists').eq('id', matchId).single(),
+                supabase.from('players').select('id, first_name, last_name, nickname, use_nickname')
+            ]);
+            if (matchRow && (matchRow.goalscorers || matchRow.assists) && allP) {
+                await ensureStatsHydratedFromMatchText(matchId, matchRow.goalscorers, matchRow.assists, allP);
+            }
+
             const { data } = await supabase
                 .from('match_player_stats')
                 .select('player_id, goals, assists, yellow_cards, red_cards')
@@ -360,7 +369,9 @@ export default function MatchdayXIPage() {
     };
 
     const fetchPlayers = async () => {
-        const { data } = await supabase.from('players').select('*');
+        let query = supabase.from('players').select('*');
+        if (clubId) query = query.eq('club_id', clubId);
+        const { data } = await query;
         if (data) {
             const mapped = data.map((p: any) => {
                 const dep = parsePlayerDeparture(p);
@@ -412,7 +423,9 @@ export default function MatchdayXIPage() {
     };
 
     const fetchMatches = async () => {
-        const { data } = await supabase.from('matches').select('*').order('date', { ascending: false });
+        let query = supabase.from('matches').select('*').order('date', { ascending: false });
+        if (clubId) query = query.eq('club_id', clubId);
+        const { data } = await query;
         if (data && data.length > 0) {
             const mapped = data.map((m: any) => ({
                 id: m.id,
@@ -421,6 +434,7 @@ export default function MatchdayXIPage() {
                 time: m.time,
                 competition: m.competition || "League",
                 isHome: m.is_home,
+                scoreline: m.scoreline || "",
                 result: m.result,
                 event_token: m.event_token,
                 notes: m.notes || ""
@@ -431,7 +445,7 @@ export default function MatchdayXIPage() {
             const requestedMatch = urlMatchId ? mapped.find((m: any) => m.id === urlMatchId) : null;
             const today = new Date().toISOString().split('T')[0];
             const upcoming = requestedMatch || [...mapped].reverse().find((m: any) => m.date >= today) || mapped[0];
-            if (upcoming) {
+            if (upcoming && (!selectedMatchId || !mapped.some((m: any) => m.id === selectedMatchId))) {
                 setSelectedMatchId(upcoming.id);
                 setNextMatch(upcoming);
             }
@@ -672,6 +686,8 @@ export default function MatchdayXIPage() {
                 }
             }
         }
+
+        await syncMatchGoalsAndAssistsEverywhere(matchId);
     };
 
     const saveLineup = async (newLineup: MatchdayXI & { usedSubstitutes?: string[] }) => {
@@ -1101,10 +1117,13 @@ export default function MatchdayXIPage() {
                             ...payload
                         }]);
                 }
+                await syncMatchGoalsAndAssistsEverywhere(selectedMatchId);
                 fetchSeasonStats();
             } catch (err) {
                 console.warn("Error syncing match event stat:", err);
             }
+        } else if (selectedMatchId) {
+            await syncMatchGoalsAndAssistsEverywhere(selectedMatchId);
         }
     };
 
@@ -2822,7 +2841,18 @@ export default function MatchdayXIPage() {
                                         <span className={nextMatch.isHome ? "text-foreground" : "text-muted-foreground"}>
                                             {settings.name}
                                         </span>
-                                        <span className="text-muted-foreground text-xs font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-2">vs</span>
+                                        {nextMatch.scoreline ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowLogisticsEditor(prev => !prev)}
+                                                title="Click to edit match scoreline"
+                                                className="text-emerald-400 text-sm md:text-base font-black px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500/25 transition-colors"
+                                            >
+                                                {nextMatch.scoreline}
+                                            </button>
+                                        ) : (
+                                            <span className="text-muted-foreground text-xs font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-2">vs</span>
+                                        )}
                                         <span className={!nextMatch.isHome ? "text-foreground" : "text-muted-foreground"}>
                                             {nextMatch.opponent}
                                         </span>
@@ -2839,7 +2869,7 @@ export default function MatchdayXIPage() {
                                         <button
                                             type="button"
                                             onClick={() => setShowLogisticsEditor(prev => !prev)}
-                                            title="Click to edit Kick-Off Time, Meet Time & Venue / Pitch Notes"
+                                            title="Click to edit Scoreline, Kick-Off Time, Meet Time & Venue / Pitch Notes"
                                             className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border transition-colors normal-case font-semibold ${
                                                 showLogisticsEditor
                                                     ? "bg-primary/15 text-primary border-primary/40"
@@ -3018,7 +3048,7 @@ export default function MatchdayXIPage() {
                                     const formattedDate = new Date(m.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
                                     return (
                                         <option key={m.id} value={m.id} className="bg-surface-1 text-foreground">
-                                            {m.isHome ? "🏠" : "🚌"} vs {m.opponent} ({formattedDate}) {m.result !== "Pending" ? `[${m.result}]` : ""}
+                                            {m.isHome ? "🏠" : "🚌"} vs {m.opponent} ({formattedDate}) {m.scoreline ? `[${m.scoreline}]` : (m.result !== "Pending" ? `[${m.result}]` : "")}
                                         </option>
                                     );
                                 })}
@@ -3029,6 +3059,27 @@ export default function MatchdayXIPage() {
                     {/* Collapsible Editor Row: Only shown when user clicks KO / Meet / Venue pill */}
                     {nextMatch && showLogisticsEditor && (
                         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60 text-xs animate-in fade-in duration-150">
+                            <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1">
+                                <Trophy className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Score (H-A):</span>
+                                <input
+                                    type="text"
+                                    placeholder="e.g. 3-1"
+                                    value={nextMatch.scoreline || ""}
+                                    onChange={async (e) => {
+                                        const rawVal = e.target.value;
+                                        const nextOutcome = computeMatchOutcome(rawVal.trim(), Boolean(nextMatch.isHome));
+                                        setNextMatch(prev => prev ? { ...prev, scoreline: rawVal, result: nextOutcome } : prev);
+                                        setMatches(prev => prev.map(m => m.id === nextMatch.id ? { ...m, scoreline: rawVal, result: nextOutcome } : m));
+                                        await supabase.from("matches").update({ scoreline: rawVal.trim(), result: nextOutcome }).eq("id", nextMatch.id);
+                                        if (nextOutcome !== "Pending" && lineup) {
+                                            await syncLineupAppearancesToDatabase(nextMatch.id, lineup);
+                                        }
+                                    }}
+                                    className="w-16 bg-transparent text-xs font-extrabold text-emerald-400 placeholder-muted-foreground focus:outline-none text-center"
+                                />
+                            </div>
+
                             <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1">
                                 <Clock className="h-3.5 w-3.5 text-foreground shrink-0" />
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">KO:</span>

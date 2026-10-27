@@ -9,6 +9,7 @@ import { BarChart3, Plus, Minus, Search, Trash2, Filter, RefreshCw, Link as Link
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
 import { isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
+import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText } from "@/lib/match-stats-sync";
 
 interface MatchPlayerStat {
     id: string;
@@ -120,16 +121,20 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
     const fetchData = async () => {
         setIsLoading(true);
         // Fetch all players
-        const { data: pData } = await supabase.from('players').select('id, first_name, last_name, position, squad, notes').order('last_name');
+        const { data: pData } = await supabase.from('players').select('id, first_name, last_name, position, squad, notes, nickname, use_nickname').order('last_name');
         if (pData) setPlayers(pData);
+
+        // Fetch raw notes & existing text scorers of the match
+        const { data: matchData } = await supabase.from('matches').select('notes, goalscorers, assists').eq('id', matchId).single();
+        if (matchData && (matchData.goalscorers || matchData.assists) && pData) {
+            await ensureStatsHydratedFromMatchText(matchId, matchData.goalscorers, matchData.assists, pData);
+        }
 
         // Fetch existing stats for this match
         let currentStats: MatchPlayerStat[] = [];
         const { data: sData } = await supabase.from('match_player_stats').select('*').eq('match_id', matchId);
         if (sData) currentStats = sData;
 
-        // Fetch raw notes of the match to extract lineup
-        const { data: matchData } = await supabase.from('matches').select('notes').eq('id', matchId).single();
         if (matchData?.notes) {
             const rawNotes = matchData.notes;
             if (rawNotes.includes("[Lineup: ")) {
@@ -213,41 +218,7 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
     };
 
     const syncMatchesTable = async (mId: string) => {
-        const { data: updatedStats } = await supabase
-            .from('match_player_stats')
-            .select('*')
-            .eq('match_id', mId);
-
-        const { data: allPlayers } = await supabase
-            .from('players')
-            .select('id, first_name, last_name');
-
-        if (updatedStats && allPlayers) {
-            const getFormattedName = (pId: string) => {
-                const p = allPlayers.find(x => x.id === pId);
-                if (!p) return "Unknown";
-                const firstInitial = p.first_name ? p.first_name[0] : "";
-                return `${firstInitial}.${p.last_name}`;
-            };
-
-            const goalsList = updatedStats
-                .filter(s => s.goals > 0)
-                .map(s => `${getFormattedName(s.player_id)}${s.goals > 1 ? ` (${s.goals})` : ''}`)
-                .join(', ');
-
-            const assistsList = updatedStats
-                .filter(s => s.assists > 0)
-                .map(s => `${getFormattedName(s.player_id)}${s.assists > 1 ? ` (${s.assists})` : ''}`)
-                .join(', ');
-
-            await supabase
-                .from('matches')
-                .update({
-                    goalscorers: goalsList || null,
-                    assists: assistsList || null
-                })
-                .eq('id', mId);
-        }
+        await syncMatchGoalsAndAssistsEverywhere(mId);
     };
 
     const addPlayerToMatch = async (playerId: string) => {

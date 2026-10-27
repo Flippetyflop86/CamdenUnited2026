@@ -1,363 +1,503 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { 
-    CalendarDays, 
-    Link2, 
-    ClipboardPaste,
-    CheckCircle2,
-    AlertCircle,
-    ChevronRight,
-    ArrowRight,
-    Trash2,
-    Clock,
-    X,
-    Save,
-    Puzzle
-} from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { RefreshCw, Link2, FileSpreadsheet, ClipboardPaste, CheckCircle2, AlertTriangle, Trash2, Plus } from "lucide-react";
+import { supabase } from "@/lib/supabase";
 
-interface ParsedItem {
-    id: string;
-    date: string | null;
-    time: string | null;
-    opponent: string;
-    is_home: boolean;
-    competition: string;
-    venue: string;
-    status: 'ready' | 'warning' | 'duplicate';
-    warnings: string[];
-}
-
-interface FootballDataImportCentreProps {
+interface ImportCentreProps {
     clubId: string;
     clubName: string;
     clubSettings: any;
-    onImportComplete: () => void;
+    knownOpponents?: string[];
+    onImportComplete: (importedIds?: string[]) => void;
+    isOpen?: boolean;
+    onOpenChange?: (open: boolean) => void;
 }
 
-export function FootballDataImportCentre({ clubId, clubName, clubSettings, onImportComplete }: FootballDataImportCentreProps) {
-    const [isPasteModalOpen, setIsPasteModalOpen] = useState(false);
-    const [isBrowserIntegrationModalOpen, setIsBrowserIntegrationModalOpen] = useState(false);
-    const [rawText, setRawText] = useState("");
-    const [isParsing, setIsParsing] = useState(false);
-    
-    const [isReviewOpen, setIsReviewOpen] = useState(false);
-    const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
-    
-    const [isSuccessOpen, setIsSuccessOpen] = useState(false);
-    const [importStats, setImportStats] = useState({ imported: 0, skipped: 0, reviews: 0 });
+export function FootballDataImportCentre({
+    clubId,
+    clubName,
+    clubSettings,
+    knownOpponents = [],
+    onImportComplete,
+    isOpen,
+    onOpenChange
+}: ImportCentreProps) {
+    const [activeMode, setActiveMode] = useState<'none' | 'url' | 'paste' | 'csv'>('paste');
+    const [inputText, setInputText] = useState("");
+    const [isLoading, setIsLoading] = useState(false);
+
+    // Preview Modal State
+    const [previewData, setPreviewData] = useState<any[]>([]);
+    const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     const handleParse = async () => {
-        if (!rawText.trim()) return;
-        setIsParsing(true);
+        if (!inputText.trim()) return;
+        setIsLoading(true);
+
         try {
-            const res = await fetch('/api/parse-schedule', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ rawText, clubName, defaultKickOff: clubSettings?.defaultHomeKickOff })
-            });
-            const data = await res.json();
-            if (data.success) {
-                // Check DB for duplicates here (skipped for brevity in this initial iteration, will add in next pass)
-                setParsedItems(data.parsed);
-                setIsPasteModalOpen(false);
-                setRawText("");
-                setIsReviewOpen(true);
+            if (activeMode === 'paste') {
+                const res = await fetch('/api/parse-schedule', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        rawText: inputText,
+                        clubName: clubName || "Camden United",
+                        defaultKickOff: clubSettings?.defaultHomeKickOff || "14:00",
+                        knownOpponents
+                    })
+                });
+                const data = await res.json();
+                if (data.success && data.parsed && data.parsed.length > 0) {
+                    setPreviewData(data.parsed);
+                    setIsPreviewOpen(true);
+                } else if (data.success && (!data.parsed || data.parsed.length === 0)) {
+                    alert("No fixtures could be recognized from the pasted text. Try including a date and opponent name on each line (e.g. '15/08/2026 14:00 Camden United vs Hackney Wick').");
+                } else {
+                    alert(data.error || "Failed to parse schedule");
+                }
+            } else if (activeMode === 'url') {
+                const res = await fetch('/api/sync-fixtures', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: inputText, clubName: clubName || "Camden United" })
+                });
+                const data = await res.json();
+                if (data.success && data.fixtures) {
+                    const mapped = data.fixtures.map((f: any) => ({
+                        id: Math.random().toString(36).substring(2, 9),
+                        date: f.date,
+                        time: f.time || clubSettings?.defaultHomeKickOff || "14:00",
+                        opponent: f.opponent,
+                        is_home: f.is_home,
+                        competition: f.competition || clubSettings?.defaultCompetition || "League",
+                        venue: f.is_home ? (clubSettings?.homeGround || "Home") : "Away",
+                        status: (!f.time || !f.date || !f.opponent) ? 'warning' : 'ready',
+                        warnings: !f.time ? ['missing_time'] : []
+                    }));
+                    setPreviewData(mapped);
+                    setIsPreviewOpen(true);
+                } else {
+                    alert(data.error || "Failed to fetch from URL");
+                }
+            } else if (activeMode === 'csv') {
+                const lines = inputText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+                const parsedRows: any[] = [];
+                for (let i = 0; i < lines.length; i++) {
+                    const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+                    if (cols.length < 2) continue;
+                    if (i === 0 && /date|opponent|home/i.test(lines[i])) continue; // skip header row
+                    parsedRows.push({
+                        id: Math.random().toString(36).substring(2, 9),
+                        date: cols[0] || new Date().toISOString().split('T')[0],
+                        time: cols[1] || "14:00",
+                        opponent: cols[2] || "",
+                        is_home: cols[3] ? !/away|^a$/i.test(cols[3]) : true,
+                        competition: cols[4] || "League",
+                        venue: cols[3] && /away|^a$/i.test(cols[3]) ? "Away" : "Home",
+                        status: cols[0] && cols[2] ? 'ready' : 'warning',
+                        warnings: []
+                    });
+                }
+                if (parsedRows.length > 0) {
+                    setPreviewData(parsedRows);
+                    setIsPreviewOpen(true);
+                } else {
+                    alert("Could not parse CSV rows. Format as: YYYY-MM-DD, HH:MM, Opponent, Home/Away, Competition");
+                }
             }
-        } catch (error) {
-            console.error("Failed to parse", error);
+        } catch (error: any) {
+            alert("Error: " + error.message);
         } finally {
-            setIsParsing(false);
+            setIsLoading(false);
         }
     };
 
-    const handleImport = async () => {
-        const readyFixtures = parsedItems.filter(i => i.status === 'ready');
-        
-        try {
-            const res = await fetch('/api/import-fixtures', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ fixtures: readyFixtures, clubId })
-            });
-            
-            const data = await res.json();
-            if (!data.success) {
-                console.error("Import failed:", data.error);
-                alert("Failed to import: " + data.error);
-                return;
+    const recomputeRowStatus = (item: any) => {
+        const warnings: string[] = [];
+        if (!item.date) warnings.push('missing_date');
+        if (!item.time) warnings.push('missing_time');
+        if (!item.opponent || !item.opponent.trim()) warnings.push('check_opponent');
+        return {
+            ...item,
+            warnings,
+            status: warnings.length > 0 ? 'warning' : 'ready'
+        };
+    };
+
+    const updatePreviewItem = (id: string, field: string, value: any) => {
+        setPreviewData(prev => prev.map(item => {
+            if (item.id !== id) return item;
+            const updated = { ...item, [field]: value };
+            if (field === 'is_home') {
+                updated.venue = value ? (clubSettings?.homeGround || "Home") : "Away";
             }
-            
-            setImportStats({
-                imported: readyFixtures.length,
-                skipped: parsedItems.filter(i => i.status === 'duplicate').length,
-                reviews: parsedItems.filter(i => i.status === 'warning').length
-            });
-            
-            setIsReviewOpen(false);
-            setIsSuccessOpen(true);
-            onImportComplete();
-        } catch (e) {
-            console.error(e);
+            return recomputeRowStatus(updated);
+        }));
+    };
+
+    const addBlankPreviewRow = () => {
+        const today = new Date().toISOString().split('T')[0];
+        setPreviewData(prev => [
+            ...prev,
+            recomputeRowStatus({
+                id: Math.random().toString(36).substring(2, 9),
+                date: today,
+                time: clubSettings?.defaultHomeKickOff || "14:00",
+                opponent: "",
+                is_home: true,
+                competition: "League",
+                venue: "Home"
+            })
+        ]);
+    };
+
+    const removePreviewItem = (id: string) => {
+        setPreviewData(prev => prev.filter(item => item.id !== id));
+    };
+
+    const handleConfirmImport = async () => {
+        const validRows = previewData.filter(f => f.opponent && f.opponent.trim() && f.date);
+        if (validRows.length === 0) {
+            alert("Please ensure at least one fixture has both a Date and an Opponent name.");
+            return;
+        }
+        setIsSaving(true);
+        try {
+            const toInsert = validRows.map(f => ({
+                club_id: clubId || undefined,
+                date: f.date,
+                time: f.time || "14:00",
+                opponent: f.opponent.trim(),
+                is_home: f.is_home,
+                competition: f.competition || "League",
+                notes: `[Location: ${f.venue || (f.is_home ? "Home" : "Away")}][Surface: 4G]`,
+                scoreline: "",
+                result: "Pending"
+            }));
+
+            const query = supabase.from('matches').select('id, date, opponent');
+            const { data: existing } = clubId ? await query.eq('club_id', clubId) : await query;
+
+            const finalInsert: any[] = [];
+            for (const item of toInsert) {
+                const isDup = existing?.some(e =>
+                    e.date === item.date &&
+                    e.opponent.toLowerCase().trim() === item.opponent.toLowerCase().trim()
+                );
+                if (!isDup) {
+                    finalInsert.push(item);
+                }
+            }
+
+            let insertedIds: string[] = [];
+            if (finalInsert.length > 0) {
+                let { data: insertedData, error } = await supabase.from('matches').insert(finalInsert).select('id');
+                if (error && error.message.includes('club_id')) {
+                    const fallbackInsert = finalInsert.map(({ club_id, ...rest }) => rest);
+                    const retry = await supabase.from('matches').insert(fallbackInsert).select('id');
+                    error = retry.error;
+                    insertedData = retry.data;
+                }
+                if (error) throw error;
+                insertedIds = (insertedData || []).map((r: any) => r.id);
+            } else {
+                alert("All listed fixtures already exist on those dates (duplicates skipped).");
+            }
+
+            setIsPreviewOpen(false);
+            setInputText("");
+            if (onOpenChange) onOpenChange(false);
+            onImportComplete(insertedIds);
+
+        } catch (error: any) {
+            alert("Database Error: " + error.message);
+        } finally {
+            setIsSaving(false);
         }
     };
 
-    const removeItem = (id: string) => {
-        setParsedItems(prev => prev.filter(p => p.id !== id));
-    };
+    const importerBody = (
+        <div className="space-y-4">
+            <datalist id="import-opponents-datalist">
+                {knownOpponents.map(opp => (
+                    <option key={opp} value={opp} />
+                ))}
+            </datalist>
 
-    return (
-        <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold font-heading text-foreground">Import Fixtures</h2>
-                <Badge variant="outline" className="bg-brand/10 text-brand border-brand/20">Data Centre</Badge>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Method 1: Paste (Primary) */}
-                <Card 
-                    className="border-brand/20 bg-brand/5 hover:bg-brand/10 transition-colors cursor-pointer p-6 flex flex-col justify-between"
-                    onClick={() => setIsPasteModalOpen(true)}
+            <div className="flex flex-wrap gap-2">
+                <Button
+                    type="button"
+                    variant={activeMode === 'paste' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => { setActiveMode('paste'); setInputText(""); }}
+                    className={activeMode === 'paste' ? "bg-brand text-brand-foreground" : "bg-surface-2 border-border"}
                 >
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-full bg-brand/20 flex items-center justify-center">
-                                    <ClipboardPaste className="h-4 w-4 text-brand" />
-                                </div>
-                                <h3 className="font-semibold text-foreground">Paste Fixture List</h3>
-                            </div>
-                            <Badge className="bg-brand text-primary-foreground">Recommended</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-2">
-                            Fastest and most reliable. Copy fixtures from FA Full-Time, Mitoo, email, WhatsApp, or spreadsheet.
-                        </p>
-                    </div>
-                    <div className="mt-4 flex items-center text-sm font-medium text-brand">
-                        Start Import <ArrowRight className="h-4 w-4 ml-1" />
-                    </div>
-                </Card>
-
-                {/* Method 2: Browser Integration */}
-                <Card className="border-border bg-surface-1 p-6 flex flex-col justify-between">
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                                <div className="h-8 w-8 rounded-full bg-brand/10 flex items-center justify-center">
-                                    <Puzzle className="h-4 w-4 text-brand" />
-                                </div>
-                                <h3 className="font-semibold text-foreground">Browser Integration</h3>
-                            </div>
-                            <Badge variant="outline" className="text-muted-foreground border-brand/20 bg-brand/5 text-brand">Chrome & Edge</Badge>
-                        </div>
-                        <p className="text-sm text-muted-foreground mt-2">
-                            Install the ClubFlow Browser Extension to import fixtures directly from supported football websites without copying and pasting.
-                        </p>
-                    </div>
-                    <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <Button type="button" variant="outline" className="font-bold border-brand/30 text-brand bg-brand/10 hover:bg-brand/20" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsBrowserIntegrationModalOpen(true); }}>
-                            Install Extension
-                        </Button>
-                        <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setIsBrowserIntegrationModalOpen(true); }} className="text-xs font-semibold text-muted-foreground hover:text-foreground hover:underline text-left">
-                            Learn More
-                        </button>
-                    </div>
-                </Card>
+                    <ClipboardPaste className="h-4 w-4 mr-2 text-emerald-500" />
+                    Paste Schedule Text
+                </Button>
+                <Button
+                    type="button"
+                    variant={activeMode === 'url' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => { setActiveMode('url'); setInputText(""); }}
+                    className={activeMode === 'url' ? "bg-brand text-brand-foreground" : "bg-surface-2 border-border"}
+                >
+                    <Link2 className="h-4 w-4 mr-2 text-indigo-400" />
+                    Import from League URL
+                </Button>
+                <Button
+                    type="button"
+                    variant={activeMode === 'csv' ? 'default' : 'outline'}
+                    size="sm"
+                    onClick={() => { setActiveMode('csv'); setInputText(""); }}
+                    className={activeMode === 'csv' ? "bg-brand text-brand-foreground" : "bg-surface-2 border-border"}
+                >
+                    <FileSpreadsheet className="h-4 w-4 mr-2 text-amber-500" />
+                    Import CSV
+                </Button>
             </div>
 
-            {/* Import History */}
-            {clubSettings?.lastImportHistory && (
-                <div className="mt-4 flex items-center gap-2 text-sm text-muted-foreground px-2">
-                    <Clock className="h-4 w-4" />
-                    <span>
-                        Last Import: {clubSettings.lastImportHistory.imported} imported, {clubSettings.lastImportHistory.skipped} skipped, {clubSettings.lastImportHistory.failed} failed.
-                    </span>
-                    <span className="opacity-50">({new Date(clubSettings.lastImportHistory.date).toLocaleDateString()})</span>
-                </div>
-            )}
-
-            {/* Browser Integration Modal */}
-            <Dialog open={isBrowserIntegrationModalOpen} onOpenChange={setIsBrowserIntegrationModalOpen}>
-                <DialogContent className="sm:max-w-md bg-surface-1 border-border">
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            <Puzzle className="h-5 w-5 text-brand" />
-                            Browser Integration
-                        </DialogTitle>
-                        <DialogDescription>
-                            Import fixtures with a single click.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4 space-y-4 text-sm text-foreground">
-                        <p>
-                            The <strong>ClubFlow Browser Extension</strong> (for Chrome & Edge) is currently in development.
-                        </p>
-                        <p>
-                            Once released, it will sit in your browser toolbar. When you visit a supported league website (like FA Full-Time), you can click it to automatically extract all fixtures and send them directly into the ClubFlow Import Engine.
-                        </p>
-                        <p className="text-muted-foreground">
-                            For now, please continue using the <strong className="text-foreground">Paste Fixture List</strong> method, which uses AI to instantly parse any text you copy from those websites.
-                        </p>
-                    </div>
-                    <div className="flex justify-end">
-                        <Button onClick={() => setIsBrowserIntegrationModalOpen(false)} className="bg-brand hover:bg-brand/90 text-primary-foreground">
-                            Got it
-                        </Button>
-                    </div>
-                </DialogContent>
-            </Dialog>
-
-            {/* Paste Modal */}
-            <Dialog open={isPasteModalOpen} onOpenChange={setIsPasteModalOpen}>
-                <DialogContent className="sm:max-w-xl bg-surface-1 border-border" preventCloseOnOutsideClick={true}>
-                    <DialogHeader>
-                        <DialogTitle>Paste Fixture List</DialogTitle>
-                        <DialogDescription>
-                            Highlight your fixtures on FA Full-Time, Mitoo, or a spreadsheet, press Ctrl+C, and paste them below.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="py-4">
-                        <Textarea 
-                            placeholder="e.g. Camden United vs Hackney FC  14:00  Sat 15 Aug" 
-                            className="min-h-[200px] bg-surface-2 border-border font-mono text-sm"
-                            value={rawText}
-                            onChange={(e) => setRawText(e.target.value)}
+            <div className="pt-2 space-y-3">
+                {activeMode === 'url' && (
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                            placeholder="Paste FA Full-Time or League URL here..."
+                            value={inputText}
+                            onChange={(e) => setInputText(e.target.value)}
+                            className="bg-surface-2 border-border flex-1"
                         />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setIsPasteModalOpen(false)}>Cancel</Button>
-                        <Button onClick={handleParse} disabled={!rawText.trim() || isParsing} className="bg-brand hover:bg-brand/90 text-primary-foreground">
-                            {isParsing ? "Parsing..." : "Parse Text"}
+                        <Button onClick={handleParse} disabled={isLoading} className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0">
+                            {isLoading ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Fetch & Review
                         </Button>
                     </div>
-                </DialogContent>
-            </Dialog>
+                )}
 
-            {/* Gmail-Style Review Modal */}
-            <Dialog open={isReviewOpen} onOpenChange={setIsReviewOpen}>
-                <DialogContent className="max-w-4xl bg-surface-1 border-border max-h-[90vh] flex flex-col" preventCloseOnOutsideClick={true}>
-                    <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2">
-                            Review Import
-                            <Badge variant="secondary">{parsedItems.length} found</Badge>
-                        </DialogTitle>
-                        <DialogDescription>
-                            Review your parsed fixtures. Resolve any warnings before importing.
-                        </DialogDescription>
-                    </DialogHeader>
-                    
-                    <div className="flex-1 overflow-y-auto py-4 space-y-2 pr-2">
-                        {parsedItems.map((item, idx) => (
-                            <div key={item.id} className="group flex items-center justify-between p-3 rounded-lg border border-border bg-surface-2/50 hover:bg-surface-2 transition-colors">
-                                <div className="flex items-center gap-4 flex-1">
-                                    {/* Status Icon */}
-                                    {item.status === 'ready' && <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />}
-                                    {item.status === 'warning' && <AlertCircle className="h-5 w-5 text-amber-500 shrink-0" />}
-                                    {item.status === 'duplicate' && <AlertCircle className="h-5 w-5 text-slate-500 shrink-0" />}
-                                    
-                                    {/* Match Info */}
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-6 flex-1 text-sm">
-                                        <div className="w-24 font-medium">{item.date ? new Date(item.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : 'Unknown Date'}</div>
-                                        <div className="w-16 text-muted-foreground">{item.is_home ? "Home" : "Away"}</div>
-                                        <div className="flex-1 font-semibold truncate">{item.opponent}</div>
-                                        <div className="w-24 text-muted-foreground truncate">{item.competition}</div>
-                                        
-                                        {/* Kick Off resolution */}
-                                        <div className="w-32">
-                                            {item.warnings.includes('missing_time') ? (
-                                                <Input 
-                                                    type="time" 
-                                                    className="h-8 w-24 bg-amber-500/10 border-amber-500/50 text-amber-500" 
-                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                                                        const newItems = [...parsedItems];
-                                                        const idx = newItems.findIndex(i => i.id === item.id);
-                                                        if (idx > -1 && e.target.value) {
-                                                            newItems[idx].time = e.target.value;
-                                                            newItems[idx].warnings = newItems[idx].warnings.filter(w => w !== 'missing_time');
-                                                            if (newItems[idx].warnings.length === 0) newItems[idx].status = 'ready';
-                                                            setParsedItems(newItems);
-                                                        }
-                                                    }}
-                                                />
-                                            ) : (
-                                                <span className="font-mono">{item.time}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                {/* Actions */}
-                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)} className="h-8 w-8 text-muted-foreground hover:text-red-500">
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    
-                    <div className="flex justify-between items-center pt-4 border-t border-border mt-auto">
-                        <div className="text-sm text-muted-foreground">
-                            {parsedItems.filter(i => i.status === 'warning').length > 0 ? (
-                                <span className="text-amber-500 flex items-center gap-1"><AlertCircle className="h-4 w-4"/> Resolve warnings to ensure accuracy</span>
-                            ) : (
-                                <span className="text-emerald-500 flex items-center gap-1"><CheckCircle2 className="h-4 w-4"/> All ready to import</span>
-                            )}
-                        </div>
-                        <div className="flex gap-2">
-                            <Button variant="outline" onClick={() => setIsReviewOpen(false)}>Discard</Button>
-                            <Button onClick={handleImport} className="bg-brand hover:bg-brand/90 text-primary-foreground">
-                                Import {parsedItems.length} Fixtures
+                {activeMode === 'paste' && (
+                    <div className="space-y-3">
+                        <p className="text-xs text-muted-foreground">
+                            Copy and paste rows directly from <strong>FA Full-Time</strong>, WhatsApp, or an email. Division headers like <em>&ldquo;Premier Division&rdquo;</em> are automatically filtered out, and you can edit every field in the review step before saving.
+                        </p>
+                        <Textarea
+                            placeholder={"Example:\n15/08/2026 14:00  Camden United vs Hackney Wick\n22/08/2026 14:00  Athletic Newham vs Camden United"}
+                            value={inputText}
+                            onChange={(e) => setInputText(e.target.value)}
+                            className="bg-surface-2 border-border min-h-[140px] font-mono text-xs"
+                        />
+                        <div className="flex justify-between items-center">
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    setPreviewData([{
+                                        id: Math.random().toString(36).substring(2, 9),
+                                        date: new Date().toISOString().split('T')[0],
+                                        time: clubSettings?.defaultHomeKickOff || "14:00",
+                                        opponent: "",
+                                        is_home: true,
+                                        competition: "League",
+                                        venue: "Home",
+                                        status: 'warning',
+                                        warnings: ['check_opponent']
+                                    }]);
+                                    setIsPreviewOpen(true);
+                                }}
+                                className="text-xs text-muted-foreground hover:text-foreground"
+                            >
+                                <Plus className="h-3.5 w-3.5 mr-1" /> Open Manual Bulk Grid Instead
+                            </Button>
+                            <Button onClick={handleParse} disabled={isLoading || !inputText.trim()} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                                {isLoading ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
+                                Parse & Review Fixtures
                             </Button>
                         </div>
                     </div>
-                </DialogContent>
-            </Dialog>
+                )}
 
-            {/* Success Summary */}
-            <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
-                <DialogContent className="sm:max-w-md bg-surface-1 border-border text-center pb-8" preventCloseOnOutsideClick={true}>
-                    <div className="flex justify-center mt-6 mb-4">
-                        <div className="h-16 w-16 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                            <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+                {activeMode === 'csv' && (
+                    <div className="space-y-3">
+                        <p className="text-xs text-muted-foreground">
+                            Paste comma-separated lines: <code className="bg-surface-2 px-1 py-0.5 rounded">YYYY-MM-DD, HH:MM, Opponent, Home/Away, Competition</code>
+                        </p>
+                        <Textarea
+                            placeholder={"2026-08-15, 14:00, Hackney Wick, Home, League\n2026-08-22, 14:00, Athletic Newham, Away, Cup"}
+                            value={inputText}
+                            onChange={(e) => setInputText(e.target.value)}
+                            className="bg-surface-2 border-border min-h-[120px] font-mono text-xs"
+                        />
+                        <div className="flex justify-end">
+                            <Button onClick={handleParse} disabled={isLoading || !inputText.trim()} className="bg-amber-600 hover:bg-amber-700 text-white">
+                                Parse CSV & Review
+                            </Button>
                         </div>
                     </div>
+                )}
+            </div>
+        </div>
+    );
+
+    return (
+        <>
+            {isOpen !== undefined && onOpenChange ? (
+                <Dialog open={isOpen} onOpenChange={onOpenChange}>
+                    <DialogContent className="sm:max-w-[680px] bg-surface-1 border-border text-foreground">
+                        <DialogHeader>
+                            <DialogTitle className="text-lg font-bold">Paste / Import Fixtures</DialogTitle>
+                            <DialogDescription className="text-xs text-muted-foreground">
+                                Paste schedules from FA Full-Time, import from a link, or enter multiple fixtures in a table.
+                            </DialogDescription>
+                        </DialogHeader>
+                        {importerBody}
+                    </DialogContent>
+                </Dialog>
+            ) : null}
+
+            {/* Editable Review Import Modal (#1) */}
+            <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+                <DialogContent className="max-w-4xl bg-surface-1 border-border text-foreground max-h-[88vh] flex flex-col">
                     <DialogHeader>
-                        <DialogTitle className="text-2xl text-center">Import Complete</DialogTitle>
+                        <DialogTitle className="text-xl font-bold flex items-center justify-between pr-6">
+                            <span>Review & Edit Imported Fixtures ({previewData.length})</span>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={addBlankPreviewRow}
+                                className="h-8 text-xs border-border bg-surface-2"
+                            >
+                                <Plus className="h-3.5 w-3.5 mr-1" /> Add Row
+                            </Button>
+                        </DialogTitle>
+                        <DialogDescription className="text-muted-foreground text-xs">
+                            Every field below is editable. Fix any misread opponent names, toggle <strong>Home / Away</strong>, or click the red trash icon to remove unwanted rows before importing.
+                        </DialogDescription>
                     </DialogHeader>
-                    
-                    <div className="space-y-4 my-6">
-                        <div className="flex justify-between items-center p-3 rounded-lg bg-surface-2 border border-border">
-                            <span className="text-foreground">Imported</span>
-                            <span className="font-semibold text-emerald-500">{importStats.imported}</span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 rounded-lg bg-surface-2 border border-border">
-                            <span className="text-foreground">Duplicates Skipped</span>
-                            <span className="font-semibold text-muted-foreground">{importStats.skipped}</span>
-                        </div>
-                        <div className="flex justify-between items-center p-3 rounded-lg bg-surface-2 border border-border">
-                            <span className="text-foreground">Requires Review</span>
-                            <span className="font-semibold text-amber-500">{importStats.reviews}</span>
-                        </div>
+
+                    <div className="flex-1 overflow-y-auto py-3">
+                        {previewData.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground">
+                                No fixtures in list. Click &ldquo;Add Row&rdquo; above or paste again.
+                            </div>
+                        ) : (
+                            <div className="border border-border rounded-lg overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-surface-2 text-muted-foreground text-[11px] uppercase border-b border-border">
+                                        <tr>
+                                            <th className="px-3 py-2.5 w-10">Status</th>
+                                            <th className="px-3 py-2.5 w-36">Date</th>
+                                            <th className="px-3 py-2.5 w-28">KO Time</th>
+                                            <th className="px-3 py-2.5 w-24 text-center">H / A</th>
+                                            <th className="px-3 py-2.5 min-w-[200px]">Opposition Team</th>
+                                            <th className="px-3 py-2.5 w-32">Competition</th>
+                                            <th className="px-3 py-2.5 w-12 text-right">Delete</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border bg-surface-1">
+                                        {previewData.map((item) => (
+                                            <tr key={item.id} className="hover:bg-surface-2/40 transition-colors">
+                                                <td className="px-3 py-2">
+                                                    {item.status === 'ready' ? (
+                                                        <span className="inline-flex items-center text-emerald-500" title="Ready to import">
+                                                            <CheckCircle2 className="h-4 w-4" />
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center text-amber-500" title="Please check highlighted fields">
+                                                            <AlertTriangle className="h-4 w-4" />
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <Input
+                                                        type="date"
+                                                        value={item.date || ""}
+                                                        onChange={(e) => updatePreviewItem(item.id, 'date', e.target.value)}
+                                                        className={`h-8 text-xs px-2 bg-surface-2 ${!item.date ? 'border-amber-500' : 'border-border'}`}
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <Input
+                                                        type="time"
+                                                        value={item.time || ""}
+                                                        onChange={(e) => updatePreviewItem(item.id, 'time', e.target.value)}
+                                                        className={`h-8 text-xs px-2 bg-surface-2 ${!item.time ? 'border-amber-500' : 'border-border'}`}
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2 text-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => updatePreviewItem(item.id, 'is_home', !item.is_home)}
+                                                        className={`px-2.5 py-1 rounded text-xs font-bold border transition-colors ${
+                                                            item.is_home
+                                                                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                                                                : 'bg-sky-500/15 text-sky-400 border-sky-500/30 hover:bg-sky-500/25'
+                                                        }`}
+                                                        title="Click to toggle Home / Away"
+                                                    >
+                                                        {item.is_home ? 'HOME' : 'AWAY'}
+                                                    </button>
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <Input
+                                                        type="text"
+                                                        list="import-opponents-datalist"
+                                                        placeholder="Enter opponent name..."
+                                                        value={item.opponent || ""}
+                                                        onChange={(e) => updatePreviewItem(item.id, 'opponent', e.target.value)}
+                                                        className={`h-8 text-xs font-semibold bg-surface-2 ${!item.opponent?.trim() ? 'border-amber-500' : 'border-border'}`}
+                                                    />
+                                                </td>
+                                                <td className="px-3 py-2">
+                                                    <select
+                                                        value={item.competition || "League"}
+                                                        onChange={(e) => updatePreviewItem(item.id, 'competition', e.target.value)}
+                                                        className="h-8 w-full rounded-md border border-border bg-surface-2 px-2 text-xs text-foreground outline-none"
+                                                    >
+                                                        <option value="League">League</option>
+                                                        <option value="Cup">Cup</option>
+                                                        <option value="Friendly">Friendly</option>
+                                                    </select>
+                                                </td>
+                                                <td className="px-3 py-2 text-right">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => removePreviewItem(item.id)}
+                                                        className="p-1.5 rounded hover:bg-rose-500/15 text-rose-500 transition-colors"
+                                                        title="Remove this fixture row"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
                     </div>
-                    
-                    <Button onClick={() => setIsSuccessOpen(false)} className="w-full bg-brand hover:bg-brand/90 text-primary-foreground">
-                        Close
-                    </Button>
+
+                    <DialogFooter className="border-t border-border pt-4 flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground mr-auto">
+                            {previewData.filter(f => f.opponent?.trim() && f.date).length} valid fixture(s) ready to save
+                        </span>
+                        <Button variant="ghost" onClick={() => setIsPreviewOpen(false)}>Cancel</Button>
+                        <Button
+                            onClick={handleConfirmImport}
+                            disabled={isSaving || previewData.length === 0}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold"
+                        >
+                            {isSaving ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Confirm & Import ({previewData.filter(f => f.opponent?.trim() && f.date).length})
+                        </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </>
     );
 }

@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Minus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink, CloudRain, Snowflake, Thermometer, CloudLightning, Sun, AlertCircle, BarChart3, Share2, Coins } from "lucide-react";
+import { Plus, Minus, Trash2, CalendarDays, Clock, MapPin, Trophy, Target, Upload, Activity, Edit2, Filter, ArrowUpDown, Instagram, MessageCircle, Copy, ExternalLink, CloudRain, Snowflake, Thermometer, CloudLightning, Sun, AlertCircle, BarChart3, Share2, Coins, ClipboardPaste, Search, CheckSquare, Square, RotateCcw, CheckCircle2, AlertTriangle, Users } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,10 +22,11 @@ import { FORMATIONS } from "@/lib/formations";
 import { calculateMeetTime, generateWhatsAppMessage } from "@/lib/whatsapp-utils";
 import { FootballDataImportCentre } from "./components/FootballDataImportCentre";
 import { NextMatchHero } from "./components/NextMatchHero";
-import { MatchPreparation } from "./components/MatchPreparation";
 import { UpcomingFixtures } from "./components/UpcomingFixtures";
 import { RecentResults } from "./components/RecentResults";
+import { QuickResultScorersModal } from "./components/QuickResultScorersModal";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
+import { parseMatchScoreline, parseStatTextString } from "@/lib/match-stats-sync";
 
 export default function MatchesPage() {
     const router = useRouter();
@@ -46,6 +47,23 @@ export default function MatchesPage() {
     const [isSyncing, setIsSyncing] = useState(false);
     const [isEditingUrl, setIsEditingUrl] = useState(false);
     const [tempUrl, setTempUrl] = useState("");
+
+    // New Redesign States (#1-#20)
+    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+    const [lastImportedIds, setLastImportedIds] = useState<string[]>([]);
+    const [quickResultMatch, setQuickResultMatch] = useState<Match | null>(null);
+    const [viewSection, setViewSection] = useState<"all" | "upcoming" | "results">("all");
+    const [opponentSearch, setOpponentSearch] = useState("");
+    const [isBulkSelectMode, setIsBulkSelectMode] = useState(false);
+    const [selectedMatchIds, setSelectedMatchIds] = useState<Set<string>>(new Set());
+
+    // Quick-Add Fixture Bar State (#3)
+    const [quickDate, setQuickDate] = useState(() => new Date().toISOString().split("T")[0]);
+    const [quickTime, setQuickTime] = useState("14:00");
+    const [quickIsHome, setQuickIsHome] = useState(true);
+    const [quickOpponent, setQuickOpponent] = useState("");
+    const [quickCompetition, setQuickCompetition] = useState("League");
+    const [isQuickAdding, setIsQuickAdding] = useState(false);
 
     const [opponentInstagram, setOpponentInstagram] = useState("");
     const [opponentBadgeUrl, setOpponentBadgeUrl] = useState("");
@@ -264,19 +282,73 @@ export default function MatchesPage() {
         return () => { supabase.removeChannel(channel); };
     }, []);
 
+    useEffect(() => {
+        if (clubId) {
+            fetchMatches();
+        }
+    }, [clubId]);
+
     async function fetchLeagueTeams() {
         const { data } = await supabase.from("league_teams").select("*");
         if (data) setLeagueTeams(data);
     }
 
+    function extractLineupBlock(rawNotesStr: string): { parsedLineup: any | null; lineupTag: string; cleanNotes: string } {
+        if (!rawNotesStr || !rawNotesStr.includes("[Lineup: ")) {
+            return { parsedLineup: null, lineupTag: "", cleanNotes: rawNotesStr || "" };
+        }
+        const tagStartIdx = rawNotesStr.indexOf("[Lineup: ");
+        const jsonStartIdx = tagStartIdx + "[Lineup: ".length;
+        let depth = 0;
+        let inString = false;
+        let escape = false;
+        let jsonEndIdx = -1;
+
+        for (let i = jsonStartIdx; i < rawNotesStr.length; i++) {
+            const ch = rawNotesStr[i];
+            if (escape) { escape = false; continue; }
+            if (ch === "\\") { escape = true; continue; }
+            if (ch === '"') { inString = !inString; continue; }
+            if (inString) continue;
+            if (ch === "{") depth++;
+            else if (ch === "}") {
+                depth--;
+                if (depth === 0) {
+                    jsonEndIdx = i;
+                    break;
+                }
+            }
+        }
+
+        if (jsonEndIdx !== -1) {
+            const jsonStr = rawNotesStr.substring(jsonStartIdx, jsonEndIdx + 1);
+            const tagCloseIdx = rawNotesStr[jsonEndIdx + 1] === "]" ? jsonEndIdx + 2 : jsonEndIdx + 1;
+            let parsedLineup = null;
+            try {
+                parsedLineup = JSON.parse(jsonStr);
+            } catch {
+                // Ignore malformed legacy lineup JSON silently
+            }
+            const lineupTag = rawNotesStr.substring(tagStartIdx, tagCloseIdx);
+            const cleanNotes = rawNotesStr.substring(0, tagStartIdx) + rawNotesStr.substring(tagCloseIdx);
+            return { parsedLineup, lineupTag, cleanNotes };
+        }
+
+        return { parsedLineup: null, lineupTag: "", cleanNotes: rawNotesStr };
+    }
+
     async function fetchMatches() {
-        const { data, error } = await supabase.from("matches").select("*");
+        let query = supabase.from("matches").select("*");
+        if (clubId) {
+            query = query.eq("club_id", clubId);
+        }
+        const { data, error } = await query;
         if (error) {
-            console.error("Error fetching matches:", error.message || error);
+            console.warn("Error fetching matches:", error.message || error);
             return;
         }
 
-        const mapped: Match[] = data.map((m: any) => {
+        const mapped: Match[] = (data || []).map((m: any) => {
             const locationMatch = m.notes ? m.notes.match(/\[Location: (.*?)\]/) : null;
             const location = locationMatch ? locationMatch[1] : "";
 
@@ -286,21 +358,9 @@ export default function MatchesPage() {
             const meetTimeMatch = m.notes ? m.notes.match(/\[MeetTime: (.*?)\]/) : null;
             const meetTime = meetTimeMatch ? meetTimeMatch[1] : "";
 
-            let cleanNotes = m.notes || "";
-            let parsedLineup = null;
-            if (cleanNotes.includes("[Lineup: ")) {
-                const endIdx = cleanNotes.indexOf("}]");
-                if (endIdx !== -1) {
-                    const tagStartIdx = cleanNotes.indexOf("[Lineup: ");
-                    const lineupStr = cleanNotes.substring(tagStartIdx + "[Lineup: ".length, endIdx + 1);
-                    try {
-                        parsedLineup = JSON.parse(lineupStr);
-                    } catch (e) {
-                        console.error("Error parsing lineup in mapping", e);
-                    }
-                    cleanNotes = cleanNotes.substring(0, tagStartIdx) + cleanNotes.substring(endIdx + 2);
-                }
-            }
+            const extracted = extractLineupBlock(m.notes || "");
+            const parsedLineup = extracted.parsedLineup;
+            let cleanNotes = extracted.cleanNotes;
             cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/, "");
             cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "");
             cleanNotes = cleanNotes.replace(/\[MeetTime: .*?\]\n?/, "");
@@ -356,6 +416,37 @@ export default function MatchesPage() {
         }));
     };
 
+    // Quick-Add 1-line fixture handler (#3)
+    const handleQuickAddFixture = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        if (!quickOpponent.trim() || !quickDate) return;
+        setIsQuickAdding(true);
+        try {
+            const meet = autoCalculateMeetTime(quickTime || "14:00", quickIsHome);
+            const loc = quickIsHome ? (settings.homeGround || "Home") : "Away";
+            const payload: any = {
+                club_id: clubId || undefined,
+                date: quickDate,
+                time: quickTime || "14:00",
+                opponent: quickOpponent.trim(),
+                is_home: quickIsHome,
+                competition: quickCompetition || "League",
+                scoreline: "",
+                result: "Pending",
+                notes: `[Location: ${loc}][Surface: 4G][MeetTime: ${meet}]`,
+                event_token: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+            };
+            const { error } = await supabase.from("matches").insert([payload]);
+            if (error) throw error;
+            setQuickOpponent("");
+            await fetchMatches();
+        } catch (err: any) {
+            alert("Failed to quick-add fixture: " + err.message);
+        } finally {
+            setIsQuickAdding(false);
+        }
+    };
+
     const handleSaveMatch = async () => {
         if (!formData.opponent || !formData.date) return;
 
@@ -385,15 +476,9 @@ export default function MatchesPage() {
             const currentMatch = matches.find(m => m.id === editingId);
             if (currentMatch) {
                 if ((currentMatch as any).rawNotes && (currentMatch as any).rawNotes.includes("[Lineup: ")) {
-                    const startIdx = (currentMatch as any).rawNotes.indexOf("[Lineup: ");
-                    const endIdx = (currentMatch as any).rawNotes.indexOf("}]", startIdx);
-                    if (endIdx !== -1) {
-                        lineupTag = (currentMatch as any).rawNotes.substring(startIdx, endIdx + 2) + "\n";
-                    } else {
-                        const singleEndIdx = (currentMatch as any).rawNotes.indexOf("]", startIdx);
-                        if (singleEndIdx !== -1) {
-                            lineupTag = (currentMatch as any).rawNotes.substring(startIdx, singleEndIdx + 1) + "\n";
-                        }
+                    const extracted = extractLineupBlock((currentMatch as any).rawNotes);
+                    if (extracted.lineupTag) {
+                        lineupTag = extracted.lineupTag + "\n";
                     }
                 }
                 
@@ -431,6 +516,7 @@ export default function MatchesPage() {
         try {
             let matchId = editingId;
             if (isNew) {
+                if (clubId) payload.club_id = clubId;
                 payload.event_token = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
                 const { data, error } = await supabase.from("matches").insert([payload]).select().single();
                 if (error) throw error;
@@ -444,7 +530,7 @@ export default function MatchesPage() {
             try {
                 const teamNameClean = formData.opponent.trim();
                 if (teamNameClean) {
-                    const existingTeam = leagueTeams.find(t => t.name.toLowerCase() === teamNameClean.toLowerCase());
+                    const existingTeam = leagueTeams.find(t => (t.name || t.team_name || "").toLowerCase() === teamNameClean.toLowerCase());
                     const teamPayload = {
                         name: teamNameClean,
                         badge_url: opponentBadgeUrl || null,
@@ -493,7 +579,7 @@ export default function MatchesPage() {
             lockTime: (match as any).lock_time ? new Date((match as any).lock_time).toISOString().slice(0, 16) : ""
         });
         setEditingId(match.id);
-        const teamMatch = leagueTeams.find(t => t.name.toLowerCase() === match.opponent.toLowerCase());
+        const teamMatch = leagueTeams.find(t => (t.name || t.team_name || "").toLowerCase() === match.opponent.toLowerCase());
         if (teamMatch) {
             setOpponentInstagram(teamMatch.instagram_handle || "");
             setOpponentBadgeUrl(teamMatch.badge_url || "");
@@ -509,16 +595,66 @@ export default function MatchesPage() {
         
         // Optimistically remove from UI instantly
         setMatches(prev => prev.filter(m => m.id !== id));
+        setSelectedMatchIds(prev => {
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+        });
         
         try {
+            await supabase.from('match_player_stats').delete().eq('match_id', id);
             const { error } = await supabase.from('matches').delete().eq('id', id);
             if (error) {
-                // Revert on error
                 fetchMatches();
                 throw error;
             }
+            await fetchMatches();
         } catch (e: any) {
             alert("Failed to delete match: " + e.message);
+        }
+    };
+
+    const toggleSelectMatch = (id: string) => {
+        setSelectedMatchIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id);
+            else next.add(id);
+            return next;
+        });
+    };
+
+    const handleBulkDelete = async () => {
+        const ids = Array.from(selectedMatchIds);
+        if (ids.length === 0) return;
+        if (!confirm(`Delete ${ids.length} selected fixture(s)?`)) return;
+
+        setMatches(prev => prev.filter(m => !selectedMatchIds.has(m.id)));
+        setSelectedMatchIds(new Set());
+        setIsBulkSelectMode(false);
+
+        try {
+            await supabase.from('match_player_stats').delete().in('match_id', ids);
+            const { error } = await supabase.from('matches').delete().in('id', ids);
+            if (error) throw error;
+            await fetchMatches();
+        } catch (err: any) {
+            alert("Failed to delete selected fixtures: " + err.message);
+            fetchMatches();
+        }
+    };
+
+    const handleUndoLastImport = async () => {
+        if (lastImportedIds.length === 0) return;
+        if (!confirm(`Undo last import and remove ${lastImportedIds.length} imported fixture(s)?`)) return;
+        const idsToDelete = [...lastImportedIds];
+        setLastImportedIds([]);
+        setMatches(prev => prev.filter(m => !idsToDelete.includes(m.id)));
+        try {
+            await supabase.from('matches').delete().in('id', idsToDelete);
+            await fetchMatches();
+        } catch (err: any) {
+            alert("Failed to undo import: " + err.message);
+            fetchMatches();
         }
     };
 
@@ -837,9 +973,9 @@ export default function MatchesPage() {
     // Helper result styling
     const getResultColor = (result?: string) => {
         switch (result) {
-            case "Win": return "text-green-600 bg-green-50 border-green-200";
-            case "Loss": return "text-red-600 bg-red-50 border-red-200";
-            case "Draw": return "text-amber-600 bg-amber-50 border-amber-200";
+            case "Win": return "text-emerald-800 dark:text-emerald-300 bg-emerald-100/90 dark:bg-emerald-500/15 border-emerald-400/60 dark:border-emerald-500/30 font-bold";
+            case "Loss": return "text-rose-800 dark:text-rose-300 bg-rose-100/90 dark:bg-rose-500/15 border-rose-400/60 dark:border-rose-500/30 font-bold";
+            case "Draw": return "text-amber-800 dark:text-amber-300 bg-amber-100/90 dark:bg-amber-500/15 border-amber-400/60 dark:border-amber-500/30 font-bold";
             default: return "text-muted-foreground bg-surface-2 border-border";
         }
     };
@@ -860,8 +996,18 @@ export default function MatchesPage() {
 
     const availableSeasons = Array.from(new Set([...matches.map(m => getSeasonFromDate(m.date)), getCurrentSeasonStr(), getNextSeasonStr()])).sort().reverse();
 
+    // Known Opponents list for autocomplete & paste parser (#2, #4)
+    const knownOpponents = Array.from(
+        new Set(
+            [
+                ...leagueTeams.map(t => (t.name || t.team_name || "").trim()),
+                ...matches.map(m => (m.opponent || "").trim())
+            ].filter(name => name && name.toLowerCase() !== (settings.name || "camden united").toLowerCase() && !/^premier division$/i.test(name))
+        )
+    ).sort((a, b) => a.localeCompare(b));
+
     const getCompetitionType = (comp: string): "league" | "cup" | "friendly" => {
-        const lower = comp.toLowerCase();
+        const lower = (comp || "").toLowerCase();
         if (lower.includes("cup") || lower.includes("trophy") || lower.includes("shield")) return "cup";
         if (lower.includes("friendly")) return "friendly";
         return "league";
@@ -869,7 +1015,7 @@ export default function MatchesPage() {
 
     const filteredMatches = matches.filter(match => {
         if (seasonFilter !== "All" && getSeasonFromDate(match.date) !== seasonFilter) return false;
-        
+        if (opponentSearch.trim() && !(match.opponent || "").toLowerCase().includes(opponentSearch.trim().toLowerCase())) return false;
         if (filterType === "all") return true;
         const type = getCompetitionType(match.competition);
         return type === filterType;
@@ -878,26 +1024,29 @@ export default function MatchesPage() {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // Upcoming: Date is in future (or today pending)
+    // Upcoming: Date is in future (or today pending) and no scoreline logged
     const upcomingMatches = filteredMatches.filter(m => {
         const d = new Date(m.date);
-        return d >= today && (!m.result || m.result === "Pending");
-    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()); // Ascending (Soonest first)
+        const hasResult = Boolean((m.scoreline && m.scoreline.trim()) || (m.result && m.result !== "Pending"));
+        return d >= today && !hasResult;
+    }).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     // Past: Date is in past OR result is documented
     const pastMatches = filteredMatches.filter(m => {
         const d = new Date(m.date);
-        return d < today || (m.result && m.result !== "Pending");
+        const hasResult = Boolean((m.scoreline && m.scoreline.trim()) || (m.result && m.result !== "Pending"));
+        return d < today || hasResult;
     }).sort((a, b) => {
         const dateA = new Date(a.date).getTime();
         const dateB = new Date(b.date).getTime();
         return resultSort === "desc" ? dateB - dateA : dateA - dateB;
     });
 
-    const MatchCard = ({ match, isPast }: { match: Match, isPast?: boolean }) => {
+    const MatchCard = ({ match, isPast, isNextUp }: { match: Match; isPast?: boolean; isNextUp?: boolean }) => {
         const [showLineup, setShowLineup] = useState(false);
-        const teamInfo = leagueTeams.find(t => t.name.toLowerCase() === match.opponent.toLowerCase());
-        
+        const teamInfo = leagueTeams.find(t => (t.name || t.team_name || "").toLowerCase() === (match.opponent || "").toLowerCase());
+        const isSelectedForBulk = selectedMatchIds.has(match.id);
+
         const localDate = getLocalDateString(match.date);
         const dayWeather = weatherForecast[localDate];
 
@@ -940,16 +1089,49 @@ export default function MatchesPage() {
             }
         }
 
+        // Parse scorer/assist tokens & scoreline goal validation (#19, #20)
+        const goalTokens = parseStatTextString(match.goalscorers, players);
+        const assistTokens = parseStatTextString(match.assists, players);
+        const totalLoggedGoals = goalTokens.reduce((acc, t) => acc + (t.count || 0), 0);
+        const parsedScore = parseMatchScoreline(match.scoreline, Boolean(match.isHome));
+        const clubExpectedGoals = parsedScore ? parsedScore.clubGoals : null;
+        const hasGoalMismatch = isPast && clubExpectedGoals !== null && clubExpectedGoals > 0 && totalLoggedGoals !== clubExpectedGoals;
+
         return (
-            <Card className="overflow-hidden hover:shadow-md transition-shadow border-border bg-surface-1">
-                <CardHeader className="py-4 bg-surface-2/50 border-border border-b flex flex-row items-center justify-between">
-                    <div className="flex items-center gap-3 flex-wrap">
-                        <Badge variant="outline" className={`bg-surface-2 ${match.competition.toLowerCase().includes("cup") ? "border-amber-200 text-amber-700" : "border-border"
-                            }`}>
-                            {match.competition}
+            <Card
+                id={`match-card-${match.id}`}
+                className={`overflow-hidden hover:shadow-md transition-all border-border bg-surface-1 ${
+                    isNextUp ? "border-l-4 border-l-brand" : ""
+                } ${isSelectedForBulk ? "ring-2 ring-brand bg-brand/5" : ""}`}
+            >
+                <CardHeader className="py-3.5 bg-surface-2/50 border-border border-b flex flex-row items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                        {isBulkSelectMode && (
+                            <button
+                                type="button"
+                                onClick={() => toggleSelectMatch(match.id)}
+                                className="text-foreground hover:text-brand transition-colors mr-1"
+                                title="Select fixture for bulk action"
+                            >
+                                {isSelectedForBulk ? (
+                                    <CheckSquare className="h-4 w-4 text-brand" />
+                                ) : (
+                                    <Square className="h-4 w-4 text-muted-foreground" />
+                                )}
+                            </button>
+                        )}
+                        {isNextUp && (
+                            <Badge className="bg-brand text-brand-foreground text-[10px] uppercase font-extrabold px-2 py-0.5">
+                                Next Up
+                            </Badge>
+                        )}
+                        <Badge variant="outline" className={`font-semibold ${(match.competition || "").toLowerCase().includes("cup") ? "bg-amber-100/90 dark:bg-amber-500/15 border-amber-400/70 dark:border-amber-500/40 text-amber-800 dark:text-amber-300" : "bg-surface-2 border-border"}`}>
+                            {match.competition || "League"}
                         </Badge>
-                        <span className="text-sm text-muted-foreground flex items-center gap-1">
-                            <CalendarDays className="h-3 w-3" /> {new Date(match.date).toLocaleDateString()}
+                        <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 font-medium">
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            {new Date(match.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                            {match.time ? ` · ${match.time.slice(0, 5)}` : ""}
                         </span>
                         {dayWeather && !isPast && (
                             <span className="text-xs text-muted-foreground flex items-center gap-1 bg-surface-2/80 border border-border px-2 py-0.5 rounded-full" title={`Temp: ${dayWeather.tempMin}°C to ${dayWeather.tempMax}°C, Rain: ${dayWeather.rain}mm`}>
@@ -957,50 +1139,57 @@ export default function MatchesPage() {
                             </span>
                         )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setQuickResultMatch(match)}
+                            className="h-7 px-2.5 text-[11px] font-bold bg-emerald-100/90 dark:bg-emerald-500/15 hover:bg-emerald-200/80 dark:hover:bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 border-emerald-400/70 dark:border-emerald-500/30 mr-1"
+                            title="Quickly log scoreline, goalscorers & assists"
+                        >
+                            ⚽ {match.scoreline ? "Edit Result / Scorers" : "Log Result"}
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-brand"
+                            onClick={() => router.push(`/matchday-xi?match=${match.id}`)}
+                            title="Open Matchday XI for this match"
+                        >
+                            <Users className="h-4 w-4" />
+                        </Button>
                         {!isPast && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50" onClick={() => handleOpenShare(match)} title="Share Player Poll">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10" onClick={() => handleOpenShare(match)} title="Share Player Poll">
                                 <MessageCircle className="h-4 w-4" />
                             </Button>
                         )}
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-50" 
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-amber-500 hover:text-amber-400 hover:bg-amber-500/10"
                             onClick={() => {
                                 setSelectedExpenseMatch(match);
                                 setIsExpenseOpen(true);
-                            }} 
+                            }}
                             title="Log Matchday Expense"
                         >
                             <Coins className="h-4 w-4" />
                         </Button>
                         {!isPast && match.isHome && (
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-blue-600 hover:text-blue-700 hover:bg-blue-50" 
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-sky-400 hover:text-sky-300 hover:bg-sky-500/10"
                                 onClick={() => handleOpenConfirmDetails(match)}
                                 title="Confirm Details with Opponent & Ref"
                             >
                                 <Share2 className="h-4 w-4" />
                             </Button>
                         )}
-                        {isPast && (
-                            <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-8 w-8 text-slate-400 hover:text-emerald-600" 
-                                onClick={() => router.push(`/analysis?matchId=${match.id}`)}
-                                title="Log Match Stats"
-                            >
-                                <BarChart3 className="h-4 w-4" />
-                            </Button>
-                        )}
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-blue-600" onClick={() => handleEditMatch(match)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" onClick={() => handleEditMatch(match)} title="Edit Match Details">
                             <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-400 hover:text-red-600" onClick={() => handleDeleteMatch(match.id)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-500" onClick={() => handleDeleteMatch(match.id)} title="Delete Match">
                             <Trash2 className="h-4 w-4" />
                         </Button>
                     </div>
@@ -1010,7 +1199,7 @@ export default function MatchesPage() {
                         {/* Home Team */}
                         <div className="flex-1 flex items-center justify-end gap-3 text-right">
                             {!match.isHome && teamInfo?.instagram_handle && (
-                                <a href={`https://instagram.com/${teamInfo.instagram_handle.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-700 transition-colors shrink-0">
+                                <a href={`https://instagram.com/${teamInfo.instagram_handle.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="text-pink-500 hover:text-pink-400 transition-colors shrink-0">
                                     <Instagram className="h-4 w-4" />
                                 </a>
                             )}
@@ -1023,37 +1212,42 @@ export default function MatchesPage() {
                             <span className={`font-bold text-lg ${match.isHome ? 'text-foreground' : 'text-muted-foreground'}`}>
                                 {match.isHome ? settings.name : match.opponent}
                             </span>
-                            {match.isHome && <span className="text-xs px-1.5 py-0.5 bg-surface-3 text-muted-foreground rounded shrink-0">H</span>}
+                            {match.isHome && <span className="text-xs px-1.5 py-0.5 bg-surface-2 border border-border text-muted-foreground rounded shrink-0">H</span>}
                         </div>
- 
+
                         {/* Score / VS */}
-                        <div className="flex flex-col items-center min-w-[100px]">
-                            <div className="text-2xl font-black text-foreground tracking-tight flex items-center justify-center min-w-[80px]">
+                        <div className="flex flex-col items-center min-w-[110px]">
+                            <button
+                                type="button"
+                                onClick={() => setQuickResultMatch(match)}
+                                title="Click to log or edit scoreline & scorers"
+                                className="text-2xl font-black text-foreground tracking-tight flex items-center justify-center min-w-[84px] px-2.5 py-0.5 rounded-lg hover:bg-surface-2 transition-colors"
+                            >
                                 {match.scoreline ? (
                                     match.scoreline.includes('-') ? (
                                         <div className="flex items-center gap-2">
                                             <span>{match.scoreline.split('-')[0].trim() || "0"}</span>
-                                            <span className="text-slate-300">-</span>
+                                            <span className="text-muted-foreground">-</span>
                                             <span>{match.scoreline.split('-')[1].trim() || "0"}</span>
                                         </div>
                                     ) : match.scoreline
                                 ) : "v"}
-                            </div>
-                            {match.result && (
+                            </button>
+                            {match.result && match.result !== "Pending" && (
                                 <Badge variant="outline" className={`mt-1 text-[10px] uppercase px-2 py-0 ${getResultColor(match.result)}`}>
                                     {match.result}
                                 </Badge>
                             )}
                             {match.location && (
                                 <span className="text-xs text-muted-foreground mt-1.5 flex items-center justify-center gap-1 bg-surface-2/80 px-2 py-0.5 rounded-full font-medium">
-                                    <MapPin className="h-3 w-3 text-slate-400 shrink-0" /> {match.location}
+                                    <MapPin className="h-3 w-3 text-muted-foreground shrink-0" /> {match.location}
                                 </span>
                             )}
                         </div>
- 
+
                         {/* Away Team */}
                         <div className="flex-1 flex items-center justify-start gap-3 text-left">
-                            {!match.isHome && <span className="text-xs px-1.5 py-0.5 bg-surface-3 text-muted-foreground rounded shrink-0">A</span>}
+                            {!match.isHome && <span className="text-xs px-1.5 py-0.5 bg-surface-2 border border-border text-muted-foreground rounded shrink-0">A</span>}
                             <span className={`font-bold text-lg flex items-center gap-2 ${!match.isHome ? 'text-foreground' : 'text-muted-foreground'}`}>
                                 {!match.isHome && settings.logo && (
                                     <img src={settings.logo} alt="Club Logo" className="h-6 w-6 object-contain shrink-0 rounded-full" />
@@ -1064,134 +1258,226 @@ export default function MatchesPage() {
                                 {!match.isHome ? settings.name : match.opponent}
                             </span>
                             {match.isHome && teamInfo?.instagram_handle && (
-                                <a href={`https://instagram.com/${teamInfo.instagram_handle.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:text-pink-700 transition-colors shrink-0">
+                                <a href={`https://instagram.com/${teamInfo.instagram_handle.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="text-pink-500 hover:text-pink-400 transition-colors shrink-0">
                                     <Instagram className="h-4 w-4" />
                                 </a>
                             )}
                         </div>
                     </div>
 
-                {/* Details */}
-                {(match.goalscorers || match.assists || match.notes || match.lineup) && (
-                    <div className="mt-4 pt-4 border-t flex flex-col items-center text-center space-y-2 w-full">
-                        {(match.goalscorers || match.assists) && (
-                            <div className="space-y-1">
-                                {match.goalscorers && (
-                                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                                        <Activity className="h-4 w-4 mt-0.5 text-green-600 shrink-0" />
-                                        <span>{match.goalscorers}</span>
-                                    </div>
-                                )}
-                                {match.assists && (
-                                    <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                                        <span className="h-4 w-4 mt-0.5 flex items-center justify-center text-xs font-bold shrink-0">🅰️</span>
-                                        <span>{match.assists}</span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
+                    {/* Visual Scorer & Assist Pills + Goal Validation (#19, #20) */}
+                    {(goalTokens.length > 0 || assistTokens.length > 0 || hasGoalMismatch || match.lineup) && (
+                        <div className="mt-4 pt-3.5 border-t border-border flex flex-col items-center text-center space-y-2.5 w-full">
+                            {(goalTokens.length > 0 || assistTokens.length > 0 || hasGoalMismatch) && (
+                                <div className="flex flex-wrap items-center justify-center gap-1.5">
+                                    {goalTokens.map((g, idx) => (
+                                        <button
+                                            type="button"
+                                            key={`g-${idx}`}
+                                            onClick={() => setQuickResultMatch(match)}
+                                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100/90 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-400/70 dark:border-emerald-500/30 hover:bg-emerald-200/80 dark:hover:bg-emerald-500/25 transition-colors"
+                                            title="Click to edit goalscorers"
+                                        >
+                                            <span>⚽</span>
+                                            <span>{g.rawName}{g.count > 1 ? ` (${g.count})` : ""}</span>
+                                        </button>
+                                    ))}
 
-                        {match.lineup && (
-                            <div className="w-full mt-3 pt-3 border-t border-border flex flex-col items-center">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setShowLineup(!showLineup)}
-                                    className="text-xs font-bold bg-surface-2 hover:bg-surface-3 text-foreground border border-border px-3 py-1 flex items-center gap-1.5 h-8 transition-colors shadow-sm"
-                                >
-                                    <span>📋</span> {showLineup ? "Hide Saved Lineup" : `Show Saved Lineup (${match.lineup.formation})`}
-                                </Button>
-                                
-                                {showLineup && (
-                                    <div className="w-full mt-2.5 p-3 rounded-xl bg-surface-2/80 border border-border text-left space-y-2.5">
-                                        <div>
-                                            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Starting XI</span>
-                                            <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                                {Object.entries(match.lineup.starters || {})
-                                                    .filter(([pos, id]) => id)
-                                                    .map(([pos, id]) => {
-                                                        const p = players.find(x => x.id === id);
-                                                        const name = p ? `${p.first_name[0]}.${p.last_name}` : "Unknown";
-                                                        return (
-                                                            <span key={pos} className="inline-flex items-center bg-surface-2 border border-border px-2 py-0.5 rounded-full shadow-sm text-[11px]">
-                                                                <span className="text-[9px] uppercase font-extrabold text-slate-400 mr-1">{pos}:</span>
-                                                                <span className="font-semibold text-slate-800">{name}</span>
-                                                            </span>
-                                                        );
-                                                    })}
-                                            </div>
-                                        </div>
-                                        
-                                        {match.lineup.substitutes && match.lineup.substitutes.filter(id => id).length > 0 && (
-                                            <div className="border-t border-border pt-2.5">
-                                                <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Substitutes</span>
+                                    {assistTokens.map((a, idx) => (
+                                        <button
+                                            type="button"
+                                            key={`a-${idx}`}
+                                            onClick={() => setQuickResultMatch(match)}
+                                            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-sky-100/90 dark:bg-sky-500/15 text-sky-800 dark:text-sky-300 border border-sky-400/70 dark:border-sky-500/30 hover:bg-sky-200/80 dark:hover:bg-sky-500/25 transition-colors"
+                                            title="Click to edit assists"
+                                        >
+                                            <span>👟</span>
+                                            <span>{a.rawName}{a.count > 1 ? ` (${a.count})` : ""}</span>
+                                        </button>
+                                    ))}
+
+                                    {hasGoalMismatch && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setQuickResultMatch(match)}
+                                            className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 dark:bg-amber-500/20 text-amber-900 dark:text-amber-300 border border-amber-400 dark:border-amber-500/40 hover:bg-amber-200/90 dark:hover:bg-amber-500/30 transition-colors shadow-xs"
+                                            title="Scoreline goals don't match assigned player goals — click to assign scorers"
+                                        >
+                                            <AlertTriangle className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400 shrink-0" />
+                                            <span>
+                                                {totalLoggedGoals === 0
+                                                    ? `+ Add Scorers (${clubExpectedGoals} ${clubExpectedGoals === 1 ? "goal" : "goals"} unassigned)`
+                                                    : `${totalLoggedGoals}/${clubExpectedGoals} goals assigned`}
+                                            </span>
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+
+                            {match.lineup && (
+                                <div className="w-full pt-2 flex flex-col items-center">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setShowLineup(!showLineup)}
+                                        className="text-xs font-bold bg-surface-2 hover:bg-surface-3 text-foreground border border-border px-3 py-1 flex items-center gap-1.5 h-7 transition-colors shadow-sm"
+                                    >
+                                        <span>📋</span> {showLineup ? "Hide Saved Lineup" : `Show Saved Lineup (${match.lineup.formation})`}
+                                    </Button>
+
+                                    {showLineup && (
+                                        <div className="w-full mt-2.5 p-3 rounded-xl bg-surface-2/80 border border-border text-left space-y-2.5">
+                                            <div>
+                                                <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Starting XI</span>
                                                 <div className="mt-1.5 flex flex-wrap gap-1.5">
-                                                    {match.lineup.substitutes
-                                                        .filter(id => id)
-                                                        .map((id, index) => {
+                                                    {Object.entries(match.lineup.starters || {})
+                                                        .filter(([pos, id]) => id)
+                                                        .map(([pos, id]) => {
                                                             const p = players.find(x => x.id === id);
                                                             const name = p ? `${p.first_name[0]}.${p.last_name}` : "Unknown";
                                                             return (
-                                                                <span key={index} className="inline-flex items-center bg-surface-2 border border-border px-2 py-0.5 rounded-full shadow-sm text-[11px]">
-                                                                    <span className="font-semibold text-slate-750 text-slate-800">{name}</span>
+                                                                <span key={pos} className="inline-flex items-center bg-surface-1 border border-border px-2 py-0.5 rounded-full shadow-sm text-[11px]">
+                                                                    <span className="text-[9px] uppercase font-extrabold text-muted-foreground mr-1">{pos}:</span>
+                                                                    <span className="font-semibold text-foreground">{name}</span>
                                                                 </span>
                                                             );
                                                         })}
                                                 </div>
                                             </div>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-                        )}
+
+                                            {match.lineup.substitutes && match.lineup.substitutes.filter(id => id).length > 0 && (
+                                                <div className="border-t border-border pt-2.5">
+                                                    <span className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Substitutes</span>
+                                                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                                        {match.lineup.substitutes
+                                                            .filter(id => id)
+                                                            .map((id, index) => {
+                                                                const p = players.find(x => x.id === id);
+                                                                const name = p ? `${p.first_name[0]}.${p.last_name}` : "Unknown";
+                                                                return (
+                                                                    <span key={index} className="inline-flex items-center bg-surface-1 border border-border px-2 py-0.5 rounded-full shadow-sm text-[11px]">
+                                                                        <span className="font-semibold text-foreground">{name}</span>
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Weather Warning Banner */}
+                    {isWarning && warningText && (
+                        <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400 font-semibold flex items-center gap-2">
+                            <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 animate-pulse" />
+                            <span>{warningText}</span>
+                        </div>
+                    )}
+                </CardContent>
+                {isPast && (
+                    <div className="p-3 bg-surface-2/60 border-t border-border grid grid-cols-1 sm:grid-cols-3 gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => setQuickResultMatch(match)}
+                            className="w-full text-xs font-bold border-emerald-400/70 dark:border-emerald-500/30 bg-emerald-100/90 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-200/80 dark:hover:bg-emerald-500/25 flex items-center justify-center gap-1.5"
+                        >
+                            <Trophy className="h-3.5 w-3.5" />
+                            Quick Result &amp; Scorers
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={() => router.push(`/matchday-xi?match=${match.id}`)}
+                            className="w-full text-xs font-bold border-border text-foreground hover:bg-surface-2 flex items-center justify-center gap-1.5"
+                        >
+                            <Users className="h-3.5 w-3.5" />
+                            Matchday XI &amp; Subs
+                        </Button>
+                        <MatchStatsDialog
+                            matchId={match.id}
+                            matchDate={match.date}
+                            opponent={match.opponent}
+                            variant="full"
+                        />
                     </div>
                 )}
-                {/* Weather Warning Banner */}
-                {isWarning && warningText && (
-                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 font-semibold flex items-center gap-2">
-                        <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 animate-pulse" />
-                        <span>{warningText}</span>
-                    </div>
-                )}
-            </CardContent>
-            {isPast && (
-                <div className="p-4 bg-surface-2 border-t grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <Button 
-                        variant="outline" 
-                        onClick={() => router.push(`/analysis?matchId=${match.id}`)}
-                        className="w-full text-xs font-bold border-border text-foreground text-foreground hover:bg-surface-3 flex items-center justify-center gap-1.5"
-                    >
-                        <BarChart3 className="h-3.5 w-3.5" /> 
-                        Visual Board Analysis
-                    </Button>
-                    <MatchStatsDialog 
-                        matchId={match.id} 
-                        matchDate={match.date} 
-                        opponent={match.opponent} 
-                        variant="full" 
-                    />
-                </div>
-            )}
-        </Card>
-    );
-};
+            </Card>
+        );
+    };
 
     return (
-        <div className="space-y-8">
-            {/* Header & Controls */}
-            <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between">
+        <div className="space-y-6">
+            {/* Shared Opponent Autocomplete Datalist (#4) */}
+            <datalist id="known-opponents-list">
+                {knownOpponents.map(opp => (
+                    <option key={opp} value={opp} />
+                ))}
+            </datalist>
+
+            {/* Header & Controls (#5, #10) */}
+            <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">Fixtures & Results</h2>
-                    <p className="text-muted-foreground">Track fixtures, results, and match statistics.</p>
+                    <h2 className="text-3xl font-bold tracking-tight text-foreground">Fixtures &amp; Results</h2>
+                    <p className="text-sm text-muted-foreground">Manage your schedule, results, goalscorers, and matchday squads.</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                    {lastImportedIds.length > 0 && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleUndoLastImport}
+                            className="border-amber-400/70 dark:border-amber-500/40 bg-amber-100/90 dark:bg-amber-500/15 text-amber-900 dark:text-amber-300 hover:bg-amber-200/80 dark:hover:bg-amber-500/25 font-bold"
+                        >
+                            <RotateCcw className="h-3.5 w-3.5 mr-1.5" />
+                            Undo Last Import ({lastImportedIds.length})
+                        </Button>
+                    )}
+
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                            setIsBulkSelectMode(prev => !prev);
+                            setSelectedMatchIds(new Set());
+                        }}
+                        className={`border-border ${isBulkSelectMode ? "bg-brand/15 text-brand border-brand/40" : "bg-surface-1 text-muted-foreground hover:text-foreground"}`}
+                    >
+                        <CheckSquare className="h-4 w-4 mr-1.5" />
+                        {isBulkSelectMode ? "Cancel Select" : "Select Multiple"}
+                    </Button>
+
+                    {isBulkSelectMode && selectedMatchIds.size > 0 && (
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={handleBulkDelete}
+                            className="bg-rose-600 hover:bg-rose-700 text-white font-semibold"
+                        >
+                            <Trash2 className="h-4 w-4 mr-1.5" />
+                            Delete Selected ({selectedMatchIds.size})
+                        </Button>
+                    )}
+
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsImportModalOpen(true)}
+                        className="bg-surface-1 border-border hover:bg-surface-2 text-foreground font-semibold"
+                    >
+                        <ClipboardPaste className="h-4 w-4 mr-1.5 text-emerald-500" />
+                        Paste / Import
+                    </Button>
+
                     <Dialog open={isAddOpen} onOpenChange={(open: boolean) => {
                         setIsAddOpen(open);
                         if (!open) resetForm();
                     }}>
                         <DialogTrigger asChild>
-                            <Button className="bg-red-600 hover:bg-red-700">
-                                <Plus className="h-4 w-4 mr-2" /> Add Match
+                            <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white font-semibold">
+                                <Plus className="h-4 w-4 mr-1.5" /> Add Match
                             </Button>
                         </DialogTrigger>
                         <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
@@ -1225,7 +1511,7 @@ export default function MatchesPage() {
                                                 <Input type="time" value={formData.meetTime} onChange={e => setFormData({ ...formData, meetTime: e.target.value })} className="h-9 text-xs" />
                                             </div>
                                         </div>
-                                        
+
                                         <div className="grid grid-cols-3 gap-3">
                                             <div className="col-span-1 space-y-1">
                                                 <Label className="text-xs font-bold text-muted-foreground">Venue</Label>
@@ -1245,13 +1531,13 @@ export default function MatchesPage() {
                                             <div className="col-span-2 space-y-1">
                                                 <Label className="text-xs font-bold text-muted-foreground">Opponent</Label>
                                                 <Input
-                                                    list="league-teams-list"
+                                                    list="known-opponents-list"
                                                     placeholder="Type opponent name"
                                                     value={formData.opponent}
                                                     onChange={e => {
                                                         const val = e.target.value;
                                                         setFormData({ ...formData, opponent: val });
-                                                        const teamMatch = leagueTeams.find(t => t.name.toLowerCase() === val.toLowerCase());
+                                                        const teamMatch = leagueTeams.find(t => (t.name || t.team_name || "").toLowerCase() === val.toLowerCase());
                                                         if (teamMatch) {
                                                             setOpponentInstagram(teamMatch.instagram_handle || "");
                                                             setOpponentBadgeUrl(teamMatch.badge_url || "");
@@ -1262,11 +1548,6 @@ export default function MatchesPage() {
                                                     }}
                                                     className="h-9 text-xs"
                                                 />
-                                                <datalist id="league-teams-list">
-                                                    {leagueTeams.map(team => (
-                                                        <option key={team.id} value={team.name} />
-                                                    ))}
-                                                </datalist>
                                             </div>
                                         </div>
 
@@ -1325,8 +1606,8 @@ export default function MatchesPage() {
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <div className="space-y-0.5">
                                                         <Label className="text-[10px] font-bold text-slate-505">Instagram</Label>
-                                                        <Input 
-                                                            placeholder="e.g. camden_utd" 
+                                                        <Input
+                                                            placeholder="e.g. camden_utd"
                                                             value={opponentInstagram}
                                                             onChange={e => setOpponentInstagram(e.target.value)}
                                                             className="h-8 text-[11px]"
@@ -1334,24 +1615,24 @@ export default function MatchesPage() {
                                                     </div>
                                                     <div className="space-y-0.5">
                                                         <Label className="text-[10px] font-bold text-slate-505">Badge Image URL</Label>
-                                                        <Input 
-                                                            placeholder="https://..." 
+                                                        <Input
+                                                            placeholder="https://..."
                                                             value={opponentBadgeUrl}
                                                             onChange={e => setOpponentBadgeUrl(e.target.value)}
                                                             className="h-8 text-[11px]"
                                                         />
                                                     </div>
                                                 </div>
-                                                
+
                                                 <div className="space-y-1">
-                                                    <div 
+                                                    <div
                                                         onDragOver={e => e.preventDefault()}
                                                         onDrop={handleBadgeDrop}
                                                         onPaste={handleBadgePaste}
                                                         className="border border-dashed border-border rounded-lg p-2 flex items-center justify-center bg-surface-2 cursor-pointer hover:border-indigo-400 transition-colors relative"
                                                     >
-                                                        <input 
-                                                            type="file" 
+                                                        <input
+                                                            type="file"
                                                             accept="image/*"
                                                             onChange={handleBadgeFileChange}
                                                             className="absolute inset-0 opacity-0 cursor-pointer"
@@ -1404,7 +1685,7 @@ export default function MatchesPage() {
                                                     />
                                                     <span className="text-xs font-bold text-muted-foreground w-10">Away</span>
                                                 </div>
-                                                                    </div>
+                                            </div>
                                         </div>
 
                                         <div className="grid grid-cols-2 gap-3">
@@ -1494,25 +1775,184 @@ export default function MatchesPage() {
                 </div>
             </div>
 
-            {/* LEVEL 0: Football Week */}
-            <WeeklyFootballCalendar title="Next 14 Days" />
+            {/* 14-Day Calendar Strip synced directly with matches (#9, #13, #14, #15) */}
+            <WeeklyFootballCalendar
+                matches={matches}
+                title="Next 14 Days"
+                daysToShow={14}
+                onSelectMatch={(matchId) => {
+                    const target = matches.find(m => m.id === matchId);
+                    if (target) {
+                        const el = document.getElementById(`match-card-${matchId}`);
+                        if (el) {
+                            el.scrollIntoView({ behavior: "smooth", block: "center" });
+                        } else {
+                            setQuickResultMatch(target);
+                        }
+                    }
+                }}
+            />
 
-            {/* Filters */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border">
-                <div className="flex flex-wrap items-center gap-2">
+            {/* Next Match Hero with Delete, Quick Result, and folded Match Prep (#6, #8, #12) */}
+            {upcomingMatches.length > 0 && (
+                <NextMatchHero
+                    match={upcomingMatches[0]}
+                    leagueTeams={leagueTeams}
+                    onManageMatch={handleEditMatch}
+                    onShareMatch={handleOpenShare}
+                    onDeleteMatch={handleDeleteMatch}
+                    onQuickLogResult={(m) => setQuickResultMatch(m)}
+                />
+            )}
+
+            {/* 1-Line Quick-Add Fixture Bar (#3) */}
+            <form
+                onSubmit={handleQuickAddFixture}
+                className="bg-surface-1 border border-border rounded-xl p-3 shadow-sm flex flex-col lg:flex-row lg:items-center gap-2.5"
+            >
+                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground shrink-0 px-1">
+                    Quick Add:
+                </span>
+                <div className="grid grid-cols-2 sm:grid-cols-5 lg:flex lg:flex-1 items-center gap-2">
+                    <Input
+                        type="date"
+                        value={quickDate}
+                        onChange={(e) => setQuickDate(e.target.value)}
+                        className="h-8 text-xs bg-surface-2 border-border lg:w-36"
+                        required
+                    />
+                    <Input
+                        type="time"
+                        value={quickTime}
+                        onChange={(e) => setQuickTime(e.target.value)}
+                        className="h-8 text-xs bg-surface-2 border-border lg:w-28"
+                    />
+                    <button
+                        type="button"
+                        onClick={() => setQuickIsHome(h => !h)}
+                        className={`h-8 px-3 rounded-md text-xs font-bold border transition-colors shrink-0 ${
+                            quickIsHome
+                                ? "bg-emerald-100/90 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-400/70 dark:border-emerald-500/30 hover:bg-emerald-200/80 dark:hover:bg-emerald-500/25"
+                                : "bg-sky-100/90 dark:bg-sky-500/15 text-sky-800 dark:text-sky-300 border-sky-400/70 dark:border-sky-500/30 hover:bg-sky-200/80 dark:hover:bg-sky-500/25"
+                        }`}
+                        title="Click to toggle Home / Away"
+                    >
+                        {quickIsHome ? "HOME (H)" : "AWAY (A)"}
+                    </button>
+                    <Input
+                        type="text"
+                        list="known-opponents-list"
+                        placeholder="Opponent name (e.g. Hackney Wick)..."
+                        value={quickOpponent}
+                        onChange={(e) => setQuickOpponent(e.target.value)}
+                        className="h-8 text-xs bg-surface-2 border-border col-span-2 sm:col-span-2 lg:flex-1 font-medium"
+                        required
+                    />
+                    <select
+                        value={quickCompetition}
+                        onChange={(e) => setQuickCompetition(e.target.value)}
+                        className="h-8 rounded-md border border-border bg-surface-2 px-2.5 text-xs text-foreground outline-none lg:w-32"
+                    >
+                        <option value="League">League</option>
+                        <option value="Middlesex Cup">Cup</option>
+                        <option value="Friendly">Friendly</option>
+                    </select>
+                </div>
+                <Button
+                    type="submit"
+                    size="sm"
+                    disabled={isQuickAdding || !quickOpponent.trim()}
+                    className="h-8 bg-brand hover:bg-brand/90 text-brand-foreground font-semibold text-xs shrink-0"
+                >
+                    <Plus className="h-3.5 w-3.5 mr-1" />
+                    Add Fixture
+                </Button>
+            </form>
+
+            {/* Sub-Tabs + Search + Competition & Season Filters (#11) */}
+            <div className="flex flex-col gap-3 pb-3 border-b border-border">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                    {/* View Section Switcher */}
+                    <div className="flex items-center gap-1 bg-surface-1 p-1 rounded-xl border border-border w-fit">
+                        <button
+                            type="button"
+                            onClick={() => setViewSection("all")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                                viewSection === "all"
+                                    ? "bg-brand text-brand-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                            }`}
+                        >
+                            All ({upcomingMatches.length + pastMatches.length})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewSection("upcoming")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                                viewSection === "upcoming"
+                                    ? "bg-brand text-brand-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                            }`}
+                        >
+                            Upcoming ({upcomingMatches.length})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setViewSection("results")}
+                            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${
+                                viewSection === "results"
+                                    ? "bg-brand text-brand-foreground shadow-sm"
+                                    : "text-muted-foreground hover:text-foreground"
+                            }`}
+                        >
+                            Results &amp; Season Log ({pastMatches.length})
+                        </button>
+                    </div>
+
+                    {/* Opponent Search + Season Selector */}
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative w-full sm:w-52">
+                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                                placeholder="Search opponent..."
+                                value={opponentSearch}
+                                onChange={(e) => setOpponentSearch(e.target.value)}
+                                className="pl-8 h-8 text-xs bg-surface-1 border-border"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-semibold text-muted-foreground hidden sm:inline-block">Season:</span>
+                            <Select value={seasonFilter} onValueChange={setSeasonFilter}>
+                                <SelectTrigger className="h-8 w-[140px] text-xs bg-surface-1 border-border shadow-sm font-medium">
+                                    <SelectValue placeholder="Select Season" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="All">All Seasons</SelectItem>
+                                    {availableSeasons.map(season => (
+                                        <SelectItem key={season} value={season}>20{season.split('/')[0]}/20{season.split('/')[1]}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Competition Pill Filters */}
+                <div className="flex flex-wrap items-center gap-1.5">
                     <Button
                         variant={filterType === "all" ? "secondary" : "ghost"}
                         size="sm"
                         onClick={() => setFilterType("all")}
-                        className="rounded-full"
+                        className="rounded-full h-7 text-xs px-3"
                     >
-                        All Matches
+                        All Competitions
                     </Button>
                     <Button
                         variant={filterType === "league" ? "secondary" : "ghost"}
                         size="sm"
                         onClick={() => setFilterType("league")}
-                        className="rounded-full"
+                        className="rounded-full h-7 text-xs px-3"
                     >
                         League
                     </Button>
@@ -1520,7 +1960,7 @@ export default function MatchesPage() {
                         variant={filterType === "cup" ? "secondary" : "ghost"}
                         size="sm"
                         onClick={() => setFilterType("cup")}
-                        className="rounded-full"
+                        className="rounded-full h-7 text-xs px-3"
                     >
                         Cups
                     </Button>
@@ -1528,56 +1968,60 @@ export default function MatchesPage() {
                         variant={filterType === "friendly" ? "secondary" : "ghost"}
                         size="sm"
                         onClick={() => setFilterType("friendly")}
-                        className="rounded-full"
+                        className="rounded-full h-7 text-xs px-3"
                     >
                         Friendlies
                     </Button>
                 </div>
-                
-                <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold text-muted-foreground hidden sm:inline-block">Season:</span>
-                    <Select value={seasonFilter} onValueChange={setSeasonFilter}>
-                        <SelectTrigger className="h-9 w-[160px] text-sm bg-surface-1 border-border shadow-sm font-medium">
-                            <SelectValue placeholder="Select Season" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="All">All Seasons</SelectItem>
-                            {availableSeasons.map(season => (
-                                <SelectItem key={season} value={season}>20{season.split('/')[0]}/20{season.split('/')[1]}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
             </div>
 
-            <FootballDataImportCentre 
+            {/* Paste / Import Modal (#1, #2, #5) */}
+            <FootballDataImportCentre
                 clubId={clubId || ""}
-                clubName={settings.name} 
+                clubName={settings.name}
                 clubSettings={settings}
-                onImportComplete={fetchMatches}
+                knownOpponents={knownOpponents}
+                isOpen={isImportModalOpen}
+                onOpenChange={setIsImportModalOpen}
+                onImportComplete={(importedIds) => {
+                    if (importedIds && importedIds.length > 0) {
+                        setLastImportedIds(importedIds);
+                    }
+                    fetchMatches();
+                }}
             />
 
-            {upcomingMatches.length > 0 && (
-                <>
-                    <NextMatchHero 
-                        match={upcomingMatches[0]} 
-                        leagueTeams={leagueTeams}
-                        onManageMatch={handleEditMatch}
-                        onShareMatch={handleOpenShare}
-                    />
-                    <MatchPreparation nextMatch={upcomingMatches[0]} />
-                </>
+            {/* Quick Result, Goals & Assists Modal (#16, #17, #18, #20) */}
+            <QuickResultScorersModal
+                match={quickResultMatch}
+                clubName={settings.name || "Camden United"}
+                isOpen={quickResultMatch !== null}
+                onClose={() => setQuickResultMatch(null)}
+                onSaved={fetchMatches}
+            />
+
+            {/* Upcoming Fixtures List — keeps Next Match visible with 'NEXT UP' badge (#7) */}
+            {(viewSection === "all" || viewSection === "upcoming") && (
+                <UpcomingFixtures
+                    matches={upcomingMatches}
+                    renderCard={(match) => (
+                        <MatchCard
+                            key={match.id}
+                            match={match}
+                            isPast={false}
+                            isNextUp={upcomingMatches[0]?.id === match.id}
+                        />
+                    )}
+                />
             )}
 
-            <UpcomingFixtures 
-                matches={upcomingMatches.length > 0 ? upcomingMatches.slice(1) : []} 
-                renderCard={(match) => <MatchCard key={match.id} match={match} isPast={false} />} 
-            />
-
-            <RecentResults 
-                matches={pastMatches} 
-                renderCard={(match) => <MatchCard key={match.id} match={match} isPast={true} />} 
-            />
+            {/* Recent Results & Season Log */}
+            {(viewSection === "all" || viewSection === "results") && (
+                <RecentResults
+                    matches={pastMatches}
+                    renderCard={(match) => <MatchCard key={match.id} match={match} isPast={true} />}
+                />
+            )}
 
             {/* Share WhatsApp Poll Modal */}
             {/* Share WhatsApp Poll Modal */}
