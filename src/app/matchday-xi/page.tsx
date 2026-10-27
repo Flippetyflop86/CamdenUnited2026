@@ -136,6 +136,8 @@ export default function MatchdayXIPage() {
     const [trialistInputNumber, setTrialistInputNumber] = useState<string>("");
     const [seasonStatsMap, setSeasonStatsMap] = useState<Record<string, { apps: number; goals: number; assists: number }>>({});
     const [currentMatchStatsMap, setCurrentMatchStatsMap] = useState<Record<string, { goals: number; assists: number; yellowCards: number; redCards: number }>>({});
+    const [showLogisticsEditor, setShowLogisticsEditor] = useState<boolean>(false);
+    const [openActionDropdown, setOpenActionDropdown] = useState<"autofill" | "share" | null>(null);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
     const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const notesDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1556,8 +1558,8 @@ export default function MatchdayXIPage() {
 
     const getFormattedMeetTime = (): string => {
         if (!nextMatch || !nextMatch.time) return "TBD";
-        const offset = typeof lineup?.meetOffsetMinutes === "number" ? lineup.meetOffsetMinutes : -60;
-        return calculateMeetTime(nextMatch.time, offset);
+        const offsetMins = typeof lineup?.meetOffsetMinutes === "number" ? Math.abs(lineup.meetOffsetMinutes) : 60;
+        return calculateMeetTime(nextMatch.time, -offsetMins);
     };
 
     const handleDownloadPitchGraphic = () => {
@@ -2473,12 +2475,12 @@ export default function MatchdayXIPage() {
                 </div>
             )}
 
-            {/* #1 Compact Fixture Header Bar + #7 Editable Meet Time & Venue Notes */}
-            <div className="bg-surface-1 rounded-2xl shadow-sm border border-border px-4 py-3.5 md:px-6 md:py-4 relative overflow-hidden">
+            {/* #1 & #2 Single-Row Compact Fixture Header Bar with Click-to-Edit Meet Time & Venue */}
+            <div className="bg-surface-1 rounded-2xl shadow-sm border border-border px-4 py-3 md:px-6 md:py-3.5 relative overflow-hidden">
                 <div className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.02]" style={{ backgroundImage: 'radial-gradient(circle at center, currentColor 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
 
-                <div className="relative z-10 flex flex-col gap-3">
-                    {/* Top Row: Fixture Title + Metadata + Fixture Selector */}
+                <div className="relative z-10 flex flex-col gap-2.5">
+                    {/* Single Top Row: Fixture Title + Metadata + Clickable Meet/Venue Pills + Fixture Selector */}
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 min-w-0">
                             {nextMatch ? (
@@ -2492,7 +2494,7 @@ export default function MatchdayXIPage() {
                                             {nextMatch.opponent}
                                         </span>
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-2.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                                    <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
                                         <span className="inline-flex items-center gap-1 text-primary bg-primary/10 px-2 py-0.5 rounded-full">
                                             <Trophy className="h-3 w-3" /> {nextMatch.competition || "Friendly"}
                                         </span>
@@ -2503,6 +2505,25 @@ export default function MatchdayXIPage() {
                                         <span className="inline-flex items-center gap-1">
                                             <Clock className="h-3.5 w-3.5" /> KO {nextMatch.time}
                                         </span>
+                                        {/* Clickable Meet & Venue Pill (expands editor when clicked) */}
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowLogisticsEditor(prev => !prev)}
+                                            title="Click to edit Meet Time & Venue / Pitch Notes"
+                                            className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full border transition-colors normal-case font-semibold ${
+                                                showLogisticsEditor
+                                                    ? "bg-primary/15 text-primary border-primary/40"
+                                                    : "bg-surface-2 hover:bg-surface-3 text-foreground border-border"
+                                            }`}
+                                        >
+                                            <span className="text-amber-500 font-bold">⏱ Meet {getFormattedMeetTime()}</span>
+                                            <span className="text-muted-foreground">•</span>
+                                            <MapPin className="h-3 w-3 text-primary shrink-0" />
+                                            <span className="max-w-[180px] sm:max-w-[240px] truncate">
+                                                {lineup.venueNotes?.trim() || (nextMatch.isHome ? (settings.homeGround || "Home Ground") : "Away Venue")}
+                                            </span>
+                                            <Pencil className="h-2.5 w-2.5 text-muted-foreground ml-0.5 shrink-0" />
+                                        </button>
                                     </div>
                                 </>
                             ) : (
@@ -2530,9 +2551,9 @@ export default function MatchdayXIPage() {
                         </div>
                     </div>
 
-                    {/* Bottom Row (#7): Editable Meet Time & Pitch / Postcode / Venue Notes */}
-                    {nextMatch && (
-                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60 text-xs">
+                    {/* Collapsible Editor Row: Only shown when user clicks Meet / Venue pill */}
+                    {nextMatch && showLogisticsEditor && (
+                        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60 text-xs animate-in fade-in duration-150">
                             <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1">
                                 <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Meet:</span>
@@ -2549,7 +2570,6 @@ export default function MatchdayXIPage() {
                                         setLineup(updated);
                                         saveLineup(updated);
                                     }}
-                                    title="Select Meet Time offset before Kick-Off (included in WhatsApp & PDF)"
                                     className="bg-transparent text-[11px] font-bold text-primary focus:outline-none cursor-pointer ml-1"
                                 >
                                     <option value={30} className="bg-surface-1 text-foreground">(30m before KO)</option>
@@ -2567,6 +2587,7 @@ export default function MatchdayXIPage() {
                                 </span>
                                 <input
                                     type="text"
+                                    autoFocus
                                     value={lineup.venueNotes ?? ""}
                                     onChange={(e) => {
                                         const val = e.target.value;
@@ -2578,17 +2599,37 @@ export default function MatchdayXIPage() {
                                         setLineup(updated);
                                         saveLineup(updated);
                                     }}
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Enter" || e.key === "Escape") {
+                                            setShowLogisticsEditor(false);
+                                        }
+                                    }}
                                     placeholder={`${nextMatch.isHome ? (settings.homeGround || "Home Ground") : "Away Venue"} — Add pitch #, postcode or parking info...`}
                                     className="w-full bg-transparent text-xs font-medium text-foreground placeholder-muted-foreground focus:outline-none"
                                 />
                             </div>
+
+                            <button
+                                type="button"
+                                onClick={() => setShowLogisticsEditor(false)}
+                                className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary text-xs font-bold transition-colors"
+                            >
+                                Done
+                            </button>
                         </div>
                     )}
                 </div>
             </div>
 
-            {/* Action Bar */}
-            <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 px-1">
+            {/* Consolidated 3-Control Action Bar (#1 Cleanup) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-1 relative z-30">
+                {openActionDropdown && (
+                    <div
+                        className="fixed inset-0 z-20"
+                        onClick={() => setOpenActionDropdown(null)}
+                    />
+                )}
+
                 <div className="flex items-center justify-between sm:justify-start gap-3 overflow-x-auto no-scrollbar max-w-full">
                     <div className="flex space-x-1.5">
                         {currentSquads.map(squad => (
@@ -2626,34 +2667,110 @@ export default function MatchdayXIPage() {
                     </div>
                 </div>
                 
-                <div className="flex flex-wrap items-center gap-2">
-                    <Button onClick={handleClearLineup} variant="outline" className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2" title="Clear Pitch & Bench">
-                        <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button onClick={handleAutoFillLastLineup} variant="outline" className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2" title="Copy Lineup from Previous Match">
-                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
-                        Last XI
-                    </Button>
-                    <Button onClick={handleAutoPickXI} variant="outline" className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2" title="Auto-Pick Available Players into Empty Pitch Slots">
-                        <Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-500" />
-                        Auto-Pick
-                    </Button>
-                    <Button onClick={handleCopyTeamSheetToWhatsApp} className="h-9 text-xs bg-emerald-600 hover:bg-emerald-700 text-white border-none shadow-sm flex" title="Share Starting XI & Bench on WhatsApp">
-                        <MessageCircle className="h-3.5 w-3.5 mr-1.5" />
-                        Share XI
-                    </Button>
-                    <Button onClick={handleCopyPollToWhatsApp} variant="outline" className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2" title="Share Matchday Availability Check-In Poll on WhatsApp">
-                        Poll
-                    </Button>
-                    {/* #4 Export / Download Pitch Graphic as PNG Image */}
-                    <Button onClick={handleDownloadPitchGraphic} variant="outline" className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2" title="Download High-Res Starting XI Pitch Graphic (PNG) for WhatsApp / Instagram">
-                        <ImageIcon className="h-3.5 w-3.5 mr-1.5 text-primary" />
-                        Graphic
-                    </Button>
-                    <Button onClick={handleExportPDF} variant="outline" className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2" title="Print / Export Team Sheet PDF">
-                        <FileDown className="h-3.5 w-3.5 mr-1.5" />
-                        PDF
-                    </Button>
+                <div className="flex flex-wrap items-center gap-2 relative z-30">
+                    {/* 1. Auto-Fill Dropdown */}
+                    <div className="relative">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpenActionDropdown(prev => prev === "autofill" ? null : "autofill")}
+                            className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2 font-bold"
+                        >
+                            <Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-500" />
+                            Auto-Fill
+                            <ChevronDown className="h-3.5 w-3.5 ml-1 text-muted-foreground" />
+                        </Button>
+                        {openActionDropdown === "autofill" && (
+                            <div className="absolute right-0 sm:left-0 mt-1.5 w-52 rounded-xl bg-surface-1 border border-border shadow-xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
+                                <button
+                                    type="button"
+                                    onClick={() => { setOpenActionDropdown(null); handleAutoPickXI(); }}
+                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                >
+                                    <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                    <span>Auto-Pick Starting XI</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setOpenActionDropdown(null); handleAutoFillLastLineup(); }}
+                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                >
+                                    <RefreshCw className="h-3.5 w-3.5 text-primary shrink-0" />
+                                    <span>Copy Last Match XI</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setOpenActionDropdown(null); handleAutoFillBench(); }}
+                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                >
+                                    <UserPlus className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                    <span>Auto-Fill Bench</span>
+                                </button>
+                                <div className="my-1 border-t border-border" />
+                                <button
+                                    type="button"
+                                    onClick={() => { setOpenActionDropdown(null); handleClearLineup(); }}
+                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-red-500 hover:bg-red-500/10 flex items-center gap-2.5"
+                                >
+                                    <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                                    <span>Clear Pitch &amp; Bench</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 2. Share & Export Dropdown */}
+                    <div className="relative">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setOpenActionDropdown(prev => prev === "share" ? null : "share")}
+                            className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2 font-bold"
+                        >
+                            <MessageCircle className="h-3.5 w-3.5 mr-1.5 text-emerald-500" />
+                            Share &amp; Export
+                            <ChevronDown className="h-3.5 w-3.5 ml-1 text-muted-foreground" />
+                        </Button>
+                        {openActionDropdown === "share" && (
+                            <div className="absolute right-0 mt-1.5 w-56 rounded-xl bg-surface-1 border border-border shadow-xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
+                                <button
+                                    type="button"
+                                    onClick={() => { setOpenActionDropdown(null); handleCopyTeamSheetToWhatsApp(); }}
+                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                >
+                                    <MessageCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                    <span>Share XI on WhatsApp</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setOpenActionDropdown(null); handleDownloadPitchGraphic(); }}
+                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                >
+                                    <ImageIcon className="h-3.5 w-3.5 text-primary shrink-0" />
+                                    <span>Download Pitch Graphic (PNG)</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setOpenActionDropdown(null); handleExportPDF(); }}
+                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                >
+                                    <FileDown className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                    <span>Export Team Sheet (PDF)</span>
+                                </button>
+                                <div className="my-1 border-t border-border" />
+                                <button
+                                    type="button"
+                                    onClick={() => { setOpenActionDropdown(null); handleCopyPollToWhatsApp(); }}
+                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                >
+                                    <MessageCircle className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                                    <span>Share Availability Poll</span>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 3. Save Lineup Primary Button */}
                     <Button onClick={async () => {
                         if (!selectedMatchId || !lineup) return;
                         await saveLineup(lineup);
@@ -2669,7 +2786,7 @@ export default function MatchdayXIPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:h-[760px]">
                 
-                {/* Left Panel - Squad (#2 Search Bar + #9 Season Stats & Last XI Badges) */}
+                {/* Left Panel - Squad (#2 Search Bar + #5 Compact 2-Line Player Cards) */}
                 <div 
                     className="lg:col-span-1 h-[480px] lg:h-full flex flex-col bg-surface-1 rounded-2xl border border-border shadow-sm order-2 lg:order-1 min-h-0 overflow-hidden"
                     onDragOver={handleDragOver}
@@ -2716,7 +2833,7 @@ export default function MatchdayXIPage() {
                         </div>
                     </div>
 
-                    <div className="p-2.5 space-y-2 overflow-y-auto flex-1 scrollbar-thin">
+                    <div className="p-2.5 space-y-1.5 overflow-y-auto flex-1 scrollbar-thin">
                         {sortedPlayers
                             .filter(p => squadFilter === "All" || getPositionCategory(p.position) === squadFilter)
                             .filter(p => {
@@ -2733,54 +2850,49 @@ export default function MatchdayXIPage() {
                                 const assistsCount = Math.max(rawSeasonStats?.assists || 0, player.assists || 0);
                                 const startedLast = lastMatchStarterIds.has(player.id);
                                 const subLast = !startedLast && lastMatchSubIds.has(player.id);
+                                const posLabel = `${player.position}${player.secondaryPositions && player.secondaryPositions.length > 0 ? `/${player.secondaryPositions.join("/")}` : ""}`;
+                                const statsSummary = [
+                                    appsCount > 0 ? `${appsCount} ${appsCount === 1 ? "App" : "Apps"}` : "",
+                                    goalsCount > 0 ? `${goalsCount}G` : "",
+                                    assistsCount > 0 ? `${assistsCount}A` : ""
+                                ].filter(Boolean).join(" • ");
 
                                 return (
                                     <div 
                                         key={player.id}
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, player.id, {type: 'squad'})}
-                                        className="group flex flex-col p-2.5 border border-border rounded-xl cursor-grab active:cursor-grabbing hover:border-foreground/30 bg-surface-1 transition-all shadow-sm relative overflow-hidden gap-1"
+                                        className="group flex items-center gap-2 p-2 border border-border rounded-xl cursor-grab active:cursor-grabbing hover:border-foreground/30 bg-surface-1 transition-all shadow-sm relative overflow-hidden"
                                     >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2 min-w-0">
-                                                <GripVertical className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
-                                                <div className="flex flex-col min-w-0">
-                                                    <span className="cf-card-title truncate w-full" title={displayName}>{displayName}</span>
-                                                    <span className="text-[10px] uppercase text-muted-foreground font-bold">
-                                                        {player.position}
-                                                        {player.secondaryPositions && player.secondaryPositions.length > 0 ? ` • ${player.secondaryPositions.join("/")}` : ""}
-                                                    </span>
+                                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                                        <div className="flex flex-col min-w-0 flex-1">
+                                            {/* Line 1: Player Name + Last XI / Squad # */}
+                                            <div className="flex items-center justify-between gap-1.5">
+                                                <span className="text-xs font-bold text-foreground truncate" title={displayName}>{displayName}</span>
+                                                <div className="flex items-center gap-1 shrink-0">
+                                                    {startedLast && (
+                                                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30" title="Started Previous Match">
+                                                            Last XI
+                                                        </span>
+                                                    )}
+                                                    {subLast && (
+                                                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30" title="Substitute in Previous Match">
+                                                            Sub Last
+                                                        </span>
+                                                    )}
+                                                    {player.squadNumber > 0 && (
+                                                        <span className="text-[9px] font-bold text-muted-foreground bg-surface-2 px-1.5 py-0.2 rounded">
+                                                            #{player.squadNumber}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
-                                            {player.squadNumber > 0 && (
-                                                <span className="text-[10px] font-bold text-muted-foreground bg-surface-2 px-1.5 py-0.5 rounded shrink-0">
-                                                    #{player.squadNumber}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        {/* #9 Season Stats & Last Match XI Badges */}
-                                        {(appsCount > 0 || goalsCount > 0 || assistsCount > 0 || startedLast || subLast) && (
-                                            <div className="flex flex-wrap items-center gap-1 pl-6 pt-0.5">
-                                                {startedLast && (
-                                                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                                                        Started Last XI
-                                                    </span>
-                                                )}
-                                                {subLast && (
-                                                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                                                        Sub Last XI
-                                                    </span>
-                                                )}
-                                                {(appsCount > 0 || goalsCount > 0 || assistsCount > 0) && (
-                                                    <span className="text-[9px] font-bold text-muted-foreground bg-surface-2 px-1.5 py-0.2 rounded">
-                                                        {appsCount} {appsCount === 1 ? "App" : "Apps"}
-                                                        {goalsCount > 0 ? ` • ${goalsCount}G` : ""}
-                                                        {assistsCount > 0 ? ` • ${assistsCount}A` : ""}
-                                                    </span>
-                                                )}
+                                            {/* Line 2: Position + Season Stats on one clean line */}
+                                            <div className="text-[10px] font-semibold text-muted-foreground truncate">
+                                                <span className="uppercase font-bold text-foreground/80">{posLabel}</span>
+                                                {statsSummary ? ` • ${statsSummary}` : ""}
                                             </div>
-                                        )}
+                                        </div>
                                     </div>
                                 );
                         })}
@@ -2872,7 +2984,7 @@ export default function MatchdayXIPage() {
                         </div>
                         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                             {/* #3 Per-Match Kit Colour Selector + Goalkeeper Jersey Colour */}
-                            <div className="flex items-center gap-1 bg-surface-1 border border-border rounded-xl px-2 py-1 shadow-sm">
+                            <div className="flex items-center gap-1 bg-surface-1 border border-border rounded-xl px-2.5 py-1.5 shadow-sm">
                                 <Shirt className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                                 <select
                                     value={lineup.kitOverride || "auto"}
@@ -2929,22 +3041,18 @@ export default function MatchdayXIPage() {
                                 />
                             </div>
 
-                            {/* 1-11 Button: Shows/Resets 1-11 on the pitch */}
-                            <button
-                                type="button"
-                                onClick={handleResetCustomNumbers}
-                                className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-colors flex items-center gap-1.5 shadow-sm ${
-                                    !lineup.customNumbers || Object.keys(lineup.customNumbers).length === 0
-                                        ? "bg-foreground text-background border-foreground"
-                                        : "bg-surface-1 text-foreground border-border hover:border-foreground/30"
-                                }`}
-                                title="Set all shirt numbers on the field to 1–11 (click any shirt number on the pitch to change it manually)"
-                            >
-                                <span>1–11</span>
-                                {lineup.customNumbers && Object.keys(lineup.customNumbers).length > 0 && (
-                                    <RotateCcw className="h-3 w-3 opacity-80" />
-                                )}
-                            </button>
+                            {/* #4 Only show Reset 1–11 button when custom numbers have been set */}
+                            {lineup.customNumbers && Object.keys(lineup.customNumbers).length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={handleResetCustomNumbers}
+                                    className="px-2.5 py-1.5 rounded-xl border border-border bg-surface-1 hover:bg-surface-2 text-foreground text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
+                                    title="Reset all shirt numbers back to 1–11"
+                                >
+                                    <RotateCcw className="h-3 w-3 text-primary" />
+                                    <span>Reset 1–11</span>
+                                </button>
+                            )}
 
                             <select
                                 value={lineup.formation}
@@ -3286,9 +3394,9 @@ export default function MatchdayXIPage() {
                             const isSubMotm = Boolean(subId && lineup.motmPlayerId === subId);
 
                             return (
-                                <div key={idx} className="space-y-1.5 p-1.5 rounded-xl border border-border bg-surface-1 shadow-sm">
+                                <div key={idx} className="space-y-1.5">
                                     <div 
-                                        className="flex flex-col gap-1.5 w-full"
+                                        className="flex flex-col gap-1 w-full"
                                         onDragOver={handleDragOver}
                                         onDrop={(e) => handleDropOnSub(e, idx)}
                                     >
@@ -3368,8 +3476,11 @@ export default function MatchdayXIPage() {
                                                                     className="w-full bg-surface-2 text-foreground text-xs font-semibold rounded px-1.5 py-0.5 outline-none ring-1 ring-primary"
                                                                 />
                                                             ) : (
-                                                                <>
-                                                                    <span className="font-semibold text-xs text-foreground truncate" title={displayName}>{displayName}</span>
+                                                                <div className="flex items-center gap-1 min-w-0">
+                                                                    <span className="font-bold text-xs text-foreground truncate" title={displayName}>{displayName}</span>
+                                                                    <span className="text-[9px] uppercase text-muted-foreground font-bold shrink-0">
+                                                                        {isTrialist ? "GUEST" : player?.position}
+                                                                    </span>
                                                                     <button
                                                                         type="button"
                                                                         onClick={(e) => {
@@ -3380,9 +3491,9 @@ export default function MatchdayXIPage() {
                                                                         title="Edit display name for Team Sheet"
                                                                         className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-opacity p-0.5 shrink-0"
                                                                     >
-                                                                        <Pencil className="h-3 w-3" />
+                                                                        <Pencil className="h-2.5 w-2.5" />
                                                                     </button>
-                                                                </>
+                                                                </div>
                                                             )}
                                                         </div>
                                                         <div className="flex items-center gap-1 shrink-0 ml-1">
@@ -3395,9 +3506,29 @@ export default function MatchdayXIPage() {
                                                                     {subEvents && subEvents.redCards > 0 && "🟥"}
                                                                 </span>
                                                             )}
-                                                            <span className="text-[9px] uppercase text-muted-foreground font-bold bg-surface-2 px-1.5 py-0.5 rounded">
-                                                                {isTrialist ? "GUEST" : player?.position}
-                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => {
+                                                                    e.preventDefault();
+                                                                    e.stopPropagation();
+                                                                    const usedSubs = lineup.usedSubstitutes || [];
+                                                                    let nextUsed;
+                                                                    let nextSubstitutions = lineup.substitutions || [];
+                                                                    if (usedSubs.includes(subId)) {
+                                                                        nextUsed = usedSubs.filter(id => id !== subId);
+                                                                        nextSubstitutions = nextSubstitutions.filter(s => s.subId !== subId);
+                                                                    } else {
+                                                                        nextUsed = [...usedSubs, subId];
+                                                                    }
+                                                                    const updated = { ...lineup, usedSubstitutes: nextUsed, substitutions: nextSubstitutions, updatedAt: new Date().toISOString() };
+                                                                    setLineup(updated);
+                                                                    saveLineup(updated);
+                                                                }}
+                                                                title={isSubPlayed ? "Click to mark as Unused sub" : "Click to mark sub as Played & log minute"}
+                                                                className={`px-2 py-0.5 rounded-full text-[9px] font-bold border transition-colors shrink-0 ${isSubPlayed ? "bg-status-success/15 text-status-success border-status-success/30 hover:bg-status-success/25" : "bg-surface-2 text-muted-foreground border-border hover:bg-surface-3 hover:text-foreground"}`}
+                                                            >
+                                                                {isSubPlayed ? `✓ ${subMinutes}'` : "Unused"}
+                                                            </button>
                                                         </div>
                                                     </>
                                                 ) : (
@@ -3416,60 +3547,24 @@ export default function MatchdayXIPage() {
                                             )}
                                         </div>
 
-                                        {subId && (
-                                            <div className="flex items-center justify-between pl-5 pr-1 gap-1">
-                                                <div className="flex items-center gap-1 min-w-0">
-                                                    <span className="text-[10px] text-muted-foreground truncate">
-                                                        {isTrialist
-                                                            ? "Trialist / Guest (Excluded from Squad DB)"
-                                                            : hasCustomSubName
-                                                                ? `Stats: ${player?.firstName} ${player?.lastName}`
-                                                                : `${player?.firstName} ${player?.lastName}`}
-                                                    </span>
-                                                    {hasCustomSubName && (
-                                                        <button
-                                                            type="button"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleCustomNameChange(subId, "");
-                                                                showToast("Reset to default player name", "info");
-                                                            }}
-                                                            title="Reset to original player name"
-                                                            className="text-muted-foreground hover:text-primary shrink-0"
-                                                        >
-                                                            <RotateCcw className="h-2.5 w-2.5" />
-                                                        </button>
-                                                    )}
-                                                </div>
-                                                <div className="flex items-center gap-1 shrink-0">
-                                                    {isSubPlayed && (
-                                                        <span className="px-1.5 py-0.5 rounded-full text-[9px] font-extrabold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
-                                                            {subMinutes}&apos; played
-                                                        </span>
-                                                    )}
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            const usedSubs = lineup.usedSubstitutes || [];
-                                                            let nextUsed;
-                                                            let nextSubstitutions = lineup.substitutions || [];
-                                                            if (usedSubs.includes(subId)) {
-                                                                nextUsed = usedSubs.filter(id => id !== subId);
-                                                                nextSubstitutions = nextSubstitutions.filter(s => s.subId !== subId);
-                                                            } else {
-                                                                nextUsed = [...usedSubs, subId];
-                                                            }
-                                                            const updated = { ...lineup, usedSubstitutes: nextUsed, substitutions: nextSubstitutions, updatedAt: new Date().toISOString() };
-                                                            setLineup(updated);
-                                                            saveLineup(updated);
-                                                        }}
-                                                        className={`px-2.5 py-0.5 rounded-full text-[9px] font-bold border transition-colors shrink-0 ${isSubPlayed ? "bg-status-success/15 text-status-success border-status-success/30 hover:bg-status-success/25" : "bg-surface-2 text-muted-foreground border-border hover:bg-surface-3 hover:text-foreground"}`}
-                                                    >
-                                                        {isSubPlayed ? "✓ Played" : "Unused"}
-                                                    </button>
-                                                </div>
+                                        {/* Only show sub-caption when a custom alias name is active */}
+                                        {subId && hasCustomSubName && (
+                                            <div className="flex items-center gap-1 pl-9 pr-1">
+                                                <span className="text-[9px] text-muted-foreground truncate">
+                                                    Stats linked to: {player?.firstName} {player?.lastName}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        handleCustomNameChange(subId, "");
+                                                        showToast("Reset to default player name", "info");
+                                                    }}
+                                                    title="Reset to original player name"
+                                                    className="text-muted-foreground hover:text-primary shrink-0"
+                                                >
+                                                    <RotateCcw className="h-2.5 w-2.5" />
+                                                </button>
                                             </div>
                                         )}
                                     </div>
@@ -3973,6 +4068,12 @@ export default function MatchdayXIPage() {
                                     const assistsCount = Math.max(rawPStats?.assists || 0, player.assists || 0);
                                     const startedLast = lastMatchStarterIds.has(player.id);
                                     const subLast = !startedLast && lastMatchSubIds.has(player.id);
+                                    const posLabel = `${player.position}${player.secondaryPositions && player.secondaryPositions.length > 0 ? `/${player.secondaryPositions.join("/")}` : ""}`;
+                                    const statsSummary = [
+                                        appsCount > 0 ? `${appsCount} ${appsCount === 1 ? "App" : "Apps"}` : "",
+                                        goalsCount > 0 ? `${goalsCount}G` : "",
+                                        assistsCount > 0 ? `${assistsCount}A` : ""
+                                    ].filter(Boolean).join(" • ");
 
                                     return (
                                         <button
@@ -3987,7 +4088,7 @@ export default function MatchdayXIPage() {
                                                 setActiveSlot(null);
                                                 setSearchQuery("");
                                             }}
-                                            className={`w-full flex items-center justify-between gap-2 p-3 border rounded-xl transition-all text-left group
+                                            className={`w-full flex items-center justify-between gap-2 p-2.5 border rounded-xl transition-all text-left group
                                                 ${matchesTarget 
                                                     ? 'bg-primary/5 border-primary/20 hover:border-primary/50 hover:bg-primary/10' 
                                                     : matchesSecondary
@@ -3995,36 +4096,26 @@ export default function MatchdayXIPage() {
                                                         : 'bg-surface-1 border-border hover:border-foreground/30 hover:bg-surface-2'
                                                 }`}
                                         >
-                                            <div className="flex flex-col min-w-0 gap-1">
-                                                <div className="flex items-center gap-1.5">
+                                            <div className="flex flex-col min-w-0 gap-0.5 flex-1">
+                                                <div className="flex items-center gap-1.5 min-w-0">
                                                     <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">
                                                         {formatPlayerName(player)}
                                                     </span>
-                                                    <span className="text-[10px] text-muted-foreground font-semibold uppercase shrink-0">
-                                                        {player.position} {player.secondaryPositions && player.secondaryPositions.length > 0 ? `• ${player.secondaryPositions.join("/")}` : ''}
-                                                    </span>
+                                                    {startedLast && (
+                                                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 shrink-0">
+                                                            Last XI
+                                                        </span>
+                                                    )}
+                                                    {subLast && (
+                                                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30 shrink-0">
+                                                            Sub Last
+                                                        </span>
+                                                    )}
                                                 </div>
-                                                {(appsCount > 0 || goalsCount > 0 || assistsCount > 0 || startedLast || subLast) && (
-                                                    <div className="flex flex-wrap items-center gap-1">
-                                                        {startedLast && (
-                                                            <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
-                                                                Started Last XI
-                                                            </span>
-                                                        )}
-                                                        {subLast && (
-                                                            <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                                                                Sub Last XI
-                                                            </span>
-                                                        )}
-                                                        {(appsCount > 0 || goalsCount > 0 || assistsCount > 0) && (
-                                                            <span className="text-[9px] font-bold text-muted-foreground bg-surface-2 px-1.5 py-0.2 rounded">
-                                                                {appsCount} {appsCount === 1 ? "App" : "Apps"}
-                                                                {goalsCount > 0 ? ` • ${goalsCount}G` : ""}
-                                                                {assistsCount > 0 ? ` • ${assistsCount}A` : ""}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                )}
+                                                <div className="text-[10px] font-semibold text-muted-foreground truncate">
+                                                    <span className="uppercase font-bold text-foreground/80">{posLabel}</span>
+                                                    {statsSummary ? ` • ${statsSummary}` : ""}
+                                                </div>
                                             </div>
                                             {matchesTarget && (
                                                 <span className="bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
