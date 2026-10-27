@@ -46,11 +46,13 @@ import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCale
 
 const POSITION_ORDER: { [key: string]: number } = {
     'GK': 1,
-    'CB': 2, 'RB': 3, 'LB': 4, 'RWB': 5, 'LWB': 6, 'DEF': 7,
-    'CDM': 8, 'CM': 9, 'CAM': 10, 'RM': 11, 'LM': 12, 'MID': 13,
-    'LW': 14,
-    'RW': 15,
-    'CF': 16, 'ST': 17, 'FWD': 18
+    'RB': 2, 'RWB': 3, 'LB': 4, 'LWB': 5, 'RCB': 6, 'CB': 7, 'LCB': 8, 'DEF': 9,
+    'DM': 10, 'CDM': 10, 'LDM': 10, 'RDM': 10,
+    'CM': 11, 'RCM': 11, 'LCM': 11,
+    'RM': 12, 'LM': 13,
+    'CAM': 14, 'AM': 14, 'LAM': 14, 'RAM': 14, 'MID': 15,
+    'RW': 16, 'LW': 17,
+    'CF': 18, 'ST': 19, 'FWD': 20
 };
 
 function parseLineupFromNotes(notes?: string): any | null {
@@ -156,8 +158,8 @@ export default function MatchdayXIPage() {
     const getPositionCategory = (pos: string) => {
         const p = pos.toUpperCase();
         if (['GK'].includes(p)) return 'GK';
-        if (['CB', 'RB', 'LB', 'DEF', 'RWB', 'LWB'].includes(p)) return 'DEF';
-        if (['CM', 'CDM', 'CAM', 'MID', 'RM', 'LM'].includes(p)) return 'MID';
+        if (['CB', 'LCB', 'RCB', 'RB', 'LB', 'DEF', 'RWB', 'LWB'].includes(p)) return 'DEF';
+        if (['CM', 'LCM', 'RCM', 'CDM', 'DM', 'LDM', 'RDM', 'CAM', 'AM', 'LAM', 'RAM', 'MID', 'RM', 'LM'].includes(p)) return 'MID';
         if (['ST', 'CF', 'RW', 'LW', 'FWD'].includes(p)) return 'FWD';
         return 'All';
     };
@@ -2377,14 +2379,22 @@ export default function MatchdayXIPage() {
                         <div class="panel">
                             <h3>Starting XI</h3>
                             <ul class="list">
-                                ${formation.map((pos, idx) => {
-                                    const pid = lineup.starters[idx];
-                                    const pObj = resolvePlayerOrTrialist(pid);
-                                    const num = getSlotDisplayNumber("pitch", idx, pos.number, pObj);
-                                    const isCapt = Boolean(pid && lineup.captainId === pid);
-                                    const isVC = Boolean(pid && lineup.viceCaptainId === pid);
-                                    return `<li><span><strong>#${num}</strong> ${pObj ? getMatchdayDisplayName(pObj) : 'TBD'} ${isCapt ? '<strong>(C)</strong>' : isVC ? '(VC)' : ''}</span><span style="color:#64748b;font-weight:600">${pos.label}</span></li>`;
-                                }).join('')}
+                                ${formation
+                                    .map((pos, idx) => ({ pos, idx }))
+                                    .sort((a, b) => {
+                                        const orderA = POSITION_ORDER[a.pos.label.toUpperCase()] || 99;
+                                        const orderB = POSITION_ORDER[b.pos.label.toUpperCase()] || 99;
+                                        if (orderA !== orderB) return orderA - orderB;
+                                        return a.pos.x - b.pos.x;
+                                    })
+                                    .map(({ pos, idx }) => {
+                                        const pid = lineup.starters[idx];
+                                        const pObj = resolvePlayerOrTrialist(pid);
+                                        const num = getSlotDisplayNumber("pitch", idx, pos.number, pObj);
+                                        const isCapt = Boolean(pid && lineup.captainId === pid);
+                                        const isVC = Boolean(pid && lineup.viceCaptainId === pid);
+                                        return `<li><span><strong>#${num}</strong> ${pObj ? getMatchdayDisplayName(pObj) : 'TBD'} ${isCapt ? '<strong>(C)</strong>' : isVC ? '(VC)' : ''}</span><span style="color:#64748b;font-weight:600">${pos.label}</span></li>`;
+                                    }).join('')}
                             </ul>
                         </div>
 
@@ -2456,13 +2466,21 @@ export default function MatchdayXIPage() {
         msg += `📋 Formation: *${lineup.formation}*\n\n`;
 
         msg += `*STARTING XI:*\n`;
-        formation.forEach((pos, idx) => {
-            const pid = lineup.starters[idx];
-            const pObj = resolvePlayerOrTrialist(pid);
-            const num = getSlotDisplayNumber("pitch", idx, pos.number, pObj);
-            const isCapt = pid && lineup.captainId === pid ? " *(C)*" : (pid && lineup.viceCaptainId === pid ? " *(VC)*" : "");
-            msg += `${num}. *${pos.label}* — ${pObj ? getMatchdayDisplayName(pObj) : 'TBD'}${isCapt}\n`;
-        });
+        formation
+            .map((pos, idx) => ({ pos, idx }))
+            .sort((a, b) => {
+                const orderA = POSITION_ORDER[a.pos.label.toUpperCase()] || 99;
+                const orderB = POSITION_ORDER[b.pos.label.toUpperCase()] || 99;
+                if (orderA !== orderB) return orderA - orderB;
+                return a.pos.x - b.pos.x;
+            })
+            .forEach(({ pos, idx }) => {
+                const pid = lineup.starters[idx];
+                const pObj = resolvePlayerOrTrialist(pid);
+                const num = getSlotDisplayNumber("pitch", idx, pos.number, pObj);
+                const isCapt = pid && lineup.captainId === pid ? " *(C)*" : (pid && lineup.viceCaptainId === pid ? " *(VC)*" : "");
+                msg += `${num}. *${pos.label}* — ${pObj ? getMatchdayDisplayName(pObj) : 'TBD'}${isCapt}\n`;
+            });
 
         const activeSubsWithIdx = lineup.substitutes.map((subId, subSlotIdx) => ({ subId, subSlotIdx })).filter(item => Boolean(item.subId));
         if (activeSubsWithIdx.length > 0) {
@@ -2560,6 +2578,15 @@ export default function MatchdayXIPage() {
     if (!lineup) return <div>Loading...</div>;
 
     const formation = FORMATIONS[lineup.formation];
+    const sortedFormationSlots = formation
+        .map((pos, idx) => ({ pos, idx }))
+        .sort((a, b) => {
+            const orderA = POSITION_ORDER[a.pos.label.toUpperCase()] || 99;
+            const orderB = POSITION_ORDER[b.pos.label.toUpperCase()] || 99;
+            if (orderA !== orderB) return orderA - orderB;
+            return a.pos.x - b.pos.x;
+        });
+
     const selectedPlayerIds = [
         ...Object.values(lineup.starters),
         ...lineup.substitutes
@@ -2569,7 +2596,8 @@ export default function MatchdayXIPage() {
         .map(id => resolvePlayerOrTrialist(id))
         .filter((p): p is Player => Boolean(p));
 
-    const selectedStarterPlayers = Object.values(lineup.starters)
+    const selectedStarterPlayers = sortedFormationSlots
+        .map(({ idx }) => lineup.starters[idx])
         .filter(Boolean)
         .map(id => resolvePlayerOrTrialist(id))
         .filter((p): p is Player => Boolean(p));
@@ -3895,13 +3923,13 @@ export default function MatchdayXIPage() {
                                                 >
                                                     <option value="">Replaced player...</option>
                                                     <optgroup label="Starters">
-                                                        {Object.entries(lineup.starters).map(([slotIdx, starterId]) => {
+                                                        {sortedFormationSlots.map(({ pos, idx }) => {
+                                                            const starterId = lineup.starters[idx];
                                                             if (!starterId) return null;
                                                             const starter = resolvePlayerOrTrialist(starterId);
-                                                            const slotLabel = formation[Number(slotIdx)]?.label || slotIdx;
                                                             return (
                                                                 <option key={starterId} value={starterId}>
-                                                                    {starter ? getMatchdayDisplayName(starter) : "Unknown"} ({slotLabel})
+                                                                    {starter ? getMatchdayDisplayName(starter) : "Unknown"} ({pos.label})
                                                                 </option>
                                                             );
                                                         })}
@@ -4408,7 +4436,7 @@ export default function MatchdayXIPage() {
                                                 Quick Swap Position With:
                                             </span>
                                             <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto scrollbar-thin">
-                                                {formation.map((pos, pIdx) => {
+                                                {sortedFormationSlots.map(({ pos, idx: pIdx }) => {
                                                     if (activeSlot.type === "pitch" && activeSlot.index === pIdx) return null;
                                                     const otherId = lineup.starters[pIdx];
                                                     const otherPlayer = resolvePlayerOrTrialist(otherId);
