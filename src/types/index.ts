@@ -159,6 +159,13 @@ export interface OppositionTeam {
     updatedAt: string;
 }
 
+export interface MatchdayPlayerEventStats {
+    goals?: number;
+    assists?: number;
+    yellowCards?: number;
+    redCards?: number;
+}
+
 export interface MatchdayXI {
     id: string;
     formation: string;
@@ -168,6 +175,21 @@ export interface MatchdayXI {
     substitutes: string[]; // array of playerIds
     usedSubstitutes?: string[]; // array of used substitutes
     substitutions?: { subId: string; replacedId: string; minute: number }[]; // substitution details
+    captainId?: string;
+    viceCaptainId?: string;
+    penaltyTakerId?: string;
+    cornerTakerId?: string;
+    freeKickTakerId?: string;
+    tacticalNotes?: string;
+    customNames?: { [playerId: string]: string };
+    customNumbers?: { [key: string]: number };
+    kitOverride?: "auto" | "home" | "away" | "custom";
+    customKitColor?: string;
+    gkKitColor?: string;
+    meetOffsetMinutes?: number;
+    venueNotes?: string;
+    motmPlayerId?: string;
+    matchEvents?: { [playerId: string]: MatchdayPlayerEventStats };
     squad?: string;
     createdAt: string;
     updatedAt: string;
