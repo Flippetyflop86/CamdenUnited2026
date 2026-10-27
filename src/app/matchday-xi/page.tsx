@@ -2994,7 +2994,7 @@ export default function MatchdayXIPage() {
                                 const starterMins = playerId ? liveMinutesMap.get(playerId) : undefined;
                                 const isGkSlot = idx === 0 || pos.label === "GK";
                                 const kitColor = isGkSlot ? getEffectiveGkKitColor() : getEffectiveOutfieldKitColor();
-                                const playerEvents = playerId ? (lineup.matchEvents?.[playerId] || currentMatchStatsMap[playerId]) : undefined;
+                                const playerEvents = playerId ? getPlayerMatchEventStats(playerId) : undefined;
                                 const isMotm = Boolean(playerId && lineup.motmPlayerId === playerId);
 
                                 const jerseyTextColor = (() => {
@@ -3282,7 +3282,7 @@ export default function MatchdayXIPage() {
                             const subDetail = lineup.substitutions?.find(s => s.subId === subId);
                             const isSubPlayed = Boolean(subId && lineup.usedSubstitutes?.includes(subId));
                             const subMinutes = isSubPlayed ? (liveMinutesMap.get(subId) ?? 30) : 0;
-                            const subEvents = subId ? (lineup.matchEvents?.[subId] || currentMatchStatsMap[subId]) : undefined;
+                            const subEvents = subId ? getPlayerMatchEventStats(subId) : undefined;
                             const isSubMotm = Boolean(subId && lineup.motmPlayerId === subId);
 
                             return (
@@ -3854,12 +3854,7 @@ export default function MatchdayXIPage() {
 
                                     {/* #10 Post-Match Quick Stats Entry (Goals, Assists, Yellow/Red Cards, MOTM) */}
                                     {!isTrialistId(activePlayer.id) && (() => {
-                                        const ev = lineup.matchEvents?.[activePlayer.id] || currentMatchStatsMap[activePlayer.id] || {
-                                            goals: 0,
-                                            assists: 0,
-                                            yellowCards: 0,
-                                            redCards: 0
-                                        };
+                                        const ev = getPlayerMatchEventStats(activePlayer.id);
                                         const isMotm = lineup.motmPlayerId === activePlayer.id;
 
                                         return (
