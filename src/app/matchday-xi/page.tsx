@@ -1358,18 +1358,12 @@ export default function MatchdayXIPage() {
         const newSubs = [...lineup.substitutes];
         let added = 0;
 
-        // Fill existing empty bench slots first
+        // Only fill the existing empty bench slots (do not add extra slots)
         for (let i = 0; i < newSubs.length; i++) {
             if (!newSubs[i] && pool.length > added) {
                 newSubs[i] = pool[added].id;
                 added++;
             }
-        }
-
-        // If all bench slots were already full and more players are available (up to 7 subs total), add up to remaining pool
-        while (newSubs.length < 7 && added < pool.length) {
-            newSubs.push(pool[added].id);
-            added++;
         }
 
         if (added === 0) {
@@ -2556,8 +2550,7 @@ export default function MatchdayXIPage() {
                         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60 text-xs animate-in fade-in duration-150">
                             <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1">
                                 <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Meet:</span>
-                                <span className="text-xs font-extrabold text-foreground">{getFormattedMeetTime()}</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Offset:</span>
                                 <select
                                     value={lineup.meetOffsetMinutes ?? 60}
                                     onChange={(e) => {
@@ -2570,13 +2563,13 @@ export default function MatchdayXIPage() {
                                         setLineup(updated);
                                         saveLineup(updated);
                                     }}
-                                    className="bg-transparent text-[11px] font-bold text-primary focus:outline-none cursor-pointer ml-1"
+                                    className="bg-transparent text-[11px] font-bold text-primary focus:outline-none cursor-pointer"
                                 >
-                                    <option value={30} className="bg-surface-1 text-foreground">(30m before KO)</option>
-                                    <option value={45} className="bg-surface-1 text-foreground">(45m before KO)</option>
-                                    <option value={60} className="bg-surface-1 text-foreground">(60m before KO)</option>
-                                    <option value={75} className="bg-surface-1 text-foreground">(75m before KO)</option>
-                                    <option value={90} className="bg-surface-1 text-foreground">(90m before KO)</option>
+                                    <option value={30} className="bg-surface-1 text-foreground">30 mins before KO</option>
+                                    <option value={45} className="bg-surface-1 text-foreground">45 mins before KO</option>
+                                    <option value={60} className="bg-surface-1 text-foreground">60 mins before KO</option>
+                                    <option value={75} className="bg-surface-1 text-foreground">75 mins before KO</option>
+                                    <option value={90} className="bg-surface-1 text-foreground">90 mins before KO</option>
                                 </select>
                             </div>
 
@@ -2984,8 +2977,23 @@ export default function MatchdayXIPage() {
                         </div>
                         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                             {/* #3 Per-Match Kit Colour Selector + Goalkeeper Jersey Colour */}
-                            <div className="flex items-center gap-1 bg-surface-1 border border-border rounded-xl px-2.5 py-1.5 shadow-sm">
-                                <Shirt className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                            <div className="flex items-center gap-1.5 bg-surface-1 border border-border rounded-xl px-2.5 py-1.5 shadow-sm">
+                                <input
+                                    type="color"
+                                    value={getEffectiveOutfieldKitColor()}
+                                    onChange={(e) => {
+                                        const updated: MatchdayXI = {
+                                            ...lineup,
+                                            kitOverride: "custom",
+                                            customKitColor: e.target.value,
+                                            updatedAt: new Date().toISOString()
+                                        };
+                                        setLineup(updated);
+                                        saveLineup(updated);
+                                    }}
+                                    title="Active Outfield Kit Colour (click to pick a custom colour)"
+                                    className="w-4 h-4 rounded cursor-pointer border-0 bg-transparent p-0 shrink-0"
+                                />
                                 <select
                                     value={lineup.kitOverride || "auto"}
                                     onChange={(e) => {
@@ -3006,24 +3014,7 @@ export default function MatchdayXIPage() {
                                     <option value="away" className="bg-surface-1 text-foreground">Kit: Away</option>
                                     <option value="custom" className="bg-surface-1 text-foreground">Kit: Custom</option>
                                 </select>
-                                {lineup.kitOverride === "custom" && (
-                                    <input
-                                        type="color"
-                                        value={lineup.customKitColor || getEffectiveOutfieldKitColor()}
-                                        onChange={(e) => {
-                                            const updated: MatchdayXI = {
-                                                ...lineup,
-                                                customKitColor: e.target.value,
-                                                updatedAt: new Date().toISOString()
-                                            };
-                                            setLineup(updated);
-                                            saveLineup(updated);
-                                        }}
-                                        title="Pick Custom Outfield Jersey Colour"
-                                        className="w-5 h-5 rounded cursor-pointer border-0 bg-transparent p-0"
-                                    />
-                                )}
-                                <span className="text-[10px] font-bold text-muted-foreground ml-1">GK:</span>
+                                <span className="text-[10px] font-bold text-muted-foreground ml-1 border-l border-border pl-2">GK:</span>
                                 <input
                                     type="color"
                                     value={getEffectiveGkKitColor()}
@@ -3037,7 +3028,7 @@ export default function MatchdayXIPage() {
                                         saveLineup(updated);
                                     }}
                                     title="Pick Goalkeeper (#1) Jersey Colour"
-                                    className="w-4 h-4 rounded cursor-pointer border-0 bg-transparent p-0"
+                                    className="w-4 h-4 rounded cursor-pointer border-0 bg-transparent p-0 shrink-0"
                                 />
                             </div>
 
