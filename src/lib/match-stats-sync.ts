@@ -241,35 +241,13 @@ export async function syncMatchGoalsAndAssistsEverywhere(
     });
 
     // Also check if lineup in matches.notes has trialist goals/assists or needs its matchEvents updated
-    let updatedNotes = matchRow?.notes || "";
+    const normalizedNotesInfo = normalizeMatchNotesString(matchRow?.notes || "");
+    let updatedNotes = normalizedNotesInfo.normalized;
     if (updatedNotes.includes("[Lineup: ")) {
-        const startIdx = updatedNotes.indexOf("[Lineup: ");
-        const jsonStartIdx = startIdx + "[Lineup: ".length;
-        let depth = 0;
-        let inString = false;
-        let escape = false;
-        let jsonEndIdx = -1;
-
-        for (let i = jsonStartIdx; i < updatedNotes.length; i++) {
-            const ch = updatedNotes[i];
-            if (escape) { escape = false; continue; }
-            if (ch === "\\") { escape = true; continue; }
-            if (ch === '"') { inString = !inString; continue; }
-            if (inString) continue;
-            if (ch === "{") depth++;
-            else if (ch === "}") {
-                depth--;
-                if (depth === 0) {
-                    jsonEndIdx = i;
-                    break;
-                }
-            }
-        }
-
-        if (jsonEndIdx !== -1) {
+        const extracted = extractLineupFromRawNotes(updatedNotes);
+        if (extracted.parsedLineup) {
             try {
-                const jsonStr = updatedNotes.substring(jsonStartIdx, jsonEndIdx + 1);
-                const parsedLineup = JSON.parse(jsonStr);
+                const parsedLineup = extracted.parsedLineup;
                 const nextMatchEvents: Record<string, any> = { ...(parsedLineup.matchEvents || {}) };
 
                 // Sync real player stats into lineup.matchEvents
@@ -310,10 +288,7 @@ export async function syncMatchGoalsAndAssistsEverywhere(
                 });
 
                 parsedLineup.matchEvents = nextMatchEvents;
-                const tagCloseIdx = updatedNotes[jsonEndIdx + 1] === "]" ? jsonEndIdx + 2 : jsonEndIdx + 1;
-                const before = updatedNotes.substring(0, startIdx);
-                const after = updatedNotes.substring(tagCloseIdx);
-                updatedNotes = `${before}[Lineup: ${JSON.stringify(parsedLineup)}]${after}`.trim();
+                updatedNotes = `[Lineup: ${JSON.stringify(parsedLineup)}]\n${extracted.cleanNotes}`.trim();
             } catch (e) {
                 console.warn("Failed to sync lineup matchEvents in notes:", e);
             }
@@ -338,6 +313,83 @@ export async function syncMatchGoalsAndAssistsEverywhere(
     await supabase.from("matches").update(updatePayload).eq("id", matchId);
 
     return { goalscorers: goalscorersStr, assists: assistsStr };
+}
+
+/**
+ * Repairs any `notes` string where a legacy save wedged `[Location:...][Surface:...][MeetTime:...]`
+ * in the middle of a `[Lineup: {...}]` JSON block right after `"substitutions":[...}]`.
+ */
+export function normalizeMatchNotesString(rawNotes?: string | null): { normalized: string; wasRepaired: boolean } {
+    if (!rawNotes || !rawNotes.includes("[Lineup: ")) {
+        return { normalized: rawNotes || "", wasRepaired: false };
+    }
+    const wedgedRegex = /(\}\])\s*(\r?\n(?:\[(?:Location|Surface|MeetTime):[^\]]*\]\s*)+)\r?\n\s*(?="[a-zA-Z0-9_]+":)/;
+    if (wedgedRegex.test(rawNotes)) {
+        let extractedTags = "";
+        const repaired = rawNotes.replace(wedgedRegex, (_match, closingArr, tagsBlock) => {
+            extractedTags = tagsBlock.trim();
+            return `${closingArr},`;
+        });
+        const finalNormalized = `${repaired.trim()}\n${extractedTags}`.trim();
+        return { normalized: finalNormalized, wasRepaired: true };
+    }
+    return { normalized: rawNotes, wasRepaired: false };
+}
+
+/**
+ * Extracts `[Lineup: {...}]` from a `matches.notes` string using balanced brace matching,
+ * automatically repairing split lineup JSON if needed.
+ */
+export function extractLineupFromRawNotes(rawNotes?: string | null): {
+    parsedLineup: any | null;
+    lineupTag: string;
+    cleanNotes: string;
+    normalizedRawNotes: string;
+    wasRepaired: boolean;
+} {
+    const { normalized, wasRepaired } = normalizeMatchNotesString(rawNotes);
+    if (!normalized || !normalized.includes("[Lineup: ")) {
+        return { parsedLineup: null, lineupTag: "", cleanNotes: normalized || "", normalizedRawNotes: normalized || "", wasRepaired: false };
+    }
+
+    const tagStartIdx = normalized.indexOf("[Lineup: ");
+    const jsonStartIdx = tagStartIdx + "[Lineup: ".length;
+    let depth = 0;
+    let inString = false;
+    let escape = false;
+    let jsonEndIdx = -1;
+
+    for (let i = jsonStartIdx; i < normalized.length; i++) {
+        const ch = normalized[i];
+        if (escape) { escape = false; continue; }
+        if (ch === "\\") { escape = true; continue; }
+        if (ch === '"') { inString = !inString; continue; }
+        if (inString) continue;
+        if (ch === "{") depth++;
+        else if (ch === "}") {
+            depth--;
+            if (depth === 0) {
+                jsonEndIdx = i;
+                break;
+            }
+        }
+    }
+
+    if (jsonEndIdx !== -1) {
+        const jsonStr = normalized.substring(jsonStartIdx, jsonEndIdx + 1);
+        const tagCloseIdx = normalized[jsonEndIdx + 1] === "]" ? jsonEndIdx + 2 : jsonEndIdx + 1;
+        let parsedLineup = null;
+        try {
+            parsedLineup = JSON.parse(jsonStr);
+        } catch {
+            // Ignore malformed JSON silently
+        }
+        const lineupTag = normalized.substring(tagStartIdx, tagCloseIdx);
+        const cleanNotes = (normalized.substring(0, tagStartIdx) + normalized.substring(tagCloseIdx)).trim();
+        return { parsedLineup, lineupTag, cleanNotes, normalizedRawNotes: normalized, wasRepaired };
+    }
+
+    return { parsedLineup: null, lineupTag: "", cleanNotes: normalized, normalizedRawNotes: normalized, wasRepaired };
 }
 
 /**

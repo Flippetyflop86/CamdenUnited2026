@@ -26,7 +26,7 @@ import { UpcomingFixtures } from "./components/UpcomingFixtures";
 import { RecentResults } from "./components/RecentResults";
 import { QuickResultScorersModal } from "./components/QuickResultScorersModal";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
-import { parseMatchScoreline, parseStatTextString } from "@/lib/match-stats-sync";
+import { parseMatchScoreline, parseStatTextString, extractLineupFromRawNotes } from "@/lib/match-stats-sync";
 
 export default function MatchesPage() {
     const router = useRouter();
@@ -293,48 +293,8 @@ export default function MatchesPage() {
         if (data) setLeagueTeams(data);
     }
 
-    function extractLineupBlock(rawNotesStr: string): { parsedLineup: any | null; lineupTag: string; cleanNotes: string } {
-        if (!rawNotesStr || !rawNotesStr.includes("[Lineup: ")) {
-            return { parsedLineup: null, lineupTag: "", cleanNotes: rawNotesStr || "" };
-        }
-        const tagStartIdx = rawNotesStr.indexOf("[Lineup: ");
-        const jsonStartIdx = tagStartIdx + "[Lineup: ".length;
-        let depth = 0;
-        let inString = false;
-        let escape = false;
-        let jsonEndIdx = -1;
-
-        for (let i = jsonStartIdx; i < rawNotesStr.length; i++) {
-            const ch = rawNotesStr[i];
-            if (escape) { escape = false; continue; }
-            if (ch === "\\") { escape = true; continue; }
-            if (ch === '"') { inString = !inString; continue; }
-            if (inString) continue;
-            if (ch === "{") depth++;
-            else if (ch === "}") {
-                depth--;
-                if (depth === 0) {
-                    jsonEndIdx = i;
-                    break;
-                }
-            }
-        }
-
-        if (jsonEndIdx !== -1) {
-            const jsonStr = rawNotesStr.substring(jsonStartIdx, jsonEndIdx + 1);
-            const tagCloseIdx = rawNotesStr[jsonEndIdx + 1] === "]" ? jsonEndIdx + 2 : jsonEndIdx + 1;
-            let parsedLineup = null;
-            try {
-                parsedLineup = JSON.parse(jsonStr);
-            } catch {
-                // Ignore malformed legacy lineup JSON silently
-            }
-            const lineupTag = rawNotesStr.substring(tagStartIdx, tagCloseIdx);
-            const cleanNotes = rawNotesStr.substring(0, tagStartIdx) + rawNotesStr.substring(tagCloseIdx);
-            return { parsedLineup, lineupTag, cleanNotes };
-        }
-
-        return { parsedLineup: null, lineupTag: "", cleanNotes: rawNotesStr };
+    function extractLineupBlock(rawNotesStr: string) {
+        return extractLineupFromRawNotes(rawNotesStr);
     }
 
     async function fetchMatches() {
@@ -349,16 +309,21 @@ export default function MatchesPage() {
         }
 
         const mapped: Match[] = (data || []).map((m: any) => {
-            const locationMatch = m.notes ? m.notes.match(/\[Location: (.*?)\]/) : null;
+            const extracted = extractLineupBlock(m.notes || "");
+            if (extracted.wasRepaired && extracted.normalizedRawNotes) {
+                supabase.from("matches").update({ notes: extracted.normalizedRawNotes }).eq("id", m.id).then(() => {});
+            }
+
+            const notesToScan = extracted.normalizedRawNotes || m.notes || "";
+            const locationMatch = notesToScan ? notesToScan.match(/\[Location: (.*?)\]/) : null;
             const location = locationMatch ? locationMatch[1] : "";
 
-            const surfaceMatch = m.notes ? m.notes.match(/\[Surface: (.*?)\]/) : null;
+            const surfaceMatch = notesToScan ? notesToScan.match(/\[Surface: (.*?)\]/) : null;
             const surface = surfaceMatch ? surfaceMatch[1] : "4G";
 
-            const meetTimeMatch = m.notes ? m.notes.match(/\[MeetTime: (.*?)\]/) : null;
+            const meetTimeMatch = notesToScan ? notesToScan.match(/\[MeetTime: (.*?)\]/) : null;
             const meetTime = meetTimeMatch ? meetTimeMatch[1] : "";
 
-            const extracted = extractLineupBlock(m.notes || "");
             const parsedLineup = extracted.parsedLineup;
             let cleanNotes = extracted.cleanNotes;
             cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/, "");
@@ -382,7 +347,7 @@ export default function MatchesPage() {
                 yellow_cards: m.yellow_cards,
                 red_cards: m.red_cards,
                 notes: cleanNotes,
-                rawNotes: m.notes || "",
+                rawNotes: extracted.normalizedRawNotes || m.notes || "",
                 surface: surface,
                 location: location,
                 lineup: parsedLineup,
@@ -1379,7 +1344,7 @@ export default function MatchesPage() {
                     )}
                 </CardContent>
                 {isPast && (
-                    <div className="p-3 bg-surface-2/60 border-t border-border grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <div className="p-3 bg-surface-2/60 border-t border-border grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <Button
                             variant="outline"
                             onClick={() => setQuickResultMatch(match)}
@@ -1396,12 +1361,6 @@ export default function MatchesPage() {
                             <Users className="h-3.5 w-3.5" />
                             Matchday XI &amp; Subs
                         </Button>
-                        <MatchStatsDialog
-                            matchId={match.id}
-                            matchDate={match.date}
-                            opponent={match.opponent}
-                            variant="full"
-                        />
                     </div>
                 )}
             </Card>

@@ -41,7 +41,7 @@ import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
 import { calculateMeetTime } from "@/lib/whatsapp-utils";
-import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, computeMatchOutcome } from "@/lib/match-stats-sync";
+import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, computeMatchOutcome, extractLineupFromRawNotes } from "@/lib/match-stats-sync";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 
@@ -58,56 +58,12 @@ const POSITION_ORDER: { [key: string]: number } = {
 
 function parseLineupFromNotes(notes?: string): any | null {
     if (!notes || !notes.includes("[Lineup: ")) return null;
-    const startIdx = notes.indexOf("[Lineup: ");
-    const jsonStart = startIdx + "[Lineup: ".length;
-    let depth = 0;
-    let inString = false;
-    let escape = false;
-    for (let i = jsonStart; i < notes.length; i++) {
-        const ch = notes[i];
-        if (escape) { escape = false; continue; }
-        if (ch === "\\") { escape = true; continue; }
-        if (ch === '"') { inString = !inString; continue; }
-        if (inString) continue;
-        if (ch === "{") depth++;
-        else if (ch === "}") {
-            depth--;
-            if (depth === 0) {
-                try {
-                    return JSON.parse(notes.substring(jsonStart, i + 1));
-                } catch (e) {
-                    console.warn("Failed to parse lineup JSON from notes:", e);
-                    return null;
-                }
-            }
-        }
-    }
-    return null;
+    return extractLineupFromRawNotes(notes).parsedLineup;
 }
 
 function stripLineupFromNotes(notes?: string): string {
     if (!notes || !notes.includes("[Lineup: ")) return (notes || "").trim();
-    const startIdx = notes.indexOf("[Lineup: ");
-    const jsonStart = startIdx + "[Lineup: ".length;
-    let depth = 0;
-    let inString = false;
-    let escape = false;
-    for (let i = jsonStart; i < notes.length; i++) {
-        const ch = notes[i];
-        if (escape) { escape = false; continue; }
-        if (ch === "\\") { escape = true; continue; }
-        if (ch === '"') { inString = !inString; continue; }
-        if (inString) continue;
-        if (ch === "{") depth++;
-        else if (ch === "}") {
-            depth--;
-            if (depth === 0) {
-                const closeBracketIdx = notes[i + 1] === "]" ? i + 2 : i + 1;
-                return (notes.substring(0, startIdx) + notes.substring(closeBracketIdx)).trim();
-            }
-        }
-    }
-    return notes.trim();
+    return extractLineupFromRawNotes(notes).cleanNotes;
 }
 
 export default function MatchdayXIPage() {
@@ -427,25 +383,34 @@ export default function MatchdayXIPage() {
         if (clubId) query = query.eq('club_id', clubId);
         const { data } = await query;
         if (data && data.length > 0) {
-            const mapped = data.map((m: any) => ({
-                id: m.id,
-                opponent: m.opponent,
-                date: m.date,
-                time: m.time,
-                competition: m.competition || "League",
-                isHome: m.is_home,
-                scoreline: m.scoreline || "",
-                result: m.result,
-                event_token: m.event_token,
-                notes: m.notes || ""
-            }));
+            const mapped = data.map((m: any) => {
+                const extracted = extractLineupFromRawNotes(m.notes || "");
+                if (extracted.wasRepaired && extracted.normalizedRawNotes) {
+                    supabase.from('matches').update({ notes: extracted.normalizedRawNotes }).eq('id', m.id).then(() => {});
+                }
+                return {
+                    id: m.id,
+                    opponent: m.opponent,
+                    date: m.date,
+                    time: m.time,
+                    competition: m.competition || "League",
+                    isHome: m.is_home,
+                    scoreline: m.scoreline || "",
+                    result: m.result,
+                    event_token: m.event_token,
+                    notes: extracted.normalizedRawNotes || m.notes || ""
+                };
+            });
             setMatches(mapped);
             
             const urlMatchId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("match") : null;
             const requestedMatch = urlMatchId ? mapped.find((m: any) => m.id === urlMatchId) : null;
             const today = new Date().toISOString().split('T')[0];
             const upcoming = requestedMatch || [...mapped].reverse().find((m: any) => m.date >= today) || mapped[0];
-            if (upcoming && (!selectedMatchId || !mapped.some((m: any) => m.id === selectedMatchId))) {
+            if (requestedMatch) {
+                setSelectedMatchId(requestedMatch.id);
+                setNextMatch(requestedMatch);
+            } else if (upcoming && (!selectedMatchId || !mapped.some((m: any) => m.id === selectedMatchId))) {
                 setSelectedMatchId(upcoming.id);
                 setNextMatch(upcoming);
             }

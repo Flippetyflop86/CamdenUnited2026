@@ -11,7 +11,8 @@ import {
     SimplePlayerRef,
     parseStatTextString,
     syncMatchGoalsAndAssistsEverywhere,
-    ensureStatsHydratedFromMatchText
+    ensureStatsHydratedFromMatchText,
+    extractLineupFromRawNotes
 } from "@/lib/match-stats-sync";
 import Link from "next/link";
 
@@ -38,9 +39,10 @@ export function QuickResultScorersModal({
     const [ownGoals, setOwnGoals] = useState<number>(0);
     const [extraManualGoals, setExtraManualGoals] = useState<{ rawName: string; count: number }[]>([]);
     const [extraManualAssists, setExtraManualAssists] = useState<{ rawName: string; count: number }[]>([]);
-    const [lineupIds, setLineupIds] = useState<{ starters: Set<string>; subs: Set<string> }>({
+    const [lineupIds, setLineupIds] = useState<{ starters: Set<string>; subs: Set<string>; starterOrder: string[] }>({
         starters: new Set(),
-        subs: new Set()
+        subs: new Set(),
+        starterOrder: []
     });
     const [search, setSearch] = useState("");
     const [filterTab, setFilterTab] = useState<"active" | "all">("active");
@@ -56,10 +58,17 @@ export function QuickResultScorersModal({
         setIsLoading(true);
         setSearch("");
 
+        // Fetch fresh match row from DB so we always have raw `notes`, `scoreline`, `goalscorers`, `assists`
+        const { data: freshMatch } = await supabase
+            .from("matches")
+            .select("notes, scoreline, result, goalscorers, assists, club_id")
+            .eq("id", m.id)
+            .single();
+
         // Parse existing scoreline
-        const rawScore = m.scoreline || (m.result && m.result.includes("-") ? m.result : "");
+        const rawScore = freshMatch?.scoreline || m.scoreline || (m.result && m.result.includes("-") ? m.result : "");
         if (rawScore && rawScore.includes("-")) {
-            const parts = rawScore.split("-").map(s => s.trim());
+            const parts = rawScore.split("-").map((s: string) => s.trim());
             setHomeGoals(parts[0] ?? "");
             setAwayGoals(parts[1] ?? "");
         } else {
@@ -67,39 +76,55 @@ export function QuickResultScorersModal({
             setAwayGoals("");
         }
 
-        // Extract lineup starters & subs from match.notes
+        // Extract lineup starters & subs from freshMatch.notes or m.rawNotes or m.lineup
         const starterSet = new Set<string>();
         const subSet = new Set<string>();
-        const rawNotes = m.notes || "";
-        if (rawNotes.includes("[Lineup: ")) {
-            const startIdx = rawNotes.indexOf("[Lineup: ");
-            const endIdx = rawNotes.indexOf("}]", startIdx);
-            if (endIdx !== -1) {
-                try {
-                    const parsed = JSON.parse(rawNotes.substring(startIdx + "[Lineup: ".length, endIdx + 1));
-                    Object.values(parsed.starters || {}).forEach((id: any) => {
-                        if (id && typeof id === "string" && !id.startsWith("trialist-")) starterSet.add(id);
-                    });
-                    (parsed.substitutes || []).forEach((id: any) => {
-                        if (id && typeof id === "string" && !id.startsWith("trialist-")) subSet.add(id);
-                    });
-                } catch (e) {
-                    console.warn("Failed to parse lineup in QuickResultScorersModal:", e);
-                }
-            }
-        }
-        setLineupIds({ starters: starterSet, subs: subSet });
+        const starterOrder: string[] = [];
 
-        // Load players
-        const { data: pData } = await supabase
+        const rawNotesStr = freshMatch?.notes || (m as any).rawNotes || m.notes || "";
+        const extracted = extractLineupFromRawNotes(rawNotesStr);
+        if (extracted.wasRepaired && extracted.normalizedRawNotes) {
+            await supabase.from("matches").update({ notes: extracted.normalizedRawNotes }).eq("id", m.id);
+        }
+
+        const parsedLineup = extracted.parsedLineup || m.lineup;
+        if (parsedLineup) {
+            Object.keys(parsedLineup.starters || {})
+                .sort((a, b) => Number(a) - Number(b))
+                .forEach((slotKey) => {
+                    const id = parsedLineup.starters?.[slotKey];
+                    if (id && typeof id === "string" && !id.startsWith("trialist-")) {
+                        starterSet.add(id);
+                        starterOrder.push(id);
+                    }
+                });
+            (parsedLineup.substitutes || []).forEach((id: any) => {
+                if (id && typeof id === "string" && !id.startsWith("trialist-")) subSet.add(id);
+            });
+            (parsedLineup.usedSubstitutes || []).forEach((id: any) => {
+                if (id && typeof id === "string" && !id.startsWith("trialist-") && !starterSet.has(id)) subSet.add(id);
+            });
+        }
+        setLineupIds({ starters: starterSet, subs: subSet, starterOrder });
+
+        // Load players (filtered by club_id if present)
+        let pQuery = supabase
             .from("players")
             .select("id, first_name, last_name, position, squad, nickname, use_nickname")
             .order("last_name");
+        const clubIdToUse = freshMatch?.club_id || (m as any).club_id;
+        if (clubIdToUse) {
+            pQuery = pQuery.eq("club_id", clubIdToUse);
+        }
+        const { data: pData } = await pQuery;
         const pList: SimplePlayerRef[] = pData || [];
         setPlayers(pList);
 
+        const goalscorersText = freshMatch?.goalscorers ?? m.goalscorers;
+        const assistsText = freshMatch?.assists ?? m.assists;
+
         // Ensure any text-logged goals/assists from earlier in the season are hydrated into match_player_stats
-        await ensureStatsHydratedFromMatchText(m.id, m.goalscorers, m.assists, pList);
+        await ensureStatsHydratedFromMatchText(m.id, goalscorersText, assistsText, pList);
 
         // Fetch match_player_stats
         const { data: sData } = await supabase
@@ -119,8 +144,8 @@ export function QuickResultScorersModal({
         });
 
         // Check for manual/unmatched tokens (e.g. "Own Goal")
-        const parsedGoalTokens = parseStatTextString(m.goalscorers, pList);
-        const parsedAssistTokens = parseStatTextString(m.assists, pList);
+        const parsedGoalTokens = parseStatTextString(goalscorersText, pList);
+        const parsedAssistTokens = parseStatTextString(assistsText, pList);
 
         let ogCount = 0;
         const otherManualGoals: { rawName: string; count: number }[] = [];
@@ -137,7 +162,8 @@ export function QuickResultScorersModal({
         setExtraManualAssists(parsedAssistTokens.filter(t => !t.playerId).map(t => ({ rawName: t.rawName, count: t.count })));
         setPlayerGoals(gMap);
         setPlayerAssists(aMap);
-        setFilterTab(starterSet.size > 0 || Object.keys(gMap).length > 0 || Object.keys(aMap).length > 0 ? "active" : "all");
+        // Always open on Matchday XI & Subs tab first
+        setFilterTab("active");
         setIsLoading(false);
     };
 
@@ -184,6 +210,11 @@ export function QuickResultScorersModal({
         }
     };
 
+    const matchdaySquadCount = useMemo(() => {
+        const ids = new Set<string>([...lineupIds.starters, ...lineupIds.subs, ...Object.keys(playerGoals), ...Object.keys(playerAssists)]);
+        return ids.size;
+    }, [lineupIds, playerGoals, playerAssists]);
+
     const sortedFilteredPlayers = useMemo(() => {
         return players
             .filter(p => {
@@ -194,17 +225,23 @@ export function QuickResultScorersModal({
                 if (filterTab === "active") {
                     const hasStat = (playerGoals[p.id] || 0) > 0 || (playerAssists[p.id] || 0) > 0;
                     const inLineup = lineupIds.starters.has(p.id) || lineupIds.subs.has(p.id);
-                    if (lineupIds.starters.size === 0 && Object.keys(playerGoals).length === 0 && Object.keys(playerAssists).length === 0) {
-                        return true;
-                    }
                     return hasStat || inLineup;
                 }
                 return true;
             })
             .sort((a, b) => {
-                const aScore = ((playerGoals[a.id] || 0) * 10) + ((playerAssists[a.id] || 0) * 5) + (lineupIds.starters.has(a.id) ? 3 : lineupIds.subs.has(a.id) ? 2 : 0);
-                const bScore = ((playerGoals[b.id] || 0) * 10) + ((playerAssists[b.id] || 0) * 5) + (lineupIds.starters.has(b.id) ? 3 : lineupIds.subs.has(b.id) ? 2 : 0);
-                if (aScore !== bScore) return bScore - aScore;
+                // Sort Starters first (in formation slot order), then Subs, then others
+                const aIsStarter = lineupIds.starters.has(a.id);
+                const bIsStarter = lineupIds.starters.has(b.id);
+                if (aIsStarter && !bIsStarter) return -1;
+                if (!aIsStarter && bIsStarter) return 1;
+                if (aIsStarter && bIsStarter) {
+                    return lineupIds.starterOrder.indexOf(a.id) - lineupIds.starterOrder.indexOf(b.id);
+                }
+                const aIsSub = lineupIds.subs.has(a.id);
+                const bIsSub = lineupIds.subs.has(b.id);
+                if (aIsSub && !bIsSub) return -1;
+                if (!aIsSub && bIsSub) return 1;
                 return (a.last_name || "").localeCompare(b.last_name || "");
             });
     }, [players, search, filterTab, playerGoals, playerAssists, lineupIds]);
@@ -391,7 +428,7 @@ export function QuickResultScorersModal({
                                             : "text-muted-foreground hover:text-foreground"
                                     }`}
                                 >
-                                    Matchday Squad & Scorers
+                                    Matchday XI &amp; Subs ({matchdaySquadCount})
                                 </button>
                                 <button
                                     type="button"
@@ -402,7 +439,7 @@ export function QuickResultScorersModal({
                                             : "text-muted-foreground hover:text-foreground"
                                     }`}
                                 >
-                                    All Squad ({players.length})
+                                    Full Club Squad ({players.length})
                                 </button>
                             </div>
 
@@ -418,9 +455,33 @@ export function QuickResultScorersModal({
                         </div>
 
                         {isLoading ? (
-                            <div className="py-10 text-center text-xs text-muted-foreground">Loading squad & match stats...</div>
+                            <div className="py-10 text-center text-xs text-muted-foreground">Loading Matchday XI &amp; match stats...</div>
                         ) : (
                             <div className="border border-border rounded-xl divide-y divide-border max-h-[290px] overflow-y-auto bg-surface-2/30">
+                                {sortedFilteredPlayers.length === 0 && filterTab === "active" && !search.trim() ? (
+                                    <div className="p-6 text-center space-y-2.5">
+                                        <p className="text-xs font-medium text-muted-foreground">
+                                            No Matchday XI has been saved for this match yet.
+                                        </p>
+                                        <div className="flex items-center justify-center gap-2">
+                                            <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+                                                <Link href={`/matchday-xi?match=${match.id}`}>
+                                                    <Users className="h-3.5 w-3.5 mr-1.5 text-brand" />
+                                                    Set Matchday XI First
+                                                </Link>
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="secondary"
+                                                className="h-7 text-xs"
+                                                onClick={() => setFilterTab("all")}
+                                            >
+                                                Or Pick From Full Squad
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ) : null}
                                 {sortedFilteredPlayers.map((p) => {
                                     const g = playerGoals[p.id] || 0;
                                     const a = playerAssists[p.id] || 0;
