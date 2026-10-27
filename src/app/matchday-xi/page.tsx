@@ -137,6 +137,8 @@ export default function MatchdayXIPage() {
     const [seasonStatsMap, setSeasonStatsMap] = useState<Record<string, { apps: number; goals: number; assists: number }>>({});
     const [currentMatchStatsMap, setCurrentMatchStatsMap] = useState<Record<string, { goals: number; assists: number; yellowCards: number; redCards: number }>>({});
     const [showLogisticsEditor, setShowLogisticsEditor] = useState<boolean>(false);
+    const [showRolesAndNotes, setShowRolesAndNotes] = useState<boolean>(false);
+    const [modalTab, setModalTab] = useState<"swap" | "details">("swap");
     const [openActionDropdown, setOpenActionDropdown] = useState<"autofill" | "share" | null>(null);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
     const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1505,6 +1507,170 @@ export default function MatchdayXIPage() {
         showToast(`Filled bench with ${pickedPlayers.length} balanced sub${pickedPlayers.length > 1 ? "s" : ""} (DEF / MID / FWD)`);
     };
 
+    const handleAutoPickFullSquad = async () => {
+        if (!lineup) return;
+        const currentFormation = FORMATIONS[lineup.formation];
+        if (!currentFormation) return;
+
+        const usedIds = new Set<string>([
+            ...Object.values(lineup.starters).filter(Boolean),
+            ...lineup.substitutes.filter(Boolean)
+        ]);
+
+        const availablePool = players.filter(p => !usedIds.has(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p));
+        if (availablePool.length === 0) {
+            showToast("No additional available players to auto-pick", "info");
+            return;
+        }
+
+        // Step 1: Fill empty Starting XI slots using formation positional fit + readiness bonus
+        const newStarters = { ...lineup.starters };
+        let startersAdded = 0;
+
+        currentFormation.forEach((slot, idx) => {
+            if (newStarters[idx]) return;
+            const slotCat = getPositionCategory(slot.label);
+            let bestPlayer: Player | null = null;
+            let bestScore = -1;
+
+            for (const candidate of availablePool) {
+                if (usedIds.has(candidate.id)) continue;
+                let score = 0;
+                if (isIdealPosition(candidate.position, slot.label)) score = 30;
+                else if (candidate.secondaryPositions?.some(pos => isIdealPosition(pos, slot.label))) score = 20;
+                else if (getPositionCategory(candidate.position) === slotCat) score = 10;
+                else if (candidate.secondaryPositions?.some(pos => getPositionCategory(pos) === slotCat)) score = 8;
+                else if (slot.label.toUpperCase() !== "GK" && candidate.position.toUpperCase() !== "GK") score = 1;
+
+                if (score > 0) {
+                    score += getPlayerReadinessBonus(candidate);
+                }
+
+                if (score > bestScore) {
+                    bestScore = score;
+                    bestPlayer = candidate;
+                }
+            }
+
+            if (bestPlayer && bestScore > 0) {
+                newStarters[idx] = bestPlayer.id;
+                usedIds.add(bestPlayer.id);
+                startersAdded++;
+            }
+        });
+
+        // Step 2: Fill empty Bench slots from remaining pool with balanced DEF / MID / FWD coverage
+        const newSubs = [...lineup.substitutes];
+        const emptySubIndices: number[] = [];
+        newSubs.forEach((subId, idx) => {
+            if (!subId) emptySubIndices.push(idx);
+        });
+
+        let subsAdded = 0;
+        if (emptySubIndices.length > 0) {
+            const benchPool = players
+                .filter(p => !usedIds.has(p.id) && isPlayerAvailable(p) && isPlayerInMatchdayTracker(p))
+                .sort((a, b) => getPlayerReadinessBonus(b) - getPlayerReadinessBonus(a));
+
+            const buckets: Record<"DEF" | "MID" | "FWD" | "GK", Player[]> = { DEF: [], MID: [], FWD: [], GK: [] };
+            benchPool.forEach(p => {
+                const cat = getPositionCategory(p.position);
+                if (cat === "GK") buckets.GK.push(p);
+                else if (cat === "DEF") buckets.DEF.push(p);
+                else if (cat === "FWD") buckets.FWD.push(p);
+                else buckets.MID.push(p);
+            });
+
+            const unitCounts: Record<"DEF" | "MID" | "FWD" | "GK", number> = { DEF: 0, MID: 0, FWD: 0, GK: 0 };
+            const exactPosCounts: Record<string, number> = {};
+            newSubs.forEach(subId => {
+                if (!subId) return;
+                const p = resolvePlayerOrTrialist(subId);
+                if (!p) return;
+                const cat = getPositionCategory(p.position);
+                if (cat === "GK" || cat === "DEF" || cat === "MID" || cat === "FWD") {
+                    unitCounts[cat]++;
+                }
+                const exact = p.position.toUpperCase();
+                exactPosCounts[exact] = (exactPosCounts[exact] || 0) + 1;
+            });
+
+            const pickNextFromBucket = (unit: "DEF" | "MID" | "FWD" | "GK"): Player | null => {
+                const list = buckets[unit];
+                if (list.length === 0) return null;
+                let bestIdx = 0;
+                let bestScore = -999;
+                list.forEach((cand, i) => {
+                    const exact = cand.position.toUpperCase();
+                    const duplicatePenalty = (exactPosCounts[exact] || 0) * 6;
+                    const score = getPlayerReadinessBonus(cand) - duplicatePenalty;
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestIdx = i;
+                    }
+                });
+                const [chosen] = list.splice(bestIdx, 1);
+                if (chosen) {
+                    unitCounts[unit]++;
+                    const exact = chosen.position.toUpperCase();
+                    exactPosCounts[exact] = (exactPosCounts[exact] || 0) + 1;
+                }
+                return chosen || null;
+            };
+
+            const priorityCycle: Array<"DEF" | "MID" | "FWD"> = ["DEF", "MID", "FWD", "MID", "DEF", "FWD"];
+            const pickedBenchPlayers: Player[] = [];
+
+            for (let slotNum = 0; slotNum < emptySubIndices.length; slotNum++) {
+                const availableOutfieldUnits = (["DEF", "MID", "FWD"] as const).filter(u => buckets[u].length > 0);
+                let chosenPlayer: Player | null = null;
+
+                if (availableOutfieldUnits.length > 0) {
+                    const preferredUnit = [...availableOutfieldUnits].sort((a, b) => {
+                        if (unitCounts[a] !== unitCounts[b]) return unitCounts[a] - unitCounts[b];
+                        return priorityCycle.indexOf(a) - priorityCycle.indexOf(b);
+                    })[0];
+                    chosenPlayer = pickNextFromBucket(preferredUnit);
+                } else if (buckets.GK.length > 0) {
+                    chosenPlayer = pickNextFromBucket("GK");
+                }
+
+                if (chosenPlayer) {
+                    pickedBenchPlayers.push(chosenPlayer);
+                }
+            }
+
+            pickedBenchPlayers.sort((a, b) => {
+                const orderA = POSITION_ORDER[a.position.toUpperCase()] || 99;
+                const orderB = POSITION_ORDER[b.position.toUpperCase()] || 99;
+                return orderA - orderB;
+            });
+
+            pickedBenchPlayers.forEach((p, idx) => {
+                const targetSlotIdx = emptySubIndices[idx];
+                if (targetSlotIdx !== undefined) {
+                    newSubs[targetSlotIdx] = p.id;
+                    subsAdded++;
+                }
+            });
+        }
+
+        if (startersAdded === 0 && subsAdded === 0) {
+            showToast("Starting XI and Bench are already full", "info");
+            return;
+        }
+
+        const updated: MatchdayXI = {
+            ...lineup,
+            starters: newStarters,
+            substitutes: newSubs,
+            updatedAt: new Date().toISOString()
+        };
+        setLineup(updated);
+        await saveLineup(updated);
+        showToast(`Auto-picked ${startersAdded} starter${startersAdded === 1 ? "" : "s"} & ${subsAdded} balanced sub${subsAdded === 1 ? "" : "s"}`);
+    };
+
     const handleClearBench = async () => {
         if (!lineup) return;
         const hasAny = lineup.substitutes.some(Boolean);
@@ -2650,13 +2816,154 @@ export default function MatchdayXIPage() {
                             )}
                         </div>
 
-                        {/* Fixture Dropdown Selector */}
-                        <div className="flex items-center gap-2 shrink-0">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground hidden sm:inline">Fixture:</span>
+                        {/* Fixture Dropdown Selector + Save Status + Auto-Fill & Share */}
+                        <div className="flex flex-wrap items-center gap-2 shrink-0 relative z-30">
+                            {openActionDropdown && (
+                                <div
+                                    className="fixed inset-0 z-20"
+                                    onClick={() => setOpenActionDropdown(null)}
+                                />
+                            )}
+
+                            {/* Live Save Status Indicator */}
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${
+                                saveStatus === "saving"
+                                    ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                    : saveStatus === "saved"
+                                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                        : "bg-surface-2 text-muted-foreground border-border"
+                            }`}>
+                                {saveStatus === "saving" ? (
+                                    <>
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        <span>Saving...</span>
+                                    </>
+                                ) : saveStatus === "saved" ? (
+                                    <>
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        <span>XI Saved</span>
+                                    </>
+                                ) : (
+                                    <span>Draft</span>
+                                )}
+                            </div>
+
+                            {/* 1. Auto-Fill Dropdown */}
+                            <div className="relative z-30">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setOpenActionDropdown(prev => prev === "autofill" ? null : "autofill")}
+                                    className="h-8 text-xs shadow-sm bg-surface-2 border-border text-foreground hover:bg-surface-3 font-bold px-2.5 rounded-xl"
+                                >
+                                    <Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-500" />
+                                    Auto-Fill
+                                    <ChevronDown className="h-3.5 w-3.5 ml-1 text-muted-foreground" />
+                                </Button>
+                                {openActionDropdown === "autofill" && (
+                                    <div className="absolute right-0 mt-1.5 w-60 rounded-xl bg-surface-1 border border-border shadow-xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleAutoPickFullSquad(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-bold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                            <span>Auto-Pick Full Squad (XI + Bench)</span>
+                                        </button>
+                                        <div className="my-1 border-t border-border/60" />
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleAutoPickXI(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <Sparkles className="h-3.5 w-3.5 text-amber-500/80 shrink-0" />
+                                            <span>Auto-Pick Starting XI Only</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleAutoFillBench(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <UserPlus className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                            <span>Auto-Fill Bench Only</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleAutoFillLastLineup(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <RefreshCw className="h-3.5 w-3.5 text-primary shrink-0" />
+                                            <span>Copy Last Match XI</span>
+                                        </button>
+                                        <div className="my-1 border-t border-border" />
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleClearLineup(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-red-500 hover:bg-red-500/10 flex items-center gap-2.5"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                                            <span>Clear Pitch &amp; Bench</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 2. Share & Export Dropdown */}
+                            <div className="relative z-30">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setOpenActionDropdown(prev => prev === "share" ? null : "share")}
+                                    className="h-8 text-xs shadow-sm bg-surface-2 border-border text-foreground hover:bg-surface-3 font-bold px-2.5 rounded-xl"
+                                >
+                                    <MessageCircle className="h-3.5 w-3.5 mr-1.5 text-emerald-500" />
+                                    Share &amp; Export
+                                    <ChevronDown className="h-3.5 w-3.5 ml-1 text-muted-foreground" />
+                                </Button>
+                                {openActionDropdown === "share" && (
+                                    <div className="absolute right-0 mt-1.5 w-56 rounded-xl bg-surface-1 border border-border shadow-xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleCopyTeamSheetToWhatsApp(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <MessageCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                            <span>Share XI on WhatsApp</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleDownloadPitchGraphic(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <ImageIcon className="h-3.5 w-3.5 text-primary shrink-0" />
+                                            <span>Download Pitch Graphic (PNG)</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleExportPDF(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <FileDown className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                            <span>Export Team Sheet (PDF)</span>
+                                        </button>
+                                        <div className="my-1 border-t border-border" />
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleCopyPollToWhatsApp(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <MessageCircle className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                                            <span>Share Availability Poll</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 3. Fixture Selector Dropdown (#8 No redundant "Fixture:" label) */}
                             <select
                                 value={selectedMatchId}
                                 onChange={(e) => setSelectedMatchId(e.target.value)}
-                                className="bg-surface-2 hover:bg-surface-3 border border-border text-foreground text-xs rounded-xl px-3 py-1.5 transition-colors focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-bold max-w-full sm:max-w-[320px] truncate"
+                                className="h-8 bg-surface-2 hover:bg-surface-3 border border-border text-foreground text-xs rounded-xl px-2.5 transition-colors focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-bold max-w-full sm:max-w-[260px] truncate"
                             >
                                 {matches.map(m => {
                                     const formattedDate = new Date(m.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
@@ -2749,180 +3056,38 @@ export default function MatchdayXIPage() {
                 </div>
             </div>
 
-            {/* Consolidated 3-Control Action Bar (#1 Cleanup) */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 px-1 relative z-30">
-                {openActionDropdown && (
-                    <div
-                        className="fixed inset-0 z-20"
-                        onClick={() => setOpenActionDropdown(null)}
-                    />
-                )}
-
-                <div className="flex items-center justify-between sm:justify-start gap-3 overflow-x-auto no-scrollbar max-w-full">
-                    <div className="flex space-x-1.5">
-                        {currentSquads.map(squad => (
-                            <button 
-                                key={squad} 
-                                onClick={() => setActiveSquadTab(squad)} 
-                                className={`px-3.5 py-1.5 text-xs font-bold rounded-lg whitespace-nowrap transition-colors ${activeSquadTab === squad ? "bg-foreground text-background shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-surface-2"}`}
-                            >
-                                {squad}
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Live Save Status Indicator */}
-                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${
-                        saveStatus === "saving"
-                            ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
-                            : saveStatus === "saved"
-                                ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
-                                : "bg-surface-2 text-muted-foreground border-border"
-                    }`}>
-                        {saveStatus === "saving" ? (
-                            <>
-                                <Loader2 className="h-3 w-3 animate-spin" />
-                                <span>Saving...</span>
-                            </>
-                        ) : saveStatus === "saved" ? (
-                            <>
-                                <CheckCircle2 className="h-3 w-3" />
-                                <span>XI Saved</span>
-                            </>
-                        ) : (
-                            <span>Draft</span>
-                        )}
-                    </div>
-                </div>
-                
-                <div className="flex flex-wrap items-center gap-2 relative z-30">
-                    {/* 1. Auto-Fill Dropdown */}
-                    <div className="relative">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpenActionDropdown(prev => prev === "autofill" ? null : "autofill")}
-                            className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2 font-bold"
-                        >
-                            <Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-500" />
-                            Auto-Fill
-                            <ChevronDown className="h-3.5 w-3.5 ml-1 text-muted-foreground" />
-                        </Button>
-                        {openActionDropdown === "autofill" && (
-                            <div className="absolute right-0 sm:left-0 mt-1.5 w-52 rounded-xl bg-surface-1 border border-border shadow-xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
-                                <button
-                                    type="button"
-                                    onClick={() => { setOpenActionDropdown(null); handleAutoPickXI(); }}
-                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
-                                >
-                                    <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                                    <span>Auto-Pick Starting XI</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setOpenActionDropdown(null); handleAutoFillLastLineup(); }}
-                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
-                                >
-                                    <RefreshCw className="h-3.5 w-3.5 text-primary shrink-0" />
-                                    <span>Copy Last Match XI</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setOpenActionDropdown(null); handleAutoFillBench(); }}
-                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
-                                >
-                                    <UserPlus className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                                    <span>Auto-Fill Bench</span>
-                                </button>
-                                <div className="my-1 border-t border-border" />
-                                <button
-                                    type="button"
-                                    onClick={() => { setOpenActionDropdown(null); handleClearLineup(); }}
-                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-red-500 hover:bg-red-500/10 flex items-center gap-2.5"
-                                >
-                                    <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                                    <span>Clear Pitch &amp; Bench</span>
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* 2. Share & Export Dropdown */}
-                    <div className="relative">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpenActionDropdown(prev => prev === "share" ? null : "share")}
-                            className="h-9 text-xs shadow-sm bg-surface-1 border-border text-foreground hover:bg-surface-2 font-bold"
-                        >
-                            <MessageCircle className="h-3.5 w-3.5 mr-1.5 text-emerald-500" />
-                            Share &amp; Export
-                            <ChevronDown className="h-3.5 w-3.5 ml-1 text-muted-foreground" />
-                        </Button>
-                        {openActionDropdown === "share" && (
-                            <div className="absolute right-0 mt-1.5 w-56 rounded-xl bg-surface-1 border border-border shadow-xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
-                                <button
-                                    type="button"
-                                    onClick={() => { setOpenActionDropdown(null); handleCopyTeamSheetToWhatsApp(); }}
-                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
-                                >
-                                    <MessageCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                                    <span>Share XI on WhatsApp</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setOpenActionDropdown(null); handleDownloadPitchGraphic(); }}
-                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
-                                >
-                                    <ImageIcon className="h-3.5 w-3.5 text-primary shrink-0" />
-                                    <span>Download Pitch Graphic (PNG)</span>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => { setOpenActionDropdown(null); handleExportPDF(); }}
-                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
-                                >
-                                    <FileDown className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                                    <span>Export Team Sheet (PDF)</span>
-                                </button>
-                                <div className="my-1 border-t border-border" />
-                                <button
-                                    type="button"
-                                    onClick={() => { setOpenActionDropdown(null); handleCopyPollToWhatsApp(); }}
-                                    className="w-full px-3 py-2 text-left text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2 flex items-center gap-2.5"
-                                >
-                                    <MessageCircle className="h-3.5 w-3.5 text-blue-400 shrink-0" />
-                                    <span>Share Availability Poll</span>
-                                </button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* 3. Save Lineup Primary Button */}
-                    <Button onClick={async () => {
-                        if (!selectedMatchId || !lineup) return;
-                        await saveLineup(lineup);
-                        const matchObj = matches.find(m => m.id === selectedMatchId);
-                        const opponentName = matchObj ? matchObj.opponent : "this game";
-                        showToast(`Lineup saved for vs ${opponentName}!`);
-                    }} className="h-9 text-xs bg-brand text-brand-foreground hover:bg-brand/90 font-bold shadow-sm px-4">
-                        <Save className="h-3.5 w-3.5 mr-1.5" />
-                        Save Lineup
-                    </Button>
-                </div>
-            </div>
-
             <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:h-[760px]">
                 
-                {/* Left Panel - Squad (#2 Search Bar + #5 Compact 2-Line Player Cards) */}
+                {/* Left Panel - Squad (#6 Squad Selector inside Header + #2 Search Bar + #5 Compact 2-Line Player Cards) */}
                 <div 
                     className="lg:col-span-1 h-[480px] lg:h-full flex flex-col bg-surface-1 rounded-2xl border border-border shadow-sm order-2 lg:order-1 min-h-0 overflow-hidden"
                     onDragOver={handleDragOver}
                     onDrop={handleDropOnSquad}
                 >
-                    <div className="p-3.5 border-b border-border flex items-center justify-between shrink-0">
-                        <span className="cf-card-title">Available Players</span>
-                        <span className="cf-metadata mt-0.5">{availablePlayers.length} Available</span>
+                    <div className="p-3 border-b border-border flex items-center justify-between gap-2 shrink-0">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="cf-card-title truncate">Available</span>
+                            <span className="text-[11px] font-bold text-muted-foreground bg-surface-2 px-1.5 py-0.5 rounded-md border border-border shrink-0">
+                                {availablePlayers.length}
+                            </span>
+                        </div>
+                        {currentSquads.length > 1 ? (
+                            <select
+                                value={activeSquadTab}
+                                onChange={(e) => setActiveSquadTab(e.target.value)}
+                                className="bg-surface-2 hover:bg-surface-3 border border-border text-foreground text-[11px] font-bold rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer truncate max-w-[120px]"
+                            >
+                                {currentSquads.map(squad => (
+                                    <option key={squad} value={squad} className="bg-surface-1 text-foreground">
+                                        {squad}
+                                    </option>
+                                ))}
+                            </select>
+                        ) : (
+                            <span className="text-[10px] font-bold text-muted-foreground bg-surface-2 px-2 py-0.5 rounded-lg border border-border truncate">
+                                {activeSquadTab}
+                            </span>
+                        )}
                     </div>
 
                     {/* Position Filter Pills */}
@@ -2990,9 +3155,9 @@ export default function MatchdayXIPage() {
                                         key={player.id}
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, player.id, {type: 'squad'})}
-                                        className="group flex items-center gap-2 p-2 border border-border rounded-xl cursor-grab active:cursor-grabbing hover:border-foreground/30 bg-surface-1 transition-all shadow-sm relative overflow-hidden"
+                                        className="group flex items-center p-2 border border-border rounded-xl cursor-grab active:cursor-grabbing hover:border-foreground/30 bg-surface-1 transition-all shadow-sm relative overflow-hidden"
                                     >
-                                        <GripVertical className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                                        <GripVertical className="h-3.5 w-0 opacity-0 group-hover:w-3.5 group-hover:opacity-100 group-hover:mr-1.5 text-primary transition-all shrink-0 overflow-hidden" />
                                         <div className="flex flex-col min-w-0 flex-1">
                                             {/* Line 1: Player Name + Last XI / Squad # */}
                                             <div className="flex items-center justify-between gap-1.5">
@@ -3144,10 +3309,10 @@ export default function MatchdayXIPage() {
                                     title="Select Matchday Kit Colour"
                                     className="bg-transparent text-xs font-bold text-foreground focus:outline-none cursor-pointer"
                                 >
-                                    <option value="auto" className="bg-surface-1 text-foreground">Kit: Auto ({nextMatch?.isHome === false ? "Away" : "Home"})</option>
-                                    <option value="home" className="bg-surface-1 text-foreground">Kit: Home</option>
-                                    <option value="away" className="bg-surface-1 text-foreground">Kit: Away</option>
-                                    <option value="custom" className="bg-surface-1 text-foreground">Kit: Custom</option>
+                                    <option value="auto" className="bg-surface-1 text-foreground">Auto ({nextMatch?.isHome === false ? "Away Kit" : "Home Kit"})</option>
+                                    <option value="home" className="bg-surface-1 text-foreground">Home Kit</option>
+                                    <option value="away" className="bg-surface-1 text-foreground">Away Kit</option>
+                                    <option value="custom" className="bg-surface-1 text-foreground">Custom Kit</option>
                                 </select>
                                 <span className="text-[10px] font-bold text-muted-foreground ml-1 border-l border-border pl-2">GK:</span>
                                 <input
@@ -3204,10 +3369,12 @@ export default function MatchdayXIPage() {
                                 <div className="absolute left-1/2 -translate-x-1/2 top-2 w-12 h-5 sm:w-14 sm:h-6 border-2 border-white/40 border-t-0"></div>
                                 <div className="absolute left-1/2 -translate-x-1/2 bottom-2 w-12 h-5 sm:w-14 sm:h-6 border-2 border-white/40 border-b-0"></div>
 
-                                {/* Watermark */}
+                                {/* Watermark (#4 Clipped to circular center-circle frame so square image backgrounds disappear) */}
                                 {settings.logo && (
                                     <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-10">
-                                        <img src={settings.logo} alt="Watermark" className="w-48 h-48 object-contain grayscale brightness-125" />
+                                        <div className="w-40 h-40 sm:w-44 sm:h-44 rounded-full overflow-hidden flex items-center justify-center">
+                                            <img src={settings.logo} alt="Watermark" className="w-full h-full object-cover grayscale brightness-125" />
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -3259,7 +3426,7 @@ export default function MatchdayXIPage() {
                                     <div className="flex flex-col items-center group relative cursor-pointer"
                                             draggable={!!playerId && !isEditingThisNumber && editingNamePlayerId !== playerId}
                                             onDragStart={(e) => playerId && handleDragStart(e, playerId, {type: 'pitch', index: idx})}
-                                            onClick={() => setActiveSlot({ type: 'pitch', index: idx, label: pos.label })}
+                                            onClick={() => { setModalTab("swap"); setActiveSlot({ type: 'pitch', index: idx, label: pos.label }); }}
                                     >
                                         <div className="relative">
                                             {/* Jersey SVG Icon colored dynamically based on kit selector & GK slot */}
@@ -3569,16 +3736,17 @@ export default function MatchdayXIPage() {
                                                 onDragStart={(e) => subId && handleDragStart(e, subId, {type: 'sub', index: idx})}
                                                 onClick={() => {
                                                     if (editingNamePlayerId === subId) return;
+                                                    setModalTab("swap");
                                                     setActiveSlot({ type: 'sub', index: idx, label: `Bench Slot ${idx + 1}` });
                                                 }}
                                                 className={`flex-1 min-w-0 flex flex-col justify-center px-2.5 py-2 border rounded-xl shadow-sm transition-all cursor-pointer ${subId ? 'bg-surface-1 hover:border-primary/50 border-border group gap-1' : 'bg-surface-2 border-dashed border-border text-muted-foreground hover:bg-surface-3'}`}
                                             >
                                                 {subId ? (
                                                     <>
-                                                        {/* Line 1: Full Player Name across the entire card width */}
+                                                        {/* Line 1: Full Player Name across the entire card width (#5 GripVertical hidden until hover) */}
                                                         <div className="flex items-center justify-between gap-1 min-w-0 w-full">
-                                                            <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                                                                <GripVertical className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                                                            <div className="flex items-center min-w-0 flex-1">
+                                                                <GripVertical className="h-3.5 w-0 opacity-0 group-hover:w-3.5 group-hover:opacity-100 group-hover:mr-1.5 text-primary transition-all shrink-0 overflow-hidden" />
                                                                 {editingNamePlayerId === subId ? (
                                                                     <input
                                                                         type="text"
@@ -3639,7 +3807,7 @@ export default function MatchdayXIPage() {
                                                         </div>
 
                                                         {/* Line 2: Position Badge + Events + Unused/Played Toggle */}
-                                                        <div className="flex items-center justify-between gap-1 pl-5 w-full">
+                                                        <div className="flex items-center justify-between gap-1 w-full">
                                                             <div className="flex items-center gap-1 min-w-0">
                                                                 <span className="text-[10px] uppercase text-muted-foreground font-extrabold">
                                                                     {isTrialist ? "GUEST" : player?.position}
@@ -3773,111 +3941,155 @@ export default function MatchdayXIPage() {
                 </div>
             </div>
 
-            {/* Matchday Roles, Set-Piece Takers & Tactical Instructions */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Roles & Set-Piece Takers */}
-                <div className="bg-surface-1 rounded-2xl border border-border p-5 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <Award className="h-4 w-4 text-amber-500" />
-                            <h3 className="cf-card-title">Captain &amp; Set-Piece Takers</h3>
-                        </div>
-                        <span className="cf-metadata">Included on Team Sheet, Graphic &amp; WhatsApp</span>
+            {/* #2 Collapsible Matchday Roles, Set-Piece Takers & Tactical Notes Accordion */}
+            <div className="bg-surface-1 rounded-2xl border border-border shadow-sm overflow-hidden">
+                <button
+                    type="button"
+                    onClick={() => setShowRolesAndNotes(prev => !prev)}
+                    className="w-full px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-left hover:bg-surface-2/60 transition-colors"
+                >
+                    <div className="flex items-center gap-2">
+                        <Award className="h-4 w-4 text-amber-500 shrink-0" />
+                        <span className="text-xs sm:text-sm font-bold text-foreground">
+                            Captain, Set-Piece Takers &amp; Tactical Notes
+                        </span>
+                        <span className="text-[10px] text-muted-foreground hidden md:inline">
+                            (Included on Team Sheet, Graphic &amp; WhatsApp)
+                        </span>
                     </div>
+                    <div className="flex items-center gap-2">
+                        {(() => {
+                            const captPlayer = lineup.captainId ? resolvePlayerOrTrialist(lineup.captainId) : null;
+                            const hasNotes = Boolean(lineup.tacticalNotes?.trim());
+                            const setPieceCount = [lineup.penaltyTakerId, lineup.cornerTakerId, lineup.freeKickTakerId].filter(Boolean).length;
+                            return (
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold">
+                                    {captPlayer && (
+                                        <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                                            © {getPitchPlayerDisplayName(captPlayer)}
+                                        </span>
+                                    )}
+                                    {setPieceCount > 0 && (
+                                        <span className="px-2 py-0.5 rounded-full bg-surface-2 text-muted-foreground border border-border">
+                                            {setPieceCount} Set-Piece{setPieceCount > 1 ? "s" : ""}
+                                        </span>
+                                    )}
+                                    {hasNotes && (
+                                        <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/25">
+                                            Notes Added
+                                        </span>
+                                    )}
+                                </div>
+                            );
+                        })()}
+                        {showRolesAndNotes ? (
+                            <ChevronUp className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        )}
+                    </div>
+                </button>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Captain (C)</label>
-                            <select
-                                value={lineup.captainId || ""}
-                                onChange={(e) => handleRoleChange("captainId", e.target.value)}
-                                className="w-full h-9 px-2.5 rounded-xl bg-surface-2 border border-border text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                            >
-                                <option value="">Select Captain...</option>
-                                {selectedStarterPlayers.map(p => (
-                                    <option key={p.id} value={p.id}>{getMatchdayDisplayName(p)} ({p.position})</option>
-                                ))}
-                            </select>
+                {showRolesAndNotes && (
+                    <div className="p-4 pt-3 border-t border-border grid grid-cols-1 lg:grid-cols-2 gap-5 animate-in fade-in duration-150">
+                        {/* Roles & Set-Piece Takers */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-foreground">Captain &amp; Set-Piece Takers</span>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Captain (C)</label>
+                                    <select
+                                        value={lineup.captainId || ""}
+                                        onChange={(e) => handleRoleChange("captainId", e.target.value)}
+                                        className="w-full h-9 px-2.5 rounded-xl bg-surface-2 border border-border text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                    >
+                                        <option value="">Select Captain...</option>
+                                        {selectedStarterPlayers.map(p => (
+                                            <option key={p.id} value={p.id}>{getMatchdayDisplayName(p)} ({p.position})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Vice-Captain (VC)</label>
+                                    <select
+                                        value={lineup.viceCaptainId || ""}
+                                        onChange={(e) => handleRoleChange("viceCaptainId", e.target.value)}
+                                        className="w-full h-9 px-2.5 rounded-xl bg-surface-2 border border-border text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                    >
+                                        <option value="">Select Vice-Captain...</option>
+                                        {selectedStarterPlayers.map(p => (
+                                            <option key={p.id} value={p.id}>{getMatchdayDisplayName(p)} ({p.position})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Penalties</label>
+                                    <select
+                                        value={lineup.penaltyTakerId || ""}
+                                        onChange={(e) => handleRoleChange("penaltyTakerId", e.target.value)}
+                                        className="w-full h-9 px-2.5 rounded-xl bg-surface-2 border border-border text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                    >
+                                        <option value="">Select Penalty Taker...</option>
+                                        {selectedStarterPlayers.map(p => (
+                                            <option key={p.id} value={p.id}>{getMatchdayDisplayName(p)} ({p.position})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Corners</label>
+                                    <select
+                                        value={lineup.cornerTakerId || ""}
+                                        onChange={(e) => handleRoleChange("cornerTakerId", e.target.value)}
+                                        className="w-full h-9 px-2.5 rounded-xl bg-surface-2 border border-border text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                    >
+                                        <option value="">Select Corner Taker...</option>
+                                        {selectedStarterPlayers.map(p => (
+                                            <option key={p.id} value={p.id}>{getMatchdayDisplayName(p)} ({p.position})</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-1 sm:col-span-2 md:col-span-2">
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Free Kicks</label>
+                                    <select
+                                        value={lineup.freeKickTakerId || ""}
+                                        onChange={(e) => handleRoleChange("freeKickTakerId", e.target.value)}
+                                        className="w-full h-9 px-2.5 rounded-xl bg-surface-2 border border-border text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                    >
+                                        <option value="">Select Free Kick Taker...</option>
+                                        {selectedStarterPlayers.map(p => (
+                                            <option key={p.id} value={p.id}>{getMatchdayDisplayName(p)} ({p.position})</option>
+                                        ))}
+                                    </select>
+                                </div>
+                            </div>
                         </div>
 
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Vice-Captain (VC)</label>
-                            <select
-                                value={lineup.viceCaptainId || ""}
-                                onChange={(e) => handleRoleChange("viceCaptainId", e.target.value)}
-                                className="w-full h-9 px-2.5 rounded-xl bg-surface-2 border border-border text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                            >
-                                <option value="">Select Vice-Captain...</option>
-                                {selectedStarterPlayers.map(p => (
-                                    <option key={p.id} value={p.id}>{getMatchdayDisplayName(p)} ({p.position})</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Penalties</label>
-                            <select
-                                value={lineup.penaltyTakerId || ""}
-                                onChange={(e) => handleRoleChange("penaltyTakerId", e.target.value)}
-                                className="w-full h-9 px-2.5 rounded-xl bg-surface-2 border border-border text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                            >
-                                <option value="">Select Penalty Taker...</option>
-                                {selectedStarterPlayers.map(p => (
-                                    <option key={p.id} value={p.id}>{getMatchdayDisplayName(p)} ({p.position})</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Corners</label>
-                            <select
-                                value={lineup.cornerTakerId || ""}
-                                onChange={(e) => handleRoleChange("cornerTakerId", e.target.value)}
-                                className="w-full h-9 px-2.5 rounded-xl bg-surface-2 border border-border text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                            >
-                                <option value="">Select Corner Taker...</option>
-                                {selectedStarterPlayers.map(p => (
-                                    <option key={p.id} value={p.id}>{getMatchdayDisplayName(p)} ({p.position})</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="space-y-1 sm:col-span-2 md:col-span-2">
-                            <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Free Kicks</label>
-                            <select
-                                value={lineup.freeKickTakerId || ""}
-                                onChange={(e) => handleRoleChange("freeKickTakerId", e.target.value)}
-                                className="w-full h-9 px-2.5 rounded-xl bg-surface-2 border border-border text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                            >
-                                <option value="">Select Free Kick Taker...</option>
-                                {selectedStarterPlayers.map(p => (
-                                    <option key={p.id} value={p.id}>{getMatchdayDisplayName(p)} ({p.position})</option>
-                                ))}
-                            </select>
+                        {/* Tactical Instructions & Matchday Notes */}
+                        <div className="flex flex-col space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-foreground">Tactical Instructions &amp; Matchday Notes</span>
+                                <span className="cf-metadata">Auto-saves &amp; prints on PDF</span>
+                            </div>
+                            <textarea
+                                value={lineup.tacticalNotes || ""}
+                                onChange={(e) => handleTacticalNotesChange(e.target.value)}
+                                placeholder="Add key tactical reminders, pressing triggers, opposition threats, or warm-up notes for this fixture..."
+                                rows={3}
+                                className="w-full flex-1 rounded-xl bg-surface-2 border border-border p-3 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
+                            />
                         </div>
                     </div>
-                </div>
-
-                {/* Tactical Instructions & Matchday Notes */}
-                <div className="bg-surface-1 rounded-2xl border border-border p-5 shadow-sm flex flex-col space-y-3">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-primary" />
-                            <h3 className="cf-card-title">Tactical Instructions &amp; Matchday Notes</h3>
-                        </div>
-                        <span className="cf-metadata">Auto-saves &amp; prints on PDF</span>
-                    </div>
-                    <textarea
-                        value={lineup.tacticalNotes || ""}
-                        onChange={(e) => handleTacticalNotesChange(e.target.value)}
-                        placeholder="Add key tactical reminders, pressing triggers, opposition threats, or warm-up notes for this fixture..."
-                        rows={4}
-                        className="w-full flex-1 rounded-xl bg-surface-2 border border-border p-3 text-xs text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary resize-none"
-                    />
-                </div>
+                )}
             </div>
 
-            {/* Assign Player Modal/Drawer (#5 Click-to-Swap, #6 Add Trialist, #10 Post-Match Stats & MOTM) */}
+            {/* Assign Player Modal/Drawer (#10 Streamlined 2-Tab View for Occupied Slots) */}
             {activeSlot && (
                 <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
                     <div 
@@ -3886,10 +4098,10 @@ export default function MatchdayXIPage() {
                     />
                     <div className="bg-surface-1 border border-border w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl max-h-[88vh] sm:max-h-[84vh] flex flex-col shadow-2xl z-10 overflow-hidden animate-in slide-in-from-bottom duration-200">
                         {/* Modal Header */}
-                        <div className="p-4 sm:p-5 border-b border-border flex items-center justify-between shrink-0 bg-surface-1 backdrop-blur-md">
+                        <div className="p-4 border-b border-border flex items-center justify-between shrink-0 bg-surface-1 backdrop-blur-md">
                             <div>
                                 <h3 className="cf-section-title">Assign Player</h3>
-                                <p className="cf-metadata mt-0.5">Select player for position: <span className="font-bold text-primary">{activeSlot.label}</span></p>
+                                <p className="cf-metadata mt-0.5">Position: <span className="font-bold text-primary">{activeSlot.label}</span></p>
                             </div>
                             <button 
                                 onClick={() => { setActiveSlot(null); setSearchQuery(""); setShowTrialistForm(false); }}
@@ -3899,147 +4111,179 @@ export default function MatchdayXIPage() {
                             </button>
                         </div>
 
-                        {/* Search Input + #6 "+ Trialist / Guest" Toggle Button */}
-                        <div className="p-3 border-b border-border bg-surface-2 shrink-0 space-y-2">
-                            <div className="flex items-center gap-2">
-                                <div className="relative flex-1">
-                                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
-                                    <input
-                                        type="text"
-                                        placeholder="Search player by name or position..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="w-full pl-9 pr-4 py-1.5 bg-surface-1 border border-border rounded-xl text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                                    />
-                                </div>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                        const defaultNum = activeSlot.type === "pitch"
-                                            ? (formation[activeSlot.index]?.number || activeSlot.index + 1)
-                                            : (12 + activeSlot.index);
-                                        setTrialistInputNumber(String(defaultNum));
-                                        setShowTrialistForm(prev => !prev);
-                                    }}
-                                    className="h-9 px-2.5 text-xs font-bold rounded-xl border-primary/30 text-primary hover:bg-primary/10 shrink-0"
-                                    title="Add a Trialist or Guest Player for this match only (without cluttering your database squad)"
-                                >
-                                    <UserPlus className="h-3.5 w-3.5 mr-1" />
-                                    Trialist
-                                </Button>
-                            </div>
-
-                            {/* #6 Collapsible Trialist / Guest Player Form */}
-                            {showTrialistForm && (
-                                <div className="p-2.5 rounded-xl bg-surface-1 border border-primary/30 space-y-2 animate-in fade-in duration-150">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary">
-                                            + Add Trialist / Guest Player (Match Only)
+                        {/* Current Assigned Player Header + 2-Tab Switcher (#10) */}
+                        {activePlayer && (
+                            <div className="px-4 pt-3 pb-2.5 bg-primary/5 border-b border-border shrink-0 space-y-2.5">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Currently Assigned</span>
+                                        <span className="cf-card-title text-foreground truncate">
+                                            {getMatchdayDisplayName(activePlayer)}
                                         </span>
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowTrialistForm(false)}
-                                            className="text-muted-foreground hover:text-foreground"
-                                        >
-                                            <X className="h-3.5 w-3.5" />
-                                        </button>
+                                        <span className="text-[10px] text-muted-foreground font-bold uppercase truncate">
+                                            {isTrialistId(activePlayer.id)
+                                                ? "Trialist / Guest Player"
+                                                : `${activePlayer.position}${lineup.customNames?.[activePlayer.id]?.trim() ? ` • Stats: ${activePlayer.firstName} ${activePlayer.lastName}` : ""}`}
+                                        </span>
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                        <input
-                                            type="number"
-                                            min={1}
-                                            max={99}
-                                            value={trialistInputNumber}
-                                            onChange={(e) => setTrialistInputNumber(e.target.value)}
-                                            placeholder="#"
-                                            className="w-14 h-8 px-2 bg-surface-2 border border-border rounded-lg text-xs font-bold text-center text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                                        />
-                                        <input
-                                            type="text"
-                                            autoFocus
-                                            value={trialistInputName}
-                                            onChange={(e) => setTrialistInputName(e.target.value)}
-                                            onKeyDown={(e) => {
-                                                if (e.key === "Enter") {
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        {activeSlot.type === 'pitch' && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onMouseDown={(e) => {
                                                     e.preventDefault();
-                                                    handleAddTrialistToActiveSlot();
-                                                }
-                                            }}
-                                            placeholder="e.g. Trialist GK or Alex Smith..."
-                                            className="flex-1 h-8 px-2.5 bg-surface-2 border border-border rounded-lg text-xs font-medium text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
-                                        />
+                                                    const nextCapt = lineup.captainId === activePlayer.id ? "" : activePlayer.id;
+                                                    handleRoleChange("captainId", nextCapt);
+                                                    showToast(nextCapt ? `${getMatchdayDisplayName(activePlayer)} set as Captain (C)` : "Captain unassigned", "info");
+                                                }}
+                                                className={`h-8 text-xs font-bold rounded-lg px-2.5 ${lineup.captainId === activePlayer.id ? "bg-amber-400 text-black border-amber-400 hover:bg-amber-500" : ""}`}
+                                            >
+                                                {lineup.captainId === activePlayer.id ? "© Captain" : "Make (C)"}
+                                            </Button>
+                                        )}
                                         <Button
-                                            type="button"
+                                            onMouseDown={(e) => {
+                                                e.preventDefault();
+                                                if (activeSlot.type === 'pitch') {
+                                                    handleRemoveFromPitch(activeSlot.index);
+                                                } else {
+                                                    handleSubChange(activeSlot.index, "");
+                                                }
+                                                setActiveSlot(null);
+                                                setSearchQuery("");
+                                            }}
+                                            variant="destructive"
                                             size="sm"
-                                            onClick={handleAddTrialistToActiveSlot}
-                                            className="h-8 px-3 text-xs font-bold bg-primary text-primary-foreground rounded-lg shrink-0"
+                                            className="h-8 text-xs bg-destructive hover:bg-destructive/90 text-white font-bold rounded-lg px-3"
                                         >
-                                            Assign
+                                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
                                         </Button>
                                     </div>
                                 </div>
-                            )}
-                        </div>
 
-                        {/* Player List */}
-                        <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-surface-0">
-                            {/* Current Assigned Player */}
-                            {activePlayer && (
-                                <div className="p-3 border border-primary/20 rounded-2xl bg-primary/5 flex flex-col gap-2.5 mb-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <div className="flex flex-col min-w-0">
-                                            <span className="text-[10px] uppercase font-bold text-primary tracking-wider">Currently Assigned</span>
-                                            <span className="cf-card-title text-foreground truncate">
-                                                {getMatchdayDisplayName(activePlayer)}
+                                {/* 2-Tab Switcher: Swap / Replace vs Details & Match Stats */}
+                                <div className="grid grid-cols-2 gap-1 p-1 bg-surface-2 rounded-xl border border-border">
+                                    <button
+                                        type="button"
+                                        onClick={() => setModalTab("swap")}
+                                        className={`py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all ${
+                                            modalTab === "swap"
+                                                ? "bg-surface-1 text-foreground shadow-sm"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        Swap / Replace
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setModalTab("details")}
+                                        className={`py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all ${
+                                            modalTab === "details"
+                                                ? "bg-surface-1 text-foreground shadow-sm"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        Shirt # &amp; Match Stats
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Search Input + "+ Trialist" Toggle (Only shown when picking/replacing a player) */}
+                        {(!activePlayer || modalTab === "swap") && (
+                            <div className="p-3 border-b border-border bg-surface-2 shrink-0 space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <div className="relative flex-1">
+                                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search player by name or position..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full pl-9 pr-4 py-1.5 bg-surface-1 border border-border rounded-xl text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                                        />
+                                    </div>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            const defaultNum = activeSlot.type === "pitch"
+                                                ? (formation[activeSlot.index]?.number || activeSlot.index + 1)
+                                                : (12 + activeSlot.index);
+                                            setTrialistInputNumber(String(defaultNum));
+                                            setShowTrialistForm(prev => !prev);
+                                        }}
+                                        className="h-9 px-2.5 text-xs font-bold rounded-xl border-primary/30 text-primary hover:bg-primary/10 shrink-0"
+                                        title="Add a Trialist or Guest Player for this match only (without cluttering your database squad)"
+                                    >
+                                        <UserPlus className="h-3.5 w-3.5 mr-1" />
+                                        Trialist
+                                    </Button>
+                                </div>
+
+                                {/* #6 Collapsible Trialist / Guest Player Form */}
+                                {showTrialistForm && (
+                                    <div className="p-2.5 rounded-xl bg-surface-1 border border-primary/30 space-y-2 animate-in fade-in duration-150">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-primary">
+                                                + Add Trialist / Guest Player (Match Only)
                                             </span>
-                                            <span className="text-[10px] text-muted-foreground font-bold uppercase">
-                                                {isTrialistId(activePlayer.id)
-                                                    ? "Trialist / Guest Player"
-                                                    : `${activePlayer.position}${lineup.customNames?.[activePlayer.id]?.trim() ? ` • Stats: ${activePlayer.firstName} ${activePlayer.lastName}` : ""}`}
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 shrink-0">
-                                            {activeSlot.type === 'pitch' && (
-                                                <Button
-                                                    type="button"
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onMouseDown={(e) => {
-                                                        e.preventDefault();
-                                                        const nextCapt = lineup.captainId === activePlayer.id ? "" : activePlayer.id;
-                                                        handleRoleChange("captainId", nextCapt);
-                                                        showToast(nextCapt ? `${getMatchdayDisplayName(activePlayer)} set as Captain (C)` : "Captain unassigned", "info");
-                                                    }}
-                                                    className={`h-8 text-xs font-bold rounded-lg px-2.5 ${lineup.captainId === activePlayer.id ? "bg-amber-400 text-black border-amber-400 hover:bg-amber-500" : ""}`}
-                                                >
-                                                    {lineup.captainId === activePlayer.id ? "© Captain" : "Make (C)"}
-                                                </Button>
-                                            )}
-                                            <Button
-                                                onMouseDown={(e) => {
-                                                    e.preventDefault();
-                                                    if (activeSlot.type === 'pitch') {
-                                                        handleRemoveFromPitch(activeSlot.index);
-                                                    } else {
-                                                        handleSubChange(activeSlot.index, "");
-                                                    }
-                                                    setActiveSlot(null);
-                                                    setSearchQuery("");
-                                                }}
-                                                variant="destructive"
-                                                size="sm"
-                                                className="h-8 text-xs bg-destructive hover:bg-destructive/90 text-white font-bold rounded-lg px-3"
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowTrialistForm(false)}
+                                                className="text-muted-foreground hover:text-foreground"
                                             >
-                                                <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                                                <X className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="number"
+                                                min={1}
+                                                max={99}
+                                                value={trialistInputNumber}
+                                                onChange={(e) => setTrialistInputNumber(e.target.value)}
+                                                placeholder="#"
+                                                className="w-14 h-8 px-2 bg-surface-2 border border-border rounded-lg text-xs font-bold text-center text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                            />
+                                            <input
+                                                type="text"
+                                                autoFocus
+                                                value={trialistInputName}
+                                                onChange={(e) => setTrialistInputName(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Enter") {
+                                                        e.preventDefault();
+                                                        handleAddTrialistToActiveSlot();
+                                                    }
+                                                }}
+                                                placeholder="e.g. Trialist GK or Alex Smith..."
+                                                className="flex-1 h-8 px-2.5 bg-surface-2 border border-border rounded-lg text-xs font-medium text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                            />
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                onClick={handleAddTrialistToActiveSlot}
+                                                className="h-8 px-3 text-xs font-bold bg-primary text-primary-foreground rounded-lg shrink-0"
+                                            >
+                                                Assign
                                             </Button>
                                         </div>
                                     </div>
+                                )}
+                            </div>
+                        )}
 
+                        {/* Modal Body */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-surface-0">
+                            {activePlayer && modalTab === "details" ? (
+                                <div className="space-y-4">
                                     {/* Custom Matchday Shirt # & Display Name Override */}
-                                    <div className="pt-2 border-t border-primary/15 space-y-1.5">
-                                        <div className="grid grid-cols-4 gap-2">
+                                    <div className="p-3.5 rounded-2xl bg-surface-1 border border-border space-y-3">
+                                        <div className="grid grid-cols-4 gap-2.5">
                                             <div className="col-span-1 space-y-1">
                                                 <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
                                                     <Hash className="h-2.5 w-2.5 text-primary" />
@@ -4060,7 +4304,7 @@ export default function MatchdayXIPage() {
                                                             onClick={(e) => (e.target as HTMLInputElement).select()}
                                                             onChange={(e) => handleCustomNumberChange(slotKey, e.target.value, defaultNum)}
                                                             placeholder={String(defaultNum)}
-                                                            className="w-full h-8 px-2 bg-surface-1 border border-border rounded-lg text-xs font-extrabold text-center text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                                            className="w-full h-9 px-2 bg-surface-2 border border-border rounded-lg text-xs font-extrabold text-center text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                                                         />
                                                     );
                                                 })()}
@@ -4089,19 +4333,19 @@ export default function MatchdayXIPage() {
                                                     value={lineup.customNames?.[activePlayer.id] ?? ""}
                                                     onChange={(e) => handleCustomNameChange(activePlayer.id, e.target.value)}
                                                     placeholder={`Default: ${formatPlayerName(activePlayer)}`}
-                                                    className="w-full h-8 px-2.5 bg-surface-1 border border-border rounded-lg text-xs font-medium text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                                                    className="w-full h-9 px-2.5 bg-surface-2 border border-border rounded-lg text-xs font-medium text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                                                 />
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* #10 Post-Match Quick Stats Entry (Goals, Assists, Yellow/Red Cards, MOTM) */}
+                                    {/* Post-Match Quick Stats Entry (Goals, Assists, Yellow/Red Cards, MOTM) */}
                                     {!isTrialistId(activePlayer.id) && (() => {
                                         const ev = getPlayerMatchEventStats(activePlayer.id);
                                         const isMotm = lineup.motmPlayerId === activePlayer.id;
 
                                         return (
-                                            <div className="pt-2 border-t border-primary/15 space-y-1.5">
+                                            <div className="p-3.5 rounded-2xl bg-surface-1 border border-border space-y-2.5">
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                                                         Match Stats &amp; Events (Syncs to Player Stats)
@@ -4109,17 +4353,17 @@ export default function MatchdayXIPage() {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleMotmToggle(activePlayer.id)}
-                                                        className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold border flex items-center gap-1 transition-colors ${
+                                                        className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold border flex items-center gap-1 transition-colors ${
                                                             isMotm
                                                                 ? "bg-amber-400 text-black border-amber-400"
-                                                                : "bg-surface-1 text-muted-foreground border-border hover:text-foreground"
+                                                                : "bg-surface-2 text-muted-foreground border-border hover:text-foreground"
                                                         }`}
                                                     >
                                                         <Star className="h-3 w-3" />
                                                         {isMotm ? "⭐ MOTM" : "Set MOTM"}
                                                     </button>
                                                 </div>
-                                                <div className="grid grid-cols-4 gap-1.5">
+                                                <div className="grid grid-cols-4 gap-2">
                                                     {(
                                                         [
                                                             { field: "goals", label: "⚽ Goals", val: ev.goals },
@@ -4128,21 +4372,21 @@ export default function MatchdayXIPage() {
                                                             { field: "redCards", label: "🟥 Red", val: ev.redCards }
                                                         ] as const
                                                     ).map(item => (
-                                                        <div key={item.field} className="bg-surface-1 border border-border rounded-lg p-1.5 flex flex-col items-center">
-                                                            <span className="text-[9px] font-bold text-muted-foreground">{item.label}</span>
-                                                            <div className="flex items-center gap-1.5 mt-1">
+                                                        <div key={item.field} className="bg-surface-2 border border-border rounded-xl p-2 flex flex-col items-center">
+                                                            <span className="text-[10px] font-bold text-muted-foreground">{item.label}</span>
+                                                            <div className="flex items-center gap-1.5 mt-1.5">
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleMatchEventStatChange(activePlayer.id, item.field, -1)}
-                                                                    className="w-5 h-5 rounded bg-surface-2 hover:bg-surface-3 text-xs font-black flex items-center justify-center"
+                                                                    className="w-6 h-6 rounded-md bg-surface-1 hover:bg-surface-3 border border-border text-xs font-black flex items-center justify-center"
                                                                 >
                                                                     -
                                                                 </button>
-                                                                <span className="text-xs font-black min-w-[14px] text-center">{item.val}</span>
+                                                                <span className="text-xs font-black min-w-[16px] text-center">{item.val}</span>
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => handleMatchEventStatChange(activePlayer.id, item.field, 1)}
-                                                                    className="w-5 h-5 rounded bg-surface-2 hover:bg-surface-3 text-xs font-black flex items-center justify-center"
+                                                                    className="w-6 h-6 rounded-md bg-surface-1 hover:bg-surface-3 border border-border text-xs font-black flex items-center justify-center"
                                                                 >
                                                                     +
                                                                 </button>
@@ -4153,187 +4397,193 @@ export default function MatchdayXIPage() {
                                             </div>
                                         );
                                     })()}
-
-                                    {/* #5 Click-to-Swap With Another Pitch or Bench Player */}
-                                    <div className="pt-2 border-t border-primary/15 space-y-1.5">
-                                        <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                                            <ArrowLeftRight className="h-3 w-3 text-primary" />
-                                            Quick Swap Position With:
-                                        </span>
-                                        <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto scrollbar-thin">
-                                            {formation.map((pos, pIdx) => {
-                                                if (activeSlot.type === "pitch" && activeSlot.index === pIdx) return null;
-                                                const otherId = lineup.starters[pIdx];
-                                                const otherPlayer = resolvePlayerOrTrialist(otherId);
-                                                if (!otherPlayer) return null;
-                                                return (
-                                                    <button
-                                                        key={`swap-pitch-${pIdx}`}
-                                                        type="button"
-                                                        onClick={() => handleSwapSlots({ type: "pitch", index: pIdx, label: pos.label })}
-                                                        className="px-2 py-1 rounded-lg bg-surface-1 hover:bg-primary/15 border border-border hover:border-primary/40 text-[10px] font-bold text-foreground transition-colors flex items-center gap-1"
-                                                    >
-                                                        <span className="text-primary font-black">{pos.label}:</span>
-                                                        <span>{getPitchPlayerDisplayName(otherPlayer)}</span>
-                                                    </button>
-                                                );
-                                            })}
-                                            {lineup.substitutes.map((sId, sIdx) => {
-                                                if (activeSlot.type === "sub" && activeSlot.index === sIdx) return null;
-                                                const otherSub = resolvePlayerOrTrialist(sId);
-                                                if (!otherSub) return null;
-                                                return (
-                                                    <button
-                                                        key={`swap-sub-${sIdx}`}
-                                                        type="button"
-                                                        onClick={() => handleSwapSlots({ type: "sub", index: sIdx, label: `Sub #${12 + sIdx}` })}
-                                                        className="px-2 py-1 rounded-lg bg-surface-1 hover:bg-primary/15 border border-border hover:border-primary/40 text-[10px] font-bold text-foreground transition-colors flex items-center gap-1"
-                                                    >
-                                                        <span className="text-muted-foreground font-black">Sub:</span>
-                                                        <span>{getPitchPlayerDisplayName(otherSub)}</span>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
                                 </div>
-                            )}
-
-                            {/* Divider if we have both current player and available list */}
-                            {activePlayer && sortedPlayers.length > 0 && (
-                                <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1 pt-1">
-                                    Available Options
-                                </div>
-                            )}
-
-                            {sortedPlayers.length > 0 ? (
-                                sortedPlayers.map(player => {
-                                    const matchesTarget = activeSlot.type === 'pitch' && isIdealPosition(player.position, activeSlot.label);
-                                    const matchesSecondary = activeSlot.type === 'pitch' && player.secondaryPositions && player.secondaryPositions.some(pos => isIdealPosition(pos, activeSlot.label));
-                                    const rawPStats = seasonStatsMap[player.id];
-                                    const appsCount = Math.max(rawPStats?.apps || 0, player.appearances || 0);
-                                    const goalsCount = Math.max(rawPStats?.goals || 0, player.goals || 0);
-                                    const assistsCount = Math.max(rawPStats?.assists || 0, player.assists || 0);
-                                    const startedLast = lastMatchStarterIds.has(player.id);
-                                    const subLast = !startedLast && lastMatchSubIds.has(player.id);
-                                    const posLabel = player.position;
-                                    const statsSummary = [
-                                        appsCount > 0 ? `${appsCount} ${appsCount === 1 ? "App" : "Apps"}` : "",
-                                        goalsCount > 0 ? `${goalsCount}G` : "",
-                                        assistsCount > 0 ? `${assistsCount}A` : ""
-                                    ].filter(Boolean).join(" • ");
-
-                                    return (
-                                        <button
-                                            key={player.id}
-                                            onMouseDown={(e) => {
-                                                e.preventDefault();
-                                                if (activeSlot.type === 'pitch') {
-                                                    handleStarterChange(activeSlot.index, player.id);
-                                                } else {
-                                                    handleSubChange(activeSlot.index, player.id);
-                                                }
-                                                setActiveSlot(null);
-                                                setSearchQuery("");
-                                            }}
-                                            className={`w-full flex items-center justify-between gap-2 p-2.5 border rounded-xl transition-all text-left group
-                                                ${matchesTarget 
-                                                    ? 'bg-primary/5 border-primary/20 hover:border-primary/50 hover:bg-primary/10' 
-                                                    : matchesSecondary
-                                                        ? 'bg-status-warning/5 border-status-warning/20 hover:border-status-warning/50 hover:bg-status-warning/10'
-                                                        : 'bg-surface-1 border-border hover:border-foreground/30 hover:bg-surface-2'
-                                                }`}
-                                        >
-                                            <div className="flex flex-col min-w-0 gap-0.5 flex-1">
-                                                <div className="flex items-center gap-1.5 min-w-0">
-                                                    <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">
-                                                        {formatPlayerName(player)}
-                                                    </span>
-                                                    {startedLast && (
-                                                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 shrink-0">
-                                                            Last XI
-                                                        </span>
-                                                    )}
-                                                    {subLast && (
-                                                        <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30 shrink-0">
-                                                            Sub Last
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                <div className="text-[10px] font-semibold text-muted-foreground truncate">
-                                                    <span className="uppercase font-bold text-foreground/80">{posLabel}</span>
-                                                    {statsSummary ? ` • ${statsSummary}` : ""}
-                                                </div>
-                                            </div>
-                                            {matchesTarget && (
-                                                <span className="bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
-                                                    Ideal Position
-                                                </span>
-                                            )}
-                                            {!matchesTarget && matchesSecondary && (
-                                                <span className="bg-status-warning/10 text-status-warning border border-status-warning/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
-                                                    Secondary Option
-                                                </span>
-                                            )}
-                                        </button>
-                                    );
-                                })
                             ) : (
-                                <div className="text-center py-8 text-slate-500 text-sm">
-                                    No available players found
-                                </div>
-                            )}
+                                <>
+                                    {/* Quick Swap Position With Another Pitch or Bench Player */}
+                                    {activePlayer && (
+                                        <div className="p-3 rounded-2xl bg-surface-1 border border-border space-y-1.5">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                                                <ArrowLeftRight className="h-3 w-3 text-primary" />
+                                                Quick Swap Position With:
+                                            </span>
+                                            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto scrollbar-thin">
+                                                {formation.map((pos, pIdx) => {
+                                                    if (activeSlot.type === "pitch" && activeSlot.index === pIdx) return null;
+                                                    const otherId = lineup.starters[pIdx];
+                                                    const otherPlayer = resolvePlayerOrTrialist(otherId);
+                                                    if (!otherPlayer) return null;
+                                                    return (
+                                                        <button
+                                                            key={`swap-pitch-${pIdx}`}
+                                                            type="button"
+                                                            onClick={() => handleSwapSlots({ type: "pitch", index: pIdx, label: pos.label })}
+                                                            className="px-2 py-1 rounded-lg bg-surface-2 hover:bg-primary/15 border border-border hover:border-primary/40 text-[10px] font-bold text-foreground transition-colors flex items-center gap-1"
+                                                        >
+                                                            <span className="text-primary font-black">{pos.label}:</span>
+                                                            <span>{getPitchPlayerDisplayName(otherPlayer)}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                                {lineup.substitutes.map((sId, sIdx) => {
+                                                    if (activeSlot.type === "sub" && activeSlot.index === sIdx) return null;
+                                                    const otherSub = resolvePlayerOrTrialist(sId);
+                                                    if (!otherSub) return null;
+                                                    return (
+                                                        <button
+                                                            key={`swap-sub-${sIdx}`}
+                                                            type="button"
+                                                            onClick={() => handleSwapSlots({ type: "sub", index: sIdx, label: `Sub #${12 + sIdx}` })}
+                                                            className="px-2 py-1 rounded-lg bg-surface-2 hover:bg-primary/15 border border-border hover:border-primary/40 text-[10px] font-bold text-foreground transition-colors flex items-center gap-1"
+                                                        >
+                                                            <span className="text-muted-foreground font-black">Sub:</span>
+                                                            <span>{getPitchPlayerDisplayName(otherSub)}</span>
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    )}
 
-                            {/* Doubtful / Unavailable Override Options in Modal */}
-                            {unavailablePlayers.length > 0 && (
-                                <div className="pt-3 border-t border-border mt-3 space-y-1.5">
-                                    <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider px-1">
-                                        Unavailable / Doubtful (Click to Override)
+                                    {/* Divider if we have both current player and available list */}
+                                    {activePlayer && sortedPlayers.length > 0 && (
+                                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-1 pt-1">
+                                            Replace With Available Player
+                                        </div>
+                                    )}
+
+                                    <div className="space-y-1.5">
+                                        {sortedPlayers.length > 0 ? (
+                                            sortedPlayers.map(player => {
+                                                const matchesTarget = activeSlot.type === 'pitch' && isIdealPosition(player.position, activeSlot.label);
+                                                const matchesSecondary = activeSlot.type === 'pitch' && player.secondaryPositions && player.secondaryPositions.some(pos => isIdealPosition(pos, activeSlot.label));
+                                                const rawPStats = seasonStatsMap[player.id];
+                                                const appsCount = Math.max(rawPStats?.apps || 0, player.appearances || 0);
+                                                const goalsCount = Math.max(rawPStats?.goals || 0, player.goals || 0);
+                                                const assistsCount = Math.max(rawPStats?.assists || 0, player.assists || 0);
+                                                const startedLast = lastMatchStarterIds.has(player.id);
+                                                const subLast = !startedLast && lastMatchSubIds.has(player.id);
+                                                const posLabel = player.position;
+                                                const statsSummary = [
+                                                    appsCount > 0 ? `${appsCount} ${appsCount === 1 ? "App" : "Apps"}` : "",
+                                                    goalsCount > 0 ? `${goalsCount}G` : "",
+                                                    assistsCount > 0 ? `${assistsCount}A` : ""
+                                                ].filter(Boolean).join(" • ");
+
+                                                return (
+                                                    <button
+                                                        key={player.id}
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault();
+                                                            if (activeSlot.type === 'pitch') {
+                                                                handleStarterChange(activeSlot.index, player.id);
+                                                            } else {
+                                                                handleSubChange(activeSlot.index, player.id);
+                                                            }
+                                                            setActiveSlot(null);
+                                                            setSearchQuery("");
+                                                        }}
+                                                        className={`w-full flex items-center justify-between gap-2 p-2.5 border rounded-xl transition-all text-left group
+                                                            ${matchesTarget 
+                                                                ? 'bg-primary/5 border-primary/20 hover:border-primary/50 hover:bg-primary/10' 
+                                                                : matchesSecondary
+                                                                    ? 'bg-status-warning/5 border-status-warning/20 hover:border-status-warning/50 hover:bg-status-warning/10'
+                                                                    : 'bg-surface-1 border-border hover:border-foreground/30 hover:bg-surface-2'
+                                                            }`}
+                                                    >
+                                                        <div className="flex flex-col min-w-0 gap-0.5 flex-1">
+                                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                                <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                                                                    {formatPlayerName(player)}
+                                                                </span>
+                                                                {startedLast && (
+                                                                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 shrink-0">
+                                                                        Last XI
+                                                                    </span>
+                                                                )}
+                                                                {subLast && (
+                                                                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30 shrink-0">
+                                                                        Sub Last
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-[10px] font-semibold text-muted-foreground truncate">
+                                                                <span className="uppercase font-bold text-foreground/80">{posLabel}</span>
+                                                                {statsSummary ? ` • ${statsSummary}` : ""}
+                                                            </div>
+                                                        </div>
+                                                        {matchesTarget && (
+                                                            <span className="bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+                                                                Ideal Position
+                                                            </span>
+                                                        )}
+                                                        {!matchesTarget && matchesSecondary && (
+                                                            <span className="bg-status-warning/10 text-status-warning border border-status-warning/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
+                                                                Secondary Option
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="text-center py-8 text-slate-500 text-sm">
+                                                No available players found
+                                            </div>
+                                        )}
                                     </div>
-                                    {unavailablePlayers
-                                        .filter(p => {
-                                            const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
-                                            return fullName.includes(searchQuery.toLowerCase()) || p.position.toLowerCase().includes(searchQuery.toLowerCase());
-                                        })
-                                        .map(player => (
-                                            <button
-                                                key={player.id}
-                                                onMouseDown={(e) => {
-                                                    e.preventDefault();
-                                                    if (activeSlot.type === 'pitch') {
-                                                        handleStarterChange(activeSlot.index, player.id);
-                                                    } else {
-                                                        handleSubChange(activeSlot.index, player.id);
-                                                    }
-                                                    setActiveSlot(null);
-                                                    setSearchQuery("");
-                                                }}
-                                                className="w-full flex items-center justify-between p-2.5 border border-border/70 rounded-xl bg-surface-1/60 hover:bg-surface-2 transition-all text-left opacity-80 hover:opacity-100"
-                                            >
-                                                <div className="flex flex-col">
-                                                    <span className="text-xs font-bold text-foreground">
-                                                        {formatPlayerName(player)}
-                                                    </span>
-                                                    <span className="text-[10px] text-muted-foreground uppercase">
-                                                        {player.position}
-                                                    </span>
-                                                </div>
-                                                <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
-                                                    {player.medicalStatus}
-                                                </span>
-                                            </button>
-                                        ))}
-                                </div>
+
+                                    {/* Doubtful / Unavailable Override Options in Modal */}
+                                    {unavailablePlayers.length > 0 && (
+                                        <div className="pt-3 border-t border-border mt-3 space-y-1.5">
+                                            <div className="text-[10px] font-bold text-amber-500 uppercase tracking-wider px-1">
+                                                Unavailable / Doubtful (Click to Override)
+                                            </div>
+                                            {unavailablePlayers
+                                                .filter(p => {
+                                                    const fullName = `${p.firstName} ${p.lastName}`.toLowerCase();
+                                                    return fullName.includes(searchQuery.toLowerCase()) || p.position.toLowerCase().includes(searchQuery.toLowerCase());
+                                                })
+                                                .map(player => (
+                                                    <button
+                                                        key={player.id}
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault();
+                                                            if (activeSlot.type === 'pitch') {
+                                                                handleStarterChange(activeSlot.index, player.id);
+                                                            } else {
+                                                                handleSubChange(activeSlot.index, player.id);
+                                                            }
+                                                            setActiveSlot(null);
+                                                            setSearchQuery("");
+                                                        }}
+                                                        className="w-full flex items-center justify-between p-2.5 border border-border/70 rounded-xl bg-surface-1/60 hover:bg-surface-2 transition-all text-left opacity-80 hover:opacity-100"
+                                                    >
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs font-bold text-foreground">
+                                                                {formatPlayerName(player)}
+                                                            </span>
+                                                            <span className="text-[10px] text-muted-foreground uppercase">
+                                                                {player.position}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                                                            {player.medicalStatus}
+                                                        </span>
+                                                    </button>
+                                                ))}
+                                        </div>
+                                    )}
+                                </>
                             )}
                         </div>
 
                         {/* Modal Footer */}
-                        <div className="p-4 bg-surface-2 border-t border-border flex justify-end shrink-0">
+                        <div className="p-3.5 bg-surface-2 border-t border-border flex justify-end shrink-0">
                             <Button 
                                 onMouseDown={(e) => { e.preventDefault(); setActiveSlot(null); setSearchQuery(""); setShowTrialistForm(false); }}
                                 className="bg-surface-3 hover:bg-border text-foreground border-none font-bold text-xs rounded-lg"
                             >
-                                Cancel
+                                Done
                             </Button>
                         </div>
                     </div>
