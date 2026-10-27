@@ -288,7 +288,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             finalSecondaryColor = generateSecondaryColor(newSettings.primaryColor);
         }
 
-        // Update DB first
+        // Update DB first (only include columns that exist on the `clubs` table)
         const updates: any = {
             name: newSettings.name ?? settings.name,
             logo: newSettings.logo ?? settings.logo,
@@ -320,18 +320,8 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             training_fee_per_session: newSettings.trainingFeePerSession ?? settings.trainingFeePerSession,
             contracts_enabled: newSettings.contractsEnabled ?? settings.contractsEnabled,
             subs_enabled: newSettings.subsEnabled ?? settings.subsEnabled,
-            default_home_kick_off: newSettings.defaultHomeKickOff ?? settings.defaultHomeKickOff,
-            default_training_venue: newSettings.defaultTrainingVenue ?? settings.defaultTrainingVenue,
-            preferred_surface: newSettings.preferredSurface ?? settings.preferredSurface,
-            primary_kit: newSettings.primaryKit ?? settings.primaryKit,
-            secondary_kit: newSettings.secondaryKit ?? settings.secondaryKit,
-            season_start: newSettings.seasonStart ?? settings.seasonStart,
-            season_end: newSettings.seasonEnd ?? settings.seasonEnd,
-            default_competition: newSettings.defaultCompetition ?? settings.defaultCompetition,
-            timezone: newSettings.timezone ?? settings.timezone,
-            last_import_history: newSettings.lastImportHistory ?? settings.lastImportHistory
+            squads: 'squads' in newSettings ? newSettings.squads : settings.squads
         };
-        if ('squads' in newSettings) updates.squads = newSettings.squads;
 
         // Check if row exists for user's clubId
         let existingId = clubId;
@@ -403,9 +393,14 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             throw new Error(errorMsg);
         }
 
-        // Apply Update to State after DB succeeds
+        // Apply Update to State & Local Cache after DB succeeds
         const updated = { ...settings, ...newSettings, secondaryColor: finalSecondaryColor };
         setSettings(updated);
+        if (typeof window !== "undefined") {
+            try {
+                localStorage.setItem("clubflow_cache_clubSettings", JSON.stringify(updated));
+            } catch (e) {}
+        }
     };
 
     return (

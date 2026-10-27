@@ -2822,10 +2822,17 @@ export default function SquadPage() {
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setIsManageSquadsOpen(false)}>Cancel</Button>
                         <Button onClick={async () => {
-                            const cleanSquads = editingSquads.filter(s => s.trim() !== "");
-                            await updateSettings({ squads: cleanSquads });
-                            if (!cleanSquads.includes(activeTab) && activeTab !== "All") setActiveTab("All");
-                            setIsManageSquadsOpen(false);
+                            try {
+                                const cleanSquads = editingSquads.map(s => s.trim()).filter(Boolean);
+                                const finalSquads = cleanSquads.length > 0 ? cleanSquads : ["First Team"];
+                                await updateSettings({ squads: finalSquads });
+                                if (!finalSquads.includes(activeTab) && activeTab !== "All") {
+                                    setActiveTab(finalSquads[0] || "All");
+                                }
+                                setIsManageSquadsOpen(false);
+                            } catch (err: any) {
+                                alert("Failed to save squads: " + (err?.message || "Unknown error"));
+                            }
                         }} className="bg-red-600 hover:bg-red-700">Save Squads</Button>
                     </DialogFooter>
                 </DialogContent>
