@@ -160,10 +160,10 @@ export interface OppositionTeam {
 }
 
 export interface MatchdayPlayerEventStats {
-    goals?: number;
-    assists?: number;
-    yellowCards?: number;
-    redCards?: number;
+    goals: number;
+    assists: number;
+    yellowCards: number;
+    redCards: number;
 }
 
 export interface MatchdayXI {
