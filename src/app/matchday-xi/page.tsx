@@ -2727,7 +2727,10 @@ export default function MatchdayXIPage() {
                             })
                             .map(player => {
                                 const displayName = formatPlayerName(player);
-                                const seasonStats = seasonStatsMap[player.id];
+                                const rawSeasonStats = seasonStatsMap[player.id];
+                                const appsCount = Math.max(rawSeasonStats?.apps || 0, player.appearances || 0);
+                                const goalsCount = Math.max(rawSeasonStats?.goals || 0, player.goals || 0);
+                                const assistsCount = Math.max(rawSeasonStats?.assists || 0, player.assists || 0);
                                 const startedLast = lastMatchStarterIds.has(player.id);
                                 const subLast = !startedLast && lastMatchSubIds.has(player.id);
 
@@ -2757,7 +2760,7 @@ export default function MatchdayXIPage() {
                                         </div>
 
                                         {/* #9 Season Stats & Last Match XI Badges */}
-                                        {(seasonStats || startedLast || subLast) && (
+                                        {(appsCount > 0 || goalsCount > 0 || assistsCount > 0 || startedLast || subLast) && (
                                             <div className="flex flex-wrap items-center gap-1 pl-6 pt-0.5">
                                                 {startedLast && (
                                                     <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
@@ -2769,11 +2772,11 @@ export default function MatchdayXIPage() {
                                                         Sub Last XI
                                                     </span>
                                                 )}
-                                                {seasonStats && seasonStats.apps > 0 && (
+                                                {(appsCount > 0 || goalsCount > 0 || assistsCount > 0) && (
                                                     <span className="text-[9px] font-bold text-muted-foreground bg-surface-2 px-1.5 py-0.2 rounded">
-                                                        {seasonStats.apps} {seasonStats.apps === 1 ? "App" : "Apps"}
-                                                        {seasonStats.goals > 0 ? ` • ${seasonStats.goals}G` : ""}
-                                                        {seasonStats.assists > 0 ? ` • ${seasonStats.assists}A` : ""}
+                                                        {appsCount} {appsCount === 1 ? "App" : "Apps"}
+                                                        {goalsCount > 0 ? ` • ${goalsCount}G` : ""}
+                                                        {assistsCount > 0 ? ` • ${assistsCount}A` : ""}
                                                     </span>
                                                 )}
                                             </div>
@@ -3969,8 +3972,12 @@ export default function MatchdayXIPage() {
                                 sortedPlayers.map(player => {
                                     const matchesTarget = activeSlot.type === 'pitch' && isIdealPosition(player.position, activeSlot.label);
                                     const matchesSecondary = activeSlot.type === 'pitch' && player.secondaryPositions && player.secondaryPositions.some(pos => isIdealPosition(pos, activeSlot.label));
-                                    const pStats = seasonStatsMap[player.id];
+                                    const rawPStats = seasonStatsMap[player.id];
+                                    const appsCount = Math.max(rawPStats?.apps || 0, player.appearances || 0);
+                                    const goalsCount = Math.max(rawPStats?.goals || 0, player.goals || 0);
+                                    const assistsCount = Math.max(rawPStats?.assists || 0, player.assists || 0);
                                     const startedLast = lastMatchStarterIds.has(player.id);
+                                    const subLast = !startedLast && lastMatchSubIds.has(player.id);
 
                                     return (
                                         <button
@@ -3985,7 +3992,7 @@ export default function MatchdayXIPage() {
                                                 setActiveSlot(null);
                                                 setSearchQuery("");
                                             }}
-                                            className={`w-full flex items-center justify-between p-3 border rounded-xl transition-all text-left group
+                                            className={`w-full flex items-center justify-between gap-2 p-3 border rounded-xl transition-all text-left group
                                                 ${matchesTarget 
                                                     ? 'bg-primary/5 border-primary/20 hover:border-primary/50 hover:bg-primary/10' 
                                                     : matchesSecondary
@@ -3993,21 +4000,36 @@ export default function MatchdayXIPage() {
                                                         : 'bg-surface-1 border-border hover:border-foreground/30 hover:bg-surface-2'
                                                 }`}
                                         >
-                                            <div className="flex flex-col min-w-0">
+                                            <div className="flex flex-col min-w-0 gap-1">
                                                 <div className="flex items-center gap-1.5">
                                                     <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">
                                                         {formatPlayerName(player)}
                                                     </span>
-                                                    {startedLast && (
-                                                        <span className="text-[8px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30 shrink-0">
-                                                            Last XI
-                                                        </span>
-                                                    )}
+                                                    <span className="text-[10px] text-muted-foreground font-semibold uppercase shrink-0">
+                                                        {player.position} {player.secondaryPositions && player.secondaryPositions.length > 0 ? `• ${player.secondaryPositions.join("/")}` : ''}
+                                                    </span>
                                                 </div>
-                                                <span className="text-[10px] text-muted-foreground font-semibold uppercase">
-                                                    {player.position} {player.secondaryPositions && player.secondaryPositions.length > 0 ? `| Sec: ${player.secondaryPositions.join(", ")}` : ''}
-                                                    {pStats && pStats.apps > 0 ? ` • ${pStats.apps} Apps${pStats.goals > 0 ? ` ${pStats.goals}G` : ""}${pStats.assists > 0 ? ` ${pStats.assists}A` : ""}` : ""}
-                                                </span>
+                                                {(appsCount > 0 || goalsCount > 0 || assistsCount > 0 || startedLast || subLast) && (
+                                                    <div className="flex flex-wrap items-center gap-1">
+                                                        {startedLast && (
+                                                            <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-500 border border-emerald-500/30">
+                                                                Started Last XI
+                                                            </span>
+                                                        )}
+                                                        {subLast && (
+                                                            <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                                                                Sub Last XI
+                                                            </span>
+                                                        )}
+                                                        {(appsCount > 0 || goalsCount > 0 || assistsCount > 0) && (
+                                                            <span className="text-[9px] font-bold text-muted-foreground bg-surface-2 px-1.5 py-0.2 rounded">
+                                                                {appsCount} {appsCount === 1 ? "App" : "Apps"}
+                                                                {goalsCount > 0 ? ` • ${goalsCount}G` : ""}
+                                                                {assistsCount > 0 ? ` • ${assistsCount}A` : ""}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                             {matchesTarget && (
                                                 <span className="bg-primary/10 text-primary border border-primary/20 text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0">
