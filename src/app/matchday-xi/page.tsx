@@ -2978,7 +2978,7 @@ export default function MatchdayXIPage() {
                                 const assistsCount = Math.max(rawSeasonStats?.assists || 0, player.assists || 0);
                                 const startedLast = lastMatchStarterIds.has(player.id);
                                 const subLast = !startedLast && lastMatchSubIds.has(player.id);
-                                const posLabel = `${player.position}${player.secondaryPositions && player.secondaryPositions.length > 0 ? `/${player.secondaryPositions.join("/")}` : ""}`;
+                                const posLabel = player.position;
                                 const statsSummary = [
                                     appsCount > 0 ? `${appsCount} ${appsCount === 1 ? "App" : "Apps"}` : "",
                                     goalsCount > 0 ? `${goalsCount}G` : "",
@@ -4216,7 +4216,7 @@ export default function MatchdayXIPage() {
                                     const assistsCount = Math.max(rawPStats?.assists || 0, player.assists || 0);
                                     const startedLast = lastMatchStarterIds.has(player.id);
                                     const subLast = !startedLast && lastMatchSubIds.has(player.id);
-                                    const posLabel = `${player.position}${player.secondaryPositions && player.secondaryPositions.length > 0 ? `/${player.secondaryPositions.join("/")}` : ""}`;
+                                    const posLabel = player.position;
                                     const statsSummary = [
                                         appsCount > 0 ? `${appsCount} ${appsCount === 1 ? "App" : "Apps"}` : "",
                                         goalsCount > 0 ? `${goalsCount}G` : "",
