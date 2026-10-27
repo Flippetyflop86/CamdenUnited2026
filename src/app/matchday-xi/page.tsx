@@ -588,8 +588,15 @@ export default function MatchdayXIPage() {
 
         // End of match (90th minute) - add remaining time for everyone still on pitch
         onPitchSince.forEach((startedAt, id) => {
-            const played = Math.max(0, 90 - startedAt);
+            const played = startedAt > 0 ? Math.max(1, 90 - startedAt) : Math.max(0, 90 - startedAt);
             minutesMap.set(id, (minutesMap.get(id) || 0) + played);
+        });
+
+        // Apply any custom played-minutes override (e.g. stoppage time adjustments)
+        sortedSubs.forEach(sub => {
+            if (isRealPlayerId(sub.subId) && typeof sub.customMinutesPlayed === "number") {
+                minutesMap.set(sub.subId, Math.max(1, sub.customMinutesPlayed));
+            }
         });
 
         // Ensure any used sub that wasn't logged in substitutions gets a fallback of 30 mins
@@ -1115,14 +1122,22 @@ export default function MatchdayXIPage() {
         showToast(nextMotm ? `⭐ ${p ? getMatchdayDisplayName(p) : "Player"} set as Man of the Match!` : "MOTM cleared", "info");
     };
 
-    const handleSubDetailChange = (subId: string, replacedId: string, minute: number) => {
+    const handleSubDetailChange = (subId: string, replacedId: string, minute: number, customMinutesPlayed?: number) => {
         if (!lineup) return;
         const currentSubs = lineup.substitutions || [];
         const filtered = currentSubs.filter(s => s.subId !== subId);
         
         let updatedSubs = filtered;
-        if (replacedId || minute) {
-            updatedSubs = [...filtered, { subId, replacedId, minute }];
+        if (replacedId || minute || typeof customMinutesPlayed === "number") {
+            const nextSubEntry: { subId: string; replacedId: string; minute: number; customMinutesPlayed?: number } = {
+                subId,
+                replacedId,
+                minute
+            };
+            if (typeof customMinutesPlayed === "number") {
+                nextSubEntry.customMinutesPlayed = Math.max(1, customMinutesPlayed);
+            }
+            updatedSubs = [...filtered, nextSubEntry];
         }
         
         const updated = {
@@ -2670,8 +2685,14 @@ export default function MatchdayXIPage() {
         });
 
         onPitchSince.forEach((startedAt, id) => {
-            const played = Math.max(0, 90 - startedAt);
+            const played = startedAt > 0 ? Math.max(1, 90 - startedAt) : Math.max(0, 90 - startedAt);
             minutesMap.set(id, (minutesMap.get(id) || 0) + played);
+        });
+
+        sortedSubs.forEach(sub => {
+            if (sub.subId && typeof sub.customMinutesPlayed === "number") {
+                minutesMap.set(sub.subId, Math.max(1, sub.customMinutesPlayed));
+            }
         });
 
         (lineup.usedSubstitutes || []).forEach((id: string) => {
@@ -3913,13 +3934,13 @@ export default function MatchdayXIPage() {
                                         )}
                                     </div>
                                     {subId && isSubPlayed && (
-                                        <div className="pl-6 pr-2 py-2 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 border-t border-border mt-1.5 bg-surface-2 rounded-lg">
-                                            <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Subbed For:</span>
-                                            <div className="flex items-center gap-1 flex-1 justify-end">
+                                        <div className="pl-6 pr-2 py-2 flex flex-col gap-1.5 border-t border-border mt-1.5 bg-surface-2 rounded-lg">
+                                            <div className="flex items-center justify-between gap-1.5 w-full">
+                                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Subbed For:</span>
                                                 <select
                                                     value={subDetail?.replacedId || ""}
-                                                    onChange={(e) => handleSubDetailChange(subId, e.target.value, subDetail?.minute || 60)}
-                                                    className="text-[10px] bg-surface-1 border border-border text-foreground rounded-md px-2 py-1 h-7 max-w-[120px] outline-none font-medium focus:border-primary"
+                                                    onChange={(e) => handleSubDetailChange(subId, e.target.value, subDetail?.minute || 60, subDetail?.customMinutesPlayed)}
+                                                    className="text-[10px] bg-surface-1 border border-border text-foreground rounded-md px-2 py-1 h-7 flex-1 min-w-0 outline-none font-medium focus:border-primary"
                                                 >
                                                     <option value="">Replaced player...</option>
                                                     <optgroup label="Starters">
@@ -3947,17 +3968,54 @@ export default function MatchdayXIPage() {
                                                         })}
                                                     </optgroup>
                                                 </select>
-                                                <div className="flex items-center gap-1 font-bold text-[9px] text-slate-500">
-                                                    <span>Min:</span>
+                                            </div>
+                                            <div className="flex items-center justify-end gap-2 font-bold text-[9px] text-slate-500">
+                                                <div className="flex items-center gap-1" title="Minute player came onto the pitch (auto-calculates played minutes)">
+                                                    <span>On:</span>
                                                     <input
                                                         type="number"
                                                         min="1"
-                                                        max="90"
+                                                        max="120"
                                                         value={subDetail?.minute ?? ""}
                                                         placeholder="60"
-                                                        onChange={(e) => handleSubDetailChange(subId, subDetail?.replacedId || "", parseInt(e.target.value) || 60)}
-                                                        className="text-[10px] bg-surface-1 border border-border text-foreground rounded-md px-1 py-1 h-7 w-10 text-center outline-none focus:border-primary"
+                                                        onChange={(e) => handleSubDetailChange(subId, subDetail?.replacedId || "", parseInt(e.target.value) || 60, undefined)}
+                                                        className="text-[10px] bg-surface-1 border border-border text-foreground rounded-md px-1 py-0.5 h-6 w-11 text-center outline-none focus:border-primary"
                                                     />
+                                                    <span>&apos;</span>
+                                                </div>
+                                                <div className="flex items-center gap-1" title="Total minutes played including stoppage time (auto-calculated from 90 - On, click to edit)">
+                                                    <span>Played:</span>
+                                                    <input
+                                                        type="number"
+                                                        min="1"
+                                                        max="120"
+                                                        value={subDetail?.customMinutesPlayed ?? subMinutes}
+                                                        onChange={(e) => {
+                                                            const val = parseInt(e.target.value, 10);
+                                                            handleSubDetailChange(
+                                                                subId,
+                                                                subDetail?.replacedId || "",
+                                                                subDetail?.minute || 60,
+                                                                !isNaN(val) && val > 0 ? val : undefined
+                                                            );
+                                                        }}
+                                                        className={`text-[10px] bg-surface-1 border rounded-md px-1 py-0.5 h-6 w-11 text-center outline-none focus:border-primary ${
+                                                            typeof subDetail?.customMinutesPlayed === "number"
+                                                                ? "border-amber-500/60 text-amber-500 font-black"
+                                                                : "border-border text-foreground"
+                                                        }`}
+                                                    />
+                                                    <span>m</span>
+                                                    {typeof subDetail?.customMinutesPlayed === "number" && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleSubDetailChange(subId, subDetail?.replacedId || "", subDetail?.minute || 60, undefined)}
+                                                            title="Reset to auto-calculated minutes (90 - On)"
+                                                            className="text-muted-foreground hover:text-primary p-0.5"
+                                                        >
+                                                            <RotateCcw className="h-2.5 w-2.5" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
