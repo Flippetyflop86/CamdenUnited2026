@@ -1,12 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { TrainingSession, Player } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CalendarDays, MapPin, Users, Trash2, Pencil, BarChart3, List, Download, ClipboardList, MessageCircle, Copy, ExternalLink, Link2, Repeat, Clock } from "lucide-react";
+import { Plus, CalendarDays, MapPin, Users, Trash2, Pencil, BarChart3, List, Download, ClipboardList, MessageCircle, Copy, ExternalLink, Link2, Repeat, Clock, Share2, X } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase";
@@ -122,6 +122,14 @@ export default function TrainingPage() {
     const [customStartDateInput, setCustomStartDateInput] = useState<string>("");
     const [sessionStatusOverrides, setSessionStatusOverrides] = useState<Record<string, "Present" | "Late" | "Absent">>({});
     const [isSavingStartDate, setIsSavingStartDate] = useState(false);
+
+    // Active Squad Only toggle & Shareable Training Graphic Studio state
+    const [activeSquadOnly, setActiveSquadOnly] = useState<boolean>(true);
+    const [showTrainingGraphicModal, setShowTrainingGraphicModal] = useState<boolean>(false);
+    const [trainingGraphicFormat, setTrainingGraphicFormat] = useState<"post" | "story">("post");
+    const [trainingGraphicScope, setTrainingGraphicScope] = useState<"top10" | "full">("top10");
+    const [copiedTrainingGraphic, setCopiedTrainingGraphic] = useState<boolean>(false);
+    const trainingShareCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
     useEffect(() => {
         if (settings.trainingLocation && !newSession.location && !editingSessionId) {
@@ -699,15 +707,18 @@ export default function TrainingPage() {
         }
     };
 
+    const formerPlayersCount = allPlayerStats.filter(p => p.playerIsFormer).length;
+    const scopedPlayerStats = allPlayerStats.filter(p => !activeSquadOnly || !p.playerIsFormer);
+
     const positionCounts = {
-        ALL: allPlayerStats.length,
-        GK: allPlayerStats.filter(p => p.posGroup === "GK").length,
-        DEF: allPlayerStats.filter(p => p.posGroup === "DEF").length,
-        MID: allPlayerStats.filter(p => p.posGroup === "MID").length,
-        FWD: allPlayerStats.filter(p => p.posGroup === "FWD").length,
+        ALL: scopedPlayerStats.length,
+        GK: scopedPlayerStats.filter(p => p.posGroup === "GK").length,
+        DEF: scopedPlayerStats.filter(p => p.posGroup === "DEF").length,
+        MID: scopedPlayerStats.filter(p => p.posGroup === "MID").length,
+        FWD: scopedPlayerStats.filter(p => p.posGroup === "FWD").length,
     };
 
-    const playerStats = allPlayerStats
+    const playerStats = scopedPlayerStats
         .filter(p => positionFilter === "ALL" || p.posGroup === positionFilter)
         .sort((a, b) => {
             const mult = attendanceSortDir === "asc" ? 1 : -1;
@@ -733,6 +744,297 @@ export default function TrainingPage() {
             if (a.stats.percentage !== b.stats.percentage) return mult * (a.stats.percentage - b.stats.percentage);
             return mult * (a.stats.attended - b.stats.attended);
         });
+
+    useEffect(() => {
+        if (!showTrainingGraphicModal || !trainingShareCanvasRef.current) return;
+        const canvas = trainingShareCanvasRef.current;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+
+        // Always rank by percentage descending -> attended descending for the shareable graphic
+        const rankedList = [...scopedPlayerStats]
+            .filter(p => p.stats.total > 0)
+            .sort((a, b) => {
+                if (b.stats.percentage !== a.stats.percentage) return b.stats.percentage - a.stats.percentage;
+                return b.stats.attended - a.stats.attended;
+            });
+
+        const rowsToDraw = trainingGraphicScope === "top10" ? rankedList.slice(0, 10) : rankedList.slice(0, 22);
+        const width = 1080;
+        const rowHeight = trainingGraphicScope === "top10" ? 72 : Math.max(50, Math.min(64, Math.floor(960 / Math.max(rowsToDraw.length, 1))));
+        const headerHeight = 340;
+        const tableHeaderHeight = 58;
+        const footerHeight = 110;
+        const calculatedHeight = headerHeight + tableHeaderHeight + rowsToDraw.length * rowHeight + footerHeight;
+        const height = trainingGraphicFormat === "story" ? Math.max(1920, calculatedHeight) : Math.max(1350, calculatedHeight);
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const brandHex = (settings.primaryColor || settings.homeKitShirt || "#dc2626").trim();
+        const secondaryHex = (settings.secondaryColor || "#111827").trim();
+
+        const parseHexToRgb = (hex: string, fallback = { r: 220, g: 38, b: 38 }) => {
+            const clean = hex.replace("#", "").trim();
+            if (clean.length === 3) {
+                const r = parseInt(clean[0] + clean[0], 16);
+                const g = parseInt(clean[1] + clean[1], 16);
+                const b = parseInt(clean[2] + clean[2], 16);
+                return isNaN(r) ? fallback : { r, g, b };
+            }
+            if (clean.length >= 6) {
+                const r = parseInt(clean.slice(0, 2), 16);
+                const g = parseInt(clean.slice(2, 4), 16);
+                const b = parseInt(clean.slice(4, 6), 16);
+                return isNaN(r) ? fallback : { r, g, b };
+            }
+            return fallback;
+        };
+
+        const pRgb = parseHexToRgb(brandHex);
+        const sRgb = parseHexToRgb(secondaryHex, { r: 17, g: 24, b: 39 });
+        const sLuminance = (0.299 * sRgb.r + 0.587 * sRgb.g + 0.114 * sRgb.b) / 255;
+        const baseEndRgb = sLuminance > 0.6
+            ? { r: Math.round(pRgb.r * 0.14), g: Math.round(pRgb.g * 0.14), b: Math.round(pRgb.b * 0.16) }
+            : { r: Math.round(sRgb.r * 0.35), g: Math.round(sRgb.g * 0.35), b: Math.round(sRgb.b * 0.4) };
+
+        const avgRate = rankedList.length > 0
+            ? Math.round(rankedList.reduce((acc, p) => acc + p.stats.percentage, 0) / rankedList.length)
+            : 0;
+        const topRate = rankedList[0]?.stats.percentage || 0;
+        const bestStreak = rankedList.reduce((max, p) => Math.max(max, p.stats.streak), 0);
+
+        const drawGraphic = (logoImg?: HTMLImageElement) => {
+            const bgGrad = ctx.createLinearGradient(0, 0, width, height);
+            bgGrad.addColorStop(0, `rgb(${Math.round(pRgb.r * 0.36)}, ${Math.round(pRgb.g * 0.36)}, ${Math.round(pRgb.b * 0.38)})`);
+            bgGrad.addColorStop(0.45, `rgb(${Math.round(pRgb.r * 0.16)}, ${Math.round(pRgb.g * 0.16)}, ${Math.round(pRgb.b * 0.20)})`);
+            bgGrad.addColorStop(1, `rgb(${baseEndRgb.r}, ${baseEndRgb.g}, ${baseEndRgb.b})`);
+            ctx.fillStyle = bgGrad;
+            ctx.fillRect(0, 0, width, height);
+
+            const glowGrad = ctx.createRadialGradient(width * 0.85, 110, 20, width * 0.85, 110, 560);
+            glowGrad.addColorStop(0, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.42)`);
+            glowGrad.addColorStop(1, "transparent");
+            ctx.fillStyle = glowGrad;
+            ctx.fillRect(0, 0, width, 620);
+
+            ctx.fillStyle = brandHex;
+            ctx.fillRect(0, 0, width, 14);
+
+            let textStartX = 64;
+            if (logoImg) {
+                const logoSize = 112;
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(64 + logoSize / 2, 76 + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+                ctx.closePath();
+                ctx.clip();
+                ctx.drawImage(logoImg, 64, 76, logoSize, logoSize);
+                ctx.restore();
+                textStartX = 200;
+            }
+
+            ctx.fillStyle = "rgba(255,255,255,0.85)";
+            ctx.font = "800 24px Inter, system-ui, sans-serif";
+            ctx.textAlign = "left";
+            ctx.fillText((settings.name || "CAMDEN UNITED").toUpperCase(), textStartX, 116);
+
+            ctx.fillStyle = "#ffffff";
+            ctx.font = "900 58px Inter, system-ui, sans-serif";
+            ctx.fillText("TRAINING COMMITMENT", textStartX, 180);
+
+            const kpiY = 228;
+            const kpis = [
+                { label: "SESSIONS", value: `${leaderboardSessions.length}` },
+                { label: "SQUAD AVG", value: `${avgRate}%` },
+                { label: "TOP RATE", value: `${topRate}%` },
+                { label: "BEST STREAK", value: `${bestStreak} IN A ROW` }
+            ];
+            const cardW = (width - 128 - 36) / 4;
+            kpis.forEach((k, i) => {
+                const x = 64 + i * (cardW + 12);
+                ctx.fillStyle = i === 0 ? `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.35)` : "rgba(255,255,255,0.06)";
+                ctx.strokeStyle = i === 0 ? brandHex : `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.25)`;
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(x, kpiY, cardW, 78, 14);
+                ctx.fill();
+                ctx.stroke();
+
+                ctx.fillStyle = "rgba(255,255,255,0.65)";
+                ctx.font = "bold 15px Inter, system-ui, sans-serif";
+                ctx.fillText(k.label, x + 20, kpiY + 28);
+
+                ctx.fillStyle = "#ffffff";
+                ctx.font = "900 26px Inter, system-ui, sans-serif";
+                ctx.fillText(k.value, x + 20, kpiY + 60);
+            });
+
+            const tableTop = headerHeight;
+            ctx.fillStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.22)`;
+            ctx.beginPath();
+            ctx.roundRect(64, tableTop, width - 128, tableHeaderHeight, [14, 14, 0, 0]);
+            ctx.fill();
+
+            ctx.fillStyle = "rgba(255,255,255,0.75)";
+            ctx.font = "bold 19px Inter, system-ui, sans-serif";
+            ctx.textAlign = "center";
+            ctx.fillText("#", 105, tableTop + 36);
+            ctx.textAlign = "left";
+            ctx.fillText("PLAYER", 150, tableTop + 36);
+            ctx.textAlign = "center";
+            ctx.fillText("POS", 520, tableTop + 36);
+            ctx.fillText("LAST 5", 685, tableTop + 36);
+            ctx.fillText("SESSIONS", 855, tableTop + 36);
+            ctx.fillText("RATE", 965, tableTop + 36);
+
+            rowsToDraw.forEach((player, idx) => {
+                const y = tableTop + tableHeaderHeight + idx * rowHeight;
+                const isTop3 = idx < 3;
+
+                ctx.fillStyle = idx === 0
+                    ? `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.34)`
+                    : idx % 2 === 0
+                    ? "rgba(255,255,255,0.045)"
+                    : "rgba(255,255,255,0.015)";
+                ctx.fillRect(64, y, width - 128, rowHeight);
+
+                if (isTop3) {
+                    ctx.fillStyle = idx === 0 ? brandHex : idx === 1 ? "#f59e0b" : "#10b981";
+                    ctx.fillRect(64, y, 7, rowHeight);
+                }
+
+                ctx.fillStyle = "rgba(255,255,255,0.07)";
+                ctx.fillRect(64, y + rowHeight - 1, width - 128, 1);
+
+                const textY = y + rowHeight / 2 + 8;
+
+                // Rank
+                ctx.textAlign = "center";
+                ctx.fillStyle = isTop3 ? "#ffffff" : "#cbd5e1";
+                ctx.font = isTop3 ? "900 23px Inter, system-ui, sans-serif" : "bold 21px Inter, system-ui, sans-serif";
+                ctx.fillText(String(idx + 1), 105, textY);
+
+                // Player Name
+                ctx.textAlign = "left";
+                ctx.fillStyle = "#ffffff";
+                ctx.font = isTop3 ? "800 23px Inter, system-ui, sans-serif" : "600 22px Inter, system-ui, sans-serif";
+                const fullName = `${player.firstName} ${player.lastName}`.trim();
+                const displayName = fullName.length > 20 ? fullName.slice(0, 19) + "…" : fullName;
+                ctx.fillText(displayName, 150, textY);
+
+                // Position pill
+                ctx.textAlign = "center";
+                ctx.fillStyle = "rgba(255,255,255,0.75)";
+                ctx.font = "bold 18px Inter, system-ui, sans-serif";
+                ctx.fillText(player.position || "—", 520, textY);
+
+                // Last 5 badges
+                const l5 = player.stats.last5;
+                const badgeSize = 26;
+                const gap = 6;
+                const totalL5W = l5.length * badgeSize + Math.max(0, l5.length - 1) * gap;
+                let startL5X = 685 - totalL5W / 2;
+                l5.forEach((sItem) => {
+                    const by = y + rowHeight / 2 - badgeSize / 2;
+                    if (sItem.status === "Present") {
+                        ctx.fillStyle = "rgba(16, 185, 129, 0.28)";
+                        ctx.strokeStyle = "rgba(16, 185, 129, 0.7)";
+                    } else if (sItem.status === "Late") {
+                        ctx.fillStyle = "rgba(245, 158, 11, 0.28)";
+                        ctx.strokeStyle = "rgba(245, 158, 11, 0.7)";
+                    } else {
+                        ctx.fillStyle = "rgba(244, 63, 94, 0.25)";
+                        ctx.strokeStyle = "rgba(244, 63, 94, 0.65)";
+                    }
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.roundRect(startL5X, by, badgeSize, badgeSize, 6);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = sItem.status === "Present" ? "#6ee7b7" : sItem.status === "Late" ? "#fcd34d" : "#fda4af";
+                    ctx.font = "bold 15px Inter, system-ui, sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.fillText(
+                        sItem.status === "Present" ? "✓" : sItem.status === "Late" ? "L" : "×",
+                        startL5X + badgeSize / 2,
+                        by + badgeSize / 2 + 5
+                    );
+                    startL5X += badgeSize + gap;
+                });
+
+                // Attended / Total
+                ctx.textAlign = "center";
+                ctx.fillStyle = "#e2e8f0";
+                ctx.font = "bold 21px Inter, system-ui, sans-serif";
+                ctx.fillText(`${player.stats.attended}/${player.stats.total}`, 855, textY);
+
+                // Percentage
+                const pct = player.stats.percentage;
+                ctx.fillStyle = pct >= 80 ? "#4ade80" : pct >= 50 ? "#fbbf24" : "#f87171";
+                ctx.font = "900 23px Inter, system-ui, sans-serif";
+                ctx.fillText(`${pct}%`, 965, textY);
+            });
+
+            // Footer
+            ctx.fillStyle = brandHex;
+            ctx.beginPath();
+            ctx.arc(72, height - 49, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.textAlign = "left";
+            ctx.fillStyle = "rgba(255,255,255,0.65)";
+            ctx.font = "600 20px Inter, system-ui, sans-serif";
+            ctx.fillText(`Powered by ClubFlow • ${settings.name || "Camden United"}`, 88, height - 42);
+        };
+
+        if (settings.logo) {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => drawGraphic(img);
+            img.onerror = () => drawGraphic();
+            img.src = settings.logo;
+        } else {
+            drawGraphic();
+        }
+    }, [
+        showTrainingGraphicModal,
+        trainingGraphicFormat,
+        trainingGraphicScope,
+        scopedPlayerStats,
+        leaderboardSessions.length,
+        settings.name,
+        settings.primaryColor,
+        settings.secondaryColor,
+        settings.homeKitShirt,
+        settings.logo
+    ]);
+
+    const handleDownloadTrainingGraphic = () => {
+        if (!trainingShareCanvasRef.current) return;
+        const link = document.createElement("a");
+        const slug = (settings.name || "club").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+        link.download = `${slug}-training-commitment.png`;
+        link.href = trainingShareCanvasRef.current.toDataURL("image/png");
+        link.click();
+    };
+
+    const handleCopyTrainingGraphic = async () => {
+        if (!trainingShareCanvasRef.current) return;
+        try {
+            const blob = await new Promise<Blob | null>(resolve => trainingShareCanvasRef.current?.toBlob(resolve, "image/png"));
+            if (blob && navigator.clipboard && (window as any).ClipboardItem) {
+                await navigator.clipboard.write([new (window as any).ClipboardItem({ "image/png": blob })]);
+                setCopiedTrainingGraphic(true);
+                setTimeout(() => setCopiedTrainingGraphic(false), 2500);
+            } else {
+                handleDownloadTrainingGraphic();
+            }
+        } catch {
+            handleDownloadTrainingGraphic();
+        }
+    };
 
     const downloadStatsExcel = () => {
         // Calculate average attendance rate
@@ -1150,18 +1452,25 @@ export default function TrainingPage() {
                                 <CardTitle>Training Attendance</CardTitle>
                                 <CardDescription>Tracking {displaySeasonLabel} • Click any column header to sort</CardDescription>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <Button
+                                    size="sm"
+                                    onClick={() => setShowTrainingGraphicModal(true)}
+                                    className="bg-brand hover:bg-brand/90 text-white font-semibold"
+                                >
+                                    <Share2 className="h-4 w-4 mr-1.5" /> Share Graphic
+                                </Button>
                                 <Button variant="outline" size="sm" onClick={downloadStatsExcel} className="border-border">
                                     <Download className="h-4 w-4 mr-2" /> Export Excel
                                 </Button>
-                                <div className="text-right">
+                                <div className="text-right pl-2">
                                     <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Sessions</p>
                                     <p className="text-2xl font-bold text-foreground">{leaderboardSessions.length}</p>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Position Filter Pills + Last 5 Legend */}
+                        {/* Position Filter Pills + Active Squad Only Toggle + Last 5 Legend */}
                         <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
                             <div className="flex flex-wrap items-center gap-1.5">
                                 {([
@@ -1190,6 +1499,21 @@ export default function TrainingPage() {
                                         </button>
                                     );
                                 })}
+
+                                <div className="h-4 w-px bg-border mx-1 hidden sm:block" />
+
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveSquadOnly(prev => !prev)}
+                                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border cursor-pointer ${
+                                        activeSquadOnly
+                                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                                            : "bg-background text-muted-foreground border-border hover:text-foreground"
+                                    }`}
+                                    title="Toggle whether departed players are hidden or shown in the attendance table"
+                                >
+                                    <span>{activeSquadOnly ? "✓ Active Squad Only" : `Including Former (${formerPlayersCount})`}</span>
+                                </button>
                             </div>
 
                             <div className="flex items-center gap-3 text-[11px] font-medium text-muted-foreground">
@@ -1760,6 +2084,83 @@ export default function TrainingPage() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {/* Shareable Training Commitment Graphic Studio Modal */}
+            {showTrainingGraphicModal && (
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+                    <div className="bg-surface-1 border border-border rounded-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 shadow-2xl my-auto">
+                        <div className="flex items-center justify-between border-b border-border pb-3">
+                            <div>
+                                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+                                    <Share2 className="h-5 w-5 text-brand" />
+                                    <span>Share Training Commitment Graphic</span>
+                                </h3>
+                                <p className="text-xs text-muted-foreground">
+                                    Club-branded leaderboard ready for your WhatsApp Squad Chat or Instagram Story.
+                                </p>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => setShowTrainingGraphicModal(false)} className="h-8 w-8 p-0">
+                                <X className="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 bg-background p-1 rounded-lg border border-border">
+                                <button
+                                    type="button"
+                                    onClick={() => setTrainingGraphicFormat("post")}
+                                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${trainingGraphicFormat === "post" ? "bg-brand text-white" : "text-muted-foreground hover:text-foreground"}`}
+                                >
+                                    Feed Post (4:5)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setTrainingGraphicFormat("story")}
+                                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${trainingGraphicFormat === "story" ? "bg-brand text-white" : "text-muted-foreground hover:text-foreground"}`}
+                                >
+                                    Instagram / WhatsApp Story (9:16)
+                                </button>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 bg-background p-1 rounded-lg border border-border">
+                                <button
+                                    type="button"
+                                    onClick={() => setTrainingGraphicScope("top10")}
+                                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${trainingGraphicScope === "top10" ? "bg-brand text-white" : "text-muted-foreground hover:text-foreground"}`}
+                                >
+                                    Top 10 Spotlight
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setTrainingGraphicScope("full")}
+                                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${trainingGraphicScope === "full" ? "bg-brand text-white" : "text-muted-foreground hover:text-foreground"}`}
+                                >
+                                    Full Squad ({scopedPlayerStats.filter(p => p.stats.total > 0).length})
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-black/50 border border-border rounded-xl p-3 flex justify-center max-h-[55vh] overflow-y-auto">
+                            <canvas
+                                ref={trainingShareCanvasRef}
+                                className="max-w-full h-auto rounded-lg shadow-lg"
+                                style={{ maxHeight: "50vh" }}
+                            />
+                        </div>
+
+                        <div className="flex items-center justify-end gap-2.5 pt-2">
+                            <Button variant="outline" onClick={handleCopyTrainingGraphic}>
+                                <Copy className="h-4 w-4 mr-1.5" />
+                                {copiedTrainingGraphic ? "Copied to Clipboard!" : "Copy for WhatsApp / Social"}
+                            </Button>
+                            <Button onClick={handleDownloadTrainingGraphic} className="bg-brand hover:bg-brand/90 text-white font-semibold">
+                                <Download className="h-4 w-4 mr-1.5" />
+                                Download PNG
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
