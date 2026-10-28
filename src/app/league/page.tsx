@@ -78,6 +78,21 @@ export default function LeagueTablePage() {
     // Feature #2: Next Opponent Spotlight
     const [nextOpponentInfo, setNextOpponentInfo] = useState<NextOpponentInfo | null>(null);
 
+    // Column Sorting State (#1)
+    type SortField = 'position' | 'played' | 'won' | 'drawn' | 'lost' | 'goals_for' | 'goals_against' | 'goal_difference' | 'points' | 'ppg';
+    const [sortField, setSortField] = useState<SortField>('position');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+    const handleSortColumn = (field: SortField) => {
+        if (sortField === field) {
+            setSortDir(prev => (prev === 'asc' ? 'desc' : 'asc'));
+        } else {
+            setSortField(field);
+            // Position and Goals Against default to ascending (1st / fewest conceded first); stats default to descending
+            setSortDir(field === 'position' || field === 'goals_against' ? 'asc' : 'desc');
+        }
+    };
+
     // Feature #7: 1-Click Social Media Standings Graphic Modal
     const [showShareModal, setShowShareModal] = useState(false);
     const [graphicFormat, setGraphicFormat] = useState<'story' | 'post'>('post');
@@ -1422,130 +1437,218 @@ export default function LeagueTablePage() {
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
-                                <thead className="text-xs text-muted-foreground uppercase bg-surface-2 border-b border-border">
+                                <thead className="text-xs text-muted-foreground uppercase bg-surface-2 border-b border-border select-none">
                                     <tr>
-                                        <th className="px-4 py-3 font-medium">Pos</th>
-                                        <th className="px-4 py-3 font-medium">Club</th>
-                                        <th className="px-4 py-3 font-medium text-center">P</th>
-                                        <th className="px-4 py-3 font-medium text-center">W</th>
-                                        <th className="px-4 py-3 font-medium text-center">D</th>
-                                        <th className="px-4 py-3 font-medium text-center">L</th>
-                                        <th className="px-4 py-3 font-medium text-center">GF</th>
-                                        <th className="px-4 py-3 font-medium text-center">GA</th>
-                                        <th className="px-4 py-3 font-medium text-center">GD</th>
-                                        <th className="px-4 py-3 font-medium text-center">Pts</th>
-                                        <th className="px-4 py-3 font-medium text-center" title="Points Per Game">PPG</th>
-                                        <th className="px-4 py-3 font-medium text-center">Last 5</th>
+                                        <th
+                                            onClick={() => handleSortColumn('position')}
+                                            className="px-2.5 sm:px-4 py-3 font-medium cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                                        >
+                                            Pos {sortField === 'position' && (sortDir === 'asc' ? '▲' : '▼')}
+                                        </th>
+                                        <th className="px-2.5 sm:px-4 py-3 font-medium">Club</th>
+                                        <th
+                                            onClick={() => handleSortColumn('played')}
+                                            className="px-2 sm:px-4 py-3 font-medium text-center cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                                        >
+                                            P {sortField === 'played' && (sortDir === 'asc' ? '▲' : '▼')}
+                                        </th>
+                                        <th
+                                            onClick={() => handleSortColumn('won')}
+                                            className="hidden md:table-cell px-4 py-3 font-medium text-center cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                                        >
+                                            W {sortField === 'won' && (sortDir === 'asc' ? '▲' : '▼')}
+                                        </th>
+                                        <th
+                                            onClick={() => handleSortColumn('drawn')}
+                                            className="hidden md:table-cell px-4 py-3 font-medium text-center cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                                        >
+                                            D {sortField === 'drawn' && (sortDir === 'asc' ? '▲' : '▼')}
+                                        </th>
+                                        <th
+                                            onClick={() => handleSortColumn('lost')}
+                                            className="hidden md:table-cell px-4 py-3 font-medium text-center cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                                        >
+                                            L {sortField === 'lost' && (sortDir === 'asc' ? '▲' : '▼')}
+                                        </th>
+                                        <th
+                                            onClick={() => handleSortColumn('goals_for')}
+                                            className="hidden md:table-cell px-4 py-3 font-medium text-center cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                                        >
+                                            GF {sortField === 'goals_for' && (sortDir === 'asc' ? '▲' : '▼')}
+                                        </th>
+                                        <th
+                                            onClick={() => handleSortColumn('goals_against')}
+                                            className="hidden md:table-cell px-4 py-3 font-medium text-center cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                                        >
+                                            GA {sortField === 'goals_against' && (sortDir === 'asc' ? '▲' : '▼')}
+                                        </th>
+                                        <th
+                                            onClick={() => handleSortColumn('goal_difference')}
+                                            className="px-2 sm:px-4 py-3 font-medium text-center cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                                        >
+                                            GD {sortField === 'goal_difference' && (sortDir === 'asc' ? '▲' : '▼')}
+                                        </th>
+                                        <th
+                                            onClick={() => handleSortColumn('points')}
+                                            className="px-2.5 sm:px-4 py-3 font-medium text-center cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                                        >
+                                            Pts {sortField === 'points' && (sortDir === 'asc' ? '▲' : '▼')}
+                                        </th>
+                                        <th
+                                            onClick={() => handleSortColumn('ppg')}
+                                            className="hidden md:table-cell px-4 py-3 font-medium text-center cursor-pointer hover:text-foreground transition-colors whitespace-nowrap"
+                                            title="Click to sort by Points Per Game"
+                                        >
+                                            PPG {sortField === 'ppg' && (sortDir === 'asc' ? '▲' : '▼')}
+                                        </th>
+                                        <th className="px-2.5 sm:px-4 py-3 font-medium text-center">Last 5</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {currentTable.map((row, idx) => {
-                                        const isNextOpp =
-                                            nextOpponentInfo &&
-                                            !row.is_our_club &&
-                                            isMatchingTeamName(row.team_name, nextOpponentInfo.opponent);
+                                    {[...currentTable]
+                                        .sort((a, b) => {
+                                            const getVal = (r: LeagueRow) => {
+                                                if (sortField === 'ppg') return r.played > 0 ? r.points / r.played : 0;
+                                                return Number((r as any)[sortField] ?? 0);
+                                            };
+                                            const diff = getVal(a) - getVal(b);
+                                            if (diff !== 0) return sortDir === 'asc' ? diff : -diff;
+                                            return a.position - b.position;
+                                        })
+                                        .map((row, idx) => {
+                                            const isNextOpp =
+                                                nextOpponentInfo &&
+                                                !row.is_our_club &&
+                                                isMatchingTeamName(row.team_name, nextOpponentInfo.opponent);
 
-                                        const formattedNextDate = nextOpponentInfo?.date
-                                            ? new Date(nextOpponentInfo.date + "T12:00:00").toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
-                                            : "";
+                                            const formattedNextDate = nextOpponentInfo?.date
+                                                ? new Date(nextOpponentInfo.date + "T12:00:00").toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                                                : "";
 
-                                        const posDiff = (row.previous_position ?? row.position) - row.position;
-                                        const formItems = Array.isArray(row.form) ? row.form.slice(-5) : [];
-                                        const rowPpg = row.played > 0 ? (row.points / row.played).toFixed(2) : "0.00";
+                                            const posDiff = (row.previous_position ?? row.position) - row.position;
+                                            const formItems = Array.isArray(row.form) ? row.form.slice(-5) : [];
+                                            const rowPpg = row.played > 0 ? (row.points / row.played).toFixed(2) : "0.00";
 
-                                        return (
-                                            <tr
-                                                key={idx}
-                                                className={`border-b border-border transition-colors ${
-                                                    row.is_our_club
-                                                        ? 'bg-primary/10 border-l-4 border-l-primary'
-                                                        : isNextOpp
-                                                            ? 'bg-amber-500/5 border-l-4 border-l-amber-500/80'
-                                                            : ''
-                                                }`}
-                                            >
-                                                <td className="px-4 py-3 font-semibold whitespace-nowrap">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="w-5 text-right">{row.position}</span>
-                                                        {posDiff > 0 ? (
-                                                            <span
-                                                                className="inline-flex items-center text-[10px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-xs"
-                                                                title={`Up ${posDiff} from #${row.previous_position}`}
-                                                            >
-                                                                <ArrowUp className="h-2.5 w-2.5 mr-0.5 stroke-[3]" />
-                                                                {posDiff}
-                                                            </span>
-                                                        ) : posDiff < 0 ? (
-                                                            <span
-                                                                className="inline-flex items-center text-[10px] font-bold text-white bg-rose-600 px-1.5 py-0.5 rounded shadow-xs"
-                                                                title={`Down ${Math.abs(posDiff)} from #${row.previous_position}`}
-                                                            >
-                                                                <ArrowDown className="h-2.5 w-2.5 mr-0.5 stroke-[3]" />
-                                                                {Math.abs(posDiff)}
-                                                            </span>
-                                                        ) : (
-                                                            <span className="inline-flex items-center text-muted-foreground/50" title="No change">
-                                                                <Minus className="h-3 w-3" />
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className={`px-4 py-3 ${row.is_our_club ? 'font-bold text-primary' : 'font-medium text-foreground'}`}>
-                                                    <div className="flex items-center gap-2 flex-wrap">
-                                                        <span>{row.team_name}</span>
-                                                        {/* Feature #2: Next Opponent Spotlight Pill */}
-                                                        {isNextOpp && (
-                                                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 text-white px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide shadow-xs">
-                                                                <Zap className="h-3 w-3 fill-white text-white" />
-                                                                Next Up {formattedNextDate ? `• ${formattedNextDate}` : ""} ({nextOpponentInfo?.is_home ? "H" : "A"})
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                                <td className="px-4 py-3 text-center">{row.played}</td>
-                                                <td className="px-4 py-3 text-center">{row.won}</td>
-                                                <td className="px-4 py-3 text-center">{row.drawn}</td>
-                                                <td className="px-4 py-3 text-center">{row.lost}</td>
-                                                <td className="px-4 py-3 text-center text-muted-foreground">{row.goals_for ?? "-"}</td>
-                                                <td className="px-4 py-3 text-center text-muted-foreground">{row.goals_against ?? "-"}</td>
-                                                <td className="px-4 py-3 text-center font-mono text-xs text-muted-foreground">
-                                                    {row.goal_difference > 0 ? '+' + row.goal_difference : row.goal_difference}
-                                                </td>
-                                                <td className="px-4 py-3 text-center font-bold text-foreground whitespace-nowrap">
-                                                    {row.points}
-                                                </td>
-                                                <td className="px-4 py-3 text-center font-mono text-xs font-semibold text-muted-foreground whitespace-nowrap">
-                                                    {rowPpg}
-                                                </td>
-                                                {/* Feature #6: Last 5 Form Pills */}
-                                                <td className="px-4 py-3 text-center whitespace-nowrap">
-                                                    {formItems.length > 0 ? (
-                                                        <div className="inline-flex items-center gap-1">
-                                                            {formItems.map((res, fIdx) => {
-                                                                const pillStyles =
-                                                                    res === 'W'
-                                                                        ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/45'
-                                                                        : res === 'D'
-                                                                            ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/45'
-                                                                            : 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/45';
-                                                                return (
-                                                                    <span
-                                                                        key={fIdx}
-                                                                        className={`inline-flex items-center justify-center w-5 h-5 rounded text-[11px] font-bold border ${pillStyles}`}
-                                                                        title={fIdx === formItems.length - 1 ? `Latest match: ${res}` : res}
-                                                                    >
-                                                                        {res}
-                                                                    </span>
-                                                                );
-                                                            })}
+                                            // Feature #8: Unbeaten or Winning Streak Detection
+                                            let trailingWins = 0;
+                                            for (let i = formItems.length - 1; i >= 0; i--) {
+                                                if (formItems[i] === 'W') trailingWins++;
+                                                else break;
+                                            }
+                                            const isUnbeatenSeason = row.played >= 3 && row.lost === 0;
+                                            const streakLabel = isUnbeatenSeason
+                                                ? `🔥 ${row.played} Unbeaten`
+                                                : trailingWins >= 4
+                                                    ? `🔥 ${trailingWins}W Streak`
+                                                    : null;
+
+                                            // Feature #2: Colour-coded Goal Difference
+                                            const gdColorClass =
+                                                row.goal_difference > 0
+                                                    ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                                                    : row.goal_difference < 0
+                                                        ? 'text-rose-600 dark:text-rose-400 font-semibold'
+                                                        : 'text-muted-foreground';
+
+                                            return (
+                                                <tr
+                                                    key={idx}
+                                                    className={`border-b border-border transition-colors ${
+                                                        row.is_our_club
+                                                            ? 'bg-primary/10 border-l-4 border-l-primary'
+                                                            : isNextOpp
+                                                                ? 'bg-amber-500/5 border-l-4 border-l-amber-500/80'
+                                                                : ''
+                                                    }`}
+                                                >
+                                                    <td className="px-2.5 sm:px-4 py-3 font-semibold whitespace-nowrap">
+                                                        <div className="flex items-center gap-1.5 sm:gap-2">
+                                                            <span className="w-5 text-right">{row.position}</span>
+                                                            {posDiff > 0 ? (
+                                                                <span
+                                                                    className="inline-flex items-center text-[10px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-xs"
+                                                                    title={`Up ${posDiff} from #${row.previous_position}`}
+                                                                >
+                                                                    <ArrowUp className="h-2.5 w-2.5 mr-0.5 stroke-[3]" />
+                                                                    {posDiff}
+                                                                </span>
+                                                            ) : posDiff < 0 ? (
+                                                                <span
+                                                                    className="inline-flex items-center text-[10px] font-bold text-white bg-rose-600 px-1.5 py-0.5 rounded shadow-xs"
+                                                                    title={`Down ${Math.abs(posDiff)} from #${row.previous_position}`}
+                                                                >
+                                                                    <ArrowDown className="h-2.5 w-2.5 mr-0.5 stroke-[3]" />
+                                                                    {Math.abs(posDiff)}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center text-muted-foreground/50" title="No change">
+                                                                    <Minus className="h-3 w-3" />
+                                                                </span>
+                                                            )}
                                                         </div>
-                                                    ) : (
-                                                        <span className="text-xs text-muted-foreground/40">—</span>
-                                                    )}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
+                                                    </td>
+                                                    <td className={`px-2.5 sm:px-4 py-3 ${row.is_our_club ? 'font-bold text-primary' : 'font-medium text-foreground'}`}>
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span>{row.team_name}</span>
+                                                            {/* Feature #2: Next Opponent Spotlight Pill */}
+                                                            {isNextOpp && (
+                                                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 text-white px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide shadow-xs">
+                                                                    <Zap className="h-3 w-3 fill-white text-white" />
+                                                                    Next Up {formattedNextDate ? `• ${formattedNextDate}` : ""} ({nextOpponentInfo?.is_home ? "H" : "A"})
+                                                                </span>
+                                                            )}
+                                                            {/* Feature #8: Unbeaten / Winning Streak Pill */}
+                                                            {streakLabel && (
+                                                                <span className="inline-flex items-center rounded-full bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/35 px-2 py-0.5 text-[10px] font-bold tracking-tight">
+                                                                    {streakLabel}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-2 sm:px-4 py-3 text-center">{row.played}</td>
+                                                    <td className="hidden md:table-cell px-4 py-3 text-center">{row.won}</td>
+                                                    <td className="hidden md:table-cell px-4 py-3 text-center">{row.drawn}</td>
+                                                    <td className="hidden md:table-cell px-4 py-3 text-center">{row.lost}</td>
+                                                    <td className="hidden md:table-cell px-4 py-3 text-center text-muted-foreground">{row.goals_for ?? "-"}</td>
+                                                    <td className="hidden md:table-cell px-4 py-3 text-center text-muted-foreground">{row.goals_against ?? "-"}</td>
+                                                    <td className={`px-2 sm:px-4 py-3 text-center font-mono text-xs ${gdColorClass}`}>
+                                                        {row.goal_difference > 0 ? '+' + row.goal_difference : row.goal_difference}
+                                                    </td>
+                                                    <td className="px-2.5 sm:px-4 py-3 text-center font-bold text-foreground whitespace-nowrap">
+                                                        {row.points}
+                                                    </td>
+                                                    <td className="hidden md:table-cell px-4 py-3 text-center font-mono text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                                                        {rowPpg}
+                                                    </td>
+                                                    {/* Feature #6: Last 5 Form Pills */}
+                                                    <td className="px-2.5 sm:px-4 py-3 text-center whitespace-nowrap">
+                                                        {formItems.length > 0 ? (
+                                                            <div className="inline-flex items-center gap-1">
+                                                                {formItems.map((res, fIdx) => {
+                                                                    const pillStyles =
+                                                                        res === 'W'
+                                                                            ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/45'
+                                                                            : res === 'D'
+                                                                                ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/45'
+                                                                                : 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/45';
+                                                                    return (
+                                                                        <span
+                                                                            key={fIdx}
+                                                                            className={`inline-flex items-center justify-center w-5 h-5 rounded text-[11px] font-bold border ${pillStyles}`}
+                                                                            title={fIdx === formItems.length - 1 ? `Latest match: ${res}` : res}
+                                                                        >
+                                                                            {res}
+                                                                        </span>
+                                                                    );
+                                                                })}
+                                                            </div>
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground/40">—</span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                 </tbody>
                             </table>
                         </div>
