@@ -474,6 +474,42 @@ export default function LeagueTablePage() {
                     }
                 });
         }
+
+        // Persist league table snapshot in Supabase so all devices & domains (localhost + clubflow.org.uk) stay in sync
+        if (clubId) {
+            try {
+                const payloadStr = JSON.stringify({
+                    teams: rowsWithMovement,
+                    connectedUrl: connectedUrl || settings.leagueUrl || urlInput || undefined,
+                    updatedAt: nowIso
+                });
+                const { data: existingCache } = await supabase
+                    .from('documents')
+                    .select('id')
+                    .eq('club_id', clubId)
+                    .eq('category', 'LEAGUE_TABLE_CACHE')
+                    .maybeSingle();
+
+                if (existingCache?.id) {
+                    await supabase
+                        .from('documents')
+                        .update({ url: payloadStr, name: 'League Standings Cache' })
+                        .eq('id', existingCache.id);
+                } else {
+                    await supabase
+                        .from('documents')
+                        .insert({
+                            club_id: clubId,
+                            name: 'League Standings Cache',
+                            type: 'JSON',
+                            category: 'LEAGUE_TABLE_CACHE',
+                            url: payloadStr
+                        });
+                }
+            } catch (e) {
+                // Non-fatal if remote cache write fails
+            }
+        }
     };
 
     const autoSyncFromUrl = async (targetUrl: string, silent = true): Promise<boolean> => {
@@ -610,6 +646,35 @@ export default function LeagueTablePage() {
             });
         } else {
             loadNextOpponent(null);
+            if (clubId) {
+                supabase
+                    .from('documents')
+                    .select('url')
+                    .eq('club_id', clubId)
+                    .eq('category', 'LEAGUE_TABLE_CACHE')
+                    .maybeSingle()
+                    .then(({ data: remoteDoc }) => {
+                        if (remoteDoc?.url) {
+                            try {
+                                const parsedPayload = JSON.parse(remoteDoc.url);
+                                if (Array.isArray(parsedPayload?.teams) && parsedPayload.teams.length > 0) {
+                                    const remoteRows = attachPositionMovements(parsedPayload.teams, parsedPayload.teams);
+                                    setCurrentTable(remoteRows);
+                                    if (parsedPayload.updatedAt) {
+                                        setLastSyncedAt(parsedPayload.updatedAt);
+                                        localStorage.setItem(syncTimestampKey, parsedPayload.updatedAt);
+                                    }
+                                    localStorage.setItem(storageKey, JSON.stringify(remoteRows));
+                                    loadNextOpponent(remoteRows);
+                                    applyNewMatchResultsToTable(remoteRows).then(updated => {
+                                        setCurrentTable(updated);
+                                        loadNextOpponent(updated);
+                                    });
+                                }
+                            } catch (e) {}
+                        }
+                    });
+            }
         }
 
         // Sync if cache is older than 6h OR if cached table predates the new Form feature
