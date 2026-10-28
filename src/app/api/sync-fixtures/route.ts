@@ -97,7 +97,19 @@ export async function POST(request: Request) {
                     
                     // Filter out short strings or common non-team words
                     // Filter out short strings, common non-team words, and purely numeric stats
-                    const potentialTeams = cellTexts.filter(t => t.length > 3 && !t.match(/^[0-9:\/ -]+$/) && !['vs', 'v', 'postponed', 'cancelled', 'p-p', 'tbc', 'home', 'away', 'overall'].includes(t.toLowerCase()));
+                    const isCompOrRoundCell = (t: string) =>
+                        /\b(division(?:\s+(?:\d+|one|two|three|four|i|ii|iii|iv))?|league|cup|trophy|shield|plate|vase|quarter[\s\-]*finals?|semi[\s\-]*finals?|round\s+\d+|\d+(?:st|nd|rd|th)\s+round|preliminary\s+round|qualifying\s+round)\b/i.test(t) &&
+                        !t.toLowerCase().includes(clubName.toLowerCase()) &&
+                        !t.toLowerCase().includes(autoDetectedClubName.toLowerCase());
+
+                    const potentialTeams = cellTexts.filter(t =>
+                        t.length > 2 &&
+                        !t.match(/^[0-9:\/ -]+$/) &&
+                        !t.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/) &&
+                        !t.match(/\d{1,2}(st|nd|rd|th)?\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}/i) &&
+                        !['vs', 'v', 'postponed', 'cancelled', 'p-p', 'tbc', 'home', 'away', 'overall', 'l', 'cup', 'f'].includes(t.toLowerCase()) &&
+                        !isCompOrRoundCell(t)
+                    );
                     
                     // If a row has too many pure numbers, it's a stats/league table (e.g. apps, goals, W, D, L, PTS)
                     const pureNumberCells = cellTexts.filter(t => t.match(/^\d+$/));
@@ -161,6 +173,10 @@ export async function POST(request: Request) {
                         scoreline = "Postponed";
                     }
 
+                    const detectedCompetition = /\b(cup|trophy|shield|plate|vase|quarter[\s\-]*finals?|semi[\s\-]*finals?|round\s+\d+|\d+(?:st|nd|rd|th)\s+round)\b/i.test(rowText)
+                        ? "Cup"
+                        : (/\b(friendly|pre-season|preseason)\b/i.test(rowText) ? "Friendly" : "League");
+
                     if (opponent && opponent !== "Unknown" && opponent !== clubName && opponent !== autoDetectedClubName) {
                         matches.push({
                             date: formattedDate,
@@ -169,7 +185,7 @@ export async function POST(request: Request) {
                             is_home: isHome || false,
                             result,
                             scoreline: scoreline || null,
-                            competition: "League",
+                            competition: detectedCompetition,
                             notes: "Imported via Scraper"
                         });
                     }

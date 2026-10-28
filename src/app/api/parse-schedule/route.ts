@@ -35,8 +35,8 @@ function isNonOpponentToken(raw: string): boolean {
     for (const rx of NON_OPPONENT_PATTERNS) {
         if (rx.test(trimmed)) return true;
     }
-    // Check if it looks like a pure competition/division/cup name
-    if (/\b(premier division|division \d|division one|division two|league cup|challenge cup|senior cup|county cup|middlesex county|premier cup|division cup|\bcup\b|\btrophy\b|\bshield\b)\b/i.test(trimmed) && !/\b(fc|united|city|town|athletic|rov|rovers|wanderers|albion|spurs|rangers|park|boys|club|sc|afc|bfc|cfc|lions|stonewall|explorers|whistlers|samurai|apollo|duet)\b/i.test(trimmed)) {
+    // Universal check: any competition/division title ends with Division (+ optional number), League, Cup, Trophy, Shield, Plate, or Vase
+    if (/\b(division(?:\s+(?:\d+|one|two|three|four|five|six|i|ii|iii|iv|v|vi|[a-z]))?|league|cup|trophy|shield|plate|vase)$/i.test(trimmed)) {
         return true;
     }
     return false;
@@ -48,9 +48,9 @@ function cleanTeamCandidate(raw: string): string {
         .replace(/\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun),?\b/gi, '')
         .replace(/\b\d{1,2}(st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*(\s+\d{2,4})?\b/gi, '')
         .replace(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g, '')
-        .replace(/\((home|away|h|a|first team)\)/gi, '')
-        .replace(/\b(premier division|division \d+|division one|division two)\b/gi, '')
-        .replace(/\b(quarter[\s\-]*finals?|semi[\s\-]*finals?|round\s+\d+[a-z]?|\d+(?:st|nd|rd|th)\s+round|(?:first|second|third|fourth|preliminary|qualifying)\s+round)\b/gi, '')
+        .replace(/\((home|away|h|a|first team|reserves|cup|league|friendly)\)/gi, '')
+        .replace(/\b(premier\s+division|senior\s+division|intermediate\s+division|combination\s+division|division\s+(?:\d+|one|two|three|four|i|ii|iii|iv))\b/gi, '')
+        .replace(/\b(quarter[\s\-]*finals?|semi[\s\-]*finals?|round\s+\d+[a-z]?|\d+(?:st|nd|rd|th)\s+round|(?:first|second|third|fourth|fifth|sixth|preliminary|extra\s+preliminary|qualifying)\s+round)\b/gi, '')
         .replace(/^[\s\-–—:|•]+|[\s\-–—:|•]+$/g, '')
         .replace(/\s+/g, ' ')
         .trim();
