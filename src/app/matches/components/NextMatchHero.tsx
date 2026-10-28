@@ -200,13 +200,13 @@ export function NextMatchHero({
                             </span>
                         </div>
 
-                        {opponentStats?.position && (
+                        {opponentStats && opponentStats.points !== undefined && (
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-2 border border-border text-[10px] font-bold text-foreground">
-                                <span>Opp #{opponentStats.position}</span>
-                                {opponentStats.points !== undefined && (
+                                <span>Opp: {opponentStats.points}pts</span>
+                                {opponentStats.goal_difference !== undefined && (
                                     <>
                                         <span className="text-muted-foreground">•</span>
-                                        <span>{opponentStats.points}pts</span>
+                                        <span>GD {opponentStats.goal_difference > 0 ? `+${opponentStats.goal_difference}` : opponentStats.goal_difference}</span>
                                     </>
                                 )}
                             </span>
@@ -305,14 +305,16 @@ export function NextMatchHero({
                             </div>
                         </div>
 
-                        {opponentStats?.position && (
+                        {opponentStats && opponentStats.points !== undefined && (
                             <div className="inline-flex items-center gap-3 px-3 py-1.5 rounded-md bg-surface-2 text-xs font-medium text-muted-foreground border border-border">
                                 <span>Opposition Info:</span>
-                                <span className="text-foreground">Pos: #{opponentStats.position}</span>
-                                <span>•</span>
                                 <span className="text-foreground">Pts: {opponentStats.points}</span>
-                                <span>•</span>
-                                <span className="text-foreground">GD: {opponentStats.goal_difference > 0 ? `+${opponentStats.goal_difference}` : opponentStats.goal_difference}</span>
+                                {opponentStats.goal_difference !== undefined && (
+                                    <>
+                                        <span>•</span>
+                                        <span className="text-foreground">GD: {opponentStats.goal_difference > 0 ? `+${opponentStats.goal_difference}` : opponentStats.goal_difference}</span>
+                                    </>
+                                )}
                             </div>
                         )}
                     </div>

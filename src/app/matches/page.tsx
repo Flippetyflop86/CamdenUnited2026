@@ -1255,11 +1255,6 @@ export default function MatchesPage() {
                             >
                                 {match.competition || "League"}
                             </span>
-                            {oppPos && (
-                                <span className="px-1.5 py-0.5 rounded bg-brand/15 text-brand border border-brand/30 text-[9px] font-black tabular-nums shrink-0">
-                                    Opp #{oppPos}
-                                </span>
-                            )}
                             <span className="text-[11px] text-muted-foreground font-semibold truncate">
                                 {shortDateStr}
                                 {match.time ? ` • ${match.time.slice(0, 5)}` : ""}
@@ -1560,11 +1555,6 @@ export default function MatchesPage() {
                         <Badge variant="outline" className={`font-semibold ${(match.competition || "").toLowerCase().includes("cup") ? "bg-amber-100/90 dark:bg-amber-500/15 border-amber-400/70 dark:border-amber-500/40 text-amber-800 dark:text-amber-300" : "bg-surface-2 border-border"}`}>
                             {match.competition || "League"}
                         </Badge>
-                        {oppPos && (
-                            <span className="px-2 py-0.5 rounded-md bg-brand/15 text-brand border border-brand/30 text-xs font-extrabold tabular-nums">
-                                Opp #{oppPos}{teamInfo?.points !== undefined ? ` · ${teamInfo.points}pts` : ""}
-                            </span>
-                        )}
                         <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 font-medium">
                             <CalendarDays className="h-3.5 w-3.5" />
                             {new Date(match.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
