@@ -117,6 +117,12 @@ export default function TrainingPage() {
     const [additionalNotes, setAdditionalNotes] = useState("");
     const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
 
+    // Amend Player Start Date & Backfill Sessions State
+    const [editingStartDatePlayer, setEditingStartDatePlayer] = useState<any | null>(null);
+    const [customStartDateInput, setCustomStartDateInput] = useState<string>("");
+    const [sessionStatusOverrides, setSessionStatusOverrides] = useState<Record<string, "Present" | "Late" | "Absent">>({});
+    const [isSavingStartDate, setIsSavingStartDate] = useState(false);
+
     useEffect(() => {
         if (settings.trainingLocation && !newSession.location && !editingSessionId) {
             setNewSession(prev => ({ ...prev, location: settings.trainingLocation || "" }));
@@ -541,7 +547,10 @@ export default function TrainingPage() {
                 const attendedRec = s.attendance.some(a => a.playerId === player.id && (a.status === 'Present' || a.status === 'Late'));
 
                 // 1. Do not count sessions before the player joined the club
-                if (effectiveStartDate) {
+                if (explicitJoinDate) {
+                    // When an explicit join date is set, strictly ignore any sessions prior to that date
+                    if (s.date < explicitJoinDate) return false;
+                } else if (effectiveStartDate) {
                     if (s.date < effectiveStartDate && !hasRec) return false;
                 } else {
                     // Brand-new player who hasn't been on any session register yet
@@ -610,9 +619,85 @@ export default function TrainingPage() {
                 playerIsFormer,
                 joinedMidSeason,
                 effectiveStartDate,
+                explicitJoinDate,
                 stats: { attended, late, total, percentage, last5, last5Attended, streak }
             };
         });
+
+    const handleOpenAmendStartDate = (player: any) => {
+        setEditingStartDatePlayer(player);
+        const initialDate = player.explicitJoinDate || player.effectiveStartDate || firstSeasonSessionDate || "";
+        setCustomStartDateInput(initialDate);
+
+        const initialOverrides: Record<string, "Present" | "Late" | "Absent"> = {};
+        leaderboardSessions.forEach(s => {
+            const rec = s.attendance.find(a => a.playerId === player.id);
+            initialOverrides[s.id] =
+                rec?.status === "Present"
+                    ? "Present"
+                    : rec?.status === "Late"
+                    ? "Late"
+                    : "Absent";
+        });
+        setSessionStatusOverrides(initialOverrides);
+    };
+
+    const handleSaveAmendStartDate = async () => {
+        if (!editingStartDatePlayer) return;
+        setIsSavingStartDate(true);
+        try {
+            const pid = editingStartDatePlayer.id;
+            const strippedNotes = (editingStartDatePlayer.notes || "")
+                .replace(/\[JOIN_DATE:[^\]]*\]\s*/g, "")
+                .trim();
+            const updatedNotes = customStartDateInput
+                ? `${strippedNotes ? strippedNotes + " " : ""}[JOIN_DATE:${customStartDateInput}]`
+                : strippedNotes;
+
+            const { error: playerError } = await supabase
+                .from("players")
+                .update({ notes: updatedNotes })
+                .eq("id", pid);
+            if (playerError) throw playerError;
+
+            // Update any sessions on or after customStartDateInput where status was set/changed
+            const updatedSessionsList = [...sessions];
+            for (const s of leaderboardSessions) {
+                if (customStartDateInput && s.date < customStartDateInput) continue;
+                const desiredStatus = sessionStatusOverrides[s.id] || "Absent";
+                const existingRec = s.attendance.find(a => a.playerId === pid);
+                const currentStatus = existingRec?.status || null;
+
+                if (currentStatus !== desiredStatus) {
+                    const nextAttendance = existingRec
+                        ? s.attendance.map(a => (a.playerId === pid ? { ...a, status: desiredStatus } : a))
+                        : [...s.attendance, { playerId: pid, status: desiredStatus, notes: "" }];
+
+                    const { error: sessErr } = await supabase
+                        .from("training_sessions")
+                        .update({ attendance: nextAttendance })
+                        .eq("id", s.id);
+                    if (!sessErr) {
+                        const idx = updatedSessionsList.findIndex(item => item.id === s.id);
+                        if (idx >= 0) {
+                            updatedSessionsList[idx] = { ...updatedSessionsList[idx], attendance: nextAttendance };
+                        }
+                    }
+                }
+            }
+
+            setPlayers(prev =>
+                prev.map(p => (p.id === pid ? { ...p, notes: updatedNotes } : p))
+            );
+            setSessions(updatedSessionsList);
+            setEditingStartDatePlayer(null);
+        } catch (err: any) {
+            console.error("Failed to save start date:", err);
+            alert("Failed to save player start date: " + (err?.message || "Unknown error"));
+        } finally {
+            setIsSavingStartDate(false);
+        }
+    };
 
     const positionCounts = {
         ALL: allPlayerStats.length,
@@ -1206,20 +1291,33 @@ export default function TrainingPage() {
                                                         <AvatarImage src={player.imageUrl || settings?.logo || undefined} />
                                                         <AvatarFallback className="bg-surface-1 text-muted-foreground">{player.firstName[0]}{player.lastName[0]}</AvatarFallback>
                                                     </Avatar>
-                                                    <div className="flex flex-wrap items-center gap-2">
+                                                    <div className="flex flex-wrap items-center gap-2 group/player">
                                                         <span className="font-bold text-foreground">{player.firstName} {player.lastName}</span>
                                                         {player.position && (
                                                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-surface-1 text-muted-foreground border border-border">
                                                                 {player.position}
                                                             </span>
                                                         )}
-                                                        {player.joinedMidSeason && player.effectiveStartDate && (
-                                                            <span
-                                                                title={`Tracked from ${formatDate(player.effectiveStartDate)}`}
-                                                                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/25"
+                                                        {player.joinedMidSeason && player.effectiveStartDate ? (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOpenAmendStartDate(player)}
+                                                                title={`Tracked from ${formatDate(player.effectiveStartDate)} • Click to amend start date or backfill attendance`}
+                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 hover:bg-blue-500/20 text-blue-700 dark:text-blue-300 border border-blue-500/25 transition-colors cursor-pointer"
                                                             >
-                                                                Joined {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(player.effectiveStartDate))}
-                                                            </span>
+                                                                <span>Joined {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(player.effectiveStartDate))}</span>
+                                                                <Pencil className="h-2.5 w-2.5 opacity-75" />
+                                                            </button>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleOpenAmendStartDate(player)}
+                                                                title="Amend player start date or backfill session attendance"
+                                                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-1 hover:bg-brand/10 text-muted-foreground hover:text-brand border border-border transition-all opacity-0 group-hover/player:opacity-100 focus:opacity-100 cursor-pointer"
+                                                            >
+                                                                <CalendarDays className="h-2.5 w-2.5" />
+                                                                <span>Start Date</span>
+                                                            </button>
                                                         )}
                                                         {player.playerIsFormer && (
                                                             <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-1 text-muted-foreground border border-border">
@@ -1526,6 +1624,138 @@ export default function TrainingPage() {
                             className="bg-brand hover:bg-brand/90 text-white font-medium"
                         >
                             <ExternalLink className="h-4 w-4 mr-2" /> Send via WhatsApp
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Amend Player Start Date & Backfill Attendance Modal */}
+            <Dialog open={!!editingStartDatePlayer} onOpenChange={(open) => !open && setEditingStartDatePlayer(null)}>
+                <DialogContent className="sm:max-w-[520px] bg-background border-border text-foreground">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                            <CalendarDays className="h-5 w-5 text-brand" />
+                            Amend Start Date — {editingStartDatePlayer?.firstName} {editingStartDatePlayer?.lastName}
+                        </DialogTitle>
+                        <DialogDescription className="text-muted-foreground text-xs">
+                            Set the exact date this player started training with the squad, and log or adjust their attendance for sessions since that date.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {editingStartDatePlayer && (
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs font-semibold text-foreground">First Training / Join Date</Label>
+                                    {customStartDateInput && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setCustomStartDateInput("")}
+                                            className="text-[11px] font-medium text-muted-foreground hover:text-foreground underline"
+                                        >
+                                            Reset to Auto-Detect
+                                        </button>
+                                    )}
+                                </div>
+                                <Input
+                                    type="date"
+                                    value={customStartDateInput}
+                                    onChange={(e) => setCustomStartDateInput(e.target.value)}
+                                    className="border-border bg-surface-1 text-foreground"
+                                />
+                                <div className="space-y-1 pt-1">
+                                    <p className="text-[11px] font-medium text-muted-foreground">Quick-pick from recent session dates:</p>
+                                    <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                                        {leaderboardSessions.slice(-10).map((s) => {
+                                            const isSelected = customStartDateInput === s.date;
+                                            return (
+                                                <button
+                                                    key={s.id}
+                                                    type="button"
+                                                    onClick={() => setCustomStartDateInput(s.date)}
+                                                    className={`px-2 py-1 rounded text-[11px] font-semibold border transition-all ${
+                                                        isSelected
+                                                            ? "bg-brand text-white border-brand"
+                                                            : "bg-surface-1 text-muted-foreground border-border hover:text-foreground"
+                                                    }`}
+                                                >
+                                                    {formatDate(s.date)}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Backfill / Edit Sessions Since Start Date */}
+                            <div className="space-y-2 border-t border-border pt-3">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                                        Sessions From Start Date ({leaderboardSessions.filter(s => !customStartDateInput || s.date >= customStartDateInput).length})
+                                    </Label>
+                                    <span className="text-[11px] text-muted-foreground">Tap to mark Present / Late / Absent</span>
+                                </div>
+                                <div className="max-h-[240px] overflow-y-auto divide-y divide-border border border-border rounded-lg bg-surface-1/50">
+                                    {leaderboardSessions
+                                        .filter(s => !customStartDateInput || s.date >= customStartDateInput)
+                                        .slice()
+                                        .reverse()
+                                        .map((s) => {
+                                            const st = sessionStatusOverrides[s.id] || "Absent";
+                                            return (
+                                                <div key={s.id} className="flex items-center justify-between px-3 py-2 text-xs">
+                                                    <div>
+                                                        <p className="font-semibold text-foreground">{formatDate(s.date)}</p>
+                                                        <p className="text-[11px] text-muted-foreground">{s.topic || "General Preparation"}</p>
+                                                    </div>
+                                                    <div className="inline-flex items-center gap-1">
+                                                        {(["Present", "Late", "Absent"] as const).map((opt) => {
+                                                            const active = st === opt;
+                                                            const activeClass =
+                                                                opt === "Present"
+                                                                    ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/50"
+                                                                    : opt === "Late"
+                                                                    ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/50"
+                                                                    : "bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/50";
+                                                            return (
+                                                                <button
+                                                                    key={opt}
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setSessionStatusOverrides(prev => ({
+                                                                            ...prev,
+                                                                            [s.id]: opt
+                                                                        }))
+                                                                    }
+                                                                    className={`px-2.5 py-1 rounded text-[11px] font-bold border transition-all ${
+                                                                        active
+                                                                            ? activeClass
+                                                                            : "bg-background text-muted-foreground border-border hover:text-foreground"
+                                                                    }`}
+                                                                >
+                                                                    {opt === "Present" ? "✓ Present" : opt === "Late" ? "L Late" : "× Absent"}
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    <DialogFooter className="gap-2 sm:gap-0 border-t border-border pt-4">
+                        <Button variant="outline" className="border-border text-foreground" onClick={() => setEditingStartDatePlayer(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleSaveAmendStartDate}
+                            disabled={isSavingStartDate}
+                            className="bg-brand hover:bg-brand/90 text-white font-semibold"
+                        >
+                            {isSavingStartDate ? "Saving..." : "Save Start Date & Attendance"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
