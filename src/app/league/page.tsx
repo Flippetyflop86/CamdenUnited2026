@@ -1,17 +1,16 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ExternalLink, AlertCircle, Settings, Trophy, Link as LinkIcon, Image as ImageIcon, FileText, CheckCircle2 } from "lucide-react";
+import { ExternalLink, AlertCircle, Trophy, Image as ImageIcon, CheckCircle2, Sparkles } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { Textarea } from "@/components/ui/textarea";
 
-// Mock LeagueRow type
 type LeagueRow = {
     position: number;
     team_name: string;
@@ -29,40 +28,231 @@ type LeagueRow = {
 export default function LeagueTablePage() {
     const { settings, updateSettings } = useClub();
     const { clubId } = useAuth();
-    
-    // Default to 'url' for live auto-sync
-    const [importMode, setImportMode] = useState<'url' | 'text' | 'screenshot'>('url');
+
+    const [universalInput, setUniversalInput] = useState("");
     const [urlInput, setUrlInput] = useState("");
-    const [textInput, setTextInput] = useState("");
+    const [faLrCode, setFaLrCode] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    
+    const hiddenFaContainerRef = useRef<HTMLDivElement>(null);
+
     const [isExtracting, setIsExtracting] = useState(false);
     const [isAutoSyncing, setIsAutoSyncing] = useState(false);
     const [extractionStatus, setExtractionStatus] = useState("");
-    const [extractionError, setExtractionError] = useState<{title: string, message: string} | null>(null);
+    const [extractionError, setExtractionError] = useState<{ title: string; message: string } | null>(null);
     const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
-    
-    // Preview State
+
     const [previewData, setPreviewData] = useState<LeagueRow[] | null>(null);
     const [isImporting, setIsImporting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
 
-    // Existing Data
     const [currentTable, setCurrentTable] = useState<LeagueRow[] | null>(null);
     const [showImporter, setShowImporter] = useState(false);
     const hasAutoSyncedRef = useRef(false);
 
     const storageKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
     const syncTimestampKey = `${storageKey}_synced_at`;
+    const appliedFixturesKey = `${storageKey}_applied_fixtures`;
+    const faLrCodeKey = `${storageKey}_fa_lrcode`;
 
-    // Auto-sync live league table
-    const autoSyncFromUrl = async (targetUrl: string, silent = true) => {
-        if (!targetUrl) return;
+    const isOurClubName = (teamName: string): boolean => {
+        const clubLower = (settings.name || "Camden United").toLowerCase().trim();
+        const clubCore = clubLower.replace(/\bfc\b/g, "").trim();
+        const candidate = teamName.toLowerCase().trim();
+        if (candidate === clubLower) return true;
+        if (clubCore.length >= 4 && candidate === clubCore) return true;
+        return candidate.includes(clubLower);
+    };
+
+    const sortStandings = (rows: LeagueRow[]): LeagueRow[] => {
+        const copy = [...rows].map(r => ({
+            ...r,
+            goal_difference: (r.goals_for || 0) - (r.goals_against || 0),
+            is_our_club: r.is_our_club || isOurClubName(r.team_name)
+        }));
+        copy.sort((a, b) => {
+            if (b.points !== a.points) return b.points - a.points;
+            if (b.goal_difference !== a.goal_difference) return b.goal_difference - a.goal_difference;
+            if ((b.goals_for || 0) !== (a.goals_for || 0)) return (b.goals_for || 0) - (a.goals_for || 0);
+            return a.team_name.localeCompare(b.team_name);
+        });
+        return copy.map((r, idx) => ({ ...r, position: idx + 1 }));
+    };
+
+    // Snapshot all currently completed League fixture IDs as baseline when a fresh table is imported/synced
+    const snapshotBaselineFixtures = async () => {
+        try {
+            let query = supabase
+                .from('fixtures')
+                .select('id, status, competition, home_score, away_score')
+                .eq('status', 'completed');
+            if (clubId) query = query.eq('club_id', clubId);
+            const { data } = await query;
+            if (data) {
+                const ids = data
+                    .filter(f => f.home_score !== null && f.away_score !== null)
+                    .map(f => String(f.id));
+                localStorage.setItem(appliedFixturesKey, JSON.stringify(ids));
+            }
+        } catch (e) {}
+    };
+
+    // Automatically apply any newly completed League match results from /matches onto the saved standings
+    const applyNewMatchResultsToTable = async (baseTable: LeagueRow[]): Promise<LeagueRow[]> => {
+        if (!baseTable || baseTable.length === 0) return baseTable;
+        try {
+            let query = supabase
+                .from('fixtures')
+                .select('id, opponent, is_home, home_score, away_score, status, competition')
+                .eq('status', 'completed');
+            if (clubId) query = query.eq('club_id', clubId);
+            const { data: completed } = await query;
+            if (!completed || completed.length === 0) return baseTable;
+
+            const savedIdsRaw = localStorage.getItem(appliedFixturesKey);
+            // If no baseline exists yet, initialize baseline with current completed fixtures so we don't double-count
+            if (!savedIdsRaw) {
+                const initialIds = completed
+                    .filter(f => f.home_score !== null && f.away_score !== null)
+                    .map(f => String(f.id));
+                localStorage.setItem(appliedFixturesKey, JSON.stringify(initialIds));
+                return baseTable;
+            }
+
+            const appliedSet = new Set<string>(JSON.parse(savedIdsRaw));
+            let modified = false;
+            const updatedRows = baseTable.map(r => ({ ...r }));
+
+            for (const match of completed) {
+                const matchId = String(match.id);
+                if (appliedSet.has(matchId)) continue;
+                if (match.home_score === null || match.away_score === null) continue;
+
+                const comp = (match.competition || "League").toLowerCase();
+                if (comp.includes("cup") || comp.includes("trophy") || comp.includes("shield") || comp.includes("friendly")) {
+                    appliedSet.add(matchId);
+                    continue;
+                }
+
+                const ourGoals = match.is_home ? Number(match.home_score) : Number(match.away_score);
+                const oppGoals = match.is_home ? Number(match.away_score) : Number(match.home_score);
+                const oppNameLower = (match.opponent || "").toLowerCase().trim();
+
+                const ourIdx = updatedRows.findIndex(r => r.is_our_club || isOurClubName(r.team_name));
+                const oppIdx = updatedRows.findIndex(r => {
+                    const t = r.team_name.toLowerCase().trim();
+                    return t === oppNameLower || (oppNameLower.length >= 4 && (t.includes(oppNameLower) || oppNameLower.includes(t)));
+                });
+
+                if (ourIdx !== -1) {
+                    const row = updatedRows[ourIdx];
+                    row.played += 1;
+                    row.goals_for = (row.goals_for || 0) + ourGoals;
+                    row.goals_against = (row.goals_against || 0) + oppGoals;
+                    if (ourGoals > oppGoals) {
+                        row.won += 1;
+                        row.points += 3;
+                    } else if (ourGoals === oppGoals) {
+                        row.drawn += 1;
+                        row.points += 1;
+                    } else {
+                        row.lost += 1;
+                    }
+                    row.goal_difference = (row.goals_for || 0) - (row.goals_against || 0);
+                    modified = true;
+                }
+
+                if (oppIdx !== -1 && oppIdx !== ourIdx) {
+                    const row = updatedRows[oppIdx];
+                    row.played += 1;
+                    row.goals_for = (row.goals_for || 0) + oppGoals;
+                    row.goals_against = (row.goals_against || 0) + ourGoals;
+                    if (oppGoals > ourGoals) {
+                        row.won += 1;
+                        row.points += 3;
+                    } else if (oppGoals === ourGoals) {
+                        row.drawn += 1;
+                        row.points += 1;
+                    } else {
+                        row.lost += 1;
+                    }
+                    row.goal_difference = (row.goals_for || 0) - (row.goals_against || 0);
+                    modified = true;
+                }
+
+                appliedSet.add(matchId);
+            }
+
+            localStorage.setItem(appliedFixturesKey, JSON.stringify(Array.from(appliedSet)));
+
+            if (modified) {
+                const sorted = sortStandings(updatedRows);
+                localStorage.setItem(storageKey, JSON.stringify(sorted));
+                const ourRow = sorted.find(r => r.is_our_club);
+                if (ourRow && ourRow.position !== settings.leaguePosition) {
+                    updateSettings({ leaguePosition: ourRow.position }).catch(() => {});
+                }
+                return sorted;
+            }
+        } catch (e) {
+            console.warn("Auto-standings match calculation skipped:", e);
+        }
+        return baseTable;
+    };
+
+    const persistStandingsDirectly = async (rows: LeagueRow[], connectedUrl?: string) => {
+        const nowIso = new Date().toISOString();
+        setCurrentTable(rows);
+        setLastSyncedAt(nowIso);
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(rows));
+            localStorage.setItem(syncTimestampKey, nowIso);
+        } catch (e) {}
+
+        await snapshotBaselineFixtures();
+
+        const ourRow = rows.find(r => r.is_our_club || isOurClubName(r.team_name));
+        const newUpdates: any = {
+            lastImportHistory: {
+                ...(settings.lastImportHistory || {}),
+                leagueTable: rows,
+                updatedAt: nowIso
+            }
+        };
+        if (ourRow && ourRow.position) {
+            newUpdates.leaguePosition = ourRow.position;
+        }
+        if (connectedUrl) {
+            newUpdates.leagueUrl = connectedUrl;
+        }
+        updateSettings(newUpdates).catch(() => {});
+
+        // Ensure opponent teams exist in league_teams for fixture autocomplete
+        for (const row of rows) {
+            if (!row.team_name || isOurClubName(row.team_name)) continue;
+            supabase
+                .from('league_teams')
+                .select('id')
+                .ilike('name', row.team_name.trim())
+                .maybeSingle()
+                .then(({ data: existing }) => {
+                    if (!existing) {
+                        supabase.from('league_teams').insert({
+                            name: row.team_name.trim(),
+                            club_id: clubId || undefined
+                        }).then(() => {});
+                    }
+                });
+        }
+    };
+
+    // Auto-sync live league table from URL
+    const autoSyncFromUrl = async (targetUrl: string, silent = true): Promise<boolean> => {
+        if (!targetUrl) return false;
         if (silent) setIsAutoSyncing(true);
         else {
             setIsExtracting(true);
             setExtractionError(null);
-            setExtractionStatus("Syncing live standings from league website...");
+            setExtractionStatus("Connecting to your league and syncing live standings...");
         }
 
         try {
@@ -73,38 +263,21 @@ export default function LeagueTablePage() {
             });
             const data = await res.json();
             if (data.success && Array.isArray(data.teams) && data.teams.length > 0) {
-                setCurrentTable(data.teams);
-                const nowIso = new Date().toISOString();
-                setLastSyncedAt(nowIso);
-                try {
-                    localStorage.setItem(storageKey, JSON.stringify(data.teams));
-                    localStorage.setItem(syncTimestampKey, nowIso);
-                } catch (e) {}
-
-                const ourRow = data.teams.find((r: any) => r.is_our_club);
-                if (ourRow && ourRow.position && ourRow.position !== settings.leaguePosition) {
-                    updateSettings({
-                        leaguePosition: ourRow.position,
-                        leagueUrl: data.resolvedUrl || targetUrl
-                    }).catch(() => {});
-                }
+                const resolved = data.resolvedUrl || targetUrl;
+                setUrlInput(resolved);
+                await persistStandingsDirectly(data.teams, resolved);
                 setShowImporter(false);
+                return true;
             } else if (!silent) {
                 if (data.errorType === 'RATE_LIMITED') {
                     setExtractionError({
                         title: "Daily sync limit reached (10/day)",
                         message: data.error || "You have reached the maximum of 10 live syncs per 24 hours."
                     });
-                } else if (data.errorType === 'BLOCKED') {
-                    setExtractionError({
-                        title: "This website blocks direct automated sync",
-                        message: "Use the Paste Table Text or Screenshot tab below for websites protected by Cloudflare CAPTCHA."
-                    });
-                    setImportMode('text');
                 } else {
                     setExtractionError({
-                        title: "Could not find standings on that URL",
-                        message: data.error || "Please check the league URL or paste the table text."
+                        title: "Paste your league table rows once into the box below",
+                        message: "This website requires a one-time table paste. Once pasted, ClubFlow will automatically keep your standings updated as match results come in."
                     });
                 }
             }
@@ -112,7 +285,7 @@ export default function LeagueTablePage() {
             if (!silent) {
                 setExtractionError({
                     title: "Connection error",
-                    message: "Could not reach the league website."
+                    message: "Could not reach the league website. You can paste your league table rows directly into the box below."
                 });
             }
         } finally {
@@ -120,9 +293,37 @@ export default function LeagueTablePage() {
             setIsExtracting(false);
             setExtractionStatus("");
         }
+        return false;
     };
 
-    // Load saved league table from localStorage AND auto-sync live if cache is older than 6 hours
+    // Silent background FA lrcode script loader (if user pasted an FA code)
+    useEffect(() => {
+        if (!faLrCode || !hiddenFaContainerRef.current) return;
+        const container = hiddenFaContainerRef.current;
+        container.innerHTML = `<div id="lrep${faLrCode}"></div>`;
+        (window as any).lrcode = faLrCode;
+
+        const script = document.createElement('script');
+        script.src = 'https://fulltime.thefa.com/client/api/js/cs1.js';
+        script.async = true;
+        container.appendChild(script);
+
+        const observer = new MutationObserver(() => {
+            const tableEl = container.querySelector('table');
+            if (tableEl) {
+                const text = tableEl.innerText || tableEl.textContent || "";
+                const parsed = parseLeagueStandingsText(text);
+                if (parsed.length > 0) {
+                    persistStandingsDirectly(parsed);
+                    observer.disconnect();
+                }
+            }
+        });
+        observer.observe(container, { childList: true, subtree: true });
+        return () => observer.disconnect();
+    }, [faLrCode]);
+
+    // Load saved league table, apply any new match results, and auto-sync if cache is >6h old
     useEffect(() => {
         const defaultMitooUrl = (settings.name || "").toLowerCase().includes("camden")
             ? "https://mitoofootball.com/LeagueTab.cfm?TblName=Matches&DivisionID=64&LeagueCode=MDX2026"
@@ -131,10 +332,17 @@ export default function LeagueTablePage() {
 
         if (activeUrl && !urlInput) {
             setUrlInput(activeUrl);
+            if (!universalInput) setUniversalInput(activeUrl);
         }
+
         let hasValidCachedTable = false;
         let isCacheFresh = false;
+        let loadedRows: LeagueRow[] | null = null;
+
         try {
+            const savedLr = localStorage.getItem(faLrCodeKey);
+            if (savedLr) setFaLrCode(savedLr);
+
             const saved = localStorage.getItem(storageKey);
             const savedAt = localStorage.getItem(syncTimestampKey);
             if (savedAt) {
@@ -147,15 +355,27 @@ export default function LeagueTablePage() {
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) {
-                    setCurrentTable(parsed);
+                    loadedRows = parsed;
                     hasValidCachedTable = true;
                 }
-            } else if (settings.lastImportHistory?.leagueTable && Array.isArray(settings.lastImportHistory.leagueTable) && settings.lastImportHistory.leagueTable.length > 0) {
-                setCurrentTable(settings.lastImportHistory.leagueTable);
+            } else if (
+                settings.lastImportHistory?.leagueTable &&
+                Array.isArray(settings.lastImportHistory.leagueTable) &&
+                settings.lastImportHistory.leagueTable.length > 0
+            ) {
+                loadedRows = settings.lastImportHistory.leagueTable;
                 hasValidCachedTable = true;
             }
         } catch (e) {
             console.warn("Failed to load cached league table:", e);
+        }
+
+        if (loadedRows) {
+            setCurrentTable(loadedRows);
+            // Automatically apply any new completed League fixtures from /matches
+            applyNewMatchResultsToTable(loadedRows).then(updated => {
+                setCurrentTable(updated);
+            });
         }
 
         if (activeUrl && !hasAutoSyncedRef.current && (!hasValidCachedTable || !isCacheFresh)) {
@@ -163,13 +383,6 @@ export default function LeagueTablePage() {
             autoSyncFromUrl(activeUrl, true);
         }
     }, [clubId, settings.leagueUrl, settings.name]);
-
-    const isOurClubName = (teamName: string): boolean => {
-        const clubLower = (settings.name || "Camden United").toLowerCase().trim();
-        const clubCore = clubLower.replace(/\bfc\b/g, "").trim();
-        const candidate = teamName.toLowerCase().trim();
-        return candidate === clubLower || candidate.includes(clubLower) || (clubCore.length >= 4 && candidate.includes(clubCore));
-    };
 
     const parseLeagueStandingsText = (raw: string): LeagueRow[] => {
         const lines = raw
@@ -180,7 +393,6 @@ export default function LeagueTablePage() {
         const rows: LeagueRow[] = [];
 
         for (const line of lines) {
-            // Skip header rows
             if (/^(pos|position|rank|#)?\s*(team|club|played|p\s+w\s+d\s+l|overall|home|away)\b/i.test(line) && !/\d+\s+\d+\s+\d+/.test(line)) {
                 continue;
             }
@@ -191,7 +403,6 @@ export default function LeagueTablePage() {
             const tokens = line.split(/\t+|\s{2,}|\s+/).filter(Boolean);
             if (tokens.length < 5) continue;
 
-            // Collect trailing numeric tokens from the right
             const nums: number[] = [];
             let idx = tokens.length - 1;
             while (idx >= 0) {
@@ -203,7 +414,7 @@ export default function LeagueTablePage() {
                     continue;
                 }
                 if (/^-?\d+$/.test(tok)) {
-                    nums.unshift( parseInt(tok, 10) );
+                    nums.unshift(parseInt(tok, 10));
                     idx--;
                 } else {
                     if (nums.length === 0 && /^[WDL\-]{1,6}$/i.test(tok)) {
@@ -312,6 +523,63 @@ export default function LeagueTablePage() {
         }));
     };
 
+    // Unified 1-click handler: detects URL vs FA code vs pasted table rows automatically
+    const handleUniversalConnect = async () => {
+        const raw = universalInput.trim();
+        if (!raw) return;
+
+        setExtractionError(null);
+
+        // 1. Check if user pasted an FA code (lrcode / lrep)
+        const lrMatch = raw.match(/lrcode\s*=\s*['"]?(\d+)['"]?/i) || raw.match(/lrep(\d+)/i);
+        if (lrMatch && lrMatch[1]) {
+            const code = lrMatch[1];
+            localStorage.setItem(faLrCodeKey, code);
+            setFaLrCode(code);
+            setIsExtracting(true);
+            setExtractionStatus("Connecting live league feed...");
+            setTimeout(() => {
+                setIsExtracting(false);
+                setExtractionStatus("");
+                setShowImporter(false);
+            }, 1500);
+            return;
+        }
+
+        // 2. Check if user pasted a URL (single line starting with http or www)
+        const lines = raw.split(/\r?\n/).filter(Boolean);
+        const urlMatch = raw.match(/https?:\/\/[^\s"'<>]+/i);
+        if (lines.length === 1 && (urlMatch || /^(www\.|mitoofootball\.com|fulltime\.thefa\.com)/i.test(raw))) {
+            const targetUrl = urlMatch ? urlMatch[0] : `https://${raw}`;
+            await autoSyncFromUrl(targetUrl, false);
+            return;
+        }
+
+        // 3. Otherwise, treat as pasted league table text and save immediately in 1 step
+        setIsExtracting(true);
+        setExtractionStatus("Setting up your automatic league table...");
+        const parsed = parseLeagueStandingsText(raw);
+        setIsExtracting(false);
+        setExtractionStatus("");
+
+        if (parsed.length > 0) {
+            await persistStandingsDirectly(parsed);
+            setShowImporter(false);
+            return;
+        }
+
+        // 4. If text contained a URL inside multiple lines, try the URL
+        if (urlMatch) {
+            await autoSyncFromUrl(urlMatch[0], false);
+            return;
+        }
+
+        setExtractionError({
+            title: "Couldn't recognise that input",
+            message: "Paste your league website link (e.g. Mitoo or FA Full-Time) or copy and paste the rows from your league table."
+        });
+    };
+
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file && file.type.startsWith('image/')) {
@@ -330,54 +598,27 @@ export default function LeagueTablePage() {
         }
     };
 
-    const handleDragOver = (e: React.DragEvent) => {
-        e.preventDefault();
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        const file = e.dataTransfer.files?.[0];
-        if (file && file.type.startsWith('image/')) {
-            loadImage(file);
-        }
-    };
-
     const processScreenshot = async (base64Image: string) => {
         setIsExtracting(true);
         setExtractionError(null);
-        setExtractionStatus("Reading screenshot...");
-        
-        try {
-            const statusSequence = [
-                "Identifying teams...",
-                "Matching columns...",
-                "Preparing your ClubFlow table..."
-            ];
-            
-            let statusIndex = 0;
-            const interval = setInterval(() => {
-                if (statusIndex < statusSequence.length) {
-                    setExtractionStatus(statusSequence[statusIndex]);
-                    statusIndex++;
-                }
-            }, 1200);
+        setExtractionStatus("Reading league screenshot...");
 
+        try {
             const res = await fetch('/api/parse-league', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: base64Image, clubName: settings.name })
+                body: JSON.stringify({ image: base64Image, clubName: settings.name, clubId })
             });
 
-            clearInterval(interval);
             const data = await res.json();
-            
-            if (!data.success) {
+            if (!data.success || !Array.isArray(data.teams) || data.teams.length === 0) {
                 setExtractionError({
                     title: "Extraction failed",
-                    message: data.error || "We couldn't read the table clearly. Try pasting the table text instead."
+                    message: data.error || "Could not read the screenshot clearly. Try pasting the league link or table text instead."
                 });
             } else {
-                setPreviewData(data.teams);
+                await persistStandingsDirectly(data.teams);
+                setShowImporter(false);
             }
         } catch (error) {
             setExtractionError({
@@ -394,8 +635,7 @@ export default function LeagueTablePage() {
         const reader = new FileReader();
         reader.onload = (e) => {
             if (e.target?.result) {
-                const base64Image = e.target.result as string;
-                processScreenshot(base64Image);
+                processScreenshot(e.target.result as string);
             }
         };
         reader.readAsDataURL(file);
@@ -409,89 +649,25 @@ export default function LeagueTablePage() {
         if (field === 'team_name') {
             newData[index].is_our_club = isOurClubName(String(value));
         }
-        
+
         if (['won', 'drawn', 'lost', 'goals_for', 'goals_against'].includes(field)) {
-             const row = newData[index];
-             if (field === 'goals_for' || field === 'goals_against') {
-                 row.goal_difference = row.goals_for - row.goals_against;
-             }
-             if (field === 'won' || field === 'drawn') {
-                 row.points = (row.won * 3) + row.drawn;
-             }
-        }
-        
-        setPreviewData(newData);
-    };
-
-    const handleExtractUrl = async () => {
-        if (!urlInput.trim()) return;
-        await autoSyncFromUrl(urlInput.trim(), false);
-    };
-
-    const handleExtractText = async () => {
-        if (!textInput.trim()) return;
-        
-        setIsExtracting(true);
-        setExtractionError(null);
-        setExtractionStatus("Parsing standings rows...");
-        
-        setTimeout(() => {
-            const parsed = parseLeagueStandingsText(textInput);
-            setIsExtracting(false);
-            setExtractionStatus("");
-
-            if (parsed.length === 0) {
-                setExtractionError({
-                    title: "Couldn't detect table rows",
-                    message: "Make sure you highlight and copy the rows from the league table (including team names and numbers like P, W, D, L, Pts)."
-                });
-                return;
+            const row = newData[index];
+            if (field === 'goals_for' || field === 'goals_against') {
+                row.goal_difference = row.goals_for - row.goals_against;
             }
-            setPreviewData(parsed);
-        }, 250);
+            if (field === 'won' || field === 'drawn') {
+                row.points = (row.won * 3) + row.drawn;
+            }
+        }
+
+        setPreviewData(newData);
     };
 
     const handleConfirmImport = async () => {
         if (!previewData || previewData.length === 0) return;
         setIsImporting(true);
         try {
-            // Save to localStorage immediately
-            localStorage.setItem(storageKey, JSON.stringify(previewData));
-
-            // Find our club's position and update club settings so Dashboard shows the live position
-            const ourRow = previewData.find(r => r.is_our_club || isOurClubName(r.team_name));
-            const newUpdates: any = {
-                lastImportHistory: {
-                    ...(settings.lastImportHistory || {}),
-                    leagueTable: previewData,
-                    updatedAt: new Date().toISOString()
-                }
-            };
-            if (ourRow && ourRow.position) {
-                newUpdates.leaguePosition = ourRow.position;
-            }
-            if (urlInput && urlInput.trim()) {
-                newUpdates.leagueUrl = urlInput.trim();
-            }
-            await updateSettings(newUpdates).catch(() => {});
-
-            // Also ensure all division opponent teams exist in league_teams for autocomplete
-            for (const row of previewData) {
-                if (!row.team_name || isOurClubName(row.team_name)) continue;
-                const { data: existing } = await supabase
-                    .from('league_teams')
-                    .select('id')
-                    .ilike('name', row.team_name.trim())
-                    .maybeSingle();
-                if (!existing) {
-                    await supabase.from('league_teams').insert({
-                        name: row.team_name.trim(),
-                        club_id: clubId || undefined
-                    }).then(() => {});
-                }
-            }
-
-            setCurrentTable(previewData);
+            await persistStandingsDirectly(previewData, urlInput || undefined);
             setPreviewData(null);
             setShowImporter(false);
             setIsSuccess(true);
@@ -502,15 +678,15 @@ export default function LeagueTablePage() {
         }
     };
 
-    // If we have a preview, show the Review Screen
+    // Review Screen (if user manually edits table)
     if (previewData) {
         return (
             <div className="h-full flex flex-col gap-6 max-w-4xl mx-auto py-8">
                 <div>
-                    <h2 className="text-2xl font-bold text-foreground">Review League Table</h2>
-                    <p className="text-muted-foreground mt-1">Review the extracted standings before saving. Every cell is editable.</p>
+                    <h2 className="text-2xl font-bold text-foreground">Edit League Standings</h2>
+                    <p className="text-muted-foreground mt-1">Adjust any row below and click Save.</p>
                 </div>
-                
+
                 <Card className="border-border bg-surface-1">
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
@@ -558,7 +734,7 @@ export default function LeagueTablePage() {
                                             </td>
                                             <td className="px-2 py-2 text-center text-muted-foreground font-mono text-xs">{row.goal_difference > 0 ? '+' + row.goal_difference : row.goal_difference}</td>
                                             <td className="px-2 py-2">
-                                                 <Input type="number" value={row.points} onChange={(e) => handleRowChange(idx, 'points', parseInt(e.target.value) || 0)} className="w-12 h-8 px-1 text-center font-bold text-foreground bg-transparent border-transparent hover:border-border focus:bg-background" />
+                                                <Input type="number" value={row.points} onChange={(e) => handleRowChange(idx, 'points', parseInt(e.target.value) || 0)} className="w-12 h-8 px-1 text-center font-bold text-foreground bg-transparent border-transparent hover:border-border focus:bg-background" />
                                             </td>
                                         </tr>
                                     ))}
@@ -569,7 +745,7 @@ export default function LeagueTablePage() {
                 </Card>
 
                 <div className="flex justify-between items-center mt-2">
-                    <span className="text-sm font-medium text-muted-foreground">{previewData.length} teams recognised</span>
+                    <span className="text-sm font-medium text-muted-foreground">{previewData.length} teams</span>
                     <div className="flex gap-3">
                         <Button variant="outline" onClick={() => setPreviewData(null)} disabled={isImporting}>
                             Cancel
@@ -583,28 +759,27 @@ export default function LeagueTablePage() {
         );
     }
 
-    // Success View
     if (isSuccess) {
         return (
             <div className="h-full flex flex-col items-center justify-center gap-4 py-20 max-w-md mx-auto text-center">
                 <div className="w-16 h-16 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mb-2">
                     <CheckCircle2 className="h-8 w-8" />
                 </div>
-                <h2 className="text-2xl font-bold text-foreground">League table updated</h2>
-                <p className="text-muted-foreground">Your standings and club position have been saved across ClubFlow.</p>
+                <h2 className="text-2xl font-bold text-foreground">League table connected</h2>
+                <p className="text-muted-foreground">Your standings will now stay updated automatically across ClubFlow.</p>
                 <div className="flex gap-3 mt-4 w-full">
-                    <Button variant="outline" className="flex-1" onClick={() => { setIsSuccess(false); setShowImporter(true); }}>Update Again</Button>
-                    <Button className="flex-1 bg-brand hover:bg-brand/90 text-white" onClick={() => { setIsSuccess(false); setShowImporter(false); }}>View Table</Button>
+                    <Button className="flex-1 bg-brand hover:bg-brand/90 text-white" onClick={() => { setIsSuccess(false); setShowImporter(false); }}>View Standings</Button>
                 </div>
             </div>
         );
     }
 
-    // If we have an existing table and aren't actively re-importing, show it
+    // Main Live Standings Table View
     if (currentTable && currentTable.length > 0 && !showImporter) {
         return (
             <div className="h-full flex flex-col gap-6">
-                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div ref={hiddenFaContainerRef} className="hidden" aria-hidden="true" />
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 bg-brand/10 rounded-full flex items-center justify-center">
                             <Trophy className="h-5 w-5 text-brand" />
@@ -612,18 +787,15 @@ export default function LeagueTablePage() {
                         <div>
                             <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
                                 <span>League Standings</span>
-                                {isAutoSyncing && (
-                                    <span className="text-xs font-normal text-emerald-500 animate-pulse">
-                                        Syncing live...
-                                    </span>
-                                )}
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-medium text-emerald-500 border border-emerald-500/20">
+                                    <span className={`h-1.5 w-1.5 rounded-full bg-emerald-500 ${isAutoSyncing ? 'animate-ping' : ''}`} />
+                                    {isAutoSyncing ? "Syncing live..." : "Auto-Updating"}
+                                </span>
                             </h2>
                             <p className="text-sm text-muted-foreground">
                                 {lastSyncedAt
-                                    ? `Synced live from league website today at ${new Date(lastSyncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
-                                    : settings.lastImportHistory?.updatedAt
-                                        ? `Last updated ${new Date(settings.lastImportHistory.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                                        : "Live division standings"}
+                                    ? `Automatically synced • Last checked ${new Date(lastSyncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+                                    : "Automatically updates from your league feed and recorded match results"}
                             </p>
                         </div>
                     </div>
@@ -635,20 +807,23 @@ export default function LeagueTablePage() {
                                 disabled={isAutoSyncing}
                                 onClick={() => autoSyncFromUrl(urlInput, false)}
                             >
-                                {isAutoSyncing ? "Syncing..." : "🔄 Refresh Live Standings"}
+                                {isAutoSyncing ? "Syncing..." : "🔄 Refresh Now"}
                             </Button>
                         )}
                         {urlInput && (
                             <Button variant="outline" size="sm" onClick={() => window.open(urlInput, '_blank')}>
-                                <ExternalLink className="h-4 w-4 mr-1.5" /> Open League Website
+                                <ExternalLink className="h-4 w-4 mr-1.5" /> League Page
                             </Button>
                         )}
+                        <Button variant="outline" size="sm" onClick={() => setPreviewData(currentTable)}>
+                            Edit Rows
+                        </Button>
                         <Button onClick={() => setShowImporter(true)} className="bg-brand hover:bg-brand/90 text-white" size="sm">
-                            Change Source / Import
+                            Change League
                         </Button>
                     </div>
                 </div>
-                
+
                 <Card className="border-border bg-surface-1">
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
@@ -693,20 +868,32 @@ export default function LeagueTablePage() {
         );
     }
 
-    // Import Workflow
+    // One-Step "Paste Your League Once" Setup View
     return (
-        <div className="h-full flex flex-col gap-6 max-w-2xl mx-auto py-12">
+        <div
+            className="h-full flex flex-col gap-6 max-w-2xl mx-auto py-12"
+            onPaste={handlePaste}
+        >
+            <div ref={hiddenFaContainerRef} className="hidden" aria-hidden="true" />
+            <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+            />
+
             <div className="text-center mb-2">
                 <div className="mx-auto h-16 w-16 bg-brand/10 rounded-full flex items-center justify-center mb-4">
                     <Trophy className="h-8 w-8 text-brand" />
                 </div>
-                <h2 className="text-3xl font-bold text-foreground tracking-tight">Connect League Table</h2>
-                <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-                    Connect your league URL once and ClubFlow will automatically sync live standings every time you open this page.
+                <h2 className="text-3xl font-bold text-foreground tracking-tight">Set Up Your League Once</h2>
+                <p className="text-muted-foreground mt-2 text-sm sm:text-base max-w-lg mx-auto">
+                    Paste your league website link or copy-paste your league table once below. ClubFlow will automatically keep your standings and league position updated from then on.
                 </p>
                 {currentTable && currentTable.length > 0 && (
                     <Button variant="ghost" size="sm" onClick={() => setShowImporter(false)} className="mt-2 text-xs text-muted-foreground">
-                        ← Back to Live Standings
+                        ← Back to Standings
                     </Button>
                 )}
             </div>
@@ -722,131 +909,45 @@ export default function LeagueTablePage() {
             )}
 
             <Card className="border-border bg-surface-1 shadow-sm">
-                <CardHeader className="border-b border-border bg-surface-2/50">
-                    <div className="flex gap-4">
-                        <button 
-                            onClick={() => { setImportMode('url'); setExtractionError(null); }}
-                            className={`flex-1 pb-3 text-sm font-semibold transition-all border-b-2 ${importMode === 'url' ? 'border-brand text-brand' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                <CardContent className="p-6 space-y-4">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <Label htmlFor="universal-league-input" className="text-sm font-semibold flex items-center gap-1.5">
+                            <Sparkles className="h-4 w-4 text-brand" />
+                            League Website Link or League Table
+                        </Label>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => fileInputRef.current?.click()}
+                            className="h-7 text-xs"
+                            disabled={isExtracting}
                         >
-                            <LinkIcon className="h-4 w-4 mx-auto mb-1" />
-                            Live League URL (Auto-Sync)
-                        </button>
-                        <button 
-                            onClick={() => { setImportMode('text'); setExtractionError(null); }}
-                            className={`flex-1 pb-3 text-sm font-semibold transition-all border-b-2 ${importMode === 'text' ? 'border-brand text-brand' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                        >
-                            <FileText className="h-4 w-4 mx-auto mb-1" />
-                            Paste Table Text
-                        </button>
-                        <button 
-                            onClick={() => { setImportMode('screenshot'); setExtractionError(null); }}
-                            className={`flex-1 pb-3 text-sm font-semibold transition-all border-b-2 ${importMode === 'screenshot' ? 'border-brand text-brand' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                        >
-                            <ImageIcon className="h-4 w-4 mx-auto mb-1" />
-                            Screenshot
-                        </button>
+                            <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> Or Upload Screenshot
+                        </Button>
                     </div>
-                </CardHeader>
-                <CardContent className="p-6">
-                    {importMode === 'url' && (
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="url">League Standings or Team URL</Label>
-                                <Input
-                                    id="url"
-                                    placeholder="https://mitoofootball.com/LeagueTab.cfm?..."
-                                    value={urlInput}
-                                    onChange={(e) => setUrlInput(e.target.value)}
-                                    className="bg-background"
-                                />
-                                <p className="text-xs text-muted-foreground">
-                                    Paste your Mitoo or League URL once — standings will automatically stay updated every week without re-importing.
-                                </p>
-                            </div>
-                            <Button
-                                onClick={handleExtractUrl}
-                                className="w-full bg-brand hover:bg-brand/90 text-white font-semibold"
-                                disabled={!urlInput.trim() || isExtracting}
-                            >
-                                {isExtracting ? extractionStatus || "Syncing Live Standings..." : "Connect & Sync Live Table"}
-                            </Button>
-                        </div>
-                    )}
 
-                    {importMode === 'text' && (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <Label htmlFor="text">Paste Standings Rows</Label>
-                                {urlInput && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => window.open(urlInput, '_blank')}
-                                        className="h-7 text-xs"
-                                    >
-                                        <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Open My League Page ↗
-                                    </Button>
-                                )}
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                                Fallback for websites behind a CAPTCHA: highlight the standings table, press <strong>Ctrl+C</strong>, and paste below.
-                            </p>
-                            <Textarea 
-                                id="text" 
-                                placeholder={"Example:\n1\tCamden United\t11\t8\t2\t0\t45\t8\t+37\t26"}
-                                value={textInput}
-                                onChange={(e) => setTextInput(e.target.value)}
-                                className="min-h-[180px] bg-background font-mono text-xs"
-                            />
-                            <Button 
-                                onClick={handleExtractText} 
-                                className="w-full bg-brand hover:bg-brand/90 text-white font-semibold" 
-                                disabled={!textInput.trim() || isExtracting}
-                            >
-                                {isExtracting ? extractionStatus || "Parsing..." : "Parse & Review Standings"}
-                            </Button>
-                        </div>
-                    )}
+                    <Textarea
+                        id="universal-league-input"
+                        placeholder={
+                            "Paste your league link (Mitoo, FA Full-Time, Pitchero) OR paste your league table rows once:\n\nhttps://fulltime.thefa.com/...\nor\n1   Camden United   11   8   2   0   45   8   +37   26"
+                        }
+                        value={universalInput}
+                        onChange={(e) => setUniversalInput(e.target.value)}
+                        className="min-h-[150px] bg-background font-mono text-xs"
+                    />
 
-                    {importMode === 'screenshot' && (
-                        <div 
-                            className="space-y-4 text-center py-8 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-inset rounded-xl transition-all"
-                            onPaste={handlePaste}
-                            onDragOver={handleDragOver}
-                            onDrop={handleDrop}
-                            tabIndex={0}
-                        >
-                            <input 
-                                type="file" 
-                                accept="image/*" 
-                                className="hidden" 
-                                ref={fileInputRef}
-                                onChange={handleFileChange}
-                            />
-                            
-                            {isExtracting ? (
-                                <div className="flex flex-col items-center justify-center py-12 px-4 border-2 border-transparent">
-                                    <div className="w-12 h-12 rounded-full border-4 border-primary/30 border-t-primary animate-spin mb-6"></div>
-                                    <h4 className="font-semibold text-foreground text-lg mb-2 flex items-center gap-2">
-                                        <span className="text-xl">⚽</span> {extractionStatus}
-                                    </h4>
-                                    <p className="text-sm text-muted-foreground max-w-sm">Turning the screenshot into editable ClubFlow data.</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center py-10 px-4 border-2 border-dashed border-border rounded-xl bg-surface-2/50 cursor-pointer hover:bg-surface-2 transition-colors" onClick={() => fileInputRef.current?.click()}>
-                                    <div className="w-14 h-14 rounded-full bg-surface-2 flex items-center justify-center mb-4 shadow-sm border border-border">
-                                        <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                                    </div>
-                                    <h4 className="font-semibold text-foreground text-lg mb-1">Upload or Paste a Screenshot</h4>
-                                    <p className="text-sm text-muted-foreground max-w-sm">Drag an image here, press Ctrl+V to paste from your clipboard, or click to browse files.</p>
-                                    <Button variant="outline" className="mt-6 border-border bg-surface-1 shadow-sm font-semibold px-6" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
-                                        Browse Files
-                                    </Button>
-                                </div>
-                            )}
-                        </div>
-                    )}
+                    <p className="text-xs text-muted-foreground">
+                        Works with any league (FA Full-Time, Football Mitoo, Pitchero, or copied standings). Once connected, ClubFlow automatically updates your table and points as matches are played.
+                    </p>
+
+                    <Button
+                        onClick={handleUniversalConnect}
+                        className="w-full bg-brand hover:bg-brand/90 text-white font-semibold h-11"
+                        disabled={!universalInput.trim() || isExtracting}
+                    >
+                        {isExtracting ? extractionStatus || "Connecting League..." : "Connect League (One-Time Setup)"}
+                    </Button>
                 </CardContent>
             </Card>
         </div>
