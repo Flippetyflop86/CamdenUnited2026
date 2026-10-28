@@ -500,13 +500,15 @@ export default function TrainingPage() {
 
     const seasonSessions = sessions.filter(s => {
         const d = new Date(s.date);
-        // Include any session in the season window that has attendance marked,
-        // whether past or future (so pre-scheduled sessions with saved attendance count)
+        // Only count sessions in the season window where attendance was actually recorded
         const hasAttendance = s.attendance && s.attendance.length > 0;
-        return d >= seasonStartDate && (d <= now || hasAttendance);
+        return d >= seasonStartDate && hasAttendance;
     });
 
-    const leaderboardSessions = seasonSessions.filter(s => squadFilter === "All" || s.squad === squadFilter);
+    const leaderboardSessions = seasonSessions
+        .filter(s => squadFilter === "All" || s.squad === squadFilter)
+        .slice()
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const leaderboardPlayers = (squadFilter === "All"
         ? players.filter(p => isFirstTeamSquad(p.squad) || p.isInTrainingSquad)
@@ -519,18 +521,41 @@ export default function TrainingPage() {
         });
     });
 
+    const firstSeasonSessionDate = leaderboardSessions[0]?.date;
+
     const allPlayerStats = leaderboardPlayers
         .map(player => {
             const playerIsFormer = isFormerPlayer(player);
             const depDate = player.departureDate;
-            const relevantSessions = (playerIsFormer
-                ? leaderboardSessions.filter(s => {
-                    const hasRec = s.attendance.some(a => a.playerId === player.id && (a.status === 'Present' || a.status === 'Late'));
-                    if (hasRec) return true;
-                    return depDate ? s.date <= depDate : false;
-                })
-                : leaderboardSessions
-            ).slice().sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+            // Determine when the player joined / first became part of the training register
+            const joinNoteMatch = (player.notes || "").match(/\[JOIN_DATE:([^\]]+)\]/);
+            const explicitJoinDate = joinNoteMatch?.[1]?.trim() || player.contractStartDate || undefined;
+            const firstRegisterSession = leaderboardSessions.find(s =>
+                s.attendance.some(a => a.playerId === player.id)
+            );
+            const effectiveStartDate = explicitJoinDate || firstRegisterSession?.date;
+
+            const relevantSessions = leaderboardSessions.filter(s => {
+                const hasRec = s.attendance.some(a => a.playerId === player.id);
+                const attendedRec = s.attendance.some(a => a.playerId === player.id && (a.status === 'Present' || a.status === 'Late'));
+
+                // 1. Do not count sessions before the player joined the club
+                if (effectiveStartDate) {
+                    if (s.date < effectiveStartDate && !hasRec) return false;
+                } else {
+                    // Brand-new player who hasn't been on any session register yet
+                    return false;
+                }
+
+                // 2. If the player left the club, do not count sessions after their departure date
+                if (playerIsFormer) {
+                    if (attendedRec) return true;
+                    return depDate ? s.date <= depDate : hasRec;
+                }
+
+                return true;
+            });
 
             const attended = relevantSessions.filter(s => {
                 const record = s.attendance.find(a => a.playerId === player.id);
@@ -573,10 +598,18 @@ export default function TrainingPage() {
             const total = relevantSessions.length;
             const percentage = total > 0 ? Math.round((attended / total) * 100) : 0;
             const posGroup = getPositionGroup(player.position);
+            const joinedMidSeason = Boolean(
+                effectiveStartDate &&
+                firstSeasonSessionDate &&
+                effectiveStartDate > firstSeasonSessionDate
+            );
 
             return {
                 ...player,
                 posGroup,
+                playerIsFormer,
+                joinedMidSeason,
+                effectiveStartDate,
                 stats: { attended, late, total, percentage, last5, last5Attended, streak }
             };
         });
@@ -1178,6 +1211,19 @@ export default function TrainingPage() {
                                                         {player.position && (
                                                             <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-surface-1 text-muted-foreground border border-border">
                                                                 {player.position}
+                                                            </span>
+                                                        )}
+                                                        {player.joinedMidSeason && player.effectiveStartDate && (
+                                                            <span
+                                                                title={`Tracked from ${formatDate(player.effectiveStartDate)}`}
+                                                                className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/25"
+                                                            >
+                                                                Joined {new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(player.effectiveStartDate))}
+                                                            </span>
+                                                        )}
+                                                        {player.playerIsFormer && (
+                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-1 text-muted-foreground border border-border">
+                                                                Left Club
                                                             </span>
                                                         )}
                                                         {player.stats.streak >= 5 && (
