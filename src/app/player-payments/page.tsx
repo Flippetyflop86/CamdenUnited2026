@@ -79,7 +79,7 @@ export interface StandardFineRule {
 interface ClubPayoutAccountConfig {
     accountName: string;
     sortCode: string;
-    accountNumberLast4: string;
+    accountNumber: string;
     defaultFeeCoverage: "player" | "club";
 }
 
@@ -121,7 +121,7 @@ export default function PlayerPaymentsPage() {
     const [payoutAccount, setPayoutAccount] = useState<ClubPayoutAccountConfig>({
         accountName: "",
         sortCode: "",
-        accountNumberLast4: "",
+        accountNumber: "",
         defaultFeeCoverage: "player",
     });
     const [isEditingAccountModal, setIsEditingAccountModal] = useState(false);
@@ -184,7 +184,7 @@ export default function PlayerPaymentsPage() {
                 setPayoutAccount({
                     accountName: parsedAcct.accountName || `${settings.name || "Club"} Main Account`,
                     sortCode: parsedAcct.sortCode || "",
-                    accountNumberLast4: parsedAcct.accountNumberLast4 || "",
+                    accountNumber: parsedAcct.accountNumber || parsedAcct.accountNumberLast4 || "",
                     defaultFeeCoverage: parsedAcct.defaultFeeCoverage === "club" ? "club" : "player",
                 });
                 setFeeCoverage(parsedAcct.defaultFeeCoverage === "club" ? "club" : "player");
@@ -345,8 +345,11 @@ export default function PlayerPaymentsPage() {
 
     const formattedPayoutAccountLabel = useMemo(() => {
         const baseName = payoutAccount.accountName || `${settings.name || "Club"} Bank Account`;
-        if (payoutAccount.accountNumberLast4) {
-            return `${baseName} (•••• ${payoutAccount.accountNumberLast4})`;
+        const details: string[] = [];
+        if (payoutAccount.sortCode) details.push(`SC: ${payoutAccount.sortCode}`);
+        if (payoutAccount.accountNumber) details.push(`Acc: ${payoutAccount.accountNumber}`);
+        if (details.length > 0) {
+            return `${baseName} (${details.join(" • ")})`;
         }
         return baseName;
     }, [payoutAccount, settings.name]);
@@ -1487,29 +1490,30 @@ export default function PlayerPaymentsPage() {
 
                         <div className="grid grid-cols-2 gap-3">
                             <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold">Sort Code (Reference)</Label>
+                                <Label className="text-xs font-semibold">Sort Code</Label>
                                 <Input
-                                    placeholder="e.g. 04-00-04"
+                                    placeholder="e.g. 60-83-71"
+                                    maxLength={8}
                                     value={payoutAccount.sortCode}
                                     onChange={e =>
                                         setPayoutAccount({ ...payoutAccount, sortCode: e.target.value })
                                     }
-                                    className="h-9 text-xs"
+                                    className="h-9 text-xs font-mono"
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold">Account Last 4 Digits</Label>
+                                <Label className="text-xs font-semibold">Club Account Number</Label>
                                 <Input
-                                    placeholder="e.g. 4821"
-                                    maxLength={4}
-                                    value={payoutAccount.accountNumberLast4}
+                                    placeholder="e.g. 12345678"
+                                    maxLength={12}
+                                    value={payoutAccount.accountNumber}
                                     onChange={e =>
                                         setPayoutAccount({
                                             ...payoutAccount,
-                                            accountNumberLast4: e.target.value.replace(/\D/g, ""),
+                                            accountNumber: e.target.value.replace(/\D/g, ""),
                                         })
                                     }
-                                    className="h-9 text-xs"
+                                    className="h-9 text-xs font-mono"
                                 />
                             </div>
                         </div>
