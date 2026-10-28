@@ -36,8 +36,8 @@ export const ALL_PAGE_PERMISSIONS: PagePermission[] = [
 // Pages that are always manager-only (never shown to staff regardless of permissions)
 export const MANAGER_ONLY_PAGES: string[] = [];
 
-// Dashboard and Calendar are always visible to all logged-in users.
-export const ALWAYS_VISIBLE_PAGES = ["/dashboard", "/calendar"];
+// Dashboard, Calendar, and Fines & Payments are always visible to logged-in managers/users.
+export const ALWAYS_VISIBLE_PAGES = ["/dashboard", "/calendar", "/player-payments"];
 
 // These pages are pre-ticked by default when creating an invite, but can be revoked.
 export const DEFAULT_GRANTED_PERMISSIONS = ["sponsors", "finance", "budgets", "payments"];

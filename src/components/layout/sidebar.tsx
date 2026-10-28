@@ -70,6 +70,7 @@ const navItems: NavItem[] = [
             { label: "Players", href: "/squad" },
             { label: "Matchday XI", href: "/matchday-xi" },
             { label: "Squad Planner", href: "/squad-planner" },
+            { label: "Fines & Kitty", href: "/player-payments" },
         ]
     },
     { label: "Training", href: "/training", icon: Activity },
