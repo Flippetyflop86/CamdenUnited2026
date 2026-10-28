@@ -181,17 +181,24 @@ export function FootballDataImportCentre({
                 result: "Pending"
             }));
 
-            const query = supabase.from('matches').select('id, date, opponent');
+            const query = supabase.from('matches').select('id, date, opponent, competition, is_home');
             const { data: existing } = clubId ? await query.eq('club_id', clubId) : await query;
 
             const finalInsert: any[] = [];
+            let updatedCount = 0;
             for (const item of toInsert) {
-                const isDup = existing?.some(e =>
+                const existingMatch = existing?.find(e =>
                     e.date === item.date &&
                     e.opponent.toLowerCase().trim() === item.opponent.toLowerCase().trim()
                 );
-                if (!isDup) {
+                if (!existingMatch) {
                     finalInsert.push(item);
+                } else if (existingMatch.competition !== item.competition || existingMatch.is_home !== item.is_home) {
+                    await supabase
+                        .from('matches')
+                        .update({ competition: item.competition, is_home: item.is_home })
+                        .eq('id', existingMatch.id);
+                    updatedCount++;
                 }
             }
 
@@ -206,7 +213,7 @@ export function FootballDataImportCentre({
                 }
                 if (error) throw error;
                 insertedIds = (insertedData || []).map((r: any) => r.id);
-            } else {
+            } else if (updatedCount === 0) {
                 alert("All listed fixtures already exist on those dates (duplicates skipped).");
             }
 

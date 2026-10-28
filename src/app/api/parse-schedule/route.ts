@@ -16,6 +16,12 @@ const NON_OPPONENT_PATTERNS = [
     /^reserves$/i,
     /^development$/i,
     /^u\d{2}s?$/i,
+    /^round\s*\d+[a-z]?$/i,
+    /^\d+(?:st|nd|rd|th)\s+round$/i,
+    /^(?:first|second|third|fourth|fifth|sixth|preliminary|extra\s+preliminary|qualifying|\d+(?:st|nd|rd|th)\s+qualifying)\s+round$/i,
+    /^round\s+(?:one|two|three|four|five|six)$/i,
+    /^(?:quarter[\s\-]*finals?|semi[\s\-]*finals?|(?:the\s+|grand\s+)?finals?|qf|sf|play[\s\-]*offs?|replay)$/i,
+    /^group\s+(?:[a-z0-9]+|stage)$/i,
     /^(date|time|kick\s*off|ko|home|away|venue|pitch|ground|competition|division|status|result|score|match|fixtures?|notes?)$/i,
     /^(mon|tue|wed|thu|fri|sat|sun)(day|sday|nesday|rsday)?$/i,
     /^(tbc|tbd|n\/a|postponed|cancelled|walkover|h\/w|a\/w|vs?\.?)$/i,
@@ -29,8 +35,8 @@ function isNonOpponentToken(raw: string): boolean {
     for (const rx of NON_OPPONENT_PATTERNS) {
         if (rx.test(trimmed)) return true;
     }
-    // Check if it looks like a pure competition/division name
-    if (/\b(premier division|division \d|division one|division two|league cup|challenge cup|senior cup|county cup|middlesex county)\b/i.test(trimmed) && !/\b(fc|united|city|town|athletic|rov|wanderers|albion|spurs|rangers|park|boys|club|sc|afc|bfc|cfc)\b/i.test(trimmed)) {
+    // Check if it looks like a pure competition/division/cup name
+    if (/\b(premier division|division \d|division one|division two|league cup|challenge cup|senior cup|county cup|middlesex county|premier cup|division cup|\bcup\b|\btrophy\b|\bshield\b)\b/i.test(trimmed) && !/\b(fc|united|city|town|athletic|rov|rovers|wanderers|albion|spurs|rangers|park|boys|club|sc|afc|bfc|cfc|lions|stonewall|explorers|whistlers|samurai|apollo|duet)\b/i.test(trimmed)) {
         return true;
     }
     return false;
@@ -44,13 +50,14 @@ function cleanTeamCandidate(raw: string): string {
         .replace(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g, '')
         .replace(/\((home|away|h|a|first team)\)/gi, '')
         .replace(/\b(premier division|division \d+|division one|division two)\b/gi, '')
+        .replace(/\b(quarter[\s\-]*finals?|semi[\s\-]*finals?|round\s+\d+[a-z]?|\d+(?:st|nd|rd|th)\s+round|(?:first|second|third|fourth|preliminary|qualifying)\s+round)\b/gi, '')
         .replace(/^[\s\-–—:|•]+|[\s\-–—:|•]+$/g, '')
         .replace(/\s+/g, ' ')
         .trim();
 }
 
 function detectCompetitionFromText(text: string): string {
-    if (/\b(cup|trophy|shield|plate|vase)\b/i.test(text)) return "Cup";
+    if (/\b(cup|trophy|shield|plate|vase|quarter[\s\-]*finals?|semi[\s\-]*finals?|round\s+\d+|\d+(?:st|nd|rd|th)\s+round|preliminary\s+round|qualifying\s+round)\b/i.test(text)) return "Cup";
     if (/\b(friendly|pre-season|preseason|warmup)\b/i.test(text)) return "Friendly";
     return "League";
 }
@@ -138,22 +145,19 @@ export async function POST(request: Request) {
         for (let i = 0; i < rawLines.length; i++) {
             const line = rawLines[i];
 
-            // Track competition context if a standalone header line appears
-            if (isNonOpponentToken(line) && !isOurClub(line)) {
+            // Track competition context if a standalone header line appears (e.g. Line 1 of a 2-line FA Full-Time Cup entry)
+            if (!isOurClub(line)) {
                 if (/\b(cup|trophy|shield|plate|vase)\b/i.test(line)) {
                     currentCompetition = "Cup";
-                } else if (/\b(friendly|pre-season)\b/i.test(line)) {
+                } else if (/\b(friendly|pre-season|preseason)\b/i.test(line)) {
                     currentCompetition = "Friendly";
-                } else if (/\b(division|league)\b/i.test(line)) {
+                } else if (isNonOpponentToken(line) && /\b(division|league)\b/i.test(line)) {
                     currentCompetition = "League";
                 }
             }
 
             const dateFound = parseDateFromLine(line);
             if (dateFound) {
-                if (currentDate && dateFound.isoDate !== currentDate && !/\b(cup|trophy|shield|plate|vase)\b/i.test(line)) {
-                    currentCompetition = "League";
-                }
                 currentDate = dateFound.isoDate;
             }
 

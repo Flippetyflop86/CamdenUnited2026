@@ -440,9 +440,13 @@ export default function MatchdayXIPage() {
                 if (extracted.wasRepaired && extracted.normalizedRawNotes) {
                     supabase.from('matches').update({ notes: extracted.normalizedRawNotes }).eq('id', m.id).then(() => {});
                 }
-                const normalizedComp = m.competition === "Cup" ? "League" : (m.competition || "League");
-                if (m.competition === "Cup") {
-                    supabase.from('matches').update({ competition: 'League' }).eq('id', m.id).then(() => {});
+                const isKnownCupFixture = (m.date === "2026-11-10" && /samurai/i.test(m.opponent || "")) || (m.date === "2026-11-21" && /wood\s+lane/i.test(m.opponent || ""));
+                const isKnownMislabelledLeague = ["2026-11-14", "2026-11-28", "2026-12-05", "2026-12-12", "2026-12-19", "2027-01-09"].includes(m.date) && m.competition === "Cup";
+                const normalizedComp = isKnownCupFixture
+                    ? (m.competition && m.competition !== "League" ? m.competition : "Cup")
+                    : (isKnownMislabelledLeague ? "League" : (m.competition || "League"));
+                if (normalizedComp !== m.competition) {
+                    supabase.from('matches').update({ competition: normalizedComp }).eq('id', m.id).then(() => {});
                 }
                 return {
                     id: m.id,
