@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
+import { calculateClubFlowFee, parsePaymentDescription } from '@/lib/clubflow-pay';
 import Stripe from 'stripe';
 
 let stripeInstance: Stripe | null = null;
@@ -9,25 +10,6 @@ const getStripe = () => {
     }
     return stripeInstance;
 };
-
-// Spond-style ClubFlow Platform Service & Processing Fee:
-// Passed on to the paying player so the club receives 100% of the fine/fee amount,
-// and ClubFlow earns the markup via Stripe Connect's application_fee_amount.
-export function calculatePlatformFeeBreakdown(baseAmountPounds: number) {
-    const base = Math.max(0, Number(baseAmountPounds) || 0);
-    // 3.9% + £0.25 service & processing fee (minimum £0.35 on any transaction)
-    const rawFee = base * 0.039 + 0.25;
-    const serviceFee = Math.round(Math.max(0.35, rawFee) * 100) / 100;
-    const totalPayable = Math.round((base + serviceFee) * 100) / 100;
-    return {
-        baseAmount: base,
-        serviceFee,
-        totalPayable,
-        baseAmountPence: Math.round(base * 100),
-        serviceFeePence: Math.round(serviceFee * 100),
-        totalPayablePence: Math.round(totalPayable * 100),
-    };
-}
 
 export async function POST(request: Request) {
     try {
@@ -65,59 +47,66 @@ export async function POST(request: Request) {
         // Fetch club details to retrieve connected Stripe account
         const { data: club, error: clubError } = await supabase
             .from('clubs')
-            .select('stripe_connect_account_id, stripe_connect_onboarding_completed')
+            .select('name, stripe_connect_account_id, stripe_connect_onboarding_completed')
             .eq('id', payment.club_id)
             .single();
 
         if (clubError || !club || !club.stripe_connect_account_id) {
-            return NextResponse.json({ error: 'This club has not configured their Stripe Connect payments integration yet.' }, { status: 400 });
+            return NextResponse.json({ error: 'This club has not linked their payout bank account with Stripe yet.' }, { status: 400 });
         }
 
         const stripe = getStripe();
-        const feeBreakdown = calculatePlatformFeeBreakdown(Number(payment.amount));
+        const meta = parsePaymentDescription(payment.description);
+        const feeBreakdown = calculateClubFlowFee(Number(payment.amount), meta.feeCoverage);
         const origin = request.headers.get('origin') || 'https://clubflow.org.uk';
 
-        // Create Stripe Checkout Session on the connected Stripe Account:
-        // Line item 1: Club Fine / Fee (100% goes to the club)
-        // Line item 2: ClubFlow Service & Processing Fee (routed to ClubFlow via application_fee_amount)
+        const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [
+            {
+                price_data: {
+                    currency: 'gbp',
+                    product_data: {
+                        name: meta.cleanDescription,
+                        description: `${club.name || 'Club'} Payment Request • Player: ${player.first_name} ${player.last_name}`,
+                    },
+                    unit_amount: feeBreakdown.basePricePence,
+                },
+                quantity: 1,
+            },
+        ];
+
+        // If player covers the transaction fee (standard setting), include it as a line item
+        if (meta.feeCoverage === 'player') {
+            lineItems.push({
+                price_data: {
+                    currency: 'gbp',
+                    product_data: {
+                        name: 'ClubFlow Transaction Fee',
+                        description: `Payment processing fee (100% of £${feeBreakdown.basePrice.toFixed(2)} base price goes to ${club.name || 'Club'})`,
+                    },
+                    unit_amount: feeBreakdown.transactionFeePence,
+                },
+                quantity: 1,
+            });
+        }
+
+        // Create Stripe Checkout Session on the connected Club Stripe Account
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
-            line_items: [
-                {
-                    price_data: {
-                        currency: 'gbp',
-                        product_data: {
-                            name: payment.description || 'Club Fine / Payment Request',
-                            description: `Player: ${player.first_name} ${player.last_name}`,
-                        },
-                        unit_amount: feeBreakdown.baseAmountPence,
-                    },
-                    quantity: 1,
-                },
-                {
-                    price_data: {
-                        currency: 'gbp',
-                        product_data: {
-                            name: 'Service & Processing Fee',
-                            description: 'Instant payment processing & platform fee (Club receives 100% of fine)',
-                        },
-                        unit_amount: feeBreakdown.serviceFeePence,
-                    },
-                    quantity: 1,
-                },
-            ],
+            line_items: lineItems,
             mode: 'payment',
             success_url: `${origin}/pay/${paymentId}?payment=success`,
             cancel_url: `${origin}/pay/${paymentId}?payment=cancelled`,
             metadata: {
                 payment_id: paymentId,
                 club_id: payment.club_id,
-                base_amount_pence: String(feeBreakdown.baseAmountPence),
-                service_fee_pence: String(feeBreakdown.serviceFeePence),
+                player_id: payment.player_id,
+                base_price_pence: String(feeBreakdown.basePricePence),
+                transaction_fee_pence: String(feeBreakdown.transactionFeePence),
+                fee_coverage: meta.feeCoverage,
             },
             payment_intent_data: {
-                // Route the Spond-style service fee markup to ClubFlow's platform account
-                application_fee_amount: feeBreakdown.serviceFeePence,
+                // ClubFlow collects the transaction fee automatically via Stripe Connect application_fee_amount
+                application_fee_amount: feeBreakdown.applicationFeePence,
             },
         }, {
             stripeAccount: club.stripe_connect_account_id,
