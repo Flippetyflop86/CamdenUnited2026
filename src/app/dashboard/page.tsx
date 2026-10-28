@@ -32,6 +32,7 @@ import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer } from "@/lib/utils";
+import { parseStatTextString } from "@/lib/match-stats-sync";
 
 type StandingsRow = {
     position: number;
@@ -53,6 +54,7 @@ export default function DashboardPage() {
 
     const [matches, setMatches] = useState<(Match & { rawNotes?: string; motm?: string })[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);
+    const [matchPlayerStats, setMatchPlayerStats] = useState<any[]>([]);
     const [nextMatch, setNextMatch] = useState<(Match & { rawNotes?: string }) | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
     const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number } | null>(null);
@@ -109,6 +111,7 @@ export default function DashboardPage() {
         const channels = [
             supabase.channel('dashboard:matches').on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, fetchMatches),
             supabase.channel('dashboard:players').on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetchSquad),
+            supabase.channel('dashboard:match_stats').on('postgres_changes', { event: '*', schema: 'public', table: 'match_player_stats' }, fetchMatchPlayerStats),
             supabase.channel('dashboard:training').on('postgres_changes', { event: '*', schema: 'public', table: 'training_sessions' }, fetchTrainingSessions)
         ];
 
@@ -142,8 +145,14 @@ export default function DashboardPage() {
     const fetchData = () => {
         fetchMatches();
         fetchSquad();
+        fetchMatchPlayerStats();
         fetchTrainingSessions();
         fetchPaymentRequests();
+    };
+
+    const fetchMatchPlayerStats = async () => {
+        const { data } = await supabase.from('match_player_stats').select('*');
+        if (data) setMatchPlayerStats(data);
     };
 
     const fetchTrainingSessions = async () => {
@@ -218,15 +227,7 @@ export default function DashboardPage() {
             .select('id, first_name, last_name, position, squad, image_url, date_of_birth, appearances, goals, assists, nickname, use_nickname, medical_status, is_contracted, contract_end_date, weight, height, notes');
 
         if (data) {
-            const mainSquad = settings.squads?.[0] || "First Team";
-            const mainSquadClean = mainSquad.toLowerCase().replace(/[\s-_]+/g, '');
-
-            const filteredPlayers = data.filter((p: any) => {
-                if (isFormerPlayer(p)) return false;
-                const sClean = (p.squad || "").toLowerCase().replace(/[\s-_]+/g, '');
-                if ((sClean === 'firstteam' || sClean === 'first team') && (mainSquadClean === 'firstteam' || mainSquadClean === 'first team')) return true;
-                return sClean === mainSquadClean;
-            });
+            const filteredPlayers = data.filter((p: any) => !isFormerPlayer(p));
 
             const mapped: Player[] = filteredPlayers.map((p: any) => {
                 const matchInjury = p.notes ? p.notes.match(/\[INJURY:(.*?)\]/) : null;
@@ -416,15 +417,95 @@ export default function DashboardPage() {
         return upcoming[0] || null;
     }, [trainingSessions]);
 
-    // Season Leaderboards (#3): Top Scorer, Top Assists, Most MOTM, Top Training Attendance %
+    // Season Leaderboards (#3): Top Scorer, Top Assists, Most MOTM (or G+A), Top Training Attendance %
     const leaderboards = useMemo(() => {
-        const topScorers = [...players]
+        // Build match lookup map (exclude friendlies/trials unless no competitive matches exist)
+        const competitiveMatchIds = new Set<string>();
+        const allMatchIds = new Set<string>();
+        matches.forEach(m => {
+            allMatchIds.add(m.id);
+            const comp = (m.competition || "").toLowerCase();
+            if (!comp.includes("friendly") && !comp.includes("pre-season") && !comp.includes("trial")) {
+                competitiveMatchIds.add(m.id);
+            }
+        });
+        const validMatchIds = competitiveMatchIds.size > 0 ? competitiveMatchIds : allMatchIds;
+
+        // Track per-player stats aggregated across valid matches
+        const statTotals = new Map<string, { goals: number; assists: number; apps: number }>();
+        const matchesWithDbGoals = new Set<string>();
+        const matchesWithDbAssists = new Set<string>();
+
+        matchPlayerStats.forEach((s: any) => {
+            if (!validMatchIds.has(s.match_id)) return;
+            const cur = statTotals.get(s.player_id) || { goals: 0, assists: 0, apps: 0 };
+            if (s.participation_type !== "UNUSED_SUB") {
+                cur.apps += 1;
+            }
+            const g = Number(s.goals || 0);
+            const a = Number(s.assists || 0);
+            if (g > 0) matchesWithDbGoals.add(s.match_id);
+            if (a > 0) matchesWithDbAssists.add(s.match_id);
+            cur.goals += g;
+            cur.assists += a;
+            statTotals.set(s.player_id, cur);
+        });
+
+        // Also parse m.goalscorers and m.assists text strings for any match where match_player_stats didn't record them
+        const simpleRefs = players.map(p => ({
+            id: p.id,
+            firstName: p.firstName,
+            lastName: p.lastName,
+            nickname: p.nickname,
+            useNickname: p.useNickname
+        }));
+
+        matches.forEach(m => {
+            if (!validMatchIds.has(m.id)) return;
+            if (m.goalscorers && !matchesWithDbGoals.has(m.id)) {
+                const parsedGoals = parseStatTextString(m.goalscorers, simpleRefs);
+                parsedGoals.forEach(token => {
+                    if (token.playerId) {
+                        const cur = statTotals.get(token.playerId) || { goals: 0, assists: 0, apps: 0 };
+                        cur.goals += token.count;
+                        statTotals.set(token.playerId, cur);
+                    }
+                });
+            }
+            if (m.assists && !matchesWithDbAssists.has(m.id)) {
+                const parsedAssists = parseStatTextString(m.assists, simpleRefs);
+                parsedAssists.forEach(token => {
+                    if (token.playerId) {
+                        const cur = statTotals.get(token.playerId) || { goals: 0, assists: 0, apps: 0 };
+                        cur.assists += token.count;
+                        statTotals.set(token.playerId, cur);
+                    }
+                });
+            }
+        });
+
+        const enrichedPlayers = players.map(p => {
+            const st = statTotals.get(p.id);
+            return {
+                ...p,
+                goals: st ? st.goals : (p.goals || 0),
+                assists: st ? st.assists : (p.assists || 0),
+                appearances: st ? st.apps : (p.appearances || 0)
+            };
+        });
+
+        const topScorers = [...enrichedPlayers]
             .filter(p => (p.goals || 0) > 0)
             .sort((a, b) => (b.goals || 0) - (a.goals || 0) || (a.appearances || 0) - (b.appearances || 0));
 
-        const topAssisters = [...players]
+        const topAssisters = [...enrichedPlayers]
             .filter(p => (p.assists || 0) > 0)
             .sort((a, b) => (b.assists || 0) - (a.assists || 0) || (a.appearances || 0) - (b.appearances || 0));
+
+        const topContributors = [...enrichedPlayers]
+            .map(p => ({ ...p, totalGA: (p.goals || 0) + (p.assists || 0) }))
+            .filter(p => p.totalGA > 0)
+            .sort((a, b) => b.totalGA - a.totalGA || (b.goals || 0) - (a.goals || 0));
 
         // Count MOTM from match notes [MOTM: ...]
         const motmCounts: Record<string, number> = {};
@@ -476,12 +557,14 @@ export default function DashboardPage() {
             secondScorer: topScorers[1] || null,
             topAssister: topAssisters[0] || null,
             secondAssister: topAssisters[1] || null,
+            topContributor: topContributors[0] || null,
+            secondContributor: topContributors[1] || null,
             topMotm: motmSorted[0] ? { name: motmSorted[0][0], count: motmSorted[0][1] } : null,
             secondMotm: motmSorted[1] ? { name: motmSorted[1][0], count: motmSorted[1][1] } : null,
             topTrainingPlayer: playerTrainingStats[0] || null,
             teamAvgAttendance
         };
-    }, [players, matches, trainingSessions]);
+    }, [players, matches, matchPlayerStats, trainingSessions]);
 
     // Needs Attention / Action Items (#1)
     const todayStr = new Date().toISOString().split("T")[0];
@@ -1071,10 +1154,10 @@ export default function DashboardPage() {
                             )}
                         </div>
 
-                        {/* Most MOTMs */}
+                        {/* Most MOTMs or Most Goal Contributions (G+A) */}
                         <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-3.5 md:p-4">
                             <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500 truncate">
-                                Man of the Match
+                                {leaderboards.topMotm ? "Man of the Match" : "Goal Contributions (G+A)"}
                             </p>
                             {leaderboards.topMotm ? (
                                 <>
@@ -1092,8 +1175,25 @@ export default function DashboardPage() {
                                             : "Season MOTM Leader"}
                                     </p>
                                 </>
+                            ) : leaderboards.topContributor ? (
+                                <>
+                                    <div className="flex items-baseline justify-between gap-2 mt-1">
+                                        <span className="text-sm md:text-base font-extrabold text-foreground truncate">
+                                            {formatPlayerName(leaderboards.topContributor)}
+                                        </span>
+                                        <span className="text-xl md:text-2xl font-black text-amber-500 shrink-0">
+                                            {leaderboards.topContributor.totalGA}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                                        {leaderboards.topContributor.goals}G + {leaderboards.topContributor.assists}A
+                                        {leaderboards.secondContributor
+                                            ? ` • 2nd: ${formatPlayerName(leaderboards.secondContributor)} (${leaderboards.secondContributor.totalGA})`
+                                            : ""}
+                                    </p>
+                                </>
                             ) : (
-                                <p className="text-xs text-muted-foreground mt-2">Awarded on match results</p>
+                                <p className="text-xs text-muted-foreground mt-2">No contributions logged yet</p>
                             )}
                         </div>
 
