@@ -99,6 +99,8 @@ export default function OppositionReportsPage() {
     const [isGeneratingGraphic, setIsGeneratingGraphic] = useState(false);
     const [showPitchSection, setShowPitchSection] = useState(false);
     const [hasHandledQueryTeam, setHasHandledQueryTeam] = useState(false);
+    const [mobileTab, setMobileTab] = useState<"all" | "threats" | "tactics" | "pitch" | "review">("all");
+    const [showMobileDirectory, setShowMobileDirectory] = useState(false);
 
     // Helper: normalize team names so "Stonewall FC" matches "Stonewall"
     const normalizeTeamKey = (name: string): string =>
@@ -948,6 +950,1046 @@ export default function OppositionReportsPage() {
                 ))}
             </datalist>
 
+            {/* ================================================================= */}
+            {/* DEDICATED MOBILE OPPOSITION REPORTS (< 768px)                     */}
+            {/* ================================================================= */}
+            <div className="md:hidden space-y-3.5 pb-20">
+                {/* 1. MOBILE HEADER & QUICK ACTION */}
+                <div className="flex items-center justify-between gap-2">
+                    <div>
+                        <h1 className="text-xl font-black tracking-tight text-foreground leading-none">
+                            Opposition Hub
+                        </h1>
+                        <p className="text-[11px] text-muted-foreground font-medium mt-1">
+                            Tactical dossiers, danger men &amp; H2H history
+                        </p>
+                    </div>
+                    <Button
+                        size="sm"
+                        onClick={handleStartNewReport}
+                        className="h-9 px-3 rounded-xl bg-brand hover:bg-brand/90 text-brand-foreground font-extrabold text-xs shadow-xs"
+                    >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        New Report
+                    </Button>
+                </div>
+
+                {/* 2. MOBILE 4-STAT SCOUTING PULSE BENTO STRIP */}
+                <div className="grid grid-cols-4 gap-1.5">
+                    <button
+                        type="button"
+                        onClick={() => nextMatch && handleOpenOrStartForTeam(nextMatch.opponent)}
+                        className="rounded-xl bg-surface-1 border border-border p-2.5 text-left transition-colors active:bg-surface-2"
+                    >
+                        <div className="text-[9px] font-extrabold uppercase tracking-wider text-brand truncate">
+                            Up Next
+                        </div>
+                        <div className="text-xs font-black text-foreground truncate mt-0.5">
+                            {nextMatch ? nextMatch.opponent : "TBC"}
+                        </div>
+                        <div className="text-[9px] font-bold text-muted-foreground truncate mt-0.5">
+                            {nextMatch
+                                ? nextMatchHasReport
+                                    ? "✓ Scouted"
+                                    : "+ Scout now"
+                                : "No fixture"}
+                        </div>
+                    </button>
+
+                    <div className="rounded-xl bg-surface-1 border border-border p-2.5">
+                        <div className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground truncate">
+                            Dossiers
+                        </div>
+                        <div className="text-sm font-black text-foreground tabular-nums mt-0.5">
+                            {reports.length}
+                        </div>
+                        <div className="text-[9px] font-semibold text-muted-foreground truncate mt-0.5">
+                            Saved teams
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={() => setShowMobileDirectory((prev) => !prev)}
+                        className="rounded-xl bg-surface-1 border border-border p-2.5 text-left transition-colors active:bg-surface-2"
+                    >
+                        <div className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground truncate">
+                            Division
+                        </div>
+                        <div className="text-sm font-black text-foreground tabular-nums mt-0.5">
+                            {knownOpponentsDirectory.length}
+                        </div>
+                        <div className="text-[9px] font-bold text-brand truncate mt-0.5">
+                            {showMobileDirectory ? "Hide list" : "Browse all"}
+                        </div>
+                    </button>
+
+                    <div className="rounded-xl bg-surface-1 border border-border p-2.5">
+                        <div className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground truncate">
+                            Shape
+                        </div>
+                        <div className="text-xs font-black text-foreground truncate mt-0.5">
+                            {activeReport.formation}
+                        </div>
+                        <div className="text-[9px] font-semibold text-muted-foreground truncate mt-0.5">
+                            {(activeReport.dangerMenList || []).length} threats
+                        </div>
+                    </div>
+                </div>
+
+                {/* 3. MOBILE "UP NEXT" MATCHDAY SCOUTING BANNER */}
+                {nextMatch && (
+                    <div className="rounded-2xl border border-brand/35 bg-surface-1 p-3 shadow-xs border-l-4 border-l-brand space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-brand/15 text-brand text-[9px] font-black uppercase tracking-wider shrink-0">
+                                    <Zap className="h-2.5 w-2.5 fill-brand" /> Up Next
+                                </span>
+                                <span className="text-[11px] font-bold text-muted-foreground truncate">
+                                    {formatDateShort(nextMatch.date)} • {nextMatch.time} ({nextMatch.isHome ? "H" : "A"})
+                                </span>
+                            </div>
+                            {nextMatchLeagueRow && (
+                                <span className="px-1.5 py-0.5 rounded bg-surface-2 border border-border text-[9px] font-black text-foreground shrink-0">
+                                    #{nextMatchLeagueRow.position} • {nextMatchLeagueRow.points} pts
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                                <div className="text-sm font-black text-foreground truncate">
+                                    vs {nextMatch.opponent}
+                                </div>
+                                {nextMatchHasReport ? (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500">
+                                        <CheckCircle2 className="h-3 w-3" /> Scouting Report Ready
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-500">
+                                        <AlertTriangle className="h-3 w-3" /> Not Scouted Yet
+                                    </span>
+                                )}
+                            </div>
+                            <Button
+                                size="sm"
+                                onClick={() => handleOpenOrStartForTeam(nextMatch.opponent)}
+                                className="h-8 px-3 rounded-xl bg-brand hover:bg-brand/90 text-brand-foreground font-extrabold text-[11px] shrink-0"
+                            >
+                                <Target className="h-3 w-3 mr-1" />
+                                {nextMatchHasReport ? "Open Dossier" : "Scout Team"}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* 4. MOBILE TEAM SWITCHER PILL BAR + EXPANDABLE DIRECTORY */}
+                <div className="rounded-2xl bg-surface-1 border border-border p-3 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                            Switch Opponent ({reports.length} Saved)
+                        </span>
+                        <button
+                            type="button"
+                            onClick={() => setShowMobileDirectory((prev) => !prev)}
+                            className="text-[11px] font-extrabold text-brand flex items-center gap-1"
+                        >
+                            <Search className="h-3 w-3" />
+                            {showMobileDirectory ? "Close Directory" : "Search All Teams"}
+                        </button>
+                    </div>
+
+                    {/* Horizontal Pill Strip */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                        {reports.map((rep) => {
+                            const isSelected = activeReport.id === rep.id || isMatchingTeam(activeReport.name, rep.name);
+                            const lRow = leagueRows.find((r: any) => isMatchingTeam(r.team_name || r.name || "", rep.name));
+                            return (
+                                <button
+                                    key={rep.id}
+                                    type="button"
+                                    onClick={() => handleSelectReport(rep)}
+                                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap border transition-colors flex items-center gap-1.5 shrink-0 ${
+                                        isSelected
+                                            ? "bg-brand text-brand-foreground border-brand shadow-xs"
+                                            : "bg-surface-2 text-foreground border-border"
+                                    }`}
+                                >
+                                    <span>{rep.name}</span>
+                                    {lRow?.position && (
+                                        <span className="text-[10px] opacity-85 font-black">#{lRow.position}</span>
+                                    )}
+                                </button>
+                            );
+                        })}
+
+                        {knownOpponentsDirectory
+                            .filter((dir) => !reports.some((r) => isMatchingTeam(r.name, dir.name)))
+                            .map((dir) => (
+                                <button
+                                    key={dir.name}
+                                    type="button"
+                                    onClick={() => handleOpenOrStartForTeam(dir.name)}
+                                    className="px-2.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap border border-dashed border-border bg-surface-1 text-muted-foreground flex items-center gap-1 shrink-0"
+                                >
+                                    <Plus className="h-3 w-3 text-brand" />
+                                    <span>{dir.name}</span>
+                                    {dir.position && <span className="text-[10px] font-bold">#{dir.position}</span>}
+                                </button>
+                            ))}
+                    </div>
+
+                    {/* Expandable Full League & Schedule Team Picker */}
+                    {showMobileDirectory && (
+                        <div className="pt-2 border-t border-border space-y-2">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                <Input
+                                    placeholder="Filter saved reports or league teams..."
+                                    value={teamSearch}
+                                    onChange={(e) => setTeamSearch(e.target.value)}
+                                    className="pl-8 h-8 text-xs bg-surface-2 border-border"
+                                />
+                            </div>
+                            <div className="grid grid-cols-1 gap-1 max-h-52 overflow-y-auto pr-1">
+                                {filteredDirectoryTeams.map((dir) => {
+                                    const savedRep = reports.find((r) => isMatchingTeam(r.name, dir.name));
+                                    return (
+                                        <div
+                                            key={dir.name}
+                                            onClick={() => {
+                                                handleOpenOrStartForTeam(dir.name);
+                                                setShowMobileDirectory(false);
+                                            }}
+                                            className="flex items-center justify-between px-2.5 py-2 rounded-xl bg-surface-2/70 border border-border active:bg-surface-2 cursor-pointer"
+                                        >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                {dir.position && (
+                                                    <span className="text-[10px] font-black text-brand w-5 tabular-nums">
+                                                        #{dir.position}
+                                                    </span>
+                                                )}
+                                                <span className="text-xs font-bold text-foreground truncate">
+                                                    {dir.name}
+                                                </span>
+                                            </div>
+                                            <span
+                                                className={`text-[10px] font-extrabold px-2 py-0.5 rounded-md ${
+                                                    savedRep
+                                                        ? "bg-emerald-500/15 text-emerald-500"
+                                                        : "bg-brand/15 text-brand"
+                                                }`}
+                                            >
+                                                {savedRep ? "Open Saved" : "+ Start Report"}
+                                            </span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* 5. MOBILE ACTIVE OPPONENT HERO CARD */}
+                <div className="rounded-2xl bg-surface-1 border border-border p-3.5 shadow-xs space-y-3">
+                    {isEditing ? (
+                        <div className="space-y-2.5">
+                            <div className="space-y-1">
+                                <Label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                    Opposition Team Name
+                                </Label>
+                                <Input
+                                    list="opposition-known-teams"
+                                    value={editedReport?.name || ""}
+                                    onChange={(e) =>
+                                        setEditedReport((prev) =>
+                                            prev ? { ...prev, name: e.target.value } : null
+                                        )
+                                    }
+                                    placeholder="Type or pick opponent..."
+                                    className="h-10 text-sm font-black bg-surface-2 border-border"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                        Expected Formation
+                                    </Label>
+                                    <select
+                                        value={editedReport?.formation || "4-2-3-1"}
+                                        onChange={(e) =>
+                                            setEditedReport((prev) =>
+                                                prev ? { ...prev, formation: e.target.value } : null
+                                            )
+                                        }
+                                        className="w-full h-9 px-2.5 rounded-lg border border-border bg-surface-2 text-xs font-bold text-foreground"
+                                    >
+                                        {FORMATION_NAMES.map((name) => (
+                                            <option key={name} value={name}>
+                                                {name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+                                <div className="flex items-end gap-1.5">
+                                    <Button
+                                        size="sm"
+                                        onClick={handleSaveReport}
+                                        className="h-9 flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg"
+                                    >
+                                        <Save className="h-3.5 w-3.5 mr-1" />
+                                        Save
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleCancelEdit}
+                                        className="h-9 px-2.5 border-border bg-surface-2 text-foreground font-bold text-xs rounded-lg"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-2.5">
+                            <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-[9px] font-black uppercase tracking-wider text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
+                                            Scouting Dossier
+                                        </span>
+                                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-surface-2 border border-border text-foreground">
+                                            {activeReport.formation}
+                                        </span>
+                                        <span className="text-[10px] text-muted-foreground">
+                                            {formatDateShort(activeReport.updatedAt)}
+                                        </span>
+                                    </div>
+                                    <h2 className="text-xl font-black text-foreground tracking-tight truncate mt-1">
+                                        {activeReport.name || "Select an Opponent"}
+                                    </h2>
+                                </div>
+                                {selectedReport && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteReport(selectedReport.id)}
+                                        className="h-8 w-8 rounded-lg flex items-center justify-center text-rose-500 hover:bg-rose-500/10 shrink-0"
+                                        title="Delete Report"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                )}
+                            </div>
+
+                            {/* Mobile Action Bar */}
+                            <div className="grid grid-cols-3 gap-1.5">
+                                <Button
+                                    size="sm"
+                                    onClick={handleEditReport}
+                                    className="h-9 rounded-xl bg-brand hover:bg-brand/90 text-brand-foreground font-extrabold text-xs"
+                                >
+                                    <Edit2 className="h-3.5 w-3.5 mr-1.5" />
+                                    Edit
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={isGeneratingGraphic}
+                                    onClick={handleShareGraphic}
+                                    className="h-9 rounded-xl border-border bg-surface-2 text-foreground font-extrabold text-xs"
+                                >
+                                    <Share2 className="h-3.5 w-3.5 mr-1.5 text-brand" />
+                                    {isGeneratingGraphic ? "..." : "Share PNG"}
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleExportPDF}
+                                    className="h-9 rounded-xl border-border bg-surface-2 text-foreground font-bold text-xs"
+                                >
+                                    <FileDown className="h-3.5 w-3.5 mr-1.5" />
+                                    PDF
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Compact 2-Col League Standing + H2H Strip on Mobile */}
+                    {activeReport.name.trim() && (
+                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-border">
+                            {/* League Box */}
+                            <div className="rounded-xl bg-surface-2/80 border border-border p-2.5 space-y-1">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                                        <Trophy className="h-3 w-3 text-amber-500" /> League
+                                    </span>
+                                    {activeLeagueStats && (
+                                        <span className="text-[10px] font-black text-brand">
+                                            #{activeLeagueStats.position} ({activeLeagueStats.points} pts)
+                                        </span>
+                                    )}
+                                </div>
+                                {activeLeagueStats ? (
+                                    <>
+                                        <div className="text-[11px] font-bold text-foreground tabular-nums">
+                                            {activeLeagueStats.played}P •{" "}
+                                            <span className="text-emerald-500">{activeLeagueStats.won}W</span>-
+                                            <span className="text-amber-500">{activeLeagueStats.drawn}D</span>-
+                                            <span className="text-rose-500">{activeLeagueStats.lost}L</span> • GD{" "}
+                                            {activeLeagueStats.goal_difference > 0
+                                                ? `+${activeLeagueStats.goal_difference}`
+                                                : activeLeagueStats.goal_difference}
+                                        </div>
+                                        {activeLeagueStats.form && (
+                                            <div className="flex items-center gap-1 pt-0.5">
+                                                {String(activeLeagueStats.form)
+                                                    .replace(/[^WDL]/gi, "")
+                                                    .slice(-5)
+                                                    .split("")
+                                                    .map((ch: string, idx: number) => {
+                                                        const u = ch.toUpperCase();
+                                                        const cls =
+                                                            u === "W"
+                                                                ? "bg-emerald-500 text-white"
+                                                                : u === "D"
+                                                                    ? "bg-amber-500 text-white"
+                                                                    : "bg-rose-500 text-white";
+                                                        return (
+                                                            <span
+                                                                key={idx}
+                                                                className={`w-4 h-4 rounded text-[9px] font-black flex items-center justify-center ${cls}`}
+                                                            >
+                                                                {u}
+                                                            </span>
+                                                        );
+                                                    })}
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <div className="text-[10px] text-muted-foreground">Non-league / Cup</div>
+                                )}
+                            </div>
+
+                            {/* H2H Box */}
+                            <div className="rounded-xl bg-surface-2/80 border border-border p-2.5 space-y-1">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                                        <Swords className="h-3 w-3 text-brand" /> H2H Record
+                                    </span>
+                                    {h2hData.past.length > 0 && (
+                                        <span className="text-[10px] font-black text-foreground tabular-nums">
+                                            {h2hData.gf}:{h2hData.ga}
+                                        </span>
+                                    )}
+                                </div>
+                                {h2hData.past.length > 0 ? (
+                                    <>
+                                        <div className="text-[11px] font-extrabold tabular-nums">
+                                            <span className="text-emerald-500">{h2hData.wins}W</span> -{" "}
+                                            <span className="text-amber-500">{h2hData.draws}D</span> -{" "}
+                                            <span className="text-rose-500">{h2hData.losses}L</span>
+                                        </div>
+                                        <div className="text-[10px] text-muted-foreground truncate">
+                                            Last: {h2hData.past[0].result?.[0]} {h2hData.past[0].scoreline} (
+                                            {formatDateShort(h2hData.past[0].date)})
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="text-[10px] text-muted-foreground">
+                                        {h2hData.upcoming.length > 0
+                                            ? `Next: ${formatDateShort(h2hData.upcoming[0].date)}`
+                                            : "First meeting"}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* 6. MOBILE SEGMENTED SUB-TAB BAR */}
+                <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-surface-1 border border-border">
+                    {(
+                        [
+                            { id: "all", label: "All" },
+                            { id: "threats", label: "Threats" },
+                            { id: "tactics", label: "Tactics" },
+                            { id: "pitch", label: "Pitch XI" },
+                            { id: "review", label: "Review" }
+                        ] as const
+                    ).map((t) => (
+                        <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => setMobileTab(t.id)}
+                            className={`py-1.5 px-1 rounded-lg text-[11px] font-extrabold transition-colors text-center truncate ${
+                                mobileTab === t.id
+                                    ? "bg-brand text-brand-foreground shadow-xs"
+                                    : "text-muted-foreground hover:text-foreground"
+                            }`}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* 7. MOBILE TAB CONTENT: THREATS (DANGER MEN, STRENGTHS, WEAKNESSES) */}
+                {(mobileTab === "all" || mobileTab === "threats") && (
+                    <div className="space-y-3">
+                        {/* Danger Men Card (Mobile Optimized Stacked Inputs) */}
+                        <div className="rounded-2xl bg-surface-1 border border-amber-500/35 border-l-4 border-l-amber-500 p-3.5 space-y-2.5 shadow-xs">
+                            <div className="flex items-center justify-between gap-2">
+                                <div>
+                                    <h3 className="text-xs font-black uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
+                                        <ShieldAlert className="h-3.5 w-3.5" />
+                                        Danger Men &amp; Key Players
+                                    </h3>
+                                    <p className="text-[10px] text-muted-foreground">
+                                        Shirt #, position, foot &amp; how to stop them
+                                    </p>
+                                </div>
+                                {isEditing && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleAddDangerMan}
+                                        className="h-7 px-2.5 text-[11px] font-extrabold border-amber-500/40 text-amber-500"
+                                    >
+                                        <Plus className="h-3 w-3 mr-1" />
+                                        Player
+                                    </Button>
+                                )}
+                            </div>
+
+                            {(activeReport.dangerMenList || []).length > 0 && (
+                                <div className="space-y-2">
+                                    {(activeReport.dangerMenList || []).map((dm) => (
+                                        <div
+                                            key={dm.id}
+                                            className="rounded-xl bg-surface-2 border border-border p-2.5 space-y-2"
+                                        >
+                                            {isEditing ? (
+                                                <>
+                                                    <div className="grid grid-cols-[54px_68px_1fr_auto] gap-1.5 items-center">
+                                                        <Input
+                                                            placeholder="#9"
+                                                            value={dm.number}
+                                                            onChange={(e) =>
+                                                                handleUpdateDangerMan(dm.id, "number", e.target.value)
+                                                            }
+                                                            className="h-8 text-xs font-bold text-center bg-surface-1 px-1"
+                                                        />
+                                                        <Input
+                                                            placeholder="ST/LW"
+                                                            value={dm.position}
+                                                            onChange={(e) =>
+                                                                handleUpdateDangerMan(dm.id, "position", e.target.value)
+                                                            }
+                                                            className="h-8 text-xs font-bold bg-surface-1 px-2"
+                                                        />
+                                                        <select
+                                                            value={dm.foot || "Right"}
+                                                            onChange={(e) =>
+                                                                handleUpdateDangerMan(dm.id, "foot", e.target.value)
+                                                            }
+                                                            className="h-8 rounded-md border border-border bg-surface-1 px-2 text-xs font-semibold text-foreground"
+                                                        >
+                                                            <option value="Right">Right Foot</option>
+                                                            <option value="Left">Left Foot</option>
+                                                            <option value="Both">Both Feet</option>
+                                                        </select>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleRemoveDangerMan(dm.id)}
+                                                            className="h-8 w-8 rounded-md flex items-center justify-center text-rose-500 hover:bg-rose-500/10"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
+                                                    <Input
+                                                        placeholder="Player name or nickname..."
+                                                        value={dm.name}
+                                                        onChange={(e) =>
+                                                            handleUpdateDangerMan(dm.id, "name", e.target.value)
+                                                        }
+                                                        className="h-8 text-xs font-semibold bg-surface-1"
+                                                    />
+                                                    <Input
+                                                        placeholder="Threat notes (e.g. Cuts inside onto right foot, rapid in behind)..."
+                                                        value={dm.notes}
+                                                        onChange={(e) =>
+                                                            handleUpdateDangerMan(dm.id, "notes", e.target.value)
+                                                        }
+                                                        className="h-8 text-xs bg-surface-1"
+                                                    />
+                                                </>
+                                            ) : (
+                                                <div className="space-y-1">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            {dm.number && (
+                                                                <span className="px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 text-[10px] font-black">
+                                                                    #{dm.number}
+                                                                </span>
+                                                            )}
+                                                            {dm.position && (
+                                                                <span className="px-1.5 py-0.5 rounded bg-surface-1 border border-border text-[10px] font-extrabold text-foreground">
+                                                                    {dm.position}
+                                                                </span>
+                                                            )}
+                                                            <span className="text-xs font-extrabold text-foreground">
+                                                                {dm.name || "Key Threat"}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-[10px] font-bold text-muted-foreground">
+                                                            {dm.foot} foot
+                                                        </span>
+                                                    </div>
+                                                    {dm.notes && (
+                                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                                            {dm.notes}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {isEditing ? (
+                                <textarea
+                                    value={editedReport?.dangerMen || ""}
+                                    onChange={(e) =>
+                                        setEditedReport((prev) =>
+                                            prev ? { ...prev, dangerMen: e.target.value } : null
+                                        )
+                                    }
+                                    placeholder="General danger men notes (e.g. #10 dictates play, #7 takes all set pieces)..."
+                                    className="w-full min-h-[75px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none"
+                                />
+                            ) : activeReport.dangerMen ? (
+                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                    {activeReport.dangerMen}
+                                </p>
+                            ) : (activeReport.dangerMenList || []).length === 0 ? (
+                                <p className="text-xs text-muted-foreground italic">
+                                    No danger men logged yet. Tap Edit to add key opposition players.
+                                </p>
+                            ) : null}
+                        </div>
+
+                        {/* Strengths Card (Mobile) */}
+                        <div className="rounded-2xl bg-surface-1 border border-border border-l-4 border-l-emerald-500 p-3.5 space-y-2 shadow-xs">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
+                                <Sparkles className="h-3.5 w-3.5" />
+                                Their Strengths
+                            </h3>
+                            {isEditing ? (
+                                <textarea
+                                    value={editedReport?.strengths || ""}
+                                    onChange={(e) =>
+                                        setEditedReport((prev) =>
+                                            prev ? { ...prev, strengths: e.target.value } : null
+                                        )
+                                    }
+                                    placeholder="What are they good at? (e.g. Physical midfield, fast wingers, dangerous on corners)..."
+                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                />
+                            ) : (
+                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                    {activeReport.strengths || (
+                                        <span className="text-muted-foreground italic">No strengths logged yet.</span>
+                                    )}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Weaknesses Card (Mobile) */}
+                        <div className="rounded-2xl bg-surface-1 border border-border border-l-4 border-l-rose-500 p-3.5 space-y-2 shadow-xs">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-rose-500 flex items-center gap-1.5">
+                                <Target className="h-3.5 w-3.5" />
+                                Their Weaknesses (How We Hurt Them)
+                            </h3>
+                            {isEditing ? (
+                                <textarea
+                                    value={editedReport?.weaknesses || ""}
+                                    onChange={(e) =>
+                                        setEditedReport((prev) =>
+                                            prev ? { ...prev, weaknesses: e.target.value } : null
+                                        )
+                                    }
+                                    placeholder="Where can we exploit them? (e.g. Slow CBs against balls in behind, GK struggles under high crosses)..."
+                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                />
+                            ) : (
+                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                    {activeReport.weaknesses || (
+                                        <span className="text-muted-foreground italic">No weaknesses logged yet.</span>
+                                    )}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* 8. MOBILE TAB CONTENT: TACTICS (IN POSSESSION, OUT OF POSSESSION, TRANSITION, SET PIECES) */}
+                {(mobileTab === "all" || mobileTab === "tactics") && (
+                    <div className="space-y-3">
+                        {/* In Possession */}
+                        <div className="rounded-2xl bg-surface-1 border border-border border-l-4 border-l-blue-500 p-3.5 space-y-2 shadow-xs">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-blue-500 flex items-center gap-1.5">
+                                <Users className="h-3.5 w-3.5" />
+                                In Possession (Build-Up &amp; Shape)
+                            </h3>
+                            {isEditing ? (
+                                <textarea
+                                    value={editedReport?.inPossession || ""}
+                                    onChange={(e) =>
+                                        setEditedReport((prev) =>
+                                            prev ? { ...prev, inPossession: e.target.value } : null
+                                        )
+                                    }
+                                    placeholder="How do they build up and attack? (e.g. Play short to #6 or go direct to #9?)..."
+                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                />
+                            ) : (
+                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                    {activeReport.inPossession || (
+                                        <span className="text-muted-foreground italic">
+                                            No in-possession notes logged yet.
+                                        </span>
+                                    )}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Out of Possession */}
+                        <div className="rounded-2xl bg-surface-1 border border-border border-l-4 border-l-purple-500 p-3.5 space-y-2 shadow-xs">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-purple-500 flex items-center gap-1.5">
+                                <Swords className="h-3.5 w-3.5" />
+                                Out of Possession (Defensive Shape &amp; Press)
+                            </h3>
+                            {isEditing ? (
+                                <textarea
+                                    value={editedReport?.outOfPossession || ""}
+                                    onChange={(e) =>
+                                        setEditedReport((prev) =>
+                                            prev ? { ...prev, outOfPossession: e.target.value } : null
+                                        )
+                                    }
+                                    placeholder="How do they defend? (e.g. High line with aggressive press, or compact mid/low block?)..."
+                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                />
+                            ) : (
+                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                    {activeReport.outOfPossession || (
+                                        <span className="text-muted-foreground italic">
+                                            No out-of-possession notes logged yet.
+                                        </span>
+                                    )}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Transition */}
+                        <div className="rounded-2xl bg-surface-1 border border-border border-l-4 border-l-orange-500 p-3.5 space-y-2 shadow-xs">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-orange-500 flex items-center gap-1.5">
+                                <Zap className="h-3.5 w-3.5" />
+                                Transition (Attacking &amp; Defensive)
+                            </h3>
+                            {isEditing ? (
+                                <textarea
+                                    value={editedReport?.transition || ""}
+                                    onChange={(e) =>
+                                        setEditedReport((prev) =>
+                                            prev ? { ...prev, transition: e.target.value } : null
+                                        )
+                                    }
+                                    placeholder="What happens when the ball turns over? (e.g. Early ball over the top to wingers; slow to track back)..."
+                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                />
+                            ) : (
+                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                    {activeReport.transition || (
+                                        <span className="text-muted-foreground italic">
+                                            No transition notes logged yet.
+                                        </span>
+                                    )}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Set Pieces */}
+                        <div className="rounded-2xl bg-surface-1 border border-border border-l-4 border-l-cyan-500 p-3.5 space-y-2 shadow-xs">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-cyan-500 flex items-center gap-1.5">
+                                <Flag className="h-3.5 w-3.5" />
+                                Set Pieces (Corners, Free Kicks &amp; Throws)
+                            </h3>
+                            {isEditing ? (
+                                <textarea
+                                    value={editedReport?.setPieces || ""}
+                                    onChange={(e) =>
+                                        setEditedReport((prev) =>
+                                            prev ? { ...prev, setPieces: e.target.value } : null
+                                        )
+                                    }
+                                    placeholder="Inswinging corners to near post? Long throw specialist? Zonal or man-marking?..."
+                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                />
+                            ) : (
+                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                    {activeReport.setPieces || (
+                                        <span className="text-muted-foreground italic">
+                                            No set-piece notes logged yet.
+                                        </span>
+                                    )}
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* 9. MOBILE TAB CONTENT: PITCH & XI */}
+                {(mobileTab === "pitch" || (mobileTab === "all" && showPitchSection)) && (
+                    <div className="rounded-2xl bg-surface-1 border border-border overflow-hidden shadow-xs">
+                        <div className="p-3.5 flex items-center justify-between border-b border-border">
+                            <div>
+                                <h3 className="text-xs font-black uppercase tracking-wider text-foreground">
+                                    Tactical Pitch ({activeReport.formation})
+                                </h3>
+                                <p className="text-[10px] text-muted-foreground">
+                                    Tap any shirt number on the pitch to edit their role &amp; traits
+                                </p>
+                            </div>
+                            {mobileTab === "all" && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPitchSection(false)}
+                                    className="text-[11px] font-bold text-muted-foreground"
+                                >
+                                    Hide
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Pitch Canvas */}
+                        <div className="relative w-full bg-emerald-700" style={{ paddingBottom: "82%" }}>
+                            <div className="absolute inset-0 opacity-40">
+                                <div className="absolute inset-3 border-2 border-white/60 rounded-sm"></div>
+                                <div className="absolute left-3 right-3 top-1/2 border-t-2 border-white/60"></div>
+                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 border-2 border-white/60 rounded-full"></div>
+                                <div className="absolute left-1/2 -translate-x-1/2 top-3 w-28 h-12 border-2 border-white/60 border-t-0"></div>
+                                <div className="absolute left-1/2 -translate-x-1/2 bottom-3 w-28 h-12 border-2 border-white/60 border-b-0"></div>
+                            </div>
+
+                            {formationPositions.map((pos, idx) => {
+                                const isTopHalf = pos.y < 50 && pos.label !== "GK";
+                                const profile = (activeReport.playerProfiles || []).find(
+                                    (p) => p.positionIndex === idx
+                                );
+                                const playerName = activeReport.lineup?.[idx] || "";
+                                return (
+                                    <div
+                                        key={idx}
+                                        className="absolute z-20 cursor-pointer"
+                                        style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                                        onClick={() => setSelectedProfileIndex(idx)}
+                                    >
+                                        <div
+                                            className={`absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-white border-2 rounded-full flex items-center justify-center shadow-lg ${
+                                                profile?.role ? "border-amber-500" : "border-red-600"
+                                            }`}
+                                        >
+                                            <span className="text-[9px] font-black text-slate-900">
+                                                {pos.number}
+                                            </span>
+                                        </div>
+                                        <div
+                                            className={`absolute -translate-x-1/2 z-30 flex flex-col items-center ${
+                                                isTopHalf ? "bottom-4" : "top-4"
+                                            }`}
+                                        >
+                                            <span className="text-[8px] font-bold text-white bg-slate-900/80 px-1.5 py-0.5 rounded whitespace-nowrap">
+                                                {playerName || getDisplayPosition(pos.label)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+
+                        {/* Mobile 11-Player List */}
+                        <div className="p-3 space-y-1.5">
+                            {formationPositions.map((pos, idx) => {
+                                const profile = (activeReport.playerProfiles || []).find(
+                                    (p) => p.positionIndex === idx
+                                );
+                                return (
+                                    <div
+                                        key={idx}
+                                        onClick={() => setSelectedProfileIndex(idx)}
+                                        className="flex items-center gap-2 p-2 rounded-xl bg-surface-2/70 border border-border"
+                                    >
+                                        <div className="w-6 h-6 rounded-full bg-brand text-brand-foreground flex items-center justify-center shrink-0 text-[10px] font-black">
+                                            {pos.number}
+                                        </div>
+                                        <span className="text-[11px] font-extrabold text-muted-foreground w-9 shrink-0">
+                                            {getDisplayPosition(pos.label)}
+                                        </span>
+                                        {isEditing ? (
+                                            <input
+                                                type="text"
+                                                value={editedReport?.lineup?.[idx] || ""}
+                                                onChange={(e) => {
+                                                    if (!editedReport) return;
+                                                    const nextLineup = [...(editedReport.lineup || [])];
+                                                    while (nextLineup.length <= idx) nextLineup.push("");
+                                                    nextLineup[idx] = e.target.value;
+                                                    setEditedReport({ ...editedReport, lineup: nextLineup });
+                                                }}
+                                                onClick={(e) => e.stopPropagation()}
+                                                placeholder="Player name / note..."
+                                                className="flex-1 text-xs bg-surface-1 border border-border rounded-lg px-2 py-1 text-foreground outline-none"
+                                            />
+                                        ) : (
+                                            <span className="flex-1 text-xs font-semibold text-foreground truncate">
+                                                {activeReport.lineup?.[idx] || "—"}
+                                            </span>
+                                        )}
+                                        {profile?.role && (
+                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 shrink-0">
+                                                {profile.role}
+                                            </span>
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {mobileTab === "all" && !showPitchSection && (
+                    <button
+                        type="button"
+                        onClick={() => setShowPitchSection(true)}
+                        className="w-full py-2.5 px-3 rounded-xl bg-surface-1 border border-border text-xs font-extrabold text-foreground flex items-center justify-center gap-1.5"
+                    >
+                        <Eye className="h-3.5 w-3.5 text-brand" />
+                        Show Optional Tactical Pitch &amp; 11-Man Lineup ({activeReport.formation})
+                    </button>
+                )}
+
+                {/* 10. MOBILE TAB CONTENT: POST-MATCH REVIEW & FULL H2H LOG */}
+                {(mobileTab === "all" || mobileTab === "review") && (
+                    <div className="space-y-3">
+                        <div className="rounded-2xl bg-surface-1 border border-border p-3.5 space-y-2 shadow-xs">
+                            <h3 className="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                                <ClipboardCheck className="h-4 w-4 text-brand" />
+                                Post-Match Review &amp; Notes for Next Time
+                            </h3>
+                            {isEditing ? (
+                                <textarea
+                                    value={editedReport?.postMatchReview || ""}
+                                    onChange={(e) =>
+                                        setEditedReport((prev) =>
+                                            prev ? { ...prev, postMatchReview: e.target.value } : null
+                                        )
+                                    }
+                                    placeholder="Log what worked after full-time so you have it ready for the reverse fixture..."
+                                    className="w-full min-h-[85px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                />
+                            ) : (
+                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                    {activeReport.postMatchReview || activeReport.generalNotes || (
+                                        <span className="text-muted-foreground italic">
+                                            No post-match notes recorded yet.
+                                        </span>
+                                    )}
+                                </p>
+                            )}
+                        </div>
+
+                        {mobileTab === "review" && h2hData.past.length > 0 && (
+                            <div className="rounded-2xl bg-surface-1 border border-border p-3.5 space-y-2 shadow-xs">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                    <History className="h-3.5 w-3.5 text-brand" />
+                                    Previous Meetings vs {activeReport.name}
+                                </h3>
+                                <div className="space-y-1.5">
+                                    {h2hData.past.map((m: any) => (
+                                        <div
+                                            key={m.id}
+                                            className="p-2.5 rounded-xl bg-surface-2/70 border border-border flex items-center justify-between gap-2"
+                                        >
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span
+                                                    className={`w-5 h-5 rounded text-[10px] font-black flex items-center justify-center shrink-0 ${
+                                                        m.result === "Win"
+                                                            ? "bg-emerald-500 text-white"
+                                                            : m.result === "Draw"
+                                                                ? "bg-amber-500 text-white"
+                                                                : "bg-rose-500 text-white"
+                                                    }`}
+                                                >
+                                                    {m.result?.[0]}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <div className="text-xs font-black text-foreground">
+                                                        {m.scoreline} ({m.isHome ? "Home" : "Away"})
+                                                    </div>
+                                                    {m.goalscorers && (
+                                                        <div className="text-[10px] text-muted-foreground truncate">
+                                                            ⚽ {m.goalscorers}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <span className="text-[10px] font-bold text-muted-foreground shrink-0">
+                                                {formatDateShort(m.date)}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* 11. FLOATING MOBILE SAVE BAR WHEN EDITING */}
+                {isEditing && (
+                    <div className="fixed bottom-16 left-3 right-3 z-40 rounded-2xl bg-surface-1/95 backdrop-blur-md border border-brand/40 p-2.5 shadow-2xl flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-extrabold text-foreground truncate pl-1">
+                            Editing: {editedReport?.name || "New Report"}
+                        </span>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleCancelEdit}
+                                className="h-8 px-3 rounded-xl border-border bg-surface-2 text-xs font-bold"
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={handleSaveReport}
+                                className="h-8 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold"
+                            >
+                                <Save className="h-3.5 w-3.5 mr-1" />
+                                Save Report
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            {/* ================================================================= */}
+            {/* DESKTOP OPPOSITION REPORTS (>= 768px — UNTOUCHED)                 */}
+            {/* ================================================================= */}
+            <div className="hidden md:block space-y-6">
             {/* ================================================================= */}
             {/* PAGE HEADER (Responsive Mobile & Desktop)                         */}
             {/* ================================================================= */}
@@ -2001,6 +3043,7 @@ export default function OppositionReportsPage() {
                         )}
                     </Card>
                 </div>
+            </div>
             </div>
 
             {/* Position Profile Modal (for Pitch Visualizer) */}
