@@ -139,6 +139,7 @@ export default function MatchdayXIPage() {
     const [showLogisticsEditor, setShowLogisticsEditor] = useState<boolean>(false);
     const [showRolesAndNotes, setShowRolesAndNotes] = useState<boolean>(false);
     const [modalTab, setModalTab] = useState<"swap" | "details">("swap");
+    const [mobileActiveTab, setMobileActiveTab] = useState<"pitch" | "bench" | "squad" | "roles">("pitch");
     const [openActionDropdown, setOpenActionDropdown] = useState<"autofill" | "share" | null>(null);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
     const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -2963,32 +2964,340 @@ export default function MatchdayXIPage() {
         return a.lastName.localeCompare(b.lastName);
     });
 
+    const handleQuickAssignFromSquad = (player: Player) => {
+        if (!lineup) return;
+        const displayName = formatPlayerName(player);
 
+        // 1. Try to find an ideal empty Starting XI slot
+        for (let i = 0; i < formation.length; i++) {
+            if (!lineup.starters[i] && isIdealPosition(player.position, formation[i].label)) {
+                handleStarterChange(i, player.id);
+                showToast(`Assigned ${displayName} to ${formation[i].label} (Starting XI)`);
+                return;
+            }
+        }
+
+        // 2. Try secondary position match in Starting XI
+        if (player.secondaryPositions && player.secondaryPositions.length > 0) {
+            for (let i = 0; i < formation.length; i++) {
+                if (!lineup.starters[i] && player.secondaryPositions.some(sec => isIdealPosition(sec, formation[i].label))) {
+                    handleStarterChange(i, player.id);
+                    showToast(`Assigned ${displayName} to ${formation[i].label} (Starting XI)`);
+                    return;
+                }
+            }
+        }
+
+        // 3. Try same position unit (GK / DEF / MID / FWD) in Starting XI
+        const playerCat = getPositionCategory(player.position);
+        for (let i = 0; i < formation.length; i++) {
+            if (!lineup.starters[i] && getPositionCategory(formation[i].label) === playerCat) {
+                handleStarterChange(i, player.id);
+                showToast(`Assigned ${displayName} to ${formation[i].label} (Starting XI)`);
+                return;
+            }
+        }
+
+        // 4. Try any open Starting XI slot (preferring outfield for outfielders)
+        for (let i = 0; i < formation.length; i++) {
+            if (!lineup.starters[i]) {
+                if (i === 0 && playerCat !== "GK" && Object.values(lineup.starters).filter(Boolean).length < 10) continue;
+                handleStarterChange(i, player.id);
+                showToast(`Assigned ${displayName} to ${formation[i].label} (Starting XI)`);
+                return;
+            }
+        }
+
+        // 5. Otherwise assign to the first open Bench slot (or append a new bench slot)
+        const emptySubIdx = lineup.substitutes.findIndex(id => !id);
+        if (emptySubIdx !== -1) {
+            handleSubChange(emptySubIdx, player.id);
+            showToast(`Assigned ${displayName} to Bench #${12 + emptySubIdx}`);
+            return;
+        }
+
+        const newSubs = [...lineup.substitutes, player.id];
+        const updated: MatchdayXI = { ...lineup, substitutes: newSubs, updatedAt: new Date().toISOString() };
+        setLineup(updated);
+        saveLineup(updated);
+        showToast(`Added ${displayName} to Bench #${11 + newSubs.length}`);
+    };
+
+    const selectedStartersCount = Object.values(lineup.starters).filter(Boolean).length;
+    const selectedSubsCount = lineup.substitutes.filter(Boolean).length;
+    const configuredRolesCount =
+        (lineup.captainId ? 1 : 0) +
+        [lineup.penaltyTakerId, lineup.cornerTakerId, lineup.freeKickTakerId].filter(Boolean).length +
+        (lineup.tacticalNotes?.trim() ? 1 : 0);
 
     return (
-        <div className="pb-16 flex flex-col gap-4 relative">
+        <div className="pb-16 flex flex-col gap-3 lg:gap-4 relative">
             {/* Non-blocking Toast Banner */}
             {toast && (
-                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-xl border backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200 bg-surface-1 border-border text-foreground">
-                    {toast.type === "error" ? (
-                        <AlertCircle className="h-4 w-4 text-status-error shrink-0" />
-                    ) : (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
-                    )}
-                    <span className="text-xs font-bold">{toast.message}</span>
-                    <button onClick={() => setToast(null)} className="ml-2 text-muted-foreground hover:text-foreground">
+                <div className="fixed bottom-4 left-4 right-4 sm:left-auto sm:bottom-6 sm:right-6 z-50 flex items-center justify-between sm:justify-start gap-2.5 px-4 py-3 rounded-xl shadow-xl border backdrop-blur-md animate-in fade-in slide-in-from-bottom-3 duration-200 bg-surface-1 border-border text-foreground">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        {toast.type === "error" ? (
+                            <AlertCircle className="h-4 w-4 text-status-error shrink-0" />
+                        ) : (
+                            <CheckCircle2 className="h-4 w-4 text-emerald-500 shrink-0" />
+                        )}
+                        <span className="text-xs font-bold truncate">{toast.message}</span>
+                    </div>
+                    <button onClick={() => setToast(null)} className="ml-2 text-muted-foreground hover:text-foreground shrink-0">
                         <X className="h-3.5 w-3.5" />
                     </button>
                 </div>
             )}
 
             {/* #1 & #2 Single-Row Compact Fixture Header Bar with Click-to-Edit Meet Time & Venue */}
-            <div className="bg-surface-1 rounded-2xl shadow-sm border border-border px-4 py-3 md:px-6 md:py-3.5 relative overflow-hidden">
-                <div className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.02]" style={{ backgroundImage: 'radial-gradient(circle at center, currentColor 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+            <div className="bg-surface-1 rounded-2xl shadow-sm border border-border px-3.5 py-3 md:px-6 md:py-3.5 relative">
+                <div className="absolute inset-0 rounded-2xl overflow-hidden pointer-events-none opacity-[0.03] dark:opacity-[0.02]" style={{ backgroundImage: 'radial-gradient(circle at center, currentColor 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
 
                 <div className="relative z-10 flex flex-col gap-2.5">
-                    {/* Single Top Row: Fixture Title + Metadata + Clickable Meet/Venue Pills + Fixture Selector */}
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                    {/* ==================== MOBILE FIXTURE HEADER (< 1024px) ==================== */}
+                    <div className="flex lg:hidden flex-col gap-2.5">
+                        {/* Mobile Row 1: Fixture Selector Dropdown + Live Save Status Pill */}
+                        <div className="flex items-center justify-between gap-2">
+                            <select
+                                value={selectedMatchId}
+                                onChange={(e) => {
+                                    const nextId = e.target.value;
+                                    selectedMatchIdRef.current = nextId;
+                                    setSelectedMatchId(nextId);
+                                    if (typeof window !== "undefined") {
+                                        sessionStorage.setItem("camden_matchday_xi_match_id", nextId);
+                                    }
+                                }}
+                                className="h-8 flex-1 min-w-0 bg-surface-2 hover:bg-surface-3 border border-border text-foreground text-xs rounded-xl px-2.5 transition-colors focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-bold truncate"
+                            >
+                                {matches.map(m => {
+                                    const formattedDate = new Date(m.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
+                                    return (
+                                        <option key={m.id} value={m.id} className="bg-surface-1 text-foreground">
+                                            {m.isHome ? "🏠" : "🚌"} vs {m.opponent} ({formattedDate}) {m.scoreline ? `[${m.scoreline}]` : (m.result !== "Pending" ? `[${m.result}]` : "")}
+                                        </option>
+                                    );
+                                })}
+                            </select>
+
+                            <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border shrink-0 ${
+                                saveStatus === "saving"
+                                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
+                                    : saveStatus === "saved"
+                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                                        : "bg-surface-2 text-muted-foreground border-border"
+                            }`}>
+                                {saveStatus === "saving" ? (
+                                    <>
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                        <span>Saving</span>
+                                    </>
+                                ) : saveStatus === "saved" ? (
+                                    <>
+                                        <CheckCircle2 className="h-3 w-3" />
+                                        <span>Saved</span>
+                                    </>
+                                ) : (
+                                    <span>Draft</span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Mobile Row 2: Matchup Title + Competition/Date + Tap-to-Edit Logistics Strip */}
+                        {nextMatch ? (
+                            <div className="flex flex-col gap-1.5">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex flex-wrap items-center gap-1.5 text-base sm:text-lg font-black tracking-tight leading-snug min-w-0">
+                                        <span className={nextMatch.isHome ? "text-foreground" : "text-muted-foreground"}>
+                                            {settings.name}
+                                        </span>
+                                        {nextMatch.scoreline ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => setShowLogisticsEditor(prev => !prev)}
+                                                className="text-emerald-400 text-xs font-black px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30"
+                                            >
+                                                {nextMatch.scoreline}
+                                            </button>
+                                        ) : (
+                                            <span className="text-muted-foreground text-[10px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-2">
+                                                vs
+                                            </span>
+                                        )}
+                                        <span className={!nextMatch.isHome ? "text-foreground" : "text-muted-foreground"}>
+                                            {nextMatch.opponent}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0 text-[10px] font-bold uppercase text-muted-foreground">
+                                        <span className="inline-flex items-center gap-1 text-primary bg-primary/10 px-2 py-0.5 rounded-full">
+                                            <Trophy className="h-2.5 w-2.5" /> {nextMatch.competition || "Friendly"}
+                                        </span>
+                                        <span className="hidden sm:inline-flex items-center gap-1">
+                                            <Calendar className="h-3 w-3" />
+                                            {new Date(nextMatch.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {/* Full-width Mobile Logistics Bar (Tap to edit Score, KO, Meet, Venue) */}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowLogisticsEditor(prev => !prev)}
+                                    className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border text-[11px] font-semibold transition-colors text-left ${
+                                        showLogisticsEditor
+                                            ? "bg-primary/15 text-primary border-primary/40"
+                                            : "bg-surface-2/80 hover:bg-surface-3 text-foreground border-border"
+                                    }`}
+                                >
+                                    <div className="flex items-center gap-1.5 min-w-0 flex-1 overflow-hidden">
+                                        <span className="inline-flex items-center gap-1 font-bold text-muted-foreground sm:hidden shrink-0">
+                                            {new Date(nextMatch.date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} •
+                                        </span>
+                                        <span className="inline-flex items-center gap-1 font-bold text-foreground shrink-0">
+                                            <Clock className="h-3 w-3 text-muted-foreground" /> KO {(koInputValue || nextMatch.time || "14:00").slice(0, 5)}
+                                        </span>
+                                        <span className="text-muted-foreground shrink-0">•</span>
+                                        <span className="text-amber-600 dark:text-amber-400 font-bold shrink-0">
+                                            Meet {getFormattedMeetTime()}
+                                        </span>
+                                        <span className="text-muted-foreground shrink-0">•</span>
+                                        <span className="inline-flex items-center gap-1 text-muted-foreground truncate min-w-0">
+                                            <MapPin className="h-3 w-3 text-primary shrink-0" />
+                                            <span className="truncate">
+                                                {lineup.venueNotes?.trim() || (nextMatch.isHome ? (settings.homeGround || "Home") : "Away")}
+                                            </span>
+                                        </span>
+                                    </div>
+                                    <Pencil className="h-3 w-3 text-muted-foreground shrink-0" />
+                                </button>
+                            </div>
+                        ) : (
+                            <h2 className="text-base font-black text-foreground">No Upcoming Matches</h2>
+                        )}
+
+                        {/* Mobile Row 3: 2-Column Action Buttons (Auto-Fill & Share/Export) */}
+                        <div className="grid grid-cols-2 gap-2 relative z-30">
+                            {openActionDropdown && (
+                                <div
+                                    className="fixed inset-0 z-20"
+                                    onClick={() => setOpenActionDropdown(null)}
+                                />
+                            )}
+                            {/* 1. Mobile Auto-Fill Dropdown (anchored left-0 so it never clips off-screen) */}
+                            <div className="relative z-30">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setOpenActionDropdown(prev => prev === "autofill" ? null : "autofill")}
+                                    className="w-full h-8 text-xs shadow-sm bg-surface-2 border-border text-foreground hover:bg-surface-3 font-bold px-2.5 rounded-xl flex items-center justify-center"
+                                >
+                                    <Sparkles className="h-3.5 w-3.5 mr-1.5 text-amber-500 shrink-0" />
+                                    <span>Auto-Fill</span>
+                                    <ChevronDown className="h-3.5 w-3.5 ml-1 text-muted-foreground shrink-0" />
+                                </Button>
+                                {openActionDropdown === "autofill" && (
+                                    <div className="absolute left-0 mt-1.5 w-60 rounded-xl bg-surface-1 border border-border shadow-xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleAutoPickFullSquad(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-bold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                            <span>Auto-Pick Full Squad (XI + Bench)</span>
+                                        </button>
+                                        <div className="my-1 border-t border-border/60" />
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleAutoPickXI(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <Sparkles className="h-3.5 w-3.5 text-amber-500/80 shrink-0" />
+                                            <span>Auto-Pick Starting XI Only</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleAutoFillBench(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <UserPlus className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                            <span>Auto-Fill Bench Only</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleAutoFillLastLineup(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <RefreshCw className="h-3.5 w-3.5 text-primary shrink-0" />
+                                            <span>Copy Last Match XI</span>
+                                        </button>
+                                        <div className="my-1 border-t border-border" />
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleClearLineup(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-red-500 hover:bg-red-500/10 flex items-center gap-2.5"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5 shrink-0" />
+                                            <span>Clear Pitch &amp; Bench</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* 2. Mobile Share & Export Dropdown (anchored right-0 so it never clips off-screen) */}
+                            <div className="relative z-30">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setOpenActionDropdown(prev => prev === "share" ? null : "share")}
+                                    className="w-full h-8 text-xs shadow-sm bg-surface-2 border-border text-foreground hover:bg-surface-3 font-bold px-2.5 rounded-xl flex items-center justify-center"
+                                >
+                                    <MessageCircle className="h-3.5 w-3.5 mr-1.5 text-emerald-500 shrink-0" />
+                                    <span>Share &amp; Export</span>
+                                    <ChevronDown className="h-3.5 w-3.5 ml-1 text-muted-foreground shrink-0" />
+                                </Button>
+                                {openActionDropdown === "share" && (
+                                    <div className="absolute right-0 mt-1.5 w-56 rounded-xl bg-surface-1 border border-border shadow-xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleCopyTeamSheetToWhatsApp(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <MessageCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                            <span>Share XI on WhatsApp</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleDownloadPitchGraphic(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <ImageIcon className="h-3.5 w-3.5 text-primary shrink-0" />
+                                            <span>Download Pitch Graphic (PNG)</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleExportPDF(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <FileDown className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                            <span>Export Team Sheet (PDF)</span>
+                                        </button>
+                                        <div className="my-1 border-t border-border" />
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleCopyPollToWhatsApp(); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                        >
+                                            <MessageCircle className="h-3.5 w-3.5 text-blue-400 shrink-0" />
+                                            <span>Share Availability Poll</span>
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* ==================== DESKTOP FIXTURE HEADER (>= 1024px) ==================== */}
+                    <div className="hidden lg:flex lg:flex-row lg:items-center justify-between gap-3">
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 min-w-0">
                             {nextMatch ? (
                                 <>
@@ -3314,11 +3623,84 @@ export default function MatchdayXIPage() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:h-[760px]">
+            {/* ==================== MOBILE SEGMENTED WORKSPACE TABS (< 1024px) ==================== */}
+            <div className="grid lg:hidden grid-cols-4 gap-1 p-1 bg-surface-1 rounded-2xl border border-border shadow-sm">
+                <button
+                    type="button"
+                    onClick={() => setMobileActiveTab("pitch")}
+                    className={`py-2 px-2 rounded-xl text-[11px] font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+                        mobileActiveTab === "pitch"
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                    <span>Pitch XI</span>
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${
+                        mobileActiveTab === "pitch" ? "bg-black/20 text-white" : "bg-surface-2 text-muted-foreground"
+                    }`}>
+                        {selectedStartersCount}/11
+                    </span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setMobileActiveTab("bench")}
+                    className={`py-2 px-2 rounded-xl text-[11px] font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+                        mobileActiveTab === "bench"
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                    <span>Bench</span>
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${
+                        mobileActiveTab === "bench" ? "bg-black/20 text-white" : "bg-surface-2 text-muted-foreground"
+                    }`}>
+                        {selectedSubsCount}/{lineup.substitutes.length}
+                    </span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setMobileActiveTab("squad")}
+                    className={`py-2 px-2 rounded-xl text-[11px] font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+                        mobileActiveTab === "squad"
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                    <span>Squad</span>
+                    <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${
+                        mobileActiveTab === "squad" ? "bg-black/20 text-white" : "bg-surface-2 text-muted-foreground"
+                    }`}>
+                        {availablePlayers.length}
+                    </span>
+                </button>
+                <button
+                    type="button"
+                    onClick={() => {
+                        setMobileActiveTab("roles");
+                        setShowRolesAndNotes(true);
+                    }}
+                    className={`py-2 px-2 rounded-xl text-[11px] font-extrabold transition-all flex items-center justify-center gap-1.5 ${
+                        mobileActiveTab === "roles"
+                            ? "bg-primary text-primary-foreground shadow-sm"
+                            : "text-muted-foreground hover:text-foreground"
+                    }`}
+                >
+                    <span>Roles</span>
+                    {configuredRolesCount > 0 && (
+                        <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${
+                            mobileActiveTab === "roles" ? "bg-black/20 text-white" : "bg-amber-500/15 text-amber-500"
+                        }`}>
+                            {configuredRolesCount}
+                        </span>
+                    )}
+                </button>
+            </div>
+
+            <div className={`${mobileActiveTab === "roles" ? "hidden lg:grid" : "grid"} grid-cols-1 lg:grid-cols-5 gap-4 lg:h-[760px]`}>
                 
                 {/* Left Panel - Squad (#6 Squad Selector inside Header + #2 Search Bar + #5 Compact 2-Line Player Cards) */}
                 <div 
-                    className="lg:col-span-1 h-[480px] lg:h-full flex flex-col bg-surface-1 rounded-2xl border border-border shadow-sm order-2 lg:order-1 min-h-0 overflow-hidden"
+                    className={`${mobileActiveTab === "squad" ? "flex" : "hidden"} lg:flex lg:col-span-1 h-[520px] lg:h-full flex-col bg-surface-1 rounded-2xl border border-border shadow-sm order-2 lg:order-1 min-h-0 overflow-hidden`}
                     onDragOver={handleDragOver}
                     onDrop={handleDropOnSquad}
                 >
@@ -3327,6 +3709,9 @@ export default function MatchdayXIPage() {
                             <span className="cf-card-title truncate">Available</span>
                             <span className="text-[11px] font-bold text-muted-foreground bg-surface-2 px-1.5 py-0.5 rounded-md border border-border shrink-0">
                                 {availablePlayers.length}
+                            </span>
+                            <span className="lg:hidden text-[10px] font-semibold text-primary ml-1 truncate">
+                                • Tap player to assign
                             </span>
                         </div>
                         {currentSquads.length > 1 ? (
@@ -3413,9 +3798,10 @@ export default function MatchdayXIPage() {
                                         key={player.id}
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, player.id, {type: 'squad'})}
-                                        className="group flex items-center p-2 border border-border rounded-xl cursor-grab active:cursor-grabbing hover:border-foreground/30 bg-surface-1 transition-all shadow-sm relative overflow-hidden"
+                                        onClick={() => handleQuickAssignFromSquad(player)}
+                                        className="group flex items-center p-2 border border-border rounded-xl cursor-pointer lg:cursor-grab active:cursor-grabbing hover:border-foreground/30 bg-surface-1 transition-all shadow-sm relative overflow-hidden"
                                     >
-                                        <GripVertical className="h-3.5 w-0 opacity-0 group-hover:w-3.5 group-hover:opacity-100 group-hover:mr-1.5 text-primary transition-all shrink-0 overflow-hidden" />
+                                        <GripVertical className="hidden lg:block h-3.5 w-0 opacity-0 group-hover:w-3.5 group-hover:opacity-100 group-hover:mr-1.5 text-primary transition-all shrink-0 overflow-hidden" />
                                         <div className="flex flex-col min-w-0 flex-1">
                                             {/* Line 1: Player Name + Last XI / Squad # */}
                                             <div className="flex items-center justify-between gap-1.5">
@@ -3436,6 +3822,9 @@ export default function MatchdayXIPage() {
                                                             #{player.squadNumber}
                                                         </span>
                                                     )}
+                                                    <span className="lg:hidden text-[9px] font-extrabold px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/25">
+                                                        + Add
+                                                    </span>
                                                 </div>
                                             </div>
                                             {/* Line 2: Position + Season Stats on one clean line */}
@@ -3503,8 +3892,9 @@ export default function MatchdayXIPage() {
                                                     key={player.id}
                                                     draggable
                                                     onDragStart={(e) => handleDragStart(e, player.id, { type: 'squad' })}
-                                                    title="Drag onto pitch/bench to override availability"
-                                                    className="flex items-center justify-between gap-2 p-2 rounded-lg border border-border/70 bg-surface-1/80 opacity-85 hover:opacity-100 cursor-grab active:cursor-grabbing transition-all"
+                                                    onClick={() => handleQuickAssignFromSquad(player)}
+                                                    title="Tap or drag onto pitch/bench to override availability"
+                                                    className="flex items-center justify-between gap-2 p-2 rounded-lg border border-border/70 bg-surface-1/80 opacity-85 hover:opacity-100 cursor-pointer lg:cursor-grab active:cursor-grabbing transition-all"
                                                 >
                                                     <div className="min-w-0">
                                                         <div className="text-xs font-bold text-foreground truncate">{displayName}</div>
@@ -3525,13 +3915,28 @@ export default function MatchdayXIPage() {
                 </div>
 
                 {/* Center Content - Formation Display (#3 Kit Selector, #6 Trialists, #10 Live Match Events) */}
-                <div className="lg:col-span-3 h-auto lg:h-full flex flex-col order-1 lg:order-2 min-h-0 overflow-hidden rounded-xl">
+                <div className={`${mobileActiveTab === "pitch" ? "flex" : "hidden"} lg:flex lg:col-span-3 h-auto lg:h-full flex-col order-1 lg:order-2 min-h-0 overflow-hidden rounded-xl`}>
                     <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 z-10 shrink-0">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 sm:gap-3">
                             <div className="flex flex-col">
                                 <span className="cf-section-title">Starting XI</span>
-                                <span className="cf-metadata">{Object.values(lineup.starters).filter(Boolean).length} / 11 Selected</span>
+                                <span className="cf-metadata">{selectedStartersCount} / 11 Selected</span>
                             </div>
+                            {/* Mobile Quick Squad Switcher right on Pitch Toolbar */}
+                            {currentSquads.length > 1 && (
+                                <select
+                                    value={activeSquadTab}
+                                    onChange={(e) => setActiveSquadTab(e.target.value)}
+                                    className="lg:hidden bg-surface-1 border border-border text-foreground text-[11px] font-bold rounded-xl px-2.5 py-1.5 shadow-sm focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer truncate max-w-[130px]"
+                                    title="Switch active squad pool"
+                                >
+                                    {currentSquads.map(squad => (
+                                        <option key={squad} value={squad} className="bg-surface-1 text-foreground">
+                                            {squad}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
                         </div>
                         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                             {/* #3 Per-Match Kit Colour Selector + Goalkeeper Jersey Colour */}
@@ -3615,7 +4020,7 @@ export default function MatchdayXIPage() {
                         </div>
                     </div>
                     <div className="flex-1 flex items-center justify-center min-h-0">
-                        <div className="relative w-full h-[560px] lg:h-full max-w-[680px] mx-auto bg-[#2b7c3d] rounded-2xl shadow-xl overflow-hidden">
+                        <div className="relative w-full h-[460px] sm:h-[540px] lg:h-full max-w-[680px] mx-auto bg-[#2b7c3d] rounded-2xl shadow-xl overflow-hidden">
                             {/* Pitch markings */}
                             <div className="absolute inset-0 overflow-hidden rounded-sm pointer-events-none">
                                 <div className="absolute inset-2 border-2 border-white/40"></div>
@@ -3714,7 +4119,7 @@ export default function MatchdayXIPage() {
                                                 )}
                                             </svg>
 
-                                            {/* Clickable Shirt Number Overlay / Inline Editor right on the pitch */}
+                                            {/* Clickable Shirt Number Overlay / Inline Editor right on the pitch (Desktop lg:block only so mobile taps open Assign Modal) */}
                                             {isEditingThisNumber ? (
                                                 <input
                                                     type="text"
@@ -3752,7 +4157,7 @@ export default function MatchdayXIPage() {
                                                         setEditingNumberValue(String(displayedNumber));
                                                     }}
                                                     title={`Shirt #${displayedNumber} — Click to change number manually (Default: ${pos.number})`}
-                                                    className="absolute inset-0 m-auto w-6 h-5 sm:w-7 sm:h-6 rounded z-20 hover:ring-1 hover:ring-amber-400 hover:bg-black/15 transition-all cursor-text"
+                                                    className="hidden lg:block absolute inset-0 m-auto w-6 h-5 sm:w-7 sm:h-6 rounded z-20 hover:ring-1 hover:ring-amber-400 hover:bg-black/15 transition-all cursor-text"
                                                 />
                                             )}
 
@@ -3825,7 +4230,7 @@ export default function MatchdayXIPage() {
                                                 setEditingNamePlayerId(playerId);
                                                 setEditingNameValue(fullPlayerName);
                                             }}
-                                            className={`px-2 py-0.5 rounded-full shadow-md min-w-[50px] sm:min-w-[64px] text-center relative transition-all flex items-center justify-center ${playerId ? 'bg-surface-1/95 border border-border backdrop-blur-sm' : 'bg-black/35 border border-white/20 backdrop-blur-sm'}`}
+                                            className={`px-1.5 sm:px-2 py-0.5 rounded-full shadow-md min-w-[44px] sm:min-w-[64px] text-center relative transition-all flex items-center justify-center ${playerId ? 'bg-surface-1/95 border border-border backdrop-blur-sm' : 'bg-black/35 border border-white/20 backdrop-blur-sm'}`}
                                         >
                                             {playerId && editingNamePlayerId === playerId ? (
                                                 <input
@@ -3852,7 +4257,7 @@ export default function MatchdayXIPage() {
                                                     className="w-[88px] sm:w-[104px] bg-surface-2 text-foreground text-[10px] sm:text-[11px] font-bold text-center rounded px-1 py-0.5 outline-none ring-1 ring-primary"
                                                 />
                                             ) : (
-                                                <span className={`text-[9px] sm:text-[11px] font-bold tracking-tight whitespace-nowrap truncate max-w-[84px] sm:max-w-[102px] ${playerId ? 'text-foreground' : 'text-white/75'}`}>
+                                                <span className={`text-[9px] sm:text-[11px] font-bold tracking-tight whitespace-nowrap truncate max-w-[74px] sm:max-w-[102px] ${playerId ? 'text-foreground' : 'text-white/75'}`}>
                                                     {playerId ? displayName : getDisplayPosition(pos.label)}
                                                 </span>
                                             )}
@@ -3889,14 +4294,90 @@ export default function MatchdayXIPage() {
                             })}
                         </div>
                     </div>
+
+                    {/* ==================== MOBILE QUICK BENCH STRIP UNDER PITCH (< 1024px) ==================== */}
+                    <div className="lg:hidden mt-3 bg-surface-1 rounded-2xl border border-border p-3 shadow-sm">
+                        <div className="flex items-center justify-between gap-2 mb-2">
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs font-extrabold text-foreground">Substitutes Bench</span>
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-surface-2 text-muted-foreground border border-border">
+                                    {selectedSubsCount}/{lineup.substitutes.length}
+                                </span>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={handleAutoFillBench}
+                                    className="text-amber-500 hover:text-amber-400 font-bold text-[10px] flex items-center px-2 py-1 rounded-full bg-amber-500/10"
+                                >
+                                    <Sparkles className="h-3 w-3 mr-0.5" /> Fill
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setMobileActiveTab("bench")}
+                                    className="text-primary font-bold text-[10px] flex items-center px-2 py-1 rounded-full bg-primary/10"
+                                >
+                                    Sub Mins &amp; Details →
+                                </button>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                            {lineup.substitutes.map((rawSubId, idx) => {
+                                const player = resolvePlayerOrTrialist(rawSubId);
+                                const subId = player ? rawSubId : "";
+                                const displayName = getMatchdayDisplayName(player);
+                                const defaultSubNumber = 12 + idx;
+                                const displayedSubNumber = getSlotDisplayNumber("sub", idx, defaultSubNumber, player);
+                                const isSubPlayed = Boolean(subId && lineup.usedSubstitutes?.includes(subId));
+                                const subMinutes = isSubPlayed ? (liveMinutesMap.get(subId) ?? 30) : 0;
+
+                                return (
+                                    <button
+                                        key={`mobile-quick-sub-${idx}`}
+                                        type="button"
+                                        onClick={() => {
+                                            setModalTab("swap");
+                                            setActiveSlot({ type: "sub", index: idx, label: `Bench Slot ${idx + 1}` });
+                                        }}
+                                        className={`flex items-center justify-between gap-1.5 px-2.5 py-2 rounded-xl border text-left transition-all ${
+                                            subId
+                                                ? "bg-surface-2/70 border-border text-foreground"
+                                                : "bg-surface-2/30 border-dashed border-border text-muted-foreground"
+                                        }`}
+                                    >
+                                        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                                            <span className="w-5 h-5 rounded-md bg-surface-1 border border-border text-[9px] font-black flex items-center justify-center shrink-0 text-muted-foreground">
+                                                {displayedSubNumber}
+                                            </span>
+                                            {subId ? (
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="text-[11px] font-bold text-foreground truncate">{displayName}</div>
+                                                    <div className="text-[9px] font-bold text-muted-foreground uppercase flex items-center gap-1">
+                                                        <span>{isTrialistId(subId) ? "GUEST" : player?.position}</span>
+                                                        {isSubPlayed && (
+                                                            <span className="text-emerald-500">• ✓ {subMinutes}&apos;</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-[10px] font-semibold text-muted-foreground truncate">
+                                                    + Tap to assign
+                                                </span>
+                                            )}
+                                        </div>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
                 </div>
 
                 {/* Right Panel - Bench (#8 One-Click Fill/Clear Bench, #6 Trialists, #10 Event Badges) */}
-                <div className="lg:col-span-1 h-[400px] lg:h-full flex flex-col bg-surface-1 rounded-2xl border border-border shadow-sm order-3 min-h-0 overflow-hidden">
+                <div className={`${mobileActiveTab === "bench" ? "flex" : "hidden"} lg:flex lg:col-span-1 h-auto max-h-[620px] lg:max-h-none lg:h-full flex-col bg-surface-1 rounded-2xl border border-border shadow-sm order-3 min-h-0 overflow-hidden`}>
                     <div className="p-3.5 border-b border-slate-200/60 dark:border-slate-800/60 flex items-center justify-between gap-1 shrink-0">
                         <div className="flex flex-col min-w-0">
                             <span className="cf-card-title">Bench</span>
-                            <span className="cf-metadata mt-0.5">{lineup.substitutes.filter(Boolean).length} / {lineup.substitutes.length} Selected</span>
+                            <span className="cf-metadata mt-0.5">{selectedSubsCount} / {lineup.substitutes.length} Selected</span>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
                             <button
@@ -4004,7 +4485,7 @@ export default function MatchdayXIPage() {
                                                         {/* Line 1: Full Player Name across the entire card width (#5 GripVertical hidden until hover) */}
                                                         <div className="flex items-center justify-between gap-1 min-w-0 w-full">
                                                             <div className="flex items-center min-w-0 flex-1">
-                                                                <GripVertical className="h-3.5 w-0 opacity-0 group-hover:w-3.5 group-hover:opacity-100 group-hover:mr-1.5 text-primary transition-all shrink-0 overflow-hidden" />
+                                                                <GripVertical className="hidden lg:block h-3.5 w-0 opacity-0 group-hover:w-3.5 group-hover:opacity-100 group-hover:mr-1.5 text-primary transition-all shrink-0 overflow-hidden" />
                                                                 {editingNamePlayerId === subId ? (
                                                                     <input
                                                                         type="text"
@@ -4036,7 +4517,7 @@ export default function MatchdayXIPage() {
                                                                 )}
                                                             </div>
                                                             {editingNamePlayerId !== subId && (
-                                                                <div className="flex items-center gap-0.5 shrink-0">
+                                                                <div className="flex items-center gap-1 shrink-0">
                                                                     <button
                                                                         type="button"
                                                                         onClick={(e) => {
@@ -4045,7 +4526,7 @@ export default function MatchdayXIPage() {
                                                                             setEditingNameValue(displayName);
                                                                         }}
                                                                         title="Edit display name for Team Sheet"
-                                                                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-opacity p-0.5"
+                                                                        className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-muted-foreground hover:text-primary transition-opacity p-0.5"
                                                                     >
                                                                         <Pencil className="h-2.5 w-2.5" />
                                                                     </button>
@@ -4056,9 +4537,9 @@ export default function MatchdayXIPage() {
                                                                             handleSubChange(idx, "");
                                                                         }}
                                                                         title="Remove player from bench slot"
-                                                                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-opacity p-0.5"
+                                                                        className="opacity-100 lg:opacity-0 lg:group-hover:opacity-100 text-muted-foreground hover:text-red-500 transition-opacity p-0.5"
                                                                     >
-                                                                        <X className="h-3 w-3" />
+                                                                        <X className="h-3.5 w-3.5" />
                                                                     </button>
                                                                 </div>
                                                             )}
@@ -4106,7 +4587,7 @@ export default function MatchdayXIPage() {
                                                         </div>
                                                     </>
                                                 ) : (
-                                                    <span className="text-[10px] font-medium text-center w-full block">Click or drag here</span>
+                                                    <span className="text-[10px] font-medium text-center w-full block">Tap or drag player here</span>
                                                 )}
                                             </div>
 
@@ -4237,7 +4718,7 @@ export default function MatchdayXIPage() {
             </div>
 
             {/* #2 Collapsible Matchday Roles, Set-Piece Takers & Tactical Notes Accordion */}
-            <div className="bg-surface-1 rounded-2xl border border-border shadow-sm overflow-hidden">
+            <div className={`${mobileActiveTab === "roles" ? "block" : "hidden"} lg:block bg-surface-1 rounded-2xl border border-border shadow-sm overflow-hidden`}>
                 <button
                     type="button"
                     onClick={() => setShowRolesAndNotes(prev => !prev)}
@@ -4277,7 +4758,7 @@ export default function MatchdayXIPage() {
                                 </div>
                             );
                         })()}
-                        {showRolesAndNotes ? (
+                        {(showRolesAndNotes || mobileActiveTab === "roles") ? (
                             <ChevronUp className="h-4 w-4 text-muted-foreground" />
                         ) : (
                             <ChevronDown className="h-4 w-4 text-muted-foreground" />
@@ -4285,7 +4766,7 @@ export default function MatchdayXIPage() {
                     </div>
                 </button>
 
-                {showRolesAndNotes && (
+                {(showRolesAndNotes || mobileActiveTab === "roles") && (
                     <div className="p-4 pt-3 border-t border-border grid grid-cols-1 lg:grid-cols-2 gap-5 animate-in fade-in duration-150">
                         {/* Roles & Set-Piece Takers */}
                         <div className="space-y-3">
@@ -4427,8 +4908,7 @@ export default function MatchdayXIPage() {
                                                 type="button"
                                                 variant="outline"
                                                 size="sm"
-                                                onMouseDown={(e) => {
-                                                    e.preventDefault();
+                                                onClick={() => {
                                                     const nextCapt = lineup.captainId === activePlayer.id ? "" : activePlayer.id;
                                                     handleRoleChange("captainId", nextCapt);
                                                     showToast(nextCapt ? `${getMatchdayDisplayName(activePlayer)} set as Captain (C)` : "Captain unassigned", "info");
@@ -4439,8 +4919,8 @@ export default function MatchdayXIPage() {
                                             </Button>
                                         )}
                                         <Button
-                                            onMouseDown={(e) => {
-                                                e.preventDefault();
+                                            type="button"
+                                            onClick={() => {
                                                 if (activeSlot.type === 'pitch') {
                                                     handleRemoveFromPitch(activeSlot.index);
                                                 } else {
@@ -4768,8 +5248,8 @@ export default function MatchdayXIPage() {
                                                 return (
                                                     <button
                                                         key={player.id}
-                                                        onMouseDown={(e) => {
-                                                            e.preventDefault();
+                                                        type="button"
+                                                        onClick={() => {
                                                             if (activeSlot.type === 'pitch') {
                                                                 handleStarterChange(activeSlot.index, player.id);
                                                             } else {
@@ -4841,8 +5321,8 @@ export default function MatchdayXIPage() {
                                                 .map(player => (
                                                     <button
                                                         key={player.id}
-                                                        onMouseDown={(e) => {
-                                                            e.preventDefault();
+                                                        type="button"
+                                                        onClick={() => {
                                                             if (activeSlot.type === 'pitch') {
                                                                 handleStarterChange(activeSlot.index, player.id);
                                                             } else {
@@ -4875,7 +5355,8 @@ export default function MatchdayXIPage() {
                         {/* Modal Footer */}
                         <div className="p-3.5 bg-surface-2 border-t border-border flex justify-end shrink-0">
                             <Button 
-                                onMouseDown={(e) => { e.preventDefault(); setActiveSlot(null); setSearchQuery(""); setShowTrialistForm(false); }}
+                                type="button"
+                                onClick={() => { setActiveSlot(null); setSearchQuery(""); setShowTrialistForm(false); }}
                                 className="bg-surface-3 hover:bg-border text-foreground border-none font-bold text-xs rounded-lg"
                             >
                                 Done
