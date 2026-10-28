@@ -2551,14 +2551,14 @@ export default function SquadPage() {
             </div>
 
             {editingPlayer && (
-                <div className="fixed inset-0 z-50 flex justify-end">
+                <div className="fixed inset-0 z-[60] flex justify-end">
                     <div className="absolute inset-0 bg-background/50 backdrop-blur-sm" onClick={closeEditDrawer} />
-                    <div className="relative h-full w-full max-w-[450px] bg-surface-1 shadow-2xl border-l border-border flex flex-col animate-in slide-in-from-right duration-300">
+                    <div className="relative h-[100dvh] sm:h-full w-full max-w-[450px] bg-surface-1 shadow-2xl border-l border-border flex flex-col animate-in slide-in-from-right duration-300">
                         <div className="p-3 border-b border-border flex items-center justify-between shrink-0 bg-surface-2">
-                            <h2 className="text-lg font-semibold text-foreground">{editingPlayer.firstName ? "Edit Player" : "Add Player"}</h2>
+                            <h2 className="text-base sm:text-lg font-semibold text-foreground">{editingPlayer.firstName ? "Edit Player" : "Add Player"}</h2>
                             <button onClick={closeEditDrawer} className="text-sm text-muted-foreground hover:text-foreground p-2">✕</button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 text-sm">
+                        <div className="flex-1 overflow-y-auto p-3.5 sm:p-4 space-y-4 text-sm">
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                     <label className="block text-xs font-medium text-slate-500">First Name</label>
@@ -3141,7 +3141,7 @@ export default function SquadPage() {
                             </div>
                         </div>
 
-                        <div className="p-4 pb-8 sm:pb-4 border-t border-border flex justify-between items-center shrink-0 bg-surface-2">
+                        <div className="p-3 sm:p-4 pb-6 sm:pb-4 border-t border-border flex justify-between items-center gap-2 shrink-0 bg-surface-2">
                             {editingPlayer.id !== "new" ? (
                                 isFormerPlayer(editingPlayer) ? (
                                     <button
@@ -3151,10 +3151,11 @@ export default function SquadPage() {
                                             setEditingPlayer(null);
                                             handleRestorePlayer(p);
                                         }}
-                                        className="px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/10 rounded transition-colors flex items-center gap-1.5"
+                                        className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/10 rounded transition-colors flex items-center gap-1.5 shrink-0"
                                     >
                                         <RotateCcw className="w-3.5 h-3.5" />
-                                        Restore to Squad
+                                        <span className="hidden xs:inline">Restore to Squad</span>
+                                        <span className="xs:hidden">Restore</span>
                                     </button>
                                 ) : (
                                     <button
@@ -3164,23 +3165,24 @@ export default function SquadPage() {
                                             setEditingPlayer(null);
                                             openDepartureDialog(p);
                                         }}
-                                        className="px-3 py-1.5 text-xs font-semibold text-amber-600 hover:bg-amber-500/10 rounded transition-colors flex items-center gap-1.5"
+                                        className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-amber-600 hover:bg-amber-500/10 rounded transition-colors flex items-center gap-1.5 shrink-0"
                                     >
                                         <UserMinus className="w-3.5 h-3.5" />
-                                        Mark as Left Club
+                                        <span className="hidden xs:inline">Mark as Left Club</span>
+                                        <span className="xs:hidden">Mark Left</span>
                                     </button>
                                 )
                             ) : <div />}
-                            <div className="flex gap-2">
+                            <div className="flex gap-2 shrink-0">
                                 <button
                                     onClick={closeEditDrawer}
-                                    className="px-4 py-1.5 text-xs border border-border rounded hover:bg-muted text-muted-foreground transition-colors"
+                                    className="px-3 sm:px-4 py-1.5 text-xs border border-border rounded hover:bg-muted text-muted-foreground transition-colors"
                                 >
                                     Cancel
                                 </button>
                                 <Button
                                     onClick={() => handleSavePlayer(editingPlayer)}
-                                    className="px-6 py-1.5 text-xs bg-brand hover:bg-brand/90 text-brand-foreground rounded shadow-sm transition-all active:scale-95"
+                                    className="px-4 sm:px-6 py-1.5 text-xs bg-brand hover:bg-brand/90 text-brand-foreground rounded shadow-sm transition-all active:scale-95"
                                 >
                                     Save Player
                                 </Button>

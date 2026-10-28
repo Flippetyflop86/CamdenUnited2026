@@ -799,9 +799,80 @@ export default function PlayerProfilePage() {
     ];
 
     return (
-        <div className="space-y-5">
-            {/* Top Navigation, Prev/Next Switcher & Season / Competition Controls */}
-            <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="space-y-4 md:space-y-5">
+            {/* =========================================================
+                MOBILE TOP NAVIGATION & FILTER BAR (< 768px)
+               ========================================================= */}
+            <div className="md:hidden space-y-2.5">
+                <div className="flex items-center justify-between gap-2">
+                    <Link
+                        href="/squad"
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                    >
+                        <span className="h-8 w-8 rounded-lg border border-border bg-surface-1 flex items-center justify-center shadow-sm">
+                            <ArrowLeft className="h-3.5 w-3.5" />
+                        </span>
+                        <span>Squad</span>
+                    </Link>
+
+                    {prevPlayer && nextPlayer && (
+                        <div className="inline-flex items-center rounded-lg border border-border bg-surface-1 p-0.5 shadow-sm">
+                            <Link
+                                href={`/squad/${prevPlayer.id}`}
+                                title={`Previous: ${prevPlayer.name} (${prevPlayer.position})`}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold text-muted-foreground hover:text-foreground active:bg-surface-2 transition-colors"
+                            >
+                                <ChevronLeft className="h-3.5 w-3.5 shrink-0" />
+                                <span>Prev</span>
+                            </Link>
+                            {squadNavIndex && (
+                                <span className="px-2 text-[10px] font-mono font-extrabold text-muted-foreground border-x border-border/60 select-none">
+                                    {squadNavIndex.current}/{squadNavIndex.total}
+                                </span>
+                            )}
+                            <Link
+                                href={`/squad/${nextPlayer.id}`}
+                                title={`Next: ${nextPlayer.name} (${nextPlayer.position})`}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-bold text-muted-foreground hover:text-foreground active:bg-surface-2 transition-colors"
+                            >
+                                <span>Next</span>
+                                <ChevronRight className="h-3.5 w-3.5 shrink-0" />
+                            </Link>
+                        </div>
+                    )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    <select
+                        value={seasonFilter}
+                        onChange={(e) => setSeasonFilter(e.target.value)}
+                        className="h-9 w-full px-2.5 bg-surface-1 border border-border rounded-xl text-xs font-bold text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-primary/30 cursor-pointer"
+                    >
+                        <option value="All">All Time Stats</option>
+                        {availableSeasons.map((s) => (
+                            <option key={s} value={s}>
+                                {s} Season
+                            </option>
+                        ))}
+                    </select>
+                    <Button
+                        variant={includeFriendlies ? "default" : "outline"}
+                        onClick={toggleIncludeFriendlies}
+                        className={
+                            includeFriendlies
+                                ? "w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] h-9 rounded-xl shadow-sm px-2"
+                                : "w-full bg-surface-1 text-muted-foreground hover:text-foreground border-border font-bold text-[11px] h-9 rounded-xl shadow-sm px-2"
+                        }
+                    >
+                        {includeFriendlies ? "⚽ + Friendlies" : "🏆 Competitive Only"}
+                    </Button>
+                </div>
+            </div>
+
+            {/* =========================================================
+                DESKTOP TOP NAVIGATION & FILTER BAR (>= 768px) — UNTOUCHED
+               ========================================================= */}
+            <div className="hidden md:flex items-center justify-between gap-3 flex-wrap">
                 <div className="flex items-center gap-3 flex-wrap">
                     <Link
                         href="/squad"
@@ -871,13 +942,13 @@ export default function PlayerProfilePage() {
             </div>
 
             {isFormer && (
-                <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="p-3.5 sm:p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
                     <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-sm font-bold text-amber-800 dark:text-amber-300">
-                            <Archive className="w-4 h-4" />
+                        <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-amber-800 dark:text-amber-300 flex-wrap">
+                            <Archive className="w-4 h-4 shrink-0" />
                             <span>Former Player — {departureInfo.departureReason || departureInfo.departureStatus}</span>
                             {departureInfo.departureDate && (
-                                <span className="text-xs font-normal text-amber-700 dark:text-amber-400">
+                                <span className="text-[11px] sm:text-xs font-normal text-amber-700 dark:text-amber-400">
                                     (Left on{" "}
                                     {new Date(departureInfo.departureDate + "T00:00:00").toLocaleDateString("en-GB", {
                                         day: "numeric",
@@ -893,21 +964,408 @@ export default function PlayerProfilePage() {
                                 Note: &ldquo;{departureInfo.departureNotes}&rdquo;
                             </p>
                         )}
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-[11px] sm:text-xs text-muted-foreground">
                             Historical match statistics and training records are preserved. You can restore this player to the active squad at any time.
                         </p>
                     </div>
                     <Button
                         onClick={handleRestore}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 text-xs h-9 gap-1.5"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 text-xs h-9 gap-1.5 w-full sm:w-auto"
                     >
                         <RotateCcw className="h-3.5 w-3.5" /> Restore to Active Squad
                     </Button>
                 </div>
             )}
 
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row gap-5 items-start bg-surface-1 p-5 sm:p-6 rounded-xl border border-border shadow-sm">
+            {/* =========================================================
+                MOBILE HERO PLAYER CARD (< 768px, FotMob / FFH Style)
+               ========================================================= */}
+            <div className="md:hidden bg-surface-1 p-3.5 rounded-2xl border border-border shadow-sm space-y-3">
+                {/* Identity Row: Avatar + Name/Position/Status */}
+                <div className="flex items-start gap-3.5">
+                    <div className="relative shrink-0">
+                        <Avatar className="h-16 w-16 border-2 border-border shadow-sm bg-surface-2">
+                            <AvatarImage
+                                src={
+                                    player.imageUrl &&
+                                    player.imageUrl !== "/placeholder-player.png" &&
+                                    !player.imageUrl.startsWith("idb:")
+                                        ? player.imageUrl
+                                        : undefined
+                                }
+                                alt={formatPlayerName(player)}
+                                className="object-cover"
+                            />
+                            <AvatarFallback className="text-lg bg-surface-2 text-foreground font-extrabold tracking-tight">
+                                {player.firstName?.[0]}
+                                {player.lastName?.[0]}
+                            </AvatarFallback>
+                        </Avatar>
+                        {player.squadNumber > 0 && (
+                            <span className="absolute -bottom-1 -right-1 px-1.5 py-0.5 rounded-md bg-foreground text-background font-mono text-[10px] font-extrabold shadow">
+                                #{player.squadNumber}
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                        <div className="flex items-start justify-between gap-2">
+                            <h2 className="text-lg font-extrabold text-foreground tracking-tight leading-snug truncate">
+                                {formatPlayerName(player)}
+                            </h2>
+                            {!isFormer && (
+                                <Badge
+                                    onClick={handleOpenStatusPicker}
+                                    title="Tap to change player status"
+                                    className={cn(
+                                        "border cursor-pointer select-none text-[10px] px-2 py-0.5 rounded-md font-bold transition-colors inline-flex items-center gap-1 shrink-0",
+                                        getStatusBadgeStyle(player.medicalStatus)
+                                    )}
+                                >
+                                    <span>{player.medicalStatus}</span>
+                                    <ChevronDown className="h-2.5 w-2.5 opacity-70" />
+                                </Badge>
+                            )}
+                        </div>
+
+                        {/* Position + Squad + Loan Pills */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <span
+                                className={cn(
+                                    "font-extrabold px-1.5 py-0.5 border rounded text-[10px] uppercase tracking-tight",
+                                    posBadgeClass
+                                )}
+                            >
+                                {player.position}
+                            </span>
+                            {secPositions.length > 0 && (
+                                <span className="text-[10px] text-muted-foreground font-semibold px-1.5 py-0.5 rounded bg-surface-2 border border-border/60">
+                                    +{secPositions.join(", ")}
+                                </span>
+                            )}
+                            {squadList.map((sq) => (
+                                <Badge
+                                    key={sq}
+                                    variant="secondary"
+                                    className="bg-surface-2 text-foreground border border-border text-[10px] font-semibold px-1.5 py-0"
+                                >
+                                    {sq}
+                                </Badge>
+                            ))}
+                            {(player.registrationType === "Loan" || player.registrationType === "Dual") && (
+                                <Badge
+                                    variant="outline"
+                                    className="border-purple-500/30 text-purple-600 dark:text-purple-400 bg-purple-500/10 text-[10px] font-semibold px-1.5 py-0"
+                                >
+                                    {player.registrationType === "Loan"
+                                        ? player.isParentClub
+                                            ? "Loaned Out"
+                                            : "Loan In"
+                                        : "Dual Reg"}
+                                </Badge>
+                            )}
+                            {player.loanClub && (
+                                <Badge
+                                    variant="outline"
+                                    className="border-purple-500/30 text-purple-600 dark:text-purple-400 bg-purple-500/10 gap-1 text-[10px] font-semibold px-1.5 py-0"
+                                >
+                                    <Building2 className="w-2.5 h-2.5" />
+                                    {player.loanClub}
+                                </Badge>
+                            )}
+                        </div>
+
+                        {/* Status context / Loan expiry sub-pill */}
+                        {(statusContextText || (player.registrationType === "Loan" && player.loanEndDate)) && (
+                            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                                {statusContextText && (
+                                    <span className="text-[10px] font-semibold text-muted-foreground bg-surface-2 border border-border/70 px-2 py-0.5 rounded-md">
+                                        {statusContextText}
+                                    </span>
+                                )}
+                                {player.registrationType === "Loan" && player.loanEndDate && (
+                                    <Badge
+                                        variant="outline"
+                                        className={cn(
+                                            "gap-1 text-[10px] font-semibold px-1.5 py-0",
+                                            getLoanExpiryStatus(player.loanEndDate).status === "expired"
+                                                ? "border-red-500/30 text-red-600 dark:text-red-400 bg-red-500/10"
+                                                : getLoanExpiryStatus(player.loanEndDate).status === "expiring_soon"
+                                                ? "border-amber-500/30 text-amber-600 dark:text-amber-400 bg-amber-500/10"
+                                                : "border-border text-muted-foreground bg-surface-2"
+                                        )}
+                                    >
+                                        <Clock className="w-2.5 h-2.5" />
+                                        {getLoanExpiryStatus(player.loanEndDate).label}
+                                    </Badge>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* Structured Mobile Bio & Form Bento Strip */}
+                <div className="bg-surface-2/60 rounded-xl p-2.5 border border-border/60 space-y-2.5">
+                    <div className="grid grid-cols-3 gap-2 divide-x divide-border/60">
+                        <div className="pr-1">
+                            <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Age / DOB</p>
+                            <p className="font-bold text-foreground text-xs mt-0.5 truncate">
+                                {displayAge ? `${displayAge} yrs` : "—"}
+                            </p>
+                            {formattedDob && (
+                                <p className="text-[10px] text-muted-foreground truncate">{formattedDob}</p>
+                            )}
+                        </div>
+                        <div className="px-2">
+                            <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Foot</p>
+                            <p className="font-bold text-foreground text-xs mt-0.5 flex items-center gap-1">
+                                <Footprints className="w-3 h-3 text-muted-foreground shrink-0" />
+                                <span className="truncate">{player.preferredFoot || "—"}</span>
+                            </p>
+                        </div>
+                        <div className="pl-2">
+                            <p className="text-[9px] text-muted-foreground uppercase font-bold tracking-wider">Physical</p>
+                            <p className="font-bold text-foreground text-xs mt-0.5 truncate">
+                                {player.height || player.weight
+                                    ? [
+                                          player.height ? `${player.height}cm` : null,
+                                          player.weight ? `${player.weight}kg` : null,
+                                      ]
+                                          .filter(Boolean)
+                                          .join(" • ")
+                                    : "—"}
+                            </p>
+                        </div>
+                    </div>
+
+                    {lastFiveForm.length > 0 && (
+                        <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
+                            <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">
+                                Recent Form (Last {lastFiveForm.length})
+                            </span>
+                            <div className="flex items-center gap-1">
+                                {lastFiveForm.map((fm, i) => {
+                                    const letter = fm.result === "Win" ? "W" : fm.result === "Draw" ? "D" : "L";
+                                    const pillCls =
+                                        fm.result === "Win"
+                                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                                            : fm.result === "Draw"
+                                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                                            : "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30";
+                                    return (
+                                        <Link
+                                            key={`${fm.matchId}-${i}`}
+                                            href={`/analysis?matchId=${fm.matchId}`}
+                                            title={`${letter} ${fm.scoreline || ""} vs ${fm.opponent} (${fm.isHome ? "H" : "A"})`}
+                                            className={cn(
+                                                "w-6 h-6 rounded-md border text-[11px] font-extrabold flex items-center justify-center",
+                                                pillCls
+                                            )}
+                                        >
+                                            {letter}
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Coach / Medical Notes (Mobile) */}
+                {(cleanPlayerNotes || player.medicalNotes) && (
+                    <div className="space-y-2 text-xs">
+                        {cleanPlayerNotes && (
+                            <div className="p-2.5 rounded-xl bg-surface-2/70 border border-border/60">
+                                <span className="font-bold uppercase tracking-wider text-[9px] text-muted-foreground block mb-0.5">
+                                    Player Notes
+                                </span>
+                                <p className="text-foreground text-xs leading-relaxed">{cleanPlayerNotes}</p>
+                            </div>
+                        )}
+                        {player.medicalNotes && (
+                            <div className="p-2.5 rounded-xl bg-rose-500/5 border border-rose-500/20">
+                                <span className="font-bold uppercase tracking-wider text-[9px] text-rose-600 dark:text-rose-400 block mb-0.5">
+                                    Medical Notes
+                                </span>
+                                <p className="text-foreground text-xs leading-relaxed">{player.medicalNotes}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Mobile Action Buttons Row */}
+                <div className="grid grid-cols-2 gap-2 pt-0.5">
+                    <Button
+                        variant="outline"
+                        asChild
+                        className="w-full bg-surface-2 hover:bg-border/60 text-foreground border-border h-9 text-xs font-bold gap-1.5 rounded-xl shadow-sm"
+                    >
+                        <Link href={`/squad?edit=${player.id}&returnTo=/squad/${player.id}`}>
+                            <Edit className="h-3.5 w-3.5" /> Edit Profile
+                        </Link>
+                    </Button>
+                    {isFormer ? (
+                        <Button
+                            variant="outline"
+                            onClick={handleRestore}
+                            className="w-full border-emerald-500/30 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 h-9 text-xs font-bold gap-1.5 rounded-xl"
+                        >
+                            <RotateCcw className="h-3.5 w-3.5" /> Restore Squad
+                        </Button>
+                    ) : (
+                        <Button
+                            variant="outline"
+                            onClick={handleOpenDepartureDialog}
+                            className="w-full text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-500/10 border-border h-9 text-xs font-semibold gap-1.5 rounded-xl"
+                        >
+                            <UserMinus className="h-3.5 w-3.5" /> Mark Left Club
+                        </Button>
+                    )}
+                </div>
+            </div>
+
+            {/* Mobile Status Quick-Picker Modal (Centered so it never clips off-screen) */}
+            {isStatusPickerOpen && (
+                <div className="md:hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+                    <div
+                        className="fixed inset-0 bg-background/60 backdrop-blur-xs"
+                        onClick={() => setIsStatusPickerOpen(false)}
+                    />
+                    <div className="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-surface-1 p-4 shadow-2xl space-y-3">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                Set Availability Status
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setIsStatusPickerOpen(false)}
+                                className="h-7 w-7 rounded-lg bg-surface-2 flex items-center justify-center text-xs text-muted-foreground hover:text-foreground"
+                            >
+                                ✕
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2">
+                            {STATUS_OPTIONS.map((st) => {
+                                const active = pickerStatus === st;
+                                return (
+                                    <button
+                                        key={st}
+                                        type="button"
+                                        onClick={() => {
+                                            setPickerStatus(st);
+                                            if (st === "Available" || st === "At Parent Club") {
+                                                handleSaveQuickStatus(st);
+                                            }
+                                        }}
+                                        className={cn(
+                                            "px-3 py-2 rounded-xl border text-xs font-bold text-left flex items-center justify-between transition-all",
+                                            active
+                                                ? getStatusBadgeStyle(st)
+                                                : "bg-surface-2/60 border-border text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                                        )}
+                                    >
+                                        <span className="truncate">{st}</span>
+                                        {active && <Check className="h-3.5 w-3.5 shrink-0" />}
+                                    </button>
+                                );
+                            })}
+                        </div>
+
+                        {(pickerStatus === "Injured" || pickerStatus === "Doubtful") && (
+                            <div className="space-y-2 pt-2 border-t border-border/60">
+                                <Input
+                                    placeholder="Injury / issue (e.g. Hamstring)"
+                                    value={pickerInjuryType}
+                                    onChange={(e) => setPickerInjuryType(e.target.value)}
+                                    className="h-9 text-xs"
+                                />
+                                <Input
+                                    placeholder="Expected return (e.g. 2 weeks)"
+                                    value={pickerInjuryDuration}
+                                    onChange={(e) => setPickerInjuryDuration(e.target.value)}
+                                    className="h-9 text-xs"
+                                />
+                                <Button
+                                    size="sm"
+                                    disabled={isSavingStatus}
+                                    onClick={() => handleSaveQuickStatus()}
+                                    className="w-full h-9 text-xs font-bold"
+                                >
+                                    {isSavingStatus ? "Saving..." : `Save ${pickerStatus} Status`}
+                                </Button>
+                            </div>
+                        )}
+
+                        {pickerStatus === "Holiday" && (
+                            <div className="space-y-2 pt-2 border-t border-border/60">
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">
+                                            From
+                                        </label>
+                                        <Input
+                                            type="date"
+                                            value={pickerHolidayStart}
+                                            onChange={(e) => setPickerHolidayStart(e.target.value)}
+                                            className="h-9 text-xs px-2"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold uppercase text-muted-foreground block mb-1">
+                                            Return Date
+                                        </label>
+                                        <Input
+                                            type="date"
+                                            value={pickerHolidayEnd}
+                                            onChange={(e) => setPickerHolidayEnd(e.target.value)}
+                                            className="h-9 text-xs px-2"
+                                        />
+                                    </div>
+                                </div>
+                                <Button
+                                    size="sm"
+                                    disabled={isSavingStatus}
+                                    onClick={() => handleSaveQuickStatus()}
+                                    className="w-full h-9 text-xs font-bold"
+                                >
+                                    {isSavingStatus ? "Saving..." : "Save Holiday Dates"}
+                                </Button>
+                            </div>
+                        )}
+
+                        {pickerStatus === "Suspended" && (
+                            <div className="space-y-2 pt-2 border-t border-border/60">
+                                <Input
+                                    placeholder="Reason (e.g. 5 Yellow Cards / Red Card)"
+                                    value={pickerSuspensionReason}
+                                    onChange={(e) => setPickerSuspensionReason(e.target.value)}
+                                    className="h-9 text-xs"
+                                />
+                                <Input
+                                    placeholder="Duration (e.g. 1 Match)"
+                                    value={pickerSuspensionDuration}
+                                    onChange={(e) => setPickerSuspensionDuration(e.target.value)}
+                                    className="h-9 text-xs"
+                                />
+                                <Button
+                                    size="sm"
+                                    disabled={isSavingStatus}
+                                    onClick={() => handleSaveQuickStatus()}
+                                    className="w-full h-9 text-xs font-bold"
+                                >
+                                    {isSavingStatus ? "Saving..." : "Save Suspension"}
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* =========================================================
+                DESKTOP HEADER SECTION (>= 768px) — UNTOUCHED
+               ========================================================= */}
+            <div className="hidden md:flex flex-col md:flex-row gap-5 items-start bg-surface-1 p-5 sm:p-6 rounded-xl border border-border shadow-sm">
                 <div className="relative shrink-0">
                     <Avatar className="h-24 w-24 sm:h-28 sm:w-28 border-2 border-border shadow-sm bg-surface-2">
                         <AvatarImage
@@ -1292,8 +1750,134 @@ export default function PlayerProfilePage() {
                 </div>
             </div>
 
-            <div className="space-y-5">
-                <div className="grid gap-3.5 grid-cols-2 lg:grid-cols-4">
+            <div className="space-y-4 md:space-y-5">
+                {/* =========================================================
+                    MOBILE COMPACT 8-STAT BENTO GRID (< 768px)
+                   ========================================================= */}
+                <div className="md:hidden space-y-2">
+                    {/* Primary 4-Stat Hero Row */}
+                    <div className="grid grid-cols-4 gap-2">
+                        <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-sm flex flex-col justify-between">
+                            <span className="text-[9px] uppercase tracking-wider font-extrabold text-indigo-600 dark:text-indigo-400">
+                                Apps
+                            </span>
+                            <div className="text-xl font-black text-foreground leading-tight my-0.5">
+                                {calculatedStats.apps}
+                            </div>
+                            <span className="text-[9px] text-muted-foreground font-semibold truncate">
+                                {calculatedStats.starts}S • {calculatedStats.subApps}Sub
+                            </span>
+                        </div>
+
+                        <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-sm flex flex-col justify-between">
+                            <span className="text-[9px] uppercase tracking-wider font-extrabold text-emerald-600 dark:text-emerald-400">
+                                Goals
+                            </span>
+                            <div className="text-xl font-black text-foreground leading-tight my-0.5">
+                                {calculatedStats.goals}
+                            </div>
+                            <span className="text-[9px] text-muted-foreground font-semibold truncate">
+                                {goalsPer90 ? `${goalsPer90} / 90` : "Season"}
+                            </span>
+                        </div>
+
+                        <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-sm flex flex-col justify-between">
+                            <span className="text-[9px] uppercase tracking-wider font-extrabold text-sky-600 dark:text-sky-400">
+                                Assists
+                            </span>
+                            <div className="text-xl font-black text-foreground leading-tight my-0.5">
+                                {calculatedStats.assists}
+                            </div>
+                            <span className="text-[9px] text-muted-foreground font-semibold truncate">
+                                Season
+                            </span>
+                        </div>
+
+                        {isDefensivePlayer ? (
+                            <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-sm flex flex-col justify-between">
+                                <span className="text-[9px] uppercase tracking-wider font-extrabold text-teal-600 dark:text-teal-400 truncate">
+                                    Clean Shts
+                                </span>
+                                <div className="text-xl font-black text-foreground leading-tight my-0.5">
+                                    {calculatedStats.cleanSheets}
+                                </div>
+                                <span className="text-[9px] text-muted-foreground font-semibold truncate">
+                                    {calculatedStats.apps > 0 ? `${cleanSheetRate}% rate` : "Season"}
+                                </span>
+                            </div>
+                        ) : (
+                            <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-sm flex flex-col justify-between">
+                                <span className="text-[9px] uppercase tracking-wider font-extrabold text-purple-600 dark:text-purple-400 truncate">
+                                    G + A
+                                </span>
+                                <div className="text-xl font-black text-foreground leading-tight my-0.5">
+                                    {calculatedStats.goals + calculatedStats.assists}
+                                </div>
+                                <span className="text-[9px] text-muted-foreground font-semibold truncate">
+                                    {contributionsPer90 ? `${contributionsPer90} / 90` : "Total"}
+                                </span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Secondary 4-Stat Strip */}
+                    <div className="grid grid-cols-4 gap-2">
+                        <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-sm flex flex-col justify-between">
+                            <span className="text-[9px] uppercase tracking-wider font-extrabold text-muted-foreground">
+                                Mins
+                            </span>
+                            <div className="text-base font-black text-foreground leading-tight my-0.5 font-mono">
+                                {calculatedStats.minutes}&apos;
+                            </div>
+                            <span className="text-[9px] text-muted-foreground font-semibold truncate">
+                                {avgMinsPerApp > 0 ? `${avgMinsPerApp}m/app` : "—"}
+                            </span>
+                        </div>
+
+                        <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-sm flex flex-col justify-between">
+                            <span className="text-[9px] uppercase tracking-wider font-extrabold text-amber-600 dark:text-amber-400">
+                                Win %
+                            </span>
+                            <div className="text-base font-black text-foreground leading-tight my-0.5">
+                                {calculatedStats.winRate}%
+                            </div>
+                            <span className="text-[9px] text-muted-foreground font-semibold truncate">
+                                {calculatedStats.wins}W {calculatedStats.draws}D {calculatedStats.losses}L
+                            </span>
+                        </div>
+
+                        <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-sm flex flex-col justify-between">
+                            <span className="text-[9px] uppercase tracking-wider font-extrabold text-yellow-600 dark:text-yellow-400 flex items-center gap-1">
+                                <span className="w-2 h-2.5 bg-yellow-400 rounded-[1px] inline-block shrink-0" />
+                                Yellows
+                            </span>
+                            <div className="text-base font-black text-foreground leading-tight my-0.5">
+                                {calculatedStats.yellow}
+                            </div>
+                            <span className="text-[9px] text-muted-foreground font-semibold truncate">
+                                Cards
+                            </span>
+                        </div>
+
+                        <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-sm flex flex-col justify-between">
+                            <span className="text-[9px] uppercase tracking-wider font-extrabold text-rose-600 dark:text-rose-400 flex items-center gap-1">
+                                <span className="w-2 h-2.5 bg-red-500 rounded-[1px] inline-block shrink-0" />
+                                Reds
+                            </span>
+                            <div className="text-base font-black text-foreground leading-tight my-0.5">
+                                {calculatedStats.red}
+                            </div>
+                            <span className="text-[9px] text-muted-foreground font-semibold truncate">
+                                Cards
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* =========================================================
+                    DESKTOP 8-STAT CARDS GRID (>= 768px) — UNTOUCHED
+                   ========================================================= */}
+                <div className="hidden md:grid gap-3.5 grid-cols-2 lg:grid-cols-4">
                     {/* Appearances */}
                     <Card className="bg-surface-1 border-border shadow-sm overflow-hidden">
                         <CardHeader className="pb-1 pt-3.5 px-4">
@@ -1444,68 +2028,58 @@ export default function PlayerProfilePage() {
 
                 {/* Match Log & Training Attendance Section */}
                 <Card className="bg-surface-1 border-border shadow-sm">
-                    <CardHeader className="pb-3 border-b border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-2 bg-surface-2 p-1 rounded-lg border border-border w-fit">
+                    <CardHeader className="pb-3 px-3.5 sm:px-6 border-b border-border/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+                        <div className="grid grid-cols-2 sm:flex items-center gap-1.5 sm:gap-2 bg-surface-2 p-1 rounded-xl sm:rounded-lg border border-border w-full sm:w-fit">
                             <button
                                 type="button"
                                 onClick={() => setActivityTab("matches")}
                                 className={cn(
-                                    "px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5",
+                                    "px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-md text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5",
                                     activityTab === "matches"
                                         ? "bg-background text-foreground shadow-sm"
                                         : "text-muted-foreground hover:text-foreground"
                                 )}
                             >
-                                <Trophy className="w-3.5 h-3.5 text-amber-500" />
-                                Match Log ({matchLog.length})
+                                <Trophy className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                <span className="truncate">Match Log ({matchLog.length})</span>
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setActivityTab("training")}
                                 className={cn(
-                                    "px-3 py-1.5 rounded-md text-xs font-bold transition-all flex items-center gap-1.5",
+                                    "px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-md text-xs font-bold transition-all flex items-center justify-center sm:justify-start gap-1.5",
                                     activityTab === "training"
                                         ? "bg-background text-foreground shadow-sm"
                                         : "text-muted-foreground hover:text-foreground"
                                 )}
                             >
-                                <Activity className="w-3.5 h-3.5 text-emerald-500" />
-                                Training Attendance ({recentActivity.length})
+                                <Activity className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                                <span className="truncate">Training ({recentActivity.length})</span>
                             </button>
                         </div>
 
                         {trainingAttendanceRate !== null && (
-                            <div className="text-xs text-muted-foreground font-medium">
-                                Recent Training Attendance:{" "}
-                                <span className="font-bold text-foreground">
+                            <div className="text-[11px] sm:text-xs text-muted-foreground font-medium flex items-center justify-between sm:justify-end px-0.5">
+                                <span>Recent Training Attendance:</span>
+                                <span className="font-bold text-foreground ml-1.5">
                                     {trainingAttendanceRate}% ({attendedTrainingCount}/{recordedTrainingCount})
                                 </span>
                             </div>
                         )}
                     </CardHeader>
-                    <CardContent className="pt-4">
+                    <CardContent className="pt-3 sm:pt-4 px-3.5 sm:px-6">
                         {activityTab === "matches" ? (
                             matchLog.length === 0 ? (
                                 <p className="text-sm text-muted-foreground italic py-4 text-center">
                                     No match appearances recorded for this period.
                                 </p>
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-xs text-left border-collapse">
-                                        <thead>
-                                            <tr className="border-b border-border text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                                <th className="py-2.5 pr-3">Date</th>
-                                                <th className="py-2.5 px-3">Fixture</th>
-                                                <th className="py-2.5 px-3 hidden sm:table-cell">Competition</th>
-                                                <th className="py-2.5 px-2 text-center">Result</th>
-                                                <th className="py-2.5 px-2 text-center">Role</th>
-                                                <th className="py-2.5 px-2 text-center">Mins</th>
-                                                <th className="py-2.5 px-2 text-center">G</th>
-                                                <th className="py-2.5 px-2 text-center">A</th>
-                                                <th className="py-2.5 pl-2 text-center">Cards</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-border/60">
+                                <>
+                                    {/* =========================================================
+                                        MOBILE MATCH LOG CARDS (< 768px, FotMob Style)
+                                       ========================================================= */}
+                                    <div className="md:hidden space-y-2">
+                                        <div className="divide-y divide-border/60">
                                             {matchLog.map((m, idx) => {
                                                 const dObj = m.date ? new Date(m.date) : null;
                                                 const dateLabel =
@@ -1526,149 +2100,299 @@ export default function PlayerProfilePage() {
                                                         : "bg-surface-2 text-muted-foreground border-border";
 
                                                 return (
-                                                    <tr
-                                                        key={`${m.matchId}-${idx}`}
+                                                    <div
+                                                        key={`mob-${m.matchId}-${idx}`}
                                                         onClick={() => router.push(`/analysis?matchId=${m.matchId}`)}
-                                                        title={`Open match analysis vs ${m.opponent}`}
-                                                        className="group hover:bg-surface-2/60 transition-colors cursor-pointer"
+                                                        className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-2.5 active:bg-surface-2/60 transition-colors cursor-pointer"
                                                     >
-                                                        <td className="py-2.5 pr-3 font-medium text-muted-foreground whitespace-nowrap">
-                                                            {dateLabel}
-                                                        </td>
-                                                        <td className="py-2.5 px-3 font-bold text-foreground">
-                                                            <div className="inline-flex items-center gap-1.5">
-                                                                <span className="group-hover:text-brand transition-colors">{m.opponent}</span>
-                                                                <span className="text-[10px] font-semibold text-muted-foreground">
+                                                        {/* Left: Result Pill + Opponent + Date/Role */}
+                                                        <div className="min-w-0 flex-1 space-y-1">
+                                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                                <span
+                                                                    className={cn(
+                                                                        "inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-extrabold shrink-0",
+                                                                        resBadge
+                                                                    )}
+                                                                >
+                                                                    {m.result === "Win"
+                                                                        ? "W"
+                                                                        : m.result === "Loss"
+                                                                        ? "L"
+                                                                        : m.result === "Draw"
+                                                                        ? "D"
+                                                                        : "—"}
+                                                                    {m.scoreline && (
+                                                                        <span className="font-mono">{m.scoreline}</span>
+                                                                    )}
+                                                                </span>
+                                                                <span className="font-bold text-xs text-foreground truncate">
+                                                                    {m.opponent}
+                                                                </span>
+                                                                <span className="text-[10px] font-semibold text-muted-foreground shrink-0">
                                                                     ({m.isHome ? "H" : "A"})
                                                                 </span>
-                                                                <ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
-                                                            </div>
-                                                        </td>
-                                                        <td className="py-2.5 px-3 text-muted-foreground hidden sm:table-cell">
-                                                            {m.competition}
-                                                        </td>
-                                                        <td className="py-2.5 px-2 text-center whitespace-nowrap">
-                                                            <div className="inline-flex items-center gap-1">
-                                                                <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-bold", resBadge)}>
-                                                                    {m.result === "Win" ? "W" : m.result === "Loss" ? "L" : m.result === "Draw" ? "D" : "—"}
-                                                                    {m.scoreline && <span className="font-mono">{m.scoreline}</span>}
-                                                                </span>
                                                                 {m.cleanSheet && (
-                                                                    <span
-                                                                        title="Clean Sheet"
-                                                                        className="px-1 py-0.5 rounded bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/25 text-[9px] font-extrabold"
-                                                                    >
+                                                                    <span className="px-1 py-0.5 rounded bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/25 text-[9px] font-extrabold shrink-0">
                                                                         CS
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                        </td>
-                                                        <td className="py-2.5 px-2 text-center">
-                                                            <span
-                                                                className={cn(
-                                                                    "px-1.5 py-0.5 rounded text-[10px] font-semibold",
-                                                                    m.role === "Starter"
-                                                                        ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
-                                                                        : m.role === "Sub"
-                                                                        ? "bg-sky-500/10 text-sky-600 dark:text-sky-400"
-                                                                        : "bg-surface-2 text-muted-foreground"
-                                                                )}
-                                                            >
-                                                                {m.role}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-2.5 px-2 text-center font-mono text-muted-foreground">
-                                                            {m.minutes}&apos;
-                                                        </td>
-                                                        <td className="py-2.5 px-2 text-center font-bold">
-                                                            {m.goals > 0 ? (
-                                                                <span className="text-emerald-600 dark:text-emerald-400">{m.goals}</span>
-                                                            ) : (
-                                                                <span className="text-muted-foreground/40">—</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2.5 px-2 text-center font-bold">
-                                                            {m.assists > 0 ? (
-                                                                <span className="text-sky-600 dark:text-sky-400">{m.assists}</span>
-                                                            ) : (
-                                                                <span className="text-muted-foreground/40">—</span>
-                                                            )}
-                                                        </td>
-                                                        <td className="py-2.5 pl-2 text-center">
-                                                            <div className="inline-flex items-center justify-center gap-1">
-                                                                {m.yellow > 0 && (
-                                                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-foreground">
-                                                                        <span className="w-2 h-2.5 bg-yellow-400 rounded-[1px] inline-block" />
-                                                                        {m.yellow > 1 ? m.yellow : ""}
-                                                                    </span>
-                                                                )}
-                                                                {m.red > 0 && (
-                                                                    <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-foreground">
-                                                                        <span className="w-2 h-2.5 bg-red-500 rounded-[1px] inline-block" />
-                                                                        {m.red > 1 ? m.red : ""}
-                                                                    </span>
-                                                                )}
-                                                                {m.yellow === 0 && m.red === 0 && (
-                                                                    <span className="text-muted-foreground/40">—</span>
-                                                                )}
+
+                                                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground flex-wrap">
+                                                                <span className="font-medium">{dateLabel}</span>
+                                                                <span>•</span>
+                                                                <span className="truncate max-w-[120px]">{m.competition}</span>
+                                                                <span>•</span>
+                                                                <span
+                                                                    className={cn(
+                                                                        "px-1.5 py-0 rounded text-[9px] font-bold",
+                                                                        m.role === "Starter"
+                                                                            ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                                                                            : m.role === "Sub"
+                                                                            ? "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                                                                            : "bg-surface-2 text-muted-foreground"
+                                                                    )}
+                                                                >
+                                                                    {m.role}
+                                                                </span>
                                                             </div>
-                                                        </td>
-                                                    </tr>
+                                                        </div>
+
+                                                        {/* Right: Compact Match Contributions Strip */}
+                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                            {m.goals > 0 && (
+                                                                <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-[10px] font-extrabold">
+                                                                    ⚽ {m.goals}
+                                                                </span>
+                                                            )}
+                                                            {m.assists > 0 && (
+                                                                <span className="px-1.5 py-0.5 rounded-md bg-sky-500/10 border border-sky-500/25 text-sky-600 dark:text-sky-400 text-[10px] font-extrabold">
+                                                                    🅰️ {m.assists}
+                                                                </span>
+                                                            )}
+                                                            {m.yellow > 0 && (
+                                                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-foreground">
+                                                                    <span className="w-2 h-2.5 bg-yellow-400 rounded-[1px] inline-block" />
+                                                                    {m.yellow > 1 ? m.yellow : ""}
+                                                                </span>
+                                                            )}
+                                                            {m.red > 0 && (
+                                                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-foreground">
+                                                                    <span className="w-2 h-2.5 bg-red-500 rounded-[1px] inline-block" />
+                                                                    {m.red > 1 ? m.red : ""}
+                                                                </span>
+                                                            )}
+                                                            <span className="px-1.5 py-0.5 rounded-md bg-surface-2 border border-border/60 font-mono text-[10px] font-bold text-muted-foreground">
+                                                                {m.minutes}&apos;
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 );
                                             })}
-                                        </tbody>
-                                        <tfoot>
-                                            <tr className="border-t-2 border-border bg-surface-2/50 font-bold text-foreground text-xs">
-                                                <td className="py-2.5 pr-3 text-[10px] uppercase tracking-wider text-muted-foreground">
-                                                    Totals
-                                                </td>
-                                                <td className="py-2.5 px-3">
-                                                    {calculatedStats.apps} {calculatedStats.apps === 1 ? "Appearance" : "Appearances"}
-                                                    <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
-                                                        ({calculatedStats.starts} Starts, {calculatedStats.subApps} Subs)
-                                                    </span>
-                                                </td>
-                                                <td className="py-2.5 px-3 hidden sm:table-cell text-[10px] text-muted-foreground font-medium">
-                                                    {calculatedStats.wins}W • {calculatedStats.draws}D • {calculatedStats.losses}L
-                                                </td>
-                                                <td className="py-2.5 px-2 text-center text-[10px] text-teal-600 dark:text-teal-400">
-                                                    {calculatedStats.cleanSheets > 0 ? `${calculatedStats.cleanSheets} CS` : "—"}
-                                                </td>
-                                                <td className="py-2.5 px-2 text-center text-[10px] text-muted-foreground">
-                                                    {avgMinsPerApp > 0 ? `${avgMinsPerApp}m avg` : "—"}
-                                                </td>
-                                                <td className="py-2.5 px-2 text-center font-mono">
-                                                    {calculatedStats.minutes}&apos;
-                                                </td>
-                                                <td className="py-2.5 px-2 text-center text-emerald-600 dark:text-emerald-400">
-                                                    {calculatedStats.goals}
-                                                </td>
-                                                <td className="py-2.5 px-2 text-center text-sky-600 dark:text-sky-400">
-                                                    {calculatedStats.assists}
-                                                </td>
-                                                <td className="py-2.5 pl-2 text-center">
-                                                    <div className="inline-flex items-center justify-center gap-1.5">
-                                                        {calculatedStats.yellow > 0 && (
-                                                            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold">
-                                                                <span className="w-2 h-2.5 bg-yellow-400 rounded-[1px] inline-block" />
-                                                                {calculatedStats.yellow}
-                                                            </span>
-                                                        )}
-                                                        {calculatedStats.red > 0 && (
-                                                            <span className="inline-flex items-center gap-0.5 text-[10px] font-bold">
-                                                                <span className="w-2 h-2.5 bg-red-500 rounded-[1px] inline-block" />
-                                                                {calculatedStats.red}
-                                                            </span>
-                                                        )}
-                                                        {calculatedStats.yellow === 0 && calculatedStats.red === 0 && (
-                                                            <span className="text-muted-foreground/40">—</span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        </tfoot>
-                                    </table>
-                                </div>
+                                        </div>
+
+                                        {/* Mobile Totals Summary Bar */}
+                                        <div className="mt-3 pt-2.5 border-t-2 border-border bg-surface-2/60 rounded-xl p-2.5 flex items-center justify-between gap-2 text-[11px]">
+                                            <div className="font-bold text-foreground">
+                                                {calculatedStats.apps} Apps{" "}
+                                                <span className="text-[10px] font-normal text-muted-foreground">
+                                                    ({calculatedStats.starts}S, {calculatedStats.subApps}Sub)
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-2 font-bold">
+                                                <span className="font-mono text-muted-foreground">{calculatedStats.minutes}&apos;</span>
+                                                <span className="text-emerald-600 dark:text-emerald-400">{calculatedStats.goals}G</span>
+                                                <span className="text-sky-600 dark:text-sky-400">{calculatedStats.assists}A</span>
+                                                {calculatedStats.cleanSheets > 0 && (
+                                                    <span className="text-teal-600 dark:text-teal-400">{calculatedStats.cleanSheets}CS</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* =========================================================
+                                        DESKTOP MATCH LOG TABLE (>= 768px) — UNTOUCHED
+                                       ========================================================= */}
+                                    <div className="hidden md:block overflow-x-auto">
+                                        <table className="w-full text-xs text-left border-collapse">
+                                            <thead>
+                                                <tr className="border-b border-border text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                                    <th className="py-2.5 pr-3">Date</th>
+                                                    <th className="py-2.5 px-3">Fixture</th>
+                                                    <th className="py-2.5 px-3 hidden sm:table-cell">Competition</th>
+                                                    <th className="py-2.5 px-2 text-center">Result</th>
+                                                    <th className="py-2.5 px-2 text-center">Role</th>
+                                                    <th className="py-2.5 px-2 text-center">Mins</th>
+                                                    <th className="py-2.5 px-2 text-center">G</th>
+                                                    <th className="py-2.5 px-2 text-center">A</th>
+                                                    <th className="py-2.5 pl-2 text-center">Cards</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-border/60">
+                                                {matchLog.map((m, idx) => {
+                                                    const dObj = m.date ? new Date(m.date) : null;
+                                                    const dateLabel =
+                                                        dObj && !isNaN(dObj.getTime())
+                                                            ? dObj.toLocaleDateString("en-GB", {
+                                                                  day: "numeric",
+                                                                  month: "short",
+                                                                  year: "2-digit",
+                                                              })
+                                                            : m.date || "—";
+                                                    const resBadge =
+                                                        m.result === "Win"
+                                                            ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
+                                                            : m.result === "Loss"
+                                                            ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/25"
+                                                            : m.result === "Draw"
+                                                            ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/25"
+                                                            : "bg-surface-2 text-muted-foreground border-border";
+
+                                                    return (
+                                                        <tr
+                                                            key={`${m.matchId}-${idx}`}
+                                                            onClick={() => router.push(`/analysis?matchId=${m.matchId}`)}
+                                                            title={`Open match analysis vs ${m.opponent}`}
+                                                            className="group hover:bg-surface-2/60 transition-colors cursor-pointer"
+                                                        >
+                                                            <td className="py-2.5 pr-3 font-medium text-muted-foreground whitespace-nowrap">
+                                                                {dateLabel}
+                                                            </td>
+                                                            <td className="py-2.5 px-3 font-bold text-foreground">
+                                                                <div className="inline-flex items-center gap-1.5">
+                                                                    <span className="group-hover:text-brand transition-colors">{m.opponent}</span>
+                                                                    <span className="text-[10px] font-semibold text-muted-foreground">
+                                                                        ({m.isHome ? "H" : "A"})
+                                                                    </span>
+                                                                    <ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-2.5 px-3 text-muted-foreground hidden sm:table-cell">
+                                                                {m.competition}
+                                                            </td>
+                                                            <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                                                                <div className="inline-flex items-center gap-1">
+                                                                    <span className={cn("inline-flex items-center gap-1 px-1.5 py-0.5 rounded border text-[10px] font-bold", resBadge)}>
+                                                                        {m.result === "Win" ? "W" : m.result === "Loss" ? "L" : m.result === "Draw" ? "D" : "—"}
+                                                                        {m.scoreline && <span className="font-mono">{m.scoreline}</span>}
+                                                                    </span>
+                                                                    {m.cleanSheet && (
+                                                                        <span
+                                                                            title="Clean Sheet"
+                                                                            className="px-1 py-0.5 rounded bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/25 text-[9px] font-extrabold"
+                                                                        >
+                                                                            CS
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                            <td className="py-2.5 px-2 text-center">
+                                                                <span
+                                                                    className={cn(
+                                                                        "px-1.5 py-0.5 rounded text-[10px] font-semibold",
+                                                                        m.role === "Starter"
+                                                                            ? "bg-indigo-500/10 text-indigo-600 dark:text-indigo-400"
+                                                                            : m.role === "Sub"
+                                                                            ? "bg-sky-500/10 text-sky-600 dark:text-sky-400"
+                                                                            : "bg-surface-2 text-muted-foreground"
+                                                                    )}
+                                                                >
+                                                                    {m.role}
+                                                                </span>
+                                                            </td>
+                                                            <td className="py-2.5 px-2 text-center font-mono text-muted-foreground">
+                                                                {m.minutes}&apos;
+                                                            </td>
+                                                            <td className="py-2.5 px-2 text-center font-bold">
+                                                                {m.goals > 0 ? (
+                                                                    <span className="text-emerald-600 dark:text-emerald-400">{m.goals}</span>
+                                                                ) : (
+                                                                    <span className="text-muted-foreground/40">—</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="py-2.5 px-2 text-center font-bold">
+                                                                {m.assists > 0 ? (
+                                                                    <span className="text-sky-600 dark:text-sky-400">{m.assists}</span>
+                                                                ) : (
+                                                                    <span className="text-muted-foreground/40">—</span>
+                                                                )}
+                                                            </td>
+                                                            <td className="py-2.5 pl-2 text-center">
+                                                                <div className="inline-flex items-center justify-center gap-1">
+                                                                    {m.yellow > 0 && (
+                                                                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-foreground">
+                                                                            <span className="w-2 h-2.5 bg-yellow-400 rounded-[1px] inline-block" />
+                                                                            {m.yellow > 1 ? m.yellow : ""}
+                                                                        </span>
+                                                                    )}
+                                                                    {m.red > 0 && (
+                                                                        <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-foreground">
+                                                                            <span className="w-2 h-2.5 bg-red-500 rounded-[1px] inline-block" />
+                                                                            {m.red > 1 ? m.red : ""}
+                                                                        </span>
+                                                                    )}
+                                                                    {m.yellow === 0 && m.red === 0 && (
+                                                                        <span className="text-muted-foreground/40">—</span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                            <tfoot>
+                                                <tr className="border-t-2 border-border bg-surface-2/50 font-bold text-foreground text-xs">
+                                                    <td className="py-2.5 pr-3 text-[10px] uppercase tracking-wider text-muted-foreground">
+                                                        Totals
+                                                    </td>
+                                                    <td className="py-2.5 px-3">
+                                                        {calculatedStats.apps} {calculatedStats.apps === 1 ? "Appearance" : "Appearances"}
+                                                        <span className="ml-1.5 text-[10px] font-normal text-muted-foreground">
+                                                            ({calculatedStats.starts} Starts, {calculatedStats.subApps} Subs)
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2.5 px-3 hidden sm:table-cell text-[10px] text-muted-foreground font-medium">
+                                                        {calculatedStats.wins}W • {calculatedStats.draws}D • {calculatedStats.losses}L
+                                                    </td>
+                                                    <td className="py-2.5 px-2 text-center text-[10px] text-teal-600 dark:text-teal-400">
+                                                        {calculatedStats.cleanSheets > 0 ? `${calculatedStats.cleanSheets} CS` : "—"}
+                                                    </td>
+                                                    <td className="py-2.5 px-2 text-center text-[10px] text-muted-foreground">
+                                                        {avgMinsPerApp > 0 ? `${avgMinsPerApp}m avg` : "—"}
+                                                    </td>
+                                                    <td className="py-2.5 px-2 text-center font-mono">
+                                                        {calculatedStats.minutes}&apos;
+                                                    </td>
+                                                    <td className="py-2.5 px-2 text-center text-emerald-600 dark:text-emerald-400">
+                                                        {calculatedStats.goals}
+                                                    </td>
+                                                    <td className="py-2.5 px-2 text-center text-sky-600 dark:text-sky-400">
+                                                        {calculatedStats.assists}
+                                                    </td>
+                                                    <td className="py-2.5 pl-2 text-center">
+                                                        <div className="inline-flex items-center justify-center gap-1.5">
+                                                            {calculatedStats.yellow > 0 && (
+                                                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold">
+                                                                    <span className="w-2 h-2.5 bg-yellow-400 rounded-[1px] inline-block" />
+                                                                    {calculatedStats.yellow}
+                                                                </span>
+                                                            )}
+                                                            {calculatedStats.red > 0 && (
+                                                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold">
+                                                                    <span className="w-2 h-2.5 bg-red-500 rounded-[1px] inline-block" />
+                                                                    {calculatedStats.red}
+                                                                </span>
+                                                            )}
+                                                            {calculatedStats.yellow === 0 && calculatedStats.red === 0 && (
+                                                                <span className="text-muted-foreground/40">—</span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                </>
                             )
                         ) : (
                             <div className="space-y-3">
