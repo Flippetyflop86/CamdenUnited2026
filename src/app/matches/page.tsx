@@ -314,21 +314,30 @@ export default function MatchesPage() {
                 supabase.from("matches").update({ notes: extracted.normalizedRawNotes }).eq("id", m.id).then(() => {});
             }
 
-            const notesToScan = extracted.normalizedRawNotes || m.notes || "";
-            const locationMatch = notesToScan ? notesToScan.match(/\[Location: (.*?)\]/) : null;
-            const location = locationMatch ? locationMatch[1] : "";
-
-            const surfaceMatch = notesToScan ? notesToScan.match(/\[Surface: (.*?)\]/) : null;
-            const surface = surfaceMatch ? surfaceMatch[1] : "4G";
-
-            const meetTimeMatch = notesToScan ? notesToScan.match(/\[MeetTime: (.*?)\]/) : null;
-            const meetTime = meetTimeMatch ? meetTimeMatch[1] : "";
-
             const parsedLineup = extracted.parsedLineup;
+            const notesToScan = extracted.normalizedRawNotes || m.notes || "";
+            const locationMatch = notesToScan ? notesToScan.match(/\[Location:\s*([^\]]*)\]/i) : null;
+            const rawLocFromTag = locationMatch ? locationMatch[1].trim() : "";
+            const location = (parsedLineup?.venueNotes && parsedLineup.venueNotes.trim())
+                ? parsedLineup.venueNotes.trim()
+                : rawLocFromTag;
+
+            const surfaceMatch = notesToScan ? notesToScan.match(/\[Surface:\s*([^\]]*)\]/i) : null;
+            const surface = surfaceMatch ? surfaceMatch[1].trim() : "4G";
+
+            const meetTimeMatch = notesToScan ? notesToScan.match(/\[MeetTime:\s*([^\]]*)\]/i) : null;
+            const rawMeetFromTag = meetTimeMatch ? meetTimeMatch[1].trim() : "";
+            const fallbackOffset = typeof parsedLineup?.meetOffsetMinutes === "number" && parsedLineup.meetOffsetMinutes !== 0
+                ? -Math.abs(parsedLineup.meetOffsetMinutes)
+                : (m.is_home ? -60 : -75);
+            const meetTime = (parsedLineup?.meetTime && parsedLineup.meetTime.trim())
+                ? parsedLineup.meetTime.trim()
+                : (rawMeetFromTag || (m.time ? calculateMeetTime(m.time, fallbackOffset) : ""));
+
             let cleanNotes = extracted.cleanNotes;
-            cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/, "");
-            cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "");
-            cleanNotes = cleanNotes.replace(/\[MeetTime: .*?\]\n?/, "");
+            cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/gi, "");
+            cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/gi, "");
+            cleanNotes = cleanNotes.replace(/\[MeetTime: .*?\]\n?/gi, "");
             cleanNotes = cleanNotes.replace(/(?:,?\s*["']usedSubstitutes["']\s*:\s*\[\]\s*\}\s*)+/g, "");
             cleanNotes = cleanNotes.replace(/^,\s*/, "").replace(/^[,\s\}\{]+/, "").trim();
             
@@ -442,7 +451,25 @@ export default function MatchesPage() {
             if (currentMatch) {
                 if ((currentMatch as any).rawNotes && (currentMatch as any).rawNotes.includes("[Lineup: ")) {
                     const extracted = extractLineupBlock((currentMatch as any).rawNotes);
-                    if (extracted.lineupTag) {
+                    if (extracted.parsedLineup) {
+                        const updatedLineupObj = { ...extracted.parsedLineup };
+                        if (formData.meetTime) {
+                            updatedLineupObj.meetTime = formData.meetTime.trim();
+                            const [koH, koM] = (formData.time || "14:00").split(":").map(Number);
+                            const [mtH, mtM] = formData.meetTime.trim().split(":").map(Number);
+                            if (!isNaN(koH) && !isNaN(koM) && !isNaN(mtH) && !isNaN(mtM)) {
+                                let diff = (koH * 60 + koM) - (mtH * 60 + mtM);
+                                if (diff < 0) diff += 24 * 60;
+                                if (diff > 0 && diff <= 240) {
+                                    updatedLineupObj.meetOffsetMinutes = diff;
+                                }
+                            }
+                        }
+                        if (formData.location && formData.location !== "Home" && formData.location !== "Away") {
+                            updatedLineupObj.venueNotes = formData.location.trim();
+                        }
+                        lineupTag = `[Lineup: ${JSON.stringify(updatedLineupObj)}]\n`;
+                    } else if (extracted.lineupTag) {
                         lineupTag = extracted.lineupTag + "\n";
                     }
                 }
@@ -1096,7 +1123,8 @@ export default function MatchesPage() {
                         <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 font-medium">
                             <CalendarDays className="h-3.5 w-3.5" />
                             {new Date(match.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
-                            {match.time ? ` · ${match.time.slice(0, 5)}` : ""}
+                            {match.time ? ` · KO ${match.time.slice(0, 5)}` : ""}
+                            {!isPast && (match as any).meetTime ? ` · Meet ${(match as any).meetTime}` : ""}
                         </span>
                         {dayWeather && !isPast && (
                             <span className="text-xs text-muted-foreground flex items-center gap-1 bg-surface-2/80 border border-border px-2 py-0.5 rounded-full" title={`Temp: ${dayWeather.tempMin}°C to ${dayWeather.tempMax}°C, Rain: ${dayWeather.rain}mm`}>

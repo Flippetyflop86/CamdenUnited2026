@@ -187,6 +187,7 @@ export interface MatchdayXI {
     customKitColor?: string;
     gkKitColor?: string;
     meetOffsetMinutes?: number;
+    meetTime?: string;
     venueNotes?: string;
     motmPlayerId?: string;
     matchEvents?: { [playerId: string]: MatchdayPlayerEventStats };

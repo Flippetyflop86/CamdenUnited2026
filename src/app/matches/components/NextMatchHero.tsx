@@ -98,7 +98,12 @@ export function NextMatchHero({
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <Clock className="h-4 w-4 text-muted-foreground/70" />
-                                <span>{(match.time || "14:00").slice(0, 5)}</span>
+                                <span>KO {(match.time || "14:00").slice(0, 5)}</span>
+                                {(match as any).meetTime && (
+                                    <span className="text-amber-700 dark:text-amber-400 font-semibold ml-1">
+                                        • Meet {(match as any).meetTime}
+                                    </span>
+                                )}
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <MapPin className="h-4 w-4 text-muted-foreground/70" />

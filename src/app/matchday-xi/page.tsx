@@ -66,6 +66,39 @@ function stripLineupFromNotes(notes?: string): string {
     return extractLineupFromRawNotes(notes).cleanNotes;
 }
 
+function extractMeetTimeFromNotes(notes?: string): string {
+    if (!notes) return "";
+    const m = notes.match(/\[MeetTime:\s*([^\]]*)\]/i);
+    return m ? m[1].trim() : "";
+}
+
+function extractLocationFromNotes(notes?: string): string {
+    if (!notes) return "";
+    const m = notes.match(/\[Location:\s*([^\]]*)\]/i);
+    const val = m ? m[1].trim() : "";
+    if (val === "Home" || val === "Away") return "";
+    return val;
+}
+
+function upsertNotesMetadata(cleanNotes: string, meetTime?: string, venueNotes?: string): string {
+    let updated = cleanNotes || "";
+    if (meetTime !== undefined && meetTime.trim()) {
+        if (/\[MeetTime:\s*[^\]]*\]/i.test(updated)) {
+            updated = updated.replace(/\[MeetTime:\s*[^\]]*\]/i, `[MeetTime: ${meetTime.trim()}]`);
+        } else {
+            updated = `[MeetTime: ${meetTime.trim()}]${updated ? `\n${updated}` : ""}`;
+        }
+    }
+    if (venueNotes !== undefined && venueNotes.trim()) {
+        if (/\[Location:\s*[^\]]*\]/i.test(updated)) {
+            updated = updated.replace(/\[Location:\s*[^\]]*\]/i, `[Location: ${venueNotes.trim()}]`);
+        } else {
+            updated = `[Location: ${venueNotes.trim()}]${updated ? `\n${updated}` : ""}`;
+        }
+    }
+    return updated.trim();
+}
+
 export default function MatchdayXIPage() {
     const { settings, isLoaded: isClubLoaded } = useClub();
     const { isLoading: isAuthLoading, clubId } = useAuth();
@@ -76,6 +109,14 @@ export default function MatchdayXIPage() {
     const [selectedMatchId, setSelectedMatchId] = useState<string>("");
     const [nextMatch, setNextMatch] = useState<Match | null>(null);
     const loadedLineupKeyRef = useRef<string>("");
+    const selectedMatchIdRef = useRef<string>("");
+    const matchesRef = useRef<Match[]>([]);
+    const lineupRef = useRef<MatchdayXI | null>(null);
+    selectedMatchIdRef.current = selectedMatchId;
+    matchesRef.current = matches;
+    lineupRef.current = lineup;
+    const [koInputValue, setKoInputValue] = useState<string>("14:00");
+    const [meetInputValue, setMeetInputValue] = useState<string>("13:00");
     const [draggedPlayer, setDraggedPlayer] = useState<string | null>(null);
     const [draggedSource, setDraggedSource] = useState<{type: 'squad' | 'pitch' | 'sub', index?: number} | null>(null);
     const [squadFilter, setSquadFilter] = useState<"All" | "GK" | "DEF" | "MID" | "FWD">("All");
@@ -195,7 +236,11 @@ export default function MatchdayXIPage() {
 
         // Subscription for realtime updates (optional but good for multi-user)
         const channel = supabase.channel('public:matchday_xis')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'matchday_xis' }, () => fetchLineupOnly())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'matchday_xis' }, () => {
+                if (!selectedMatchIdRef.current && matchesRef.current.length === 0) {
+                    fetchLineupOnly();
+                }
+            })
             .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => fetchPlayers())
             .subscribe();
 
@@ -209,7 +254,9 @@ export default function MatchdayXIPage() {
     }, [currentSquads, activeSquadTab]);
 
     useEffect(() => {
-        fetchLineupOnly();
+        if (!selectedMatchIdRef.current && matchesRef.current.length === 0) {
+            fetchLineupOnly();
+        }
     }, [activeSquadTab]);
 
     const fetchSeasonStats = async () => {
@@ -264,11 +311,11 @@ export default function MatchdayXIPage() {
     };
 
     const fetchData = async () => {
-        await Promise.all([fetchLineupOnly(), fetchPlayers(), fetchMatches(), fetchSeasonStats()]);
+        await Promise.all([fetchPlayers(), fetchMatches(), fetchSeasonStats()]);
     };
 
     const fetchLineupOnly = async (isFallback = false) => {
-        if (selectedMatchId && !isFallback) return;
+        if ((selectedMatchId || selectedMatchIdRef.current) && !isFallback) return;
         try {
             const { data, error } = await supabase
                 .from('matchday_xis')
@@ -277,6 +324,8 @@ export default function MatchdayXIPage() {
                 .order('created_at', { ascending: false })
                 .limit(1);
 
+            if ((selectedMatchId || selectedMatchIdRef.current) && !isFallback) return;
+
             if (error && (
                 error.message.includes('column "squad" does not exist') || 
                 error.message.includes("Could not find the 'squad' column") || 
@@ -284,6 +333,7 @@ export default function MatchdayXIPage() {
             )) {
                 // Fallback for database migration pending
                 const fallbackRes = await supabase.from('matchday_xis').select('*').order('created_at', { ascending: false }).limit(1);
+                if ((selectedMatchId || selectedMatchIdRef.current) && !isFallback) return;
                 if (fallbackRes.data && fallbackRes.data.length > 0) {
                     setLineup({
                         id: fallbackRes.data[0].id,
@@ -311,6 +361,8 @@ export default function MatchdayXIPage() {
         } catch (e) {
             console.error("Error fetching lineup:", e);
         }
+
+        if ((selectedMatchId || selectedMatchIdRef.current) && !isFallback) return;
 
         // Default empty lineup if nothing found
         setLineup({
@@ -404,16 +456,31 @@ export default function MatchdayXIPage() {
             setMatches(mapped);
             
             const urlMatchId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("match") : null;
-            const requestedMatch = urlMatchId ? mapped.find((m: any) => m.id === urlMatchId) : null;
+            const storedMatchId = typeof window !== "undefined" ? sessionStorage.getItem("camden_matchday_xi_match_id") : null;
+            const requestedMatch = urlMatchId
+                ? mapped.find((m: any) => m.id === urlMatchId)
+                : (storedMatchId ? mapped.find((m: any) => m.id === storedMatchId) : null);
             const today = new Date().toISOString().split('T')[0];
             const upcoming = requestedMatch || [...mapped].reverse().find((m: any) => m.date >= today) || mapped[0];
-            if (requestedMatch) {
+
+            const currentId = selectedMatchIdRef.current;
+            const existingSelected = currentId ? mapped.find((m: any) => m.id === currentId) : null;
+
+            if (urlMatchId && requestedMatch) {
+                selectedMatchIdRef.current = requestedMatch.id;
                 setSelectedMatchId(requestedMatch.id);
                 setNextMatch(requestedMatch);
-            } else if (upcoming && (!selectedMatchId || !mapped.some((m: any) => m.id === selectedMatchId))) {
+                if (typeof window !== "undefined") sessionStorage.setItem("camden_matchday_xi_match_id", requestedMatch.id);
+            } else if (existingSelected) {
+                setNextMatch(existingSelected);
+            } else if (upcoming) {
+                selectedMatchIdRef.current = upcoming.id;
                 setSelectedMatchId(upcoming.id);
                 setNextMatch(upcoming);
+                if (typeof window !== "undefined") sessionStorage.setItem("camden_matchday_xi_match_id", upcoming.id);
             }
+        } else {
+            fetchLineupOnly(true);
         }
     };
 
@@ -421,20 +488,41 @@ export default function MatchdayXIPage() {
     useEffect(() => {
         if (!selectedMatchId || matches.length === 0) return;
 
-        const currentKey = `${activeSquadTab}-${selectedMatchId}`;
-        if (loadedLineupKeyRef.current === currentKey) {
-            return;
+        if (typeof window !== "undefined") {
+            sessionStorage.setItem("camden_matchday_xi_match_id", selectedMatchId);
         }
 
         const currentMatch = matches.find(m => m.id === selectedMatchId);
         if (!currentMatch) return;
 
         setNextMatch(currentMatch);
+        setKoInputValue((currentMatch.time || "14:00").slice(0, 5));
+
+        const currentKey = `${activeSquadTab}-${selectedMatchId}`;
+        if (loadedLineupKeyRef.current === currentKey) {
+            return;
+        }
+
         fetchCurrentMatchStats(selectedMatchId);
+
+        const notesMeetTime = extractMeetTimeFromNotes(currentMatch.notes);
+        const notesLocation = extractLocationFromNotes(currentMatch.notes);
+        const defaultOffset = currentMatch.isHome ? 60 : 75;
 
         const parsed = parseLineupFromNotes(currentMatch.notes);
         if (parsed) {
             const hasStarters = Object.values(parsed.starters || {}).some(Boolean);
+            const normalizedOffset = typeof parsed.meetOffsetMinutes === "number" && parsed.meetOffsetMinutes !== 0
+                ? Math.abs(parsed.meetOffsetMinutes)
+                : defaultOffset;
+            const resolvedMeetTime = (parsed.meetTime && parsed.meetTime.trim())
+                ? parsed.meetTime.trim()
+                : (notesMeetTime || calculateMeetTime((currentMatch.time || "14:00").slice(0, 5), -normalizedOffset));
+            const resolvedVenue = (parsed.venueNotes && parsed.venueNotes.trim())
+                ? parsed.venueNotes.trim()
+                : notesLocation;
+
+            setMeetInputValue(resolvedMeetTime);
             setLineup({
                 id: `match-lineup-${currentMatch.id}`,
                 formation: parsed.formation || "4-2-3-1",
@@ -453,8 +541,9 @@ export default function MatchdayXIPage() {
                 kitOverride: parsed.kitOverride || "auto",
                 customKitColor: parsed.customKitColor || "",
                 gkKitColor: parsed.gkKitColor || "#10b981",
-                meetOffsetMinutes: typeof parsed.meetOffsetMinutes === "number" ? parsed.meetOffsetMinutes : -60,
-                venueNotes: parsed.venueNotes || "",
+                meetOffsetMinutes: normalizedOffset,
+                meetTime: resolvedMeetTime,
+                venueNotes: resolvedVenue,
                 motmPlayerId: parsed.motmPlayerId || "",
                 matchEvents: parsed.matchEvents || {},
                 squad: activeSquadTab,
@@ -466,7 +555,9 @@ export default function MatchdayXIPage() {
             return;
         }
 
-        // Fallback to blank lineup
+        // Fallback to blank lineup with metadata hydrated from match notes
+        const fallbackMeetTime = notesMeetTime || calculateMeetTime((currentMatch.time || "14:00").slice(0, 5), -defaultOffset);
+        setMeetInputValue(fallbackMeetTime);
         setLineup({
             id: `match-lineup-${selectedMatchId}`,
             formation: "4-2-3-1",
@@ -485,8 +576,9 @@ export default function MatchdayXIPage() {
             kitOverride: "auto",
             customKitColor: "",
             gkKitColor: "#10b981",
-            meetOffsetMinutes: -60,
-            venueNotes: "",
+            meetOffsetMinutes: defaultOffset,
+            meetTime: fallbackMeetTime,
+            venueNotes: notesLocation,
             motmPlayerId: "",
             matchEvents: {},
             squad: activeSquadTab,
@@ -655,9 +747,10 @@ export default function MatchdayXIPage() {
         await syncMatchGoalsAndAssistsEverywhere(matchId);
     };
 
-    const saveLineup = async (newLineup: MatchdayXI & { usedSubstitutes?: string[] }) => {
-        if (!selectedMatchId) return;
-        const currentMatch = matches.find(m => m.id === selectedMatchId);
+    const saveLineup = async (newLineup: MatchdayXI & { usedSubstitutes?: string[] }, overrideTime?: string) => {
+        const targetMatchId = selectedMatchIdRef.current || selectedMatchId;
+        if (!targetMatchId) return;
+        const currentMatch = matchesRef.current.find(m => m.id === targetMatchId) || matches.find(m => m.id === targetMatchId);
         if (!currentMatch) return;
 
         setSaveStatus("saving");
@@ -684,8 +777,17 @@ export default function MatchdayXIPage() {
                 cornerTakerId: validCornerTakerId,
                 freeKickTakerId: validFreeKickTakerId,
             };
+            lineupRef.current = newLineup;
             setLineup(newLineup);
         }
+
+        const effectiveKoTime = (overrideTime || currentMatch.time || "14:00").slice(0, 5);
+        const normalizedOffset = typeof newLineup.meetOffsetMinutes === "number" && newLineup.meetOffsetMinutes !== 0
+            ? Math.abs(newLineup.meetOffsetMinutes)
+            : (currentMatch.isHome ? 60 : 75);
+        const effectiveMeetTime = (newLineup.meetTime && newLineup.meetTime.trim())
+            ? newLineup.meetTime.trim()
+            : calculateMeetTime(effectiveKoTime, -normalizedOffset);
 
         const serialized = {
             formation: newLineup.formation,
@@ -704,23 +806,37 @@ export default function MatchdayXIPage() {
             kitOverride: newLineup.kitOverride || "auto",
             customKitColor: newLineup.customKitColor || "",
             gkKitColor: newLineup.gkKitColor || "#10b981",
-            meetOffsetMinutes: typeof newLineup.meetOffsetMinutes === "number" ? newLineup.meetOffsetMinutes : -60,
+            meetOffsetMinutes: normalizedOffset,
+            meetTime: effectiveMeetTime,
             venueNotes: newLineup.venueNotes || "",
             motmPlayerId: newLineup.motmPlayerId || "",
             matchEvents: newLineup.matchEvents || {}
         };
 
-        const cleanNotes = stripLineupFromNotes(currentMatch.notes);
-        const updatedNotes = `[Lineup: ${JSON.stringify(serialized)}]\n${cleanNotes}`.trim();
+        const strippedNotes = stripLineupFromNotes(currentMatch.notes);
+        const cleanNotesWithMeta = upsertNotesMetadata(strippedNotes, effectiveMeetTime, newLineup.venueNotes);
+        const updatedNotes = `[Lineup: ${JSON.stringify(serialized)}]\n${cleanNotesWithMeta}`.trim();
 
-        // Update local matches state so we don't trigger re-fetch loops
-        setMatches(prev => prev.map(m => m.id === selectedMatchId ? { ...m, notes: updatedNotes } : m));
+        const nextTimeVal = overrideTime || currentMatch.time;
 
-        // Update database match notes
+        // Update local matches & nextMatch state immediately so tab switches or rapid edits never see stale state
+        const nextMatchesList = matchesRef.current.map(m =>
+            m.id === targetMatchId ? { ...m, time: nextTimeVal, notes: updatedNotes } : m
+        );
+        matchesRef.current = nextMatchesList;
+        setMatches(nextMatchesList);
+        setNextMatch(prev => (prev && prev.id === targetMatchId ? { ...prev, time: nextTimeVal, notes: updatedNotes } : prev));
+
+        const updatePayload: any = { notes: updatedNotes };
+        if (overrideTime) {
+            updatePayload.time = overrideTime;
+        }
+
+        // Update database match notes (and time if provided)
         const { error } = await supabase
             .from('matches')
-            .update({ notes: updatedNotes })
-            .eq('id', selectedMatchId);
+            .update(updatePayload)
+            .eq('id', targetMatchId);
 
         if (error) {
             console.error("Save Match Lineup Error:", error);
@@ -731,7 +847,7 @@ export default function MatchdayXIPage() {
 
         // If this match has already been completed, automatically sync appearances directly to the squad page!
         if (currentMatch.result && currentMatch.result !== "Pending") {
-            await syncLineupAppearancesToDatabase(selectedMatchId, newLineup);
+            await syncLineupAppearancesToDatabase(targetMatchId, newLineup);
         }
 
         // Also save as fallback template to matchday_xis
@@ -753,7 +869,7 @@ export default function MatchdayXIPage() {
         }
 
         const hasStarters = Object.values(newLineup.starters || {}).some(Boolean);
-        setSaveStatus(hasStarters ? "saved" : "draft");
+        setSaveStatus(hasStarters || Boolean(overrideTime) || Boolean(effectiveMeetTime) ? "saved" : "draft");
     };
 
     const handleRoleChange = (field: "captainId" | "viceCaptainId" | "penaltyTakerId" | "cornerTakerId" | "freeKickTakerId", value: string) => {
@@ -832,54 +948,115 @@ export default function MatchdayXIPage() {
             tacticalNotes: notes,
             updatedAt: new Date().toISOString()
         };
+        lineupRef.current = updated;
         setLineup(updated);
         if (notesDebounceRef.current) clearTimeout(notesDebounceRef.current);
         setSaveStatus("saving");
         notesDebounceRef.current = setTimeout(() => {
             saveLineup(updated);
-        }, 600);
+        }, 300);
     };
 
     const handleVenueNotesChange = (venueNotes: string) => {
-        if (!lineup) return;
+        const currentLineup = lineupRef.current || lineup;
+        if (!currentLineup) return;
         const updated: MatchdayXI = {
-            ...lineup,
+            ...currentLineup,
             venueNotes,
             updatedAt: new Date().toISOString()
         };
+        lineupRef.current = updated;
         setLineup(updated);
         if (venueDebounceRef.current) clearTimeout(venueDebounceRef.current);
         setSaveStatus("saving");
         venueDebounceRef.current = setTimeout(() => {
             saveLineup(updated);
-        }, 600);
+        }, 250);
     };
 
     const handleMeetOffsetChange = (offsetMins: number) => {
-        if (!lineup) return;
+        const currentLineup = lineupRef.current || lineup;
+        if (!currentLineup) return;
+        const absMins = Math.abs(offsetMins) || 60;
+        const ko = (koInputValue || nextMatch?.time || "14:00").slice(0, 5);
+        const computedMeet = calculateMeetTime(ko, -absMins);
+        setMeetInputValue(computedMeet);
         const updated: MatchdayXI = {
-            ...lineup,
-            meetOffsetMinutes: offsetMins,
+            ...currentLineup,
+            meetOffsetMinutes: absMins,
+            meetTime: computedMeet,
             updatedAt: new Date().toISOString()
         };
+        lineupRef.current = updated;
+        setLineup(updated);
+        saveLineup(updated);
+    };
+
+    const handleDirectMeetTimeChange = (newMeetTime: string) => {
+        setMeetInputValue(newMeetTime);
+        const currentLineup = lineupRef.current || lineup;
+        if (!currentLineup || !newMeetTime) return;
+
+        // Calculate minutes difference from KO if possible so the offset dropdown stays aligned when matching a preset
+        const ko = (koInputValue || nextMatch?.time || "14:00").slice(0, 5);
+        let derivedOffset = currentLineup.meetOffsetMinutes ? Math.abs(currentLineup.meetOffsetMinutes) : 60;
+        const [koH, koM] = ko.split(":").map(Number);
+        const [mtH, mtM] = newMeetTime.split(":").map(Number);
+        if (!isNaN(koH) && !isNaN(koM) && !isNaN(mtH) && !isNaN(mtM)) {
+            let diff = (koH * 60 + koM) - (mtH * 60 + mtM);
+            if (diff < 0) diff += 24 * 60;
+            if (diff > 0 && diff <= 240) {
+                derivedOffset = diff;
+            }
+        }
+
+        const updated: MatchdayXI = {
+            ...currentLineup,
+            meetOffsetMinutes: derivedOffset,
+            meetTime: newMeetTime,
+            updatedAt: new Date().toISOString()
+        };
+        lineupRef.current = updated;
         setLineup(updated);
         saveLineup(updated);
     };
 
     const handleKickOffTimeChange = async (newTime: string) => {
-        if (!selectedMatchId || !newTime) return;
-        setNextMatch(prev => (prev && prev.id === selectedMatchId ? { ...prev, time: newTime } : prev));
-        setMatches(prev => prev.map(m => (m.id === selectedMatchId ? { ...m, time: newTime } : m)));
-        setSaveStatus("saving");
-        const { error } = await supabase
-            .from("matches")
-            .update({ time: newTime })
-            .eq("id", selectedMatchId);
-        if (error) {
-            console.error("Failed to update match kick-off time:", error);
-            showToast("Failed to save kick-off time", "error");
+        setKoInputValue(newTime);
+        const targetMatchId = selectedMatchIdRef.current || selectedMatchId;
+        if (!targetMatchId || !newTime) return;
+
+        const currentLineup = lineupRef.current || lineup;
+        const offsetMins = typeof currentLineup?.meetOffsetMinutes === "number" && currentLineup.meetOffsetMinutes !== 0
+            ? Math.abs(currentLineup.meetOffsetMinutes)
+            : (nextMatch?.isHome ? 60 : 75);
+        const newMeetTime = calculateMeetTime(newTime, -offsetMins);
+        setMeetInputValue(newMeetTime);
+
+        if (currentLineup) {
+            const updated: MatchdayXI = {
+                ...currentLineup,
+                meetOffsetMinutes: offsetMins,
+                meetTime: newMeetTime,
+                updatedAt: new Date().toISOString()
+            };
+            lineupRef.current = updated;
+            setLineup(updated);
+            await saveLineup(updated, newTime);
         } else {
-            setSaveStatus("saved");
+            setNextMatch(prev => (prev && prev.id === targetMatchId ? { ...prev, time: newTime } : prev));
+            setMatches(prev => prev.map(m => (m.id === targetMatchId ? { ...m, time: newTime } : m)));
+            setSaveStatus("saving");
+            const { error } = await supabase
+                .from("matches")
+                .update({ time: newTime })
+                .eq("id", targetMatchId);
+            if (error) {
+                console.error("Failed to update match kick-off time:", error);
+                showToast("Failed to save kick-off time", "error");
+            } else {
+                setSaveStatus("saved");
+            }
         }
     };
 
@@ -1842,8 +2019,13 @@ export default function MatchdayXIPage() {
     };
 
     const getFormattedMeetTime = (): string => {
+        if (lineup?.meetTime && lineup.meetTime.trim()) return lineup.meetTime.trim();
         if (!nextMatch || !nextMatch.time) return "TBD";
-        const offsetMins = typeof lineup?.meetOffsetMinutes === "number" ? Math.abs(lineup.meetOffsetMinutes) : 60;
+        const notesMeet = extractMeetTimeFromNotes(nextMatch.notes);
+        if (notesMeet) return notesMeet;
+        const offsetMins = typeof lineup?.meetOffsetMinutes === "number" && lineup.meetOffsetMinutes !== 0
+            ? Math.abs(lineup.meetOffsetMinutes)
+            : (nextMatch.isHome ? 60 : 75);
         return calculateMeetTime(nextMatch.time, -offsetMins);
     };
 
@@ -2842,10 +3024,10 @@ export default function MatchdayXIPage() {
                                             }`}
                                         >
                                             <span className="inline-flex items-center gap-1 font-bold text-foreground">
-                                                <Clock className="h-3 w-3 text-muted-foreground" /> KO {nextMatch.time || "14:00"}
+                                                <Clock className="h-3 w-3 text-muted-foreground" /> KO {(koInputValue || nextMatch.time || "14:00").slice(0, 5)}
                                             </span>
                                             <span className="text-muted-foreground">•</span>
-                                            <span className="text-amber-500 font-bold">⏱ Meet {getFormattedMeetTime()}</span>
+                                            <span className="text-amber-700 dark:text-amber-400 font-bold">⏱ Meet {getFormattedMeetTime()}</span>
                                             <span className="text-muted-foreground">•</span>
                                             <MapPin className="h-3 w-3 text-primary shrink-0" />
                                             <span className="max-w-[180px] sm:max-w-[240px] truncate">
@@ -2872,9 +3054,9 @@ export default function MatchdayXIPage() {
                             {/* Live Save Status Indicator */}
                             <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border shrink-0 ${
                                 saveStatus === "saving"
-                                    ? "bg-amber-500/10 text-amber-500 border-amber-500/20"
+                                    ? "bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20"
                                     : saveStatus === "saved"
-                                        ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                                        ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
                                         : "bg-surface-2 text-muted-foreground border-border"
                             }`}>
                                 {saveStatus === "saving" ? (
@@ -2885,7 +3067,7 @@ export default function MatchdayXIPage() {
                                 ) : saveStatus === "saved" ? (
                                     <>
                                         <CheckCircle2 className="h-3 w-3" />
-                                        <span>XI Saved</span>
+                                        <span>Saved</span>
                                     </>
                                 ) : (
                                     <span>Draft</span>
@@ -3006,7 +3188,14 @@ export default function MatchdayXIPage() {
                             {/* 3. Fixture Selector Dropdown (#8 No redundant "Fixture:" label) */}
                             <select
                                 value={selectedMatchId}
-                                onChange={(e) => setSelectedMatchId(e.target.value)}
+                                onChange={(e) => {
+                                    const nextId = e.target.value;
+                                    selectedMatchIdRef.current = nextId;
+                                    setSelectedMatchId(nextId);
+                                    if (typeof window !== "undefined") {
+                                        sessionStorage.setItem("camden_matchday_xi_match_id", nextId);
+                                    }
+                                }}
                                 className="h-8 bg-surface-2 hover:bg-surface-3 border border-border text-foreground text-xs rounded-xl px-2.5 transition-colors focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-bold max-w-full sm:max-w-[260px] truncate"
                             >
                                 {matches.map(m => {
@@ -3041,7 +3230,7 @@ export default function MatchdayXIPage() {
                                             await syncLineupAppearancesToDatabase(nextMatch.id, lineup);
                                         }
                                     }}
-                                    className="w-16 bg-transparent text-xs font-extrabold text-emerald-400 placeholder-muted-foreground focus:outline-none text-center"
+                                    className="w-16 bg-transparent text-xs font-extrabold text-emerald-600 dark:text-emerald-400 placeholder-muted-foreground focus:outline-none text-center"
                                 />
                             </div>
 
@@ -3050,33 +3239,39 @@ export default function MatchdayXIPage() {
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">KO:</span>
                                 <input
                                     type="time"
-                                    value={nextMatch.time || "14:00"}
+                                    value={koInputValue}
                                     onChange={(e) => handleKickOffTimeChange(e.target.value)}
                                     className="bg-transparent text-xs font-extrabold text-foreground focus:outline-none cursor-pointer"
                                 />
                             </div>
 
                             <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Meet Offset:</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Meet:</span>
+                                <input
+                                    type="time"
+                                    value={meetInputValue}
+                                    onChange={(e) => handleDirectMeetTimeChange(e.target.value)}
+                                    className="bg-transparent text-xs font-extrabold text-amber-700 dark:text-amber-400 focus:outline-none cursor-pointer"
+                                />
+                                <span className="text-muted-foreground/40">|</span>
                                 <select
-                                    value={lineup.meetOffsetMinutes ?? 60}
+                                    value={[30, 45, 60, 75, 90].includes(Math.abs(lineup.meetOffsetMinutes || 60)) ? Math.abs(lineup.meetOffsetMinutes || 60) : "custom"}
                                     onChange={(e) => {
+                                        if (e.target.value === "custom") return;
                                         const mins = parseInt(e.target.value, 10) || 60;
-                                        const updated: MatchdayXI = {
-                                            ...lineup,
-                                            meetOffsetMinutes: mins,
-                                            updatedAt: new Date().toISOString()
-                                        };
-                                        setLineup(updated);
-                                        saveLineup(updated);
+                                        handleMeetOffsetChange(mins);
                                     }}
                                     className="bg-transparent text-[11px] font-bold text-primary focus:outline-none cursor-pointer"
+                                    title="Quick Meet Offset before Kick-Off"
                                 >
-                                    <option value={30} className="bg-surface-1 text-foreground">30 mins before KO</option>
-                                    <option value={45} className="bg-surface-1 text-foreground">45 mins before KO</option>
-                                    <option value={60} className="bg-surface-1 text-foreground">60 mins before KO</option>
-                                    <option value={75} className="bg-surface-1 text-foreground">75 mins before KO</option>
-                                    <option value={90} className="bg-surface-1 text-foreground">90 mins before KO</option>
+                                    <option value={30} className="bg-surface-1 text-foreground">-30m before KO</option>
+                                    <option value={45} className="bg-surface-1 text-foreground">-45m before KO</option>
+                                    <option value={60} className="bg-surface-1 text-foreground">-60m before KO</option>
+                                    <option value={75} className="bg-surface-1 text-foreground">-75m before KO</option>
+                                    <option value={90} className="bg-surface-1 text-foreground">-90m before KO</option>
+                                    {![30, 45, 60, 75, 90].includes(Math.abs(lineup.meetOffsetMinutes || 60)) && (
+                                        <option value="custom" className="bg-surface-1 text-foreground">Custom ({meetInputValue})</option>
+                                    )}
                                 </select>
                             </div>
 
@@ -3087,18 +3282,8 @@ export default function MatchdayXIPage() {
                                 </span>
                                 <input
                                     type="text"
-                                    autoFocus
                                     value={lineup.venueNotes ?? ""}
-                                    onChange={(e) => {
-                                        const val = e.target.value;
-                                        const updated: MatchdayXI = {
-                                            ...lineup,
-                                            venueNotes: val,
-                                            updatedAt: new Date().toISOString()
-                                        };
-                                        setLineup(updated);
-                                        saveLineup(updated);
-                                    }}
+                                    onChange={(e) => handleVenueNotesChange(e.target.value)}
                                     onKeyDown={(e) => {
                                         if (e.key === "Enter" || e.key === "Escape") {
                                             setShowLogisticsEditor(false);
