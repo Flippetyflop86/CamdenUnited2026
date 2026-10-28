@@ -29,7 +29,6 @@ function parseMarkdownStandings(markdown: string, clubName: string) {
             .filter(c => c !== '');
 
         if (rawCells.length < 6) continue;
-        // Skip markdown separator row | --- | --- |
         if (rawCells.every(c => /^[\-:]+$/.test(c))) continue;
 
         const numericTail: number[] = [];
@@ -73,7 +72,6 @@ function parseMarkdownStandings(markdown: string, clubName: string) {
             goal_difference = goals_for - goals_against;
             points = numericTail[6];
         } else if (numericTail.length === 6) {
-            // FA Full-Time summary table format: P | W | D | L | GD | PTS
             played = numericTail[0];
             won = numericTail[1];
             drawn = numericTail[2];
@@ -103,7 +101,37 @@ function parseMarkdownStandings(markdown: string, clubName: string) {
             goals_against,
             goal_difference,
             points,
+            form: [] as ('W' | 'D' | 'L')[],
             is_our_club: isOurClub
+        });
+    }
+
+    // Also extract any recent results embedded in the FA Full-Time markdown
+    if (teams.length > 0) {
+        const teamNames = teams.map(t => t.team_name);
+        const formMap: Record<string, ('W' | 'D' | 'L')[]> = {};
+        teamNames.forEach(n => { formMap[n] = []; });
+
+        const resultRegex = /\[([^\]]+)\]\([^)]*displayFixture[^)]*\).*?\[(\d+)\s*-\s*(\d+)\]\([^)]*displayFixture[^)]*\).*?\[([^\]]+)\]\([^)]*displayFixture[^)]*\)/g;
+        let match: RegExpExecArray | null;
+        while ((match = resultRegex.exec(markdown)) !== null) {
+            const homeRaw = match[1].trim();
+            const hs = parseInt(match[2], 10);
+            const as = parseInt(match[3], 10);
+            const awayRaw = match[4].trim();
+
+            const homeTeam = teamNames.find(t => t.toLowerCase() === homeRaw.toLowerCase());
+            const awayTeam = teamNames.find(t => t.toLowerCase() === awayRaw.toLowerCase());
+            if (homeTeam && awayTeam && !isNaN(hs) && !isNaN(as)) {
+                formMap[homeTeam].push(hs > as ? 'W' : hs === as ? 'D' : 'L');
+                formMap[awayTeam].push(as > hs ? 'W' : as === hs ? 'D' : 'L');
+            }
+        }
+
+        teams.forEach(t => {
+            if (formMap[t.team_name]?.length > 0) {
+                t.form = formMap[t.team_name].slice(-5);
+            }
         });
     }
 
@@ -111,6 +139,74 @@ function parseMarkdownStandings(markdown: string, clubName: string) {
     const leagueName = titleMatch ? titleMatch[1].trim() : "League Standings";
 
     return { teams, position, foundName, leagueName };
+}
+
+// Fetch recent monthly results on Mitoo to build each team's Last 5 Form (W/D/L)
+async function enrichMitooForm(fetchUrl: string, teams: any[]) {
+    try {
+        const urlObj = new URL(fetchUrl);
+        const divisionId = urlObj.searchParams.get('DivisionID');
+        const leagueCode = urlObj.searchParams.get('LeagueCode');
+        const tblName = urlObj.searchParams.get('TblName') || 'Matches';
+        if (!divisionId || !leagueCode || teams.length === 0) return;
+
+        const teamNames: string[] = teams.map(t => t.team_name);
+        const sortedByLength = [...teamNames].sort((a, b) => b.length - a.length);
+        const formMap: Record<string, ('W' | 'D' | 'L')[]> = {};
+        teamNames.forEach(t => { formMap[t] = []; });
+
+        // Season months from August (8) up to current month (plus wrap-around for Jan-May)
+        const nowMonth = new Date().getMonth() + 1;
+        const seasonOrder = [8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
+        const idx = seasonOrder.indexOf(nowMonth);
+        const monthsToFetch = idx >= 0
+            ? seasonOrder.slice(Math.max(0, idx - 2), idx + 1)
+            : [8, 9, 10];
+
+        const pages = await Promise.all(
+            monthsToFetch.map(async (m) => {
+                const mUrl = `https://mitoofootball.com/FixtResMonth.cfm?TblName=${encodeURIComponent(tblName)}&DivisionID=${encodeURIComponent(divisionId)}&LeagueCode=${encodeURIComponent(leagueCode)}&MonthNo=${m}`;
+                const res = await fetch(mUrl, {
+                    headers: { 'Accept': 'text/html' },
+                    cache: 'no-store'
+                });
+                return res.ok ? res.text() : '';
+            })
+        );
+
+        for (const pageHtml of pages) {
+            if (!pageHtml) continue;
+            const $ = cheerio.load(pageHtml);
+            $('tr').each((_, tr) => {
+                const tds = $(tr).find('> td');
+                if (tds.length >= 3 && tds.length <= 6) {
+                    const c0 = $(tds[0]).text().trim();
+                    const c1 = $(tds[1]).text().trim();
+                    const c2 = $(tds[2]).text().trim().replace(/\s+/g, ' ');
+                    if (/^\d+$/.test(c0) && /^\d+$/.test(c1) && c2.includes(' v ')) {
+                        const hs = Number(c0);
+                        const as = Number(c1);
+                        const [left, right] = c2.split(' v ');
+                        if (!left || !right) return;
+                        const homeTeam = teamNames.find(t => left.trim().toLowerCase() === t.toLowerCase());
+                        const awayTeam = sortedByLength.find(t => right.trim().toLowerCase().startsWith(t.toLowerCase()));
+                        if (homeTeam && awayTeam) {
+                            formMap[homeTeam].push(hs > as ? 'W' : hs === as ? 'D' : 'L');
+                            formMap[awayTeam].push(as > hs ? 'W' : as === hs ? 'D' : 'L');
+                        }
+                    }
+                }
+            });
+        }
+
+        teams.forEach(t => {
+            if (formMap[t.team_name] && formMap[t.team_name].length > 0) {
+                t.form = formMap[t.team_name].slice(-5);
+            }
+        });
+    } catch (e) {
+        // Non-fatal if monthly results cannot be fetched
+    }
 }
 
 export async function POST(request: Request) {
@@ -136,12 +232,12 @@ export async function POST(request: Request) {
 
         let fetchUrl = url;
         const isFaFullTime = /fulltime\.thefa\.com/i.test(fetchUrl);
+        const isMitoo = /mitoofootball\.com/i.test(fetchUrl);
 
-        if (/mitoofootball\.com/i.test(fetchUrl)) {
+        if (isMitoo) {
             fetchUrl = fetchUrl.replace(/TeamHist(?:All)?\.cfm/i, 'LeagueTab.cfm');
             fetchUrl = fetchUrl.replace(/LeagueCode=MDX2025/i, 'LeagueCode=MDX2026');
         } else if (isFaFullTime) {
-            // FA Full-Time renders the live division table on /index.html; rewrite /table.html etc. to /index.html
             fetchUrl = fetchUrl.replace(/\/(table|results|fixtures|displayTeam)\.html/i, '/index.html');
         }
 
@@ -162,7 +258,6 @@ export async function POST(request: Request) {
             }
         }
 
-        // Fallback to Jina Reader for FA Full-Time or Cloudflare-challenged pages
         if (!html || /<title>\s*(Just a moment|Attention Required)/i.test(html)) {
             const jinaUrl = `https://r.jina.ai/${fetchUrl}`;
             const jinaRes = await fetch(jinaUrl, { cache: 'no-store' });
@@ -287,6 +382,7 @@ export async function POST(request: Request) {
                 goals_against,
                 goal_difference,
                 points,
+                form: [] as ('W' | 'D' | 'L')[],
                 is_our_club: isOurClub
             });
         });
@@ -297,6 +393,9 @@ export async function POST(request: Request) {
         }
 
         if (teams.length > 0) {
+            if (isMitoo) {
+                await enrichMitooForm(fetchUrl, teams);
+            }
             return NextResponse.json({
                 success: true,
                 position: position ?? (teams.find(t => t.is_our_club)?.position || null),

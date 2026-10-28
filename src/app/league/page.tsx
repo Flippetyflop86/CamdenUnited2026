@@ -26,6 +26,8 @@ import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { Textarea } from "@/components/ui/textarea";
 
+type FormResult = 'W' | 'D' | 'L';
+
 type LeagueRow = {
     position: number;
     previous_position?: number;
@@ -38,6 +40,7 @@ type LeagueRow = {
     goals_against: number;
     goal_difference: number;
     points: number;
+    form?: FormResult[];
     is_our_club: boolean;
 };
 
@@ -118,54 +121,107 @@ export default function LeagueTablePage() {
         return false;
     };
 
-    // Feature #10: Attach and persist position movement arrows whenever the table updates
+    // Feature #6 & #10: Attach Position Movement Arrows AND W/D/L Form Diffing
     const attachPositionMovements = (newRows: LeagueRow[], existingRows?: LeagueRow[] | null): LeagueRow[] => {
         try {
-            let prevMap: Record<string, { position: number; played: number }> = {};
+            type TeamSnapshot = {
+                position: number;
+                played: number;
+                won?: number;
+                drawn?: number;
+                lost?: number;
+                form?: FormResult[];
+            };
+            let prevMap: Record<string, TeamSnapshot> = {};
             const savedPrev = localStorage.getItem(prevPositionsKey);
             if (savedPrev) {
                 prevMap = JSON.parse(savedPrev);
             }
 
-            // Compare existing table to new table: if total games played across the division increased,
-            // snapshot the existing positions as the "previous matchday" baseline
             const oldList = existingRows || currentTable;
             if (oldList && oldList.length > 0) {
                 const oldTotalPlayed = oldList.reduce((sum, r) => sum + (r.played || 0), 0);
                 const newTotalPlayed = newRows.reduce((sum, r) => sum + (r.played || 0), 0);
 
                 if (newTotalPlayed > oldTotalPlayed) {
-                    const updatedPrevMap: Record<string, { position: number; played: number }> = { ...prevMap };
+                    const updatedPrevMap: Record<string, TeamSnapshot> = { ...prevMap };
                     for (const oldRow of oldList) {
                         const key = normalizeTeamKey(oldRow.team_name);
-                        updatedPrevMap[key] = { position: oldRow.position, played: oldRow.played };
+                        updatedPrevMap[key] = {
+                            position: oldRow.position,
+                            played: oldRow.played,
+                            won: oldRow.won,
+                            drawn: oldRow.drawn,
+                            lost: oldRow.lost,
+                            form: oldRow.form || prevMap[key]?.form || []
+                        };
                     }
                     prevMap = updatedPrevMap;
-                    localStorage.setItem(prevPositionsKey, JSON.stringify(prevMap));
                 } else if (Object.keys(prevMap).length === 0) {
-                    // Initialize baseline if none existed yet
                     for (const row of oldList) {
                         const key = normalizeTeamKey(row.team_name);
-                        prevMap[key] = { position: row.position, played: row.played };
+                        prevMap[key] = {
+                            position: row.position,
+                            played: row.played,
+                            won: row.won,
+                            drawn: row.drawn,
+                            lost: row.lost,
+                            form: row.form || []
+                        };
                     }
-                    localStorage.setItem(prevPositionsKey, JSON.stringify(prevMap));
                 }
             } else if (Object.keys(prevMap).length === 0) {
                 for (const row of newRows) {
                     const key = normalizeTeamKey(row.team_name);
-                    prevMap[key] = { position: row.position, played: row.played };
+                    prevMap[key] = {
+                        position: row.position,
+                        played: row.played,
+                        won: row.won,
+                        drawn: row.drawn,
+                        lost: row.lost,
+                        form: row.form || []
+                    };
                 }
-                localStorage.setItem(prevPositionsKey, JSON.stringify(prevMap));
             }
 
-            return newRows.map(r => {
+            const enriched = newRows.map(r => {
                 const key = normalizeTeamKey(r.team_name);
                 const prev = prevMap[key];
+                let form: FormResult[] = Array.isArray(r.form) && r.form.length > 0
+                    ? [...r.form]
+                    : Array.isArray(prev?.form)
+                        ? [...prev.form]
+                        : [];
+
+                // If live feed didn't supply form, infer new W/D/L from column diff when played count increases
+                if ((!r.form || r.form.length === 0) && prev && r.played > prev.played) {
+                    const wDiff = Math.max(0, (r.won || 0) - (prev.won || 0));
+                    const dDiff = Math.max(0, (r.drawn || 0) - (prev.drawn || 0));
+                    const lDiff = Math.max(0, (r.lost || 0) - (prev.lost || 0));
+                    for (let i = 0; i < wDiff; i++) form.push('W');
+                    for (let i = 0; i < dDiff; i++) form.push('D');
+                    for (let i = 0; i < lDiff; i++) form.push('L');
+                    form = form.slice(-5);
+                }
+
+                prevMap[key] = {
+                    position: prev?.position ?? r.position,
+                    played: r.played,
+                    won: r.won,
+                    drawn: r.drawn,
+                    lost: r.lost,
+                    form
+                };
+
                 return {
                     ...r,
-                    previous_position: prev?.position ?? r.previous_position ?? r.position
+                    previous_position: prev?.position ?? r.previous_position ?? r.position,
+                    form: form.slice(-5)
                 };
             });
+
+            localStorage.setItem(prevPositionsKey, JSON.stringify(prevMap));
+            return enriched;
         } catch (e) {
             return newRows;
         }
@@ -240,11 +296,34 @@ export default function LeagueTablePage() {
         try {
             let query = supabase
                 .from('fixtures')
-                .select('id, opponent, is_home, home_score, away_score, status, competition')
-                .eq('status', 'completed');
+                .select('id, opponent, date, is_home, home_score, away_score, status, competition')
+                .eq('status', 'completed')
+                .order('date', { ascending: true });
             if (clubId) query = query.eq('club_id', clubId);
             const { data: completed } = await query;
             if (!completed || completed.length === 0) return baseTable;
+
+            const leagueCompleted = completed.filter(f => {
+                if (f.home_score === null || f.away_score === null) return false;
+                const comp = (f.competition || "League").toLowerCase();
+                return !comp.includes("cup") && !comp.includes("trophy") && !comp.includes("shield") && !comp.includes("friendly");
+            });
+
+            const updatedRows = baseTable.map(r => ({
+                ...r,
+                form: Array.isArray(r.form) ? [...r.form] : []
+            }));
+
+            // Backfill our own club's Last 5 Form from /matches if not already populated
+            const ourIdx = updatedRows.findIndex(r => r.is_our_club || isOurClubName(r.team_name));
+            if (ourIdx !== -1 && (!updatedRows[ourIdx].form || updatedRows[ourIdx].form!.length === 0) && leagueCompleted.length > 0) {
+                const ourForm: FormResult[] = leagueCompleted.slice(-5).map(m => {
+                    const ourGoals = m.is_home ? Number(m.home_score) : Number(m.away_score);
+                    const oppGoals = m.is_home ? Number(m.away_score) : Number(m.home_score);
+                    return ourGoals > oppGoals ? 'W' : ourGoals === oppGoals ? 'D' : 'L';
+                });
+                updatedRows[ourIdx].form = ourForm;
+            }
 
             const savedIdsRaw = localStorage.getItem(appliedFixturesKey);
             if (!savedIdsRaw) {
@@ -252,12 +331,11 @@ export default function LeagueTablePage() {
                     .filter(f => f.home_score !== null && f.away_score !== null)
                     .map(f => String(f.id));
                 localStorage.setItem(appliedFixturesKey, JSON.stringify(initialIds));
-                return baseTable;
+                return updatedRows;
             }
 
             const appliedSet = new Set<string>(JSON.parse(savedIdsRaw));
             let modified = false;
-            const updatedRows = baseTable.map(r => ({ ...r }));
 
             for (const match of completed) {
                 const matchId = String(match.id);
@@ -273,7 +351,6 @@ export default function LeagueTablePage() {
                 const ourGoals = match.is_home ? Number(match.home_score) : Number(match.away_score);
                 const oppGoals = match.is_home ? Number(match.away_score) : Number(match.home_score);
 
-                const ourIdx = updatedRows.findIndex(r => r.is_our_club || isOurClubName(r.team_name));
                 const oppIdx = updatedRows.findIndex(r => !r.is_our_club && isMatchingTeamName(r.team_name, match.opponent || ""));
 
                 if (ourIdx !== -1) {
@@ -281,16 +358,18 @@ export default function LeagueTablePage() {
                     row.played += 1;
                     row.goals_for = (row.goals_for || 0) + ourGoals;
                     row.goals_against = (row.goals_against || 0) + oppGoals;
-                    if (ourGoals > oppGoals) {
+                    const resChar: FormResult = ourGoals > oppGoals ? 'W' : ourGoals === oppGoals ? 'D' : 'L';
+                    if (resChar === 'W') {
                         row.won += 1;
                         row.points += 3;
-                    } else if (ourGoals === oppGoals) {
+                    } else if (resChar === 'D') {
                         row.drawn += 1;
                         row.points += 1;
                     } else {
                         row.lost += 1;
                     }
                     row.goal_difference = (row.goals_for || 0) - (row.goals_against || 0);
+                    row.form = [...(row.form || []), resChar].slice(-5);
                     modified = true;
                 }
 
@@ -299,16 +378,18 @@ export default function LeagueTablePage() {
                     row.played += 1;
                     row.goals_for = (row.goals_for || 0) + oppGoals;
                     row.goals_against = (row.goals_against || 0) + ourGoals;
-                    if (oppGoals > ourGoals) {
+                    const oppResChar: FormResult = oppGoals > ourGoals ? 'W' : oppGoals === ourGoals ? 'D' : 'L';
+                    if (oppResChar === 'W') {
                         row.won += 1;
                         row.points += 3;
-                    } else if (oppGoals === ourGoals) {
+                    } else if (oppResChar === 'D') {
                         row.drawn += 1;
                         row.points += 1;
                     } else {
                         row.lost += 1;
                     }
                     row.goal_difference = (row.goals_for || 0) - (row.goals_against || 0);
+                    row.form = [...(row.form || []), oppResChar].slice(-5);
                     modified = true;
                 }
 
@@ -326,6 +407,7 @@ export default function LeagueTablePage() {
                 }
                 return sorted;
             }
+            return updatedRows;
         } catch (e) {
             console.warn("Auto-standings match calculation skipped:", e);
         }
@@ -468,6 +550,7 @@ export default function LeagueTablePage() {
 
         let hasValidCachedTable = false;
         let isCacheFresh = false;
+        let hasFormPopulated = false;
         let loadedRows: LeagueRow[] | null = null;
 
         try {
@@ -488,6 +571,7 @@ export default function LeagueTablePage() {
                 if (Array.isArray(parsed) && parsed.length > 0) {
                     loadedRows = attachPositionMovements(parsed, parsed);
                     hasValidCachedTable = true;
+                    hasFormPopulated = loadedRows.some(r => Array.isArray(r.form) && r.form.length > 0);
                 }
             } else if (
                 settings.lastImportHistory?.leagueTable &&
@@ -496,6 +580,7 @@ export default function LeagueTablePage() {
             ) {
                 loadedRows = attachPositionMovements(settings.lastImportHistory.leagueTable, settings.lastImportHistory.leagueTable);
                 hasValidCachedTable = true;
+                hasFormPopulated = loadedRows.some(r => Array.isArray(r.form) && r.form.length > 0);
             }
         } catch (e) {
             console.warn("Failed to load cached league table:", e);
@@ -512,7 +597,8 @@ export default function LeagueTablePage() {
             loadNextOpponent(null);
         }
 
-        if (activeUrl && !hasAutoSyncedRef.current && (!hasValidCachedTable || !isCacheFresh)) {
+        // Sync if cache is older than 6h OR if cached table predates the new Form feature
+        if (activeUrl && !hasAutoSyncedRef.current && (!hasValidCachedTable || !isCacheFresh || !hasFormPopulated)) {
             hasAutoSyncedRef.current = true;
             autoSyncFromUrl(activeUrl, true);
         }
@@ -766,6 +852,7 @@ export default function LeagueTablePage() {
             if (tokens.length < 5) continue;
 
             const nums: number[] = [];
+            const extractedForm: FormResult[] = [];
             let idx = tokens.length - 1;
             while (idx >= 0) {
                 const tok = tokens[idx].replace(/^\+/, '');
@@ -780,6 +867,8 @@ export default function LeagueTablePage() {
                     idx--;
                 } else {
                     if (nums.length === 0 && /^[WDL\-]{1,6}$/i.test(tok)) {
+                        const chars = tok.toUpperCase().replace(/[^WDL]/g, '').split('') as FormResult[];
+                        extractedForm.unshift(...chars);
                         idx--;
                         continue;
                     }
@@ -875,6 +964,7 @@ export default function LeagueTablePage() {
                 goals_against,
                 goal_difference,
                 points,
+                form: extractedForm.slice(-5),
                 is_our_club: isOurClubName(teamName)
             });
         }
@@ -1206,6 +1296,7 @@ export default function LeagueTablePage() {
                                         <th className="px-4 py-3 font-medium text-center">GA</th>
                                         <th className="px-4 py-3 font-medium text-center">GD</th>
                                         <th className="px-4 py-3 font-medium text-center">Pts</th>
+                                        <th className="px-4 py-3 font-medium text-center">Last 5</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -1220,6 +1311,7 @@ export default function LeagueTablePage() {
                                             : "";
 
                                         const posDiff = (row.previous_position ?? row.position) - row.position;
+                                        const formItems = Array.isArray(row.form) ? row.form.slice(-5) : [];
 
                                         return (
                                             <tr
@@ -1281,6 +1373,33 @@ export default function LeagueTablePage() {
                                                 </td>
                                                 <td className="px-4 py-3 text-center font-bold text-foreground whitespace-nowrap">
                                                     {row.points}
+                                                </td>
+                                                {/* Feature #6: Last 5 Form Pills */}
+                                                <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                    {formItems.length > 0 ? (
+                                                        <div className="inline-flex items-center gap-1">
+                                                            {formItems.map((res, fIdx) => {
+                                                                const isLatest = fIdx === formItems.length - 1;
+                                                                const pillStyles =
+                                                                    res === 'W'
+                                                                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                                                        : res === 'D'
+                                                                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+                                                                            : 'bg-red-500/20 text-red-400 border-red-500/40';
+                                                                return (
+                                                                    <span
+                                                                        key={fIdx}
+                                                                        className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold border ${pillStyles} ${isLatest ? 'ring-1 ring-white/30' : 'opacity-85'}`}
+                                                                        title={isLatest ? `Most recent: ${res}` : res}
+                                                                    >
+                                                                        {res}
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground/40">—</span>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );
