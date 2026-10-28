@@ -698,7 +698,7 @@ export default function LeagueTablePage() {
 
             ctx.fillStyle = "#ffffff";
             ctx.font = "900 68px Inter, system-ui, sans-serif";
-            ctx.fillText("THE TABLE", textStartX, 182);
+            ctx.fillText("AS IT STANDS", textStartX, 182);
 
             const kpiY = 228;
             const kpis = [
