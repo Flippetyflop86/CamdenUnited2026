@@ -624,24 +624,53 @@ export default function LeagueTablePage() {
         canvas.width = width;
         canvas.height = height;
 
-        const brandHex = settings.primaryColor || "#dc2626";
+        const brandHex = (settings.primaryColor || settings.homeKitShirt || "#dc2626").trim();
+        const secondaryHex = (settings.secondaryColor || "#111827").trim();
+
+        const parseHexToRgb = (hex: string, fallback = { r: 220, g: 38, b: 38 }) => {
+            const clean = hex.replace('#', '').trim();
+            if (clean.length === 3) {
+                const r = parseInt(clean[0] + clean[0], 16);
+                const g = parseInt(clean[1] + clean[1], 16);
+                const b = parseInt(clean[2] + clean[2], 16);
+                return isNaN(r) ? fallback : { r, g, b };
+            }
+            if (clean.length >= 6) {
+                const r = parseInt(clean.slice(0, 2), 16);
+                const g = parseInt(clean.slice(2, 4), 16);
+                const b = parseInt(clean.slice(4, 6), 16);
+                return isNaN(r) ? fallback : { r, g, b };
+            }
+            return fallback;
+        };
+
+        const pRgb = parseHexToRgb(brandHex);
+        const sRgb = parseHexToRgb(secondaryHex, { r: 17, g: 24, b: 39 });
+        // If secondary is pure white or very bright, use darkened primary for the deep base
+        const sLuminance = (0.299 * sRgb.r + 0.587 * sRgb.g + 0.114 * sRgb.b) / 255;
+        const baseEndRgb = sLuminance > 0.6
+            ? { r: Math.round(pRgb.r * 0.14), g: Math.round(pRgb.g * 0.14), b: Math.round(pRgb.b * 0.16) }
+            : { r: Math.round(sRgb.r * 0.35), g: Math.round(sRgb.g * 0.35), b: Math.round(sRgb.b * 0.4) };
 
         const drawGraphic = (logoImg?: HTMLImageElement) => {
+            // Club-coloured background gradient derived from the user's club colours
             const bgGrad = ctx.createLinearGradient(0, 0, width, height);
-            bgGrad.addColorStop(0, "#090d16");
-            bgGrad.addColorStop(0.5, "#0f172a");
-            bgGrad.addColorStop(1, "#090d16");
+            bgGrad.addColorStop(0, `rgb(${Math.round(pRgb.r * 0.36)}, ${Math.round(pRgb.g * 0.36)}, ${Math.round(pRgb.b * 0.38)})`);
+            bgGrad.addColorStop(0.45, `rgb(${Math.round(pRgb.r * 0.16)}, ${Math.round(pRgb.g * 0.16)}, ${Math.round(pRgb.b * 0.20)})`);
+            bgGrad.addColorStop(1, `rgb(${baseEndRgb.r}, ${baseEndRgb.g}, ${baseEndRgb.b})`);
             ctx.fillStyle = bgGrad;
             ctx.fillRect(0, 0, width, height);
 
-            const glowGrad = ctx.createRadialGradient(width * 0.85, 120, 20, width * 0.85, 120, 520);
-            glowGrad.addColorStop(0, `${brandHex}44`);
+            // Top-right club colour spotlight glow
+            const glowGrad = ctx.createRadialGradient(width * 0.85, 110, 20, width * 0.85, 110, 560);
+            glowGrad.addColorStop(0, `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.42)`);
             glowGrad.addColorStop(1, "transparent");
             ctx.fillStyle = glowGrad;
-            ctx.fillRect(0, 0, width, 600);
+            ctx.fillRect(0, 0, width, 620);
 
+            // Top club colour bar
             ctx.fillStyle = brandHex;
-            ctx.fillRect(0, 0, width, 12);
+            ctx.fillRect(0, 0, width, 14);
 
             const ourRow = currentTable.find(r => r.is_our_club) || currentTable[0];
             const ordinal = (n: number) => {
@@ -652,31 +681,26 @@ export default function LeagueTablePage() {
 
             let textStartX = 64;
             if (logoImg) {
-                const logoSize = 116;
+                const logoSize = 112;
                 ctx.save();
                 ctx.beginPath();
-                ctx.arc(64 + logoSize / 2, 78 + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
+                ctx.arc(64 + logoSize / 2, 76 + logoSize / 2, logoSize / 2, 0, Math.PI * 2);
                 ctx.closePath();
                 ctx.clip();
-                ctx.drawImage(logoImg, 64, 78, logoSize, logoSize);
+                ctx.drawImage(logoImg, 64, 76, logoSize, logoSize);
                 ctx.restore();
-                textStartX = 204;
+                textStartX = 200;
             }
 
-            ctx.fillStyle = brandHex;
-            ctx.font = "bold 24px Inter, system-ui, sans-serif";
-            ctx.fillText((settings.name || "CAMDEN UNITED").toUpperCase(), textStartX, 108);
+            ctx.fillStyle = "rgba(255,255,255,0.85)";
+            ctx.font = "800 24px Inter, system-ui, sans-serif";
+            ctx.fillText((settings.name || "CAMDEN UNITED").toUpperCase(), textStartX, 116);
 
             ctx.fillStyle = "#ffffff";
-            ctx.font = "900 58px Inter, system-ui, sans-serif";
-            ctx.fillText("LEAGUE STANDINGS", textStartX, 168);
+            ctx.font = "900 68px Inter, system-ui, sans-serif";
+            ctx.fillText("THE TABLE", textStartX, 182);
 
-            ctx.fillStyle = "#94a3b8";
-            ctx.font = "500 24px Inter, system-ui, sans-serif";
-            const dateLabel = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
-            ctx.fillText(`2026/27 Season • Updated ${dateLabel}`, textStartX, 206);
-
-            const kpiY = 236;
+            const kpiY = 228;
             const kpis = [
                 { label: "POSITION", value: ordinal(ourRow.position) },
                 { label: "POINTS", value: `${ourRow.points} PTS` },
@@ -686,30 +710,30 @@ export default function LeagueTablePage() {
             const cardW = (width - 128 - 36) / 4;
             kpis.forEach((k, i) => {
                 const x = 64 + i * (cardW + 12);
-                ctx.fillStyle = i === 0 ? `${brandHex}26` : "rgba(255,255,255,0.04)";
-                ctx.strokeStyle = i === 0 ? brandHex : "rgba(255,255,255,0.08)";
+                ctx.fillStyle = i === 0 ? `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.35)` : "rgba(255,255,255,0.06)";
+                ctx.strokeStyle = i === 0 ? brandHex : `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.25)`;
                 ctx.lineWidth = 2;
                 ctx.beginPath();
-                ctx.roundRect(x, kpiY, cardW, 76, 14);
+                ctx.roundRect(x, kpiY, cardW, 78, 14);
                 ctx.fill();
                 ctx.stroke();
 
-                ctx.fillStyle = "#94a3b8";
-                ctx.font = "bold 16px Inter, system-ui, sans-serif";
+                ctx.fillStyle = "rgba(255,255,255,0.65)";
+                ctx.font = "bold 15px Inter, system-ui, sans-serif";
                 ctx.fillText(k.label, x + 20, kpiY + 28);
 
-                ctx.fillStyle = i === 0 ? "#ffffff" : "#f8fafc";
+                ctx.fillStyle = "#ffffff";
                 ctx.font = "900 28px Inter, system-ui, sans-serif";
                 ctx.fillText(k.value, x + 20, kpiY + 60);
             });
 
             const tableTop = headerHeight;
-            ctx.fillStyle = "rgba(255,255,255,0.06)";
+            ctx.fillStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.22)`;
             ctx.beginPath();
             ctx.roundRect(64, tableTop, width - 128, tableHeaderHeight, [14, 14, 0, 0]);
             ctx.fill();
 
-            ctx.fillStyle = "#94a3b8";
+            ctx.fillStyle = "rgba(255,255,255,0.75)";
             ctx.font = "bold 20px Inter, system-ui, sans-serif";
             ctx.textAlign = "center";
             ctx.fillText("POS", 110, tableTop + 36);
@@ -732,10 +756,10 @@ export default function LeagueTablePage() {
                 const isNextOpp = nextOpponentInfo && !isOurs && isMatchingTeamName(row.team_name, nextOpponentInfo.opponent);
 
                 ctx.fillStyle = isOurs
-                    ? `${brandHex}33`
+                    ? `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.38)`
                     : idx % 2 === 0
-                        ? "rgba(255,255,255,0.025)"
-                        : "rgba(255,255,255,0.01)";
+                        ? "rgba(255,255,255,0.04)"
+                        : "rgba(255,255,255,0.015)";
                 ctx.fillRect(64, y, width - 128, rowHeight);
 
                 if (isOurs) {
@@ -746,17 +770,17 @@ export default function LeagueTablePage() {
                     ctx.fillRect(64, y, 6, rowHeight);
                 }
 
-                ctx.fillStyle = "rgba(255,255,255,0.06)";
+                ctx.fillStyle = "rgba(255,255,255,0.07)";
                 ctx.fillRect(64, y + rowHeight - 1, width - 128, 1);
 
                 const textY = y + rowHeight / 2 + 8;
                 ctx.textAlign = "center";
-                ctx.fillStyle = isOurs ? "#ffffff" : "#cbd5e1";
+                ctx.fillStyle = isOurs ? "#ffffff" : "#e2e8f0";
                 ctx.font = isOurs ? "900 24px Inter, system-ui, sans-serif" : "bold 22px Inter, system-ui, sans-serif";
                 ctx.fillText(String(row.position), 110, textY);
 
                 ctx.textAlign = "left";
-                ctx.fillStyle = isOurs ? "#ffffff" : "#f1f5f9";
+                ctx.fillStyle = "#ffffff";
                 ctx.font = isOurs ? "900 25px Inter, system-ui, sans-serif" : "600 23px Inter, system-ui, sans-serif";
                 const maxClubName = row.team_name.length > 24 ? row.team_name.slice(0, 23) + "…" : row.team_name;
                 ctx.fillText(maxClubName, 165, textY);
@@ -764,7 +788,7 @@ export default function LeagueTablePage() {
                 if (isNextOpp) {
                     const nameWidth = ctx.measureText(maxClubName).width;
                     const badgeX = Math.min(165 + nameWidth + 14, 510);
-                    ctx.fillStyle = "rgba(245, 158, 11, 0.2)";
+                    ctx.fillStyle = "rgba(245, 158, 11, 0.25)";
                     ctx.beginPath();
                     ctx.roundRect(badgeX, y + rowHeight / 2 - 14, 92, 26, 6);
                     ctx.fill();
@@ -775,14 +799,14 @@ export default function LeagueTablePage() {
 
                 ctx.textAlign = "center";
                 ctx.font = isOurs ? "bold 23px Inter, system-ui, sans-serif" : "500 22px Inter, system-ui, sans-serif";
-                ctx.fillStyle = isOurs ? "#ffffff" : "#cbd5e1";
+                ctx.fillStyle = isOurs ? "#ffffff" : "#e2e8f0";
                 ctx.fillText(String(row.played), 640, textY);
                 ctx.fillText(String(row.won), 705, textY);
                 ctx.fillText(String(row.drawn), 770, textY);
                 ctx.fillText(String(row.lost), 835, textY);
 
                 const gdStr = row.goal_difference > 0 ? `+${row.goal_difference}` : String(row.goal_difference);
-                ctx.fillStyle = row.goal_difference > 0 ? "#34d399" : row.goal_difference < 0 ? "#f87171" : "#94a3b8";
+                ctx.fillStyle = row.goal_difference > 0 ? "#4ade80" : row.goal_difference < 0 ? "#f87171" : "#cbd5e1";
                 ctx.fillText(gdStr, 905, textY);
 
                 ctx.fillStyle = "#ffffff";
@@ -790,10 +814,16 @@ export default function LeagueTablePage() {
                 ctx.fillText(String(row.points), 975, textY);
             });
 
+            // Footer with Club Colour accent dot + Powered by ClubFlow
+            ctx.fillStyle = brandHex;
+            ctx.beginPath();
+            ctx.arc(72, height - 49, 6, 0, Math.PI * 2);
+            ctx.fill();
+
             ctx.textAlign = "left";
-            ctx.fillStyle = "#64748b";
+            ctx.fillStyle = "rgba(255,255,255,0.65)";
             ctx.font = "600 20px Inter, system-ui, sans-serif";
-            ctx.fillText(`Powered by ClubFlow • ${settings.name || "Camden United"}`, 64, height - 42);
+            ctx.fillText(`Powered by ClubFlow • ${settings.name || "Camden United"}`, 88, height - 42);
         };
 
         if (settings.logo) {
@@ -805,7 +835,7 @@ export default function LeagueTablePage() {
         } else {
             drawGraphic();
         }
-    }, [showShareModal, graphicFormat, graphicScope, currentTable, settings.name, settings.primaryColor, settings.logo, nextOpponentInfo]);
+    }, [showShareModal, graphicFormat, graphicScope, currentTable, settings.name, settings.primaryColor, settings.secondaryColor, settings.homeKitShirt, settings.logo, nextOpponentInfo]);
 
     const handleDownloadGraphic = () => {
         if (!shareCanvasRef.current) return;
