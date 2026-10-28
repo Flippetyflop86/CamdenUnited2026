@@ -1,64 +1,97 @@
 "use client";
-import { useState, useEffect } from "react";
-import { PageHeader } from "@/components/ui/page-header";
-import { PageSection } from "@/components/layout/page-section";
-import { SectionHeader } from "@/components/ui/section-header";
-import { EmptyState } from "@/components/ui/empty-state";
-import { MetricCard } from "@/components/ui/metric-card";
+
+import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Match, Player } from "@/types";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { FORMATIONS } from "@/lib/formations";
 import {
     Users,
     Trophy,
-    Activity,
     CalendarDays,
     RefreshCw,
     Check,
     Clock,
     ShieldAlert,
-    DollarSign,
     MapPin,
-    Plus,
     Award,
-    TrendingUp,
     AlertCircle,
     CheckCircle2,
     Calendar,
-    Thermometer,
-    Footprints,
-    UserCheck,
-    FileText
+    Copy,
+    ArrowRight,
+    Sparkles,
+    Zap,
+    Flame,
+    Home,
+    Plane,
+    HeartPulse
 } from "lucide-react";
-import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 import { useClub } from "@/context/club-context";
+import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer } from "@/lib/utils";
 
+type StandingsRow = {
+    position: number;
+    team_name: string;
+    played: number;
+    won: number;
+    drawn: number;
+    lost: number;
+    goals_for?: number;
+    goals_against?: number;
+    goal_difference: number;
+    points: number;
+    is_our_club?: boolean;
+};
+
 export default function DashboardPage() {
     const { settings, updateSettings } = useClub();
-    const [matches, setMatches] = useState<Match[]>([]);
+    const { clubId } = useAuth();
+
+    const [matches, setMatches] = useState<(Match & { rawNotes?: string; motm?: string })[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);
-    const [lineup, setLineup] = useState<any>(null);
-    const [nextMatch, setNextMatch] = useState<Match | null>(null);
-    const [upcomingFixtures, setUpcomingFixtures] = useState<Match[]>([]);
-    const [squadCounts, setSquadCounts] = useState<Record<string, number>>({});
+    const [nextMatch, setNextMatch] = useState<(Match & { rawNotes?: string }) | null>(null);
     const [isSyncing, setIsSyncing] = useState(false);
-    const [syncSuccess, setSyncSuccess] = useState(false);
-    const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number; seconds: number } | null>(null);
-    
-    // V3 Advanced Football Operations States
-    const [recruits, setRecruits] = useState<any[]>([]);
+    const [timeLeft, setTimeLeft] = useState<{ days: number; hours: number; minutes: number } | null>(null);
+
     const [trainingSessions, setTrainingSessions] = useState<any[]>([]);
     const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
-    const [injuryFilter, setInjuryFilter] = useState<'All' | 'Injured' | 'Suspended' | 'On Holiday'>('All');
-    const [leagueNameState, setLeagueNameState] = useState("");
-    const [isEditingLeagueName, setIsEditingLeagueName] = useState(false);
-    const [tempLeagueName, setTempLeagueName] = useState("");
     const [dismissedPriorities, setDismissedPriorities] = useState<string[]>([]);
-    const [leagueTeams, setLeagueTeams] = useState<any[]>([]);
+    const [standingsTable, setStandingsTable] = useState<StandingsRow[]>([]);
+    const [copiedWhatsApp, setCopiedWhatsApp] = useState<"match" | "training" | null>(null);
+
+    // Load standings table from localStorage or Supabase settings
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const loadStandings = () => {
+            try {
+                const scopedKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
+                const raw =
+                    localStorage.getItem(scopedKey) ||
+                    localStorage.getItem("clubflow_league_table");
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setStandingsTable(parsed);
+                        return;
+                    }
+                }
+                if (
+                    settings.lastImportHistory?.leagueTable &&
+                    Array.isArray(settings.lastImportHistory.leagueTable) &&
+                    settings.lastImportHistory.leagueTable.length > 0
+                ) {
+                    setStandingsTable(settings.lastImportHistory.leagueTable);
+                }
+            } catch (e) {
+                // Ignore parse error
+            }
+        };
+        loadStandings();
+    }, [clubId, settings.lastImportHistory]);
 
     useEffect(() => {
         fetchData();
@@ -73,13 +106,10 @@ export default function DashboardPage() {
             }
         }
 
-        // Subscriptions
         const channels = [
-            supabase.channel('public:matches').on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, fetchMatches),
-            supabase.channel('public:players').on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetchSquad),
-            supabase.channel('public:matchday_xis').on('postgres_changes', { event: '*', schema: 'public', table: 'matchday_xis' }, fetchLineup),
-            supabase.channel('public:recruits').on('postgres_changes', { event: '*', schema: 'public', table: 'recruits' }, fetchRecruits),
-            supabase.channel('public:training_sessions').on('postgres_changes', { event: '*', schema: 'public', table: 'training_sessions' }, fetchTrainingSessions)
+            supabase.channel('dashboard:matches').on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, fetchMatches),
+            supabase.channel('dashboard:players').on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetchSquad),
+            supabase.channel('dashboard:training').on('postgres_changes', { event: '*', schema: 'public', table: 'training_sessions' }, fetchTrainingSessions)
         ];
 
         channels.forEach(channel => channel.subscribe());
@@ -92,7 +122,7 @@ export default function DashboardPage() {
     useEffect(() => {
         if (!nextMatch) return;
         const calculateTimeLeft = () => {
-            const matchDateTime = new Date(`${nextMatch.date}T${nextMatch.time || "12:00:00"}`);
+            const matchDateTime = new Date(`${nextMatch.date}T${nextMatch.time || "14:00:00"}`);
             const difference = matchDateTime.getTime() - new Date().getTime();
             if (difference <= 0) {
                 setTimeLeft(null);
@@ -101,84 +131,58 @@ export default function DashboardPage() {
             setTimeLeft({
                 days: Math.floor(difference / (1000 * 60 * 60 * 24)),
                 hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-                minutes: Math.floor((difference / 1000 / 60) % 60),
-                seconds: Math.floor((difference / 1000) % 60)
+                minutes: Math.floor((difference / 1000 / 60) % 60)
             });
         };
         calculateTimeLeft();
-        const timer = setInterval(calculateTimeLeft, 1000);
+        const timer = setInterval(calculateTimeLeft, 30000);
         return () => clearInterval(timer);
     }, [nextMatch]);
 
     const fetchData = () => {
         fetchMatches();
         fetchSquad();
-        fetchLineup();
-        fetchRecruits();
         fetchTrainingSessions();
         fetchPaymentRequests();
-        fetchLeagueTeams();
-    };
-
-    const fetchLeagueTeams = async () => {
-        const { data } = await supabase.from('league_teams').select('*');
-        if (data) {
-            setLeagueTeams(data);
-        }
-    };
-
-    const fetchLineup = async () => {
-        const { data } = await supabase
-            .from('matchday_xis')
-            .select('*')
-            .order('created_at', { ascending: false })
-            .limit(1);
-        if (data && data.length > 0) {
-            setLineup(data[0]);
-        }
-    };
-
-    const fetchRecruits = async () => {
-        const { data } = await supabase.from('recruits').select('*');
-        if (data) {
-            setRecruits(data);
-        }
     };
 
     const fetchTrainingSessions = async () => {
         const { data } = await supabase.from('training_sessions').select('*');
-        if (data) {
-            setTrainingSessions(data);
-        }
+        if (data) setTrainingSessions(data);
     };
 
     const fetchPaymentRequests = async () => {
         const { data } = await supabase.from('player_payment_requests').select('*');
-        if (data) {
-            setPaymentRequests(data);
-        }
+        if (data) setPaymentRequests(data);
     };
 
     const fetchMatches = async () => {
         const { data } = await supabase.from('matches').select('*');
         if (data) {
-            const loadedMatches: Match[] = data.map((m: any) => {
-                const locationMatch = m.notes ? m.notes.match(/\[Location: (.*?)\]/) : null;
+            const loadedMatches = data.map((m: any) => {
+                const rawNotes = m.notes || "";
+                const locationMatch = rawNotes.match(/\[Location: (.*?)\]/);
                 const location = locationMatch ? locationMatch[1] : "";
-                
-                const surfaceMatch = m.notes ? m.notes.match(/\[Surface: (.*?)\]/) : null;
+
+                const surfaceMatch = rawNotes.match(/\[Surface: (.*?)\]/);
                 const surface = surfaceMatch ? surfaceMatch[1] : "4G";
-                
-                let cleanNotes = m.notes || "";
+
+                const motmMatch = rawNotes.match(/\[MOTM:\s*(.*?)\]/i);
+                const motm = motmMatch ? motmMatch[1].trim() : undefined;
+
+                let cleanNotes = rawNotes;
                 if (cleanNotes.includes("[Lineup: ")) {
                     const endIdx = cleanNotes.indexOf("}]");
                     if (endIdx !== -1) {
                         cleanNotes = cleanNotes.substring(endIdx + 2);
                     }
                 }
-                cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/, "");
-                cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/, "").trim();
-                
+                cleanNotes = cleanNotes
+                    .replace(/\[Location: .*?\]\n?/g, "")
+                    .replace(/\[Surface: .*?\]\n?/g, "")
+                    .replace(/\[MOTM:.*?\]\n?/gi, "")
+                    .trim();
+
                 return {
                     id: m.id,
                     date: m.date,
@@ -191,21 +195,20 @@ export default function DashboardPage() {
                     goalscorers: m.goalscorers,
                     assists: m.assists,
                     notes: cleanNotes,
-                    surface: surface,
-                    location: location
+                    rawNotes,
+                    motm,
+                    surface,
+                    location
                 };
             });
             setMatches(loadedMatches);
 
-            const now = new Date();
-            now.setHours(0, 0, 0, 0);
-
+            const todayStr = new Date().toISOString().split("T")[0];
             const upcoming = loadedMatches
-                .filter(m => m.result === "Pending" && new Date(m.date) >= now)
-                .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                .filter(m => m.result === "Pending" && m.date >= todayStr)
+                .sort((a, b) => a.date.localeCompare(b.date));
 
             setNextMatch(upcoming[0] || null);
-            setUpcomingFixtures(upcoming.slice(0, 3));
         }
     };
 
@@ -213,11 +216,11 @@ export default function DashboardPage() {
         const { data } = await supabase
             .from('players')
             .select('id, first_name, last_name, position, squad, image_url, date_of_birth, appearances, goals, assists, nickname, use_nickname, medical_status, is_contracted, contract_end_date, weight, height, notes');
-        
+
         if (data) {
             const mainSquad = settings.squads?.[0] || "First Team";
             const mainSquadClean = mainSquad.toLowerCase().replace(/[\s-_]+/g, '');
-            
+
             const filteredPlayers = data.filter((p: any) => {
                 if (isFormerPlayer(p)) return false;
                 const sClean = (p.squad || "").toLowerCase().replace(/[\s-_]+/g, '');
@@ -226,9 +229,6 @@ export default function DashboardPage() {
             });
 
             const mapped: Player[] = filteredPlayers.map((p: any) => {
-                const matchFoot = p.notes ? p.notes.match(/\[FOOT:(Left|Right|Both)\]/) : null;
-                const preferredFoot = matchFoot ? (matchFoot[1] as "Left" | "Right" | "Both") : undefined;
-
                 const matchInjury = p.notes ? p.notes.match(/\[INJURY:(.*?)\]/) : null;
                 const injuryType = matchInjury ? matchInjury[1] : undefined;
 
@@ -253,510 +253,1036 @@ export default function DashboardPage() {
                     dateOfBirth: p.date_of_birth,
                     medicalStatus: p.medical_status || "Available",
                     contractExpiry: p.contract_end_date || "",
-                    availability: p.medical_status === "Available",
+                    availability: (p.medical_status || "Available") === "Available",
                     appearances: p.appearances || 0,
                     goals: p.goals || 0,
                     assists: p.assists || 0,
                     nickname: p.nickname || "",
                     useNickname: p.use_nickname || false,
-                    isContracted: p.is_contracted,
-                    contractEndDate: p.contract_end_date,
-                    weight: p.weight,
-                    height: p.height,
-                    preferredFoot: preferredFoot,
-                    injuryType: injuryType,
-                    injuryDuration: injuryDuration,
-                    suspensionReason: suspensionReason,
-                    suspensionDuration: suspensionDuration
+                    imageUrl: p.image_url,
+                    injuryType,
+                    injuryDuration,
+                    suspensionReason,
+                    suspensionDuration
                 };
             });
             setPlayers(mapped);
-
-            const counts: Record<string, number> = {};
-            const SQUAD_LABELS: Record<string, string> = { firstTeam: "First Team", midweek: "Midweek", youth: "Youth" };
-            
-            data.forEach((p: any) => {
-                const rawSquad = p.squad || "Unknown";
-                const mappedSquad = SQUAD_LABELS[rawSquad] || rawSquad;
-                counts[mappedSquad] = (counts[mappedSquad] || 0) + 1;
-            });
-            setSquadCounts(counts);
         }
     };
 
     const syncLeague = async () => {
-        if (!settings.leagueUrl) {
-            alert("Please configure a League URL first.");
-            return;
-        }
-
+        if (!settings.leagueUrl) return;
         setIsSyncing(true);
-        setSyncSuccess(false);
-
         try {
-            const res = await fetch('/api/sync-league', { 
+            const res = await fetch('/api/sync-league', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ url: settings.leagueUrl, clubName: settings.name })
             });
             const data = await res.json();
-
-            if (data.success && data.position) {
-                await updateSettings({ leaguePosition: data.position });
-                if (data.leagueName) {
-                    localStorage.setItem("clubflow_league_name", data.leagueName);
+            if (data.success) {
+                if (Array.isArray(data.standings) && data.standings.length > 0) {
+                    setStandingsTable(data.standings);
+                    const tableJson = JSON.stringify(data.standings);
+                    const scopedKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
+                    localStorage.setItem(scopedKey, tableJson);
+                    localStorage.setItem("clubflow_league_table", tableJson);
+                    await updateSettings({
+                        leaguePosition: data.position || settings.leaguePosition,
+                        lastImportHistory: {
+                            ...(settings.lastImportHistory || {}),
+                            leagueTable: data.standings,
+                            leagueTableSyncedAt: new Date().toISOString()
+                        }
+                    });
+                } else if (data.position) {
+                    await updateSettings({ leaguePosition: data.position });
                 }
-                setSyncSuccess(true);
-                setTimeout(() => setSyncSuccess(false), 3000);
-            } else {
-                alert("Failed to sync: " + (data.error || "Unknown error"));
             }
         } catch (e) {
-            alert("Error during sync. Check console.");
             console.error(e);
         } finally {
             setIsSyncing(false);
         }
     };
 
-    const formatDate = (dateStr: string) => {
+    // Helper: Fuzzy match team name against league standings to get #position
+    const getTeamLeaguePos = (teamName?: string): number | null => {
+        if (!teamName || standingsTable.length === 0) return null;
+        const clean = (s: string) =>
+            s.toLowerCase()
+                .replace(/\b(fc|afc|united|utd|city|town|athletic|ath|rovers|wanderers|albion|sc|1st|first|xi|reserves|res)\b/gi, "")
+                .replace(/[^a-z0-9]/g, "")
+                .trim();
+        const target = clean(teamName);
+        if (!target) return null;
+        const exact = standingsTable.find(r => r.team_name.toLowerCase().trim() === teamName.toLowerCase().trim());
+        if (exact) return exact.position;
+        const fuzzy = standingsTable.find(r => {
+            const c = clean(r.team_name);
+            return c && (c === target || c.includes(target) || target.includes(c));
+        });
+        return fuzzy ? fuzzy.position : null;
+    };
+
+    const formatDate = (dateStr?: string) => {
         if (!dateStr) return "";
-        return new Date(dateStr).toLocaleDateString("en-GB", {
+        return new Date(dateStr + "T12:00:00").toLocaleDateString("en-GB", {
+            weekday: "short",
             day: "numeric",
             month: "short"
         });
     };
 
-    const getLeaguePositionSuffix = (pos: number) => {
+    const ordinal = (pos: number) => {
         const j = pos % 10, k = pos % 100;
-        if (j == 1 && k != 11) return "st";
-        if (j == 2 && k != 12) return "nd";
-        if (j == 3 && k != 13) return "rd";
-        return "th";
+        if (j === 1 && k !== 11) return `${pos}st`;
+        if (j === 2 && k !== 12) return `${pos}nd`;
+        if (j === 3 && k !== 13) return `${pos}rd`;
+        return `${pos}th`;
     };
 
-    const displayLeaguePosition = settings.leaguePosition 
-        ? `${settings.leaguePosition}${getLeaguePositionSuffix(settings.leaguePosition)}` 
-        : "Unranked";
+    const ourStandingsRow = useMemo(() => {
+        return standingsTable.find(r => r.is_our_club) ||
+            (settings.name ? standingsTable.find(r => r.team_name.toLowerCase().includes(settings.name.toLowerCase())) : undefined);
+    }, [standingsTable, settings.name]);
 
-    // V3 Advanced Analytics
-    const totalSquadCount = players.length || 1;
-    const availablePlayers = players.filter(p => p.medicalStatus === "Available");
-    const squadAvailabilityRate = Math.round((availablePlayers.length / totalSquadCount) * 100);
+    const currentPosNumber = ourStandingsRow?.position || settings.leaguePosition || null;
+    const displayLeaguePosition = currentPosNumber ? ordinal(currentPosNumber) : "Unranked";
+
+    // 3-Row Mini League Table Slice around our club
+    const miniTableRows = useMemo(() => {
+        if (standingsTable.length === 0) return [];
+        const sorted = [...standingsTable].sort((a, b) => a.position - b.position);
+        const ourIdx = sorted.findIndex(r => r.is_our_club || (settings.name && r.team_name.toLowerCase().includes(settings.name.toLowerCase())));
+        if (ourIdx <= 0) return sorted.slice(0, 3);
+        if (ourIdx >= sorted.length - 1) return sorted.slice(Math.max(0, sorted.length - 3));
+        return sorted.slice(ourIdx - 1, ourIdx + 2);
+    }, [standingsTable, settings.name]);
+
+    // Availability & Unavailable Players (#2)
+    const availablePlayers = players.filter(p => (p.medicalStatus || "Available") === "Available");
     const injuredPlayers = players.filter(p => p.medicalStatus === "Injured" || p.medicalStatus === "Doubtful");
     const suspendedPlayers = players.filter(p => p.medicalStatus === "Suspended");
-    const recoveringPlayers = players.filter(p => p.medicalStatus === "Holiday"); // Recovering fallback
+    const holidayPlayers = players.filter(p => p.medicalStatus === "Holiday");
+    const unavailablePlayers = [...injuredPlayers, ...suspendedPlayers, ...holidayPlayers];
 
-    // Outfield vs Goalkeepers
-    const gkCount = players.filter(p => p.position === "GK").length;
-    const outfieldCount = players.length - gkCount;
+    // Completed competitive matches + Home/Away Split (#4 + Addition #4)
+    const completedMatches = useMemo(() => {
+        return matches
+            .filter(m => {
+                if (!m.result || m.result === "Pending") return false;
+                const comp = (m.competition || "").toLowerCase();
+                return !comp.includes("friendly") && !comp.includes("pre-season") && !comp.includes("trial");
+            })
+            .sort((a, b) => b.date.localeCompare(a.date));
+    }, [matches]);
 
-    // Homegrown & U23 Roster Metrics
-    const u23Count = players.filter(p => {
-        if (!p.dateOfBirth) return false;
-        const age = Math.floor((new Date().getTime() - new Date(p.dateOfBirth).getTime()) / (1000 * 60 * 60 * 24 * 365.25));
-        return age < 23;
-    }).length;
-    const homegrownCount = Math.round(players.length * 0.7) || 0; // Mock homegrown rule logic
+    const lastMatch = useMemo(() => {
+        const allCompleted = matches
+            .filter(m => m.result && m.result !== "Pending")
+            .sort((a, b) => b.date.localeCompare(a.date));
+        return allCompleted[0] || null;
+    }, [matches]);
 
-    // Left, Right & Both Footed Distributions
-    const leftFootedCount = players.filter(p => p.preferredFoot === "Left").length;
-    const rightFootedCount = players.filter(p => p.preferredFoot === "Right").length;
-    const bothFootedCount = players.filter(p => p.preferredFoot === "Both").length;
+    const homeAwayStats = useMemo(() => {
+        const calc = (list: typeof completedMatches) => {
+            const p = list.length;
+            const w = list.filter(m => m.result === "Win").length;
+            const d = list.filter(m => m.result === "Draw").length;
+            const l = p - w - d;
+            const pts = w * 3 + d;
+            const ppg = p > 0 ? (pts / p).toFixed(2) : "0.00";
+            return { p, w, d, l, pts, ppg };
+        };
+        return {
+            overall: calc(completedMatches),
+            home: calc(completedMatches.filter(m => m.isHome)),
+            away: calc(completedMatches.filter(m => !m.isHome))
+        };
+    }, [completedMatches]);
 
-    // Average starting XI age & heights
-    const getAverageAge = (roster: Player[]) => {
-        const ages = roster.map(p => {
-            if (p.dateOfBirth) {
-                const dob = new Date(p.dateOfBirth);
-                const diff = new Date().getTime() - dob.getTime();
-                return Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
-            }
-            return 24;
-        });
-        return ages.length > 0 ? (ages.reduce((a, b) => a + b, 0) / ages.length).toFixed(1) : "24.5";
-    };
-    const avgSquadAge = getAverageAge(players);
+    // Recent 5 Form (chronological left-to-right)
+    const recentForm = useMemo(() => {
+        return [...completedMatches].slice(0, 5).reverse();
+    }, [completedMatches]);
 
-    // Last session attendance tracking
-    const sortedSessions = [...trainingSessions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const lastSession = sortedSessions[0];
-    const calculateLastSessionAttendance = () => {
-        if (!lastSession || !lastSession.attendance || !Array.isArray(lastSession.attendance)) return 0;
-        const total = lastSession.attendance.length;
-        if (total === 0) return 0;
-        const present = lastSession.attendance.filter((att: any) => att.status === "Present" || att.status === "Late").length;
-        return Math.round((present / total) * 100);
-    };
-    const lastSessionAttendanceRate = calculateLastSessionAttendance();
-
-    // Finance and registration updates
-    const outstandingInvoices = paymentRequests.filter(r => r.status === "Unpaid" || r.status === "unpaid" || r.status === "Overdue");
-    const totalOutstandingAmount = outstandingInvoices.reduce((sum, r) => sum + (r.amount || 0), 0);
-    const registrationIssues = players.filter(p => p.status === "Pending Registration" || p.status === "Pending Invitation" || p.status === "Draft");
-
-    const handleDismissPriority = (label: string) => {
-        const today = new Date().toISOString().split("T")[0];
-        const updated = [...dismissedPriorities, label];
-        setDismissedPriorities(updated);
-        localStorage.setItem(`clubflow_dismissed_priorities_${today}`, JSON.stringify(updated));
-    };
-
-    // Dynamic priorities list
-    const getPriorities = () => {
-        const list = [];
-        if (registrationIssues.length > 0) list.push({ label: `Submit ${registrationIssues.length} Missing Player Registrations`, category: "Registration" });
-        if (totalOutstandingAmount > 0) list.push({ label: `Collect Outstanding Player Dues (£${totalOutstandingAmount})`, category: "Finance" });
-        
-        const isMatchConfirmed = typeof window !== "undefined" && nextMatch
-            ? localStorage.getItem("matchday_squad_confirmed_" + nextMatch.id) === "true"
-            : false;
-        if (nextMatch && !isMatchConfirmed) list.push({ label: `Confirm Matchday Squad vs ${nextMatch.opponent}`, category: "Matchday" });
-        
-        if (injuredPlayers.length > 0) list.push({ label: `Review recovery timeline for ${injuredPlayers.length} injured player(s)`, category: "Medical" });
-        if (suspendedPlayers.length > 0) list.push({ label: `${suspendedPlayers.length} player(s) currently serving suspensions`, category: "Discipline" });
-        if (settings.leagueUrl && !settings.leaguePosition) list.push({ label: "Sync League Table Standings", category: "Operations" });
-        
-        return list.filter(task => !dismissedPriorities.includes(task.label)).slice(0, 5);
-    };
-    const priorities = getPriorities();
-
-    // V3 Team Performance calculations from actual matches (excluding friendlies)
-    const completedMatches = matches.filter(m => {
-        if (!m.result || m.result === "Pending") return false;
-        const comp = (m.competition || "").toLowerCase();
-        return !comp.includes("friendly") && !comp.includes("pre-season") && !comp.includes("trial");
-    });
-    const winsCount = completedMatches.filter(m => m.result === "Win").length;
-    const drawsCount = completedMatches.filter(m => m.result === "Draw").length;
-    const winRate = completedMatches.length > 0 ? Math.round((winsCount / completedMatches.length) * 100) : 0;
-    const ppg = completedMatches.length > 0 ? ((winsCount * 3 + drawsCount) / completedMatches.length).toFixed(2) : "0.00";
-
-    let goalsScored = 0;
-    let goalsConceded = 0;
-    completedMatches.forEach(m => {
-        if (m.scoreline) {
-            const parts = m.scoreline.split("-").map(p => parseInt(p.trim()));
-            if (parts.length === 2 && !isNaN(parts[0]) && !isNaN(parts[1])) {
-                if (m.isHome) {
-                    goalsScored += parts[0];
-                    goalsConceded += parts[1];
-                } else {
-                    goalsScored += parts[1];
-                    goalsConceded += parts[0];
-                }
-            }
-        }
-    });
-    const goalDifference = goalsScored - goalsConceded;
-    const totalPlayed = completedMatches.length;
-    const wins = winsCount;
-    const draws = drawsCount;
-    const losses = totalPlayed - wins - draws;
-    const points = wins * 3 + draws;
-
-    // Recruitment statistics
-    const activeTrialistsCount = recruits.filter(r => r.on_trial).length;
-
-    // Squad depth analysis helper
-    const getDepthMetrics = () => {
-        const gks = players.filter(p => p.position === "GK").length;
-        const cbs = players.filter(p => ["CB", "LCB", "RCB"].includes(p.position)).length;
-        const fbs = players.filter(p => ["LB", "RB", "LWB", "RWB"].includes(p.position)).length;
-        const mids = players.filter(p => ["CM", "CDM", "CAM", "RM", "LM"].includes(p.position)).length;
-        const wingers = players.filter(p => ["RW", "LW"].includes(p.position)).length;
-        const strikers = players.filter(p => ["ST", "CF", "FWD"].includes(p.position)).length;
-        return { gks, cbs, fbs, mids, wingers, strikers };
-    };
-    const depth = getDepthMetrics();
-
-    // Average training attendance calculation (Suggestion 4)
-    const calculateAverageAttendance = () => {
-        if (trainingSessions.length === 0) return 0;
-        let totalRatesSum = 0;
-        let count = 0;
-        trainingSessions.forEach(s => {
-            if (s.attendance && Array.isArray(s.attendance) && s.attendance.length > 0) {
-                const present = s.attendance.filter((att: any) => att.status === "Present" || att.status === "Late").length;
-                totalRatesSum += (present / s.attendance.length) * 100;
-                count++;
-            }
-        });
-        return count > 0 ? Math.round(totalRatesSum / count) : 0;
-    };
-    const averageTrainingAttendance = calculateAverageAttendance();
-
-    // Next training session finder (Suggestion 7)
-    const getNextTrainingSession = () => {
+    // Next Training Session
+    const nextTrainingSession = useMemo(() => {
         const todayStr = new Date().toISOString().split('T')[0];
         const upcoming = trainingSessions
             .filter(s => s.date >= todayStr)
             .sort((a, b) => a.date.localeCompare(b.date));
         return upcoming[0] || null;
-    };
-    const nextTrainingSession = getNextTrainingSession();
+    }, [trainingSessions]);
 
-    // Recent results lookup (Suggestion 9)
-    const getRecentResults = () => {
-        const completed = matches
-            .filter(m => m.result && m.result !== "Pending")
-            .sort((a, b) => b.date.localeCompare(a.date));
-        return completed.slice(0, 2);
-    };
-    const recentResults = getRecentResults();
+    // Season Leaderboards (#3): Top Scorer, Top Assists, Most MOTM, Top Training Attendance %
+    const leaderboards = useMemo(() => {
+        const topScorers = [...players]
+            .filter(p => (p.goals || 0) > 0)
+            .sort((a, b) => (b.goals || 0) - (a.goals || 0) || (a.appearances || 0) - (b.appearances || 0));
 
-    // Recent form of last 5 completed competitive matches
-    const getRecentForm = () => {
-        const completedComp = matches
-            .filter((m: Match) => m.result && m.result !== "Pending" && !m.competition?.toLowerCase().includes("friendly"))
-            .sort((a, b) => b.date.localeCompare(a.date))
-            .slice(0, 5);
-        return completedComp.reverse(); // chronological order left-to-right
-    };
-    const recentForm = getRecentForm();
+        const topAssisters = [...players]
+            .filter(p => (p.assists || 0) > 0)
+            .sort((a, b) => (b.assists || 0) - (a.assists || 0) || (a.appearances || 0) - (b.appearances || 0));
 
-    // Injury table list filtering
-    const getFilteredInjuryList = () => {
-        const holidayPlayers = players.filter(p => p.medicalStatus === "Holiday");
-        if (injuryFilter === "Injured") return injuredPlayers;
-        if (injuryFilter === "Suspended") return suspendedPlayers;
-        if (injuryFilter === "On Holiday") return holidayPlayers;
-        return [...injuredPlayers, ...suspendedPlayers, ...holidayPlayers];
-    };
-    const filteredInjuryList = getFilteredInjuryList();
-
-    const getLeagueName = () => {
-        if (!settings.leagueUrl) return "No League Configured";
-        const stored = typeof window !== "undefined" ? localStorage.getItem("clubflow_league_name") : null;
-        if (stored) return stored;
-        try {
-            const url = new URL(settings.leagueUrl);
-            if (url.hostname.includes("thefa.com")) {
-                return "FA Full-Time League";
+        // Count MOTM from match notes [MOTM: ...]
+        const motmCounts: Record<string, number> = {};
+        matches.forEach(m => {
+            if (m.motm) {
+                motmCounts[m.motm] = (motmCounts[m.motm] || 0) + 1;
             }
-            if (url.hostname.includes("mitoo")) {
-                return "Mitoo League";
-            }
-            const parts = url.hostname.replace("www.", "").split(".");
-            return parts[0].charAt(0).toUpperCase() + parts[0].slice(1) + " League";
-        } catch (e) {
-            return "League";
+        });
+        const motmSorted = Object.entries(motmCounts).sort((a, b) => b[1] - a[1]);
+
+        // Calculate per-player training attendance %
+        const playerTrainingStats: { name: string; present: number; total: number; rate: number }[] = [];
+        const sessionsWithAttendance = trainingSessions.filter(s => Array.isArray(s.attendance) && s.attendance.length > 0);
+        if (sessionsWithAttendance.length > 0) {
+            players.forEach(p => {
+                let present = 0;
+                let total = 0;
+                sessionsWithAttendance.forEach(s => {
+                    const rec = s.attendance.find((a: any) => a.player_id === p.id || a.playerId === p.id);
+                    if (rec) {
+                        total++;
+                        if (rec.status === "Present" || rec.status === "Late") present++;
+                    }
+                });
+                if (total > 0) {
+                    playerTrainingStats.push({
+                        name: formatPlayerName(p),
+                        present,
+                        total,
+                        rate: Math.round((present / total) * 100)
+                    });
+                }
+            });
+            playerTrainingStats.sort((a, b) => b.rate - a.rate || b.present - a.present);
         }
+
+        // Team average training attendance
+        let teamTotalRates = 0;
+        let teamSessionCount = 0;
+        sessionsWithAttendance.forEach(s => {
+            const pres = s.attendance.filter((a: any) => a.status === "Present" || a.status === "Late").length;
+            teamTotalRates += (pres / s.attendance.length) * 100;
+            teamSessionCount++;
+        });
+        const teamAvgAttendance = teamSessionCount > 0 ? Math.round(teamTotalRates / teamSessionCount) : 0;
+
+        return {
+            topScorer: topScorers[0] || null,
+            secondScorer: topScorers[1] || null,
+            topAssister: topAssisters[0] || null,
+            secondAssister: topAssisters[1] || null,
+            topMotm: motmSorted[0] ? { name: motmSorted[0][0], count: motmSorted[0][1] } : null,
+            secondMotm: motmSorted[1] ? { name: motmSorted[1][0], count: motmSorted[1][1] } : null,
+            topTrainingPlayer: playerTrainingStats[0] || null,
+            teamAvgAttendance
+        };
+    }, [players, matches, trainingSessions]);
+
+    // Needs Attention / Action Items (#1)
+    const todayStr = new Date().toISOString().split("T")[0];
+    const overduePendingMatches = matches.filter(m => m.result === "Pending" && m.date < todayStr);
+    const outstandingInvoices = paymentRequests.filter(r => r.status === "Unpaid" || r.status === "unpaid" || r.status === "Overdue");
+    const totalOutstandingAmount = outstandingInvoices.reduce((sum, r) => sum + (r.amount || 0), 0);
+
+    const handleDismissPriority = (id: string) => {
+        const updated = [...dismissedPriorities, id];
+        setDismissedPriorities(updated);
+        localStorage.setItem(`clubflow_dismissed_priorities_${todayStr}`, JSON.stringify(updated));
     };
 
-    useEffect(() => {
-        setLeagueNameState(getLeagueName());
-    }, [settings.leagueUrl, players]);
+    const actionItems = useMemo(() => {
+        const items: { id: string; label: string; sub: string; href: string; tone: "amber" | "rose" | "brand" }[] = [];
+
+        if (overduePendingMatches.length > 0) {
+            const latestOverdue = overduePendingMatches[0];
+            items.push({
+                id: `overdue_${latestOverdue.id}`,
+                label: `Log result vs ${latestOverdue.opponent}`,
+                sub: `Played ${formatDate(latestOverdue.date)} • Result still marked Pending`,
+                href: "/matches",
+                tone: "amber"
+            });
+        }
+
+        if (nextMatch) {
+            const hasSavedLineup = nextMatch.rawNotes?.includes("[Lineup: ");
+            if (!hasSavedLineup) {
+                items.push({
+                    id: `xi_${nextMatch.id}`,
+                    label: `Select Matchday XI vs ${nextMatch.opponent}`,
+                    sub: `${formatDate(nextMatch.date)} (${nextMatch.isHome ? "Home" : "Away"})`,
+                    href: "/matchday-xi",
+                    tone: "brand"
+                });
+            }
+        }
+
+        if (unavailablePlayers.length > 0) {
+            items.push({
+                id: "unavailable_players",
+                label: `${unavailablePlayers.length} player${unavailablePlayers.length === 1 ? "" : "s"} unavailable for selection`,
+                sub: `${injuredPlayers.length} injured/doubtful • ${suspendedPlayers.length} suspended • ${holidayPlayers.length} away`,
+                href: "/squad",
+                tone: "rose"
+            });
+        }
+
+        if (totalOutstandingAmount > 0) {
+            items.push({
+                id: "unpaid_subs",
+                label: `£${totalOutstandingAmount} in unpaid player subs`,
+                sub: `${outstandingInvoices.length} open payment request${outstandingInvoices.length === 1 ? "" : "s"}`,
+                href: "/payments",
+                tone: "amber"
+            });
+        }
+
+        if (standingsTable.length === 0) {
+            items.push({
+                id: "connect_league",
+                label: "Connect your League Table",
+                sub: "Sync live standings & opposition league positions",
+                href: "/league",
+                tone: "brand"
+            });
+        }
+
+        return items.filter(item => !dismissedPriorities.includes(item.id));
+    }, [overduePendingMatches, nextMatch, unavailablePlayers.length, injuredPlayers.length, suspendedPlayers.length, holidayPlayers.length, totalOutstandingAmount, outstandingInvoices.length, standingsTable.length, dismissedPriorities]);
+
+    // 1-Tap WhatsApp Copy Helpers (Addition #6)
+    const copyMatchForWhatsApp = async () => {
+        if (!nextMatch) return;
+        const oppPos = getTeamLeaguePos(nextMatch.opponent);
+        const text = [
+            `⚽ *NEXT MATCH — ${(settings.name || "CAMDEN UNITED").toUpperCase()}*`,
+            `🆚 *Opposition:* ${nextMatch.opponent}${oppPos ? ` (#${oppPos})` : ""} (${nextMatch.isHome ? "HOME" : "AWAY"})`,
+            `🏆 *Competition:* ${nextMatch.competition || "League"}`,
+            `📅 *Date:* ${formatDate(nextMatch.date)}`,
+            `⏰ *Kick-Off:* ${nextMatch.time || "TBC"}`,
+            nextMatch.location ? `📍 *Venue:* ${nextMatch.location} (${nextMatch.surface || "4G"})` : `📍 *Surface:* ${nextMatch.surface || "4G"}`,
+            ``,
+            `Please confirm your availability asap! 💪`
+        ].join("\n");
+
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedWhatsApp("match");
+            setTimeout(() => setCopiedWhatsApp(null), 2500);
+        } catch (e) {}
+    };
+
+    const copyTrainingForWhatsApp = async () => {
+        if (!nextTrainingSession) return;
+        const text = [
+            `🏃 *NEXT TRAINING — ${(settings.name || "CAMDEN UNITED").toUpperCase()}*`,
+            `🎯 *Focus:* ${nextTrainingSession.focus || nextTrainingSession.topic || "Team Training Session"}`,
+            `📅 *Date:* ${formatDate(nextTrainingSession.date)}`,
+            `⏰ *Time:* ${nextTrainingSession.time || "TBC"}`,
+            `📍 *Location:* ${nextTrainingSession.location || "Training Ground"}${nextTrainingSession.surface ? ` (${nextTrainingSession.surface})` : ""}`,
+            ``,
+            `Please make sure you arrive 15 mins early! 🔥`
+        ].join("\n");
+
+        try {
+            await navigator.clipboard.writeText(text);
+            setCopiedWhatsApp("training");
+            setTimeout(() => setCopiedWhatsApp(null), 2500);
+        } catch (e) {}
+    };
+
+    const nextOppPos = getTeamLeaguePos(nextMatch?.opponent);
+    const lastOppPos = getTeamLeaguePos(lastMatch?.opponent);
 
     return (
-        <div className="pb-16 bg-background min-h-screen">
-            {/* LEVEL 1: Club Overview (Hero) */}
-            <div className="bg-card border-b border-border px-6 py-10 mb-8 shadow-sm">
-                <div className="max-w-7xl mx-auto flex flex-col md:flex-row gap-8 justify-between items-start md:items-end">
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-3">
-                            {settings.logo && (
-                                <img src={settings.logo} alt={settings.name} className="h-12 w-12 object-contain" />
-                            )}
-                            <div>
-                                <h1 className="cf-page-title text-3xl">{settings.name || "Club Dashboard"}</h1>
-                                <p className="text-sm font-medium text-muted-foreground mt-1">{leagueNameState} • {displayLeaguePosition}</p>
-                            </div>
-                        </div>
-                        
-                        <div className="flex flex-wrap items-center gap-6 mt-6 pt-4 border-t border-border">
-                            {/* Recent Form */}
-                            <div className="flex flex-col gap-1">
-                                <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Recent Form</span>
-                                <div className="flex gap-1.5">
-                                    {recentForm.map(m => (
-                                        <div key={m.id} className={`w-6 h-6 rounded flex items-center justify-center text-[10px] font-bold ${m.result === "Win" ? "bg-status-success text-white" : m.result === "Loss" ? "bg-status-error text-white" : "bg-muted text-muted-foreground"}`} title={`vs ${m.opponent} (${m.result})`}>
-                                            {m.result?.[0] || "-"}
-                                        </div>
-                                    ))}
-                                    {recentForm.length === 0 && <span className="text-sm text-muted-foreground">N/A</span>}
-                                </div>
-                            </div>
+        <div className="w-full max-w-full overflow-x-hidden min-w-0 pb-24 md:pb-12">
+            <div className="max-w-7xl mx-auto flex flex-col gap-4 md:gap-6">
 
-                            {/* Training Attendance removed per user request */}
-
-                            {/* Next Fixture Quick Status */}
-                            {nextMatch && (
-                                <div className="flex flex-col gap-1">
-                                    <span className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">Next Fixture</span>
-                                    <span className="text-sm font-medium text-foreground">
-                                        vs {nextMatch.opponent} ({nextMatch.isHome ? "H" : "A"})
-                                    </span>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="flex flex-col gap-3">
-                        {priorities.length > 0 && (
-                            <div className="bg-status-warning/10 border border-status-warning/20 text-status-warning-foreground px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
-                                <AlertCircle className="h-4 w-4 text-status-warning" />
-                                {priorities.length} Action{priorities.length !== 1 && "s"} Required
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            <div className="max-w-7xl mx-auto px-6 space-y-12">
-                {/* LEVEL 2: Quick Actions */}
-                <div className="flex flex-wrap gap-3">
-                    <a href="/matches" className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-all shadow-sm">
-                        + New Fixture
-                    </a>
-                    <a href="/training" className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-all border border-border shadow-sm">
-                        + New Session
-                    </a>
-                    <a href="/squad" className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-all border border-border shadow-sm">
-                        + Add Player
-                    </a>
-                    <button onClick={syncLeague} className="px-4 py-2 rounded-lg bg-secondary text-secondary-foreground text-sm font-medium hover:bg-accent transition-all border border-border shadow-sm">
-                        Sync Standings
-                    </button>
-                </div>
-
-                {/* LEVEL 3: This Week (Timeline) */}
-                <section>
-                    <div className="flex items-center justify-between mb-6">
-                        <h2 className="cf-section-title">This Week</h2>
-                        <a href="/calendar" className="text-sm font-medium text-primary hover:underline">Open Calendar &rarr;</a>
-                    </div>
-                    <div className="bg-card border border-border rounded-2xl p-6 shadow-sm">
-                        <WeeklyFootballCalendar />
-                    </div>
-                </section>
-
-                {/* LEVEL 4: Next Match & Next Training */}
-                <section className="grid gap-6 md:grid-cols-2">
-                    {/* Next Match */}
-                    <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col justify-between">
-                        <div>
-                            <div className="flex justify-between items-start mb-6">
-                                <h3 className="text-sm uppercase font-semibold text-muted-foreground tracking-wider">Next Match</h3>
-                                <Badge className="bg-secondary text-secondary-foreground hover:bg-secondary font-medium px-2.5 py-0.5 rounded-md border-transparent">
-                                    {nextMatch?.competition || "Friendly"}
-                                </Badge>
-                            </div>
-                            
-                            <div className="mb-8">
-                                <div className="text-3xl md:text-4xl font-bold text-foreground tracking-tight flex items-center gap-3">
-                                    {nextMatch ? (
-                                        <>
-                                            {leagueTeams.find(t => t.name.toLowerCase() === nextMatch.opponent.toLowerCase())?.badge_url && (
-                                                <img src={leagueTeams.find(t => t.name.toLowerCase() === nextMatch.opponent.toLowerCase())?.badge_url} alt="Badge" className="h-8 w-8 object-contain" />
-                                            )}
-                                            {nextMatch.opponent}
-                                        </>
-                                    ) : "TBC"}
-                                </div>
-                                <div className="text-sm font-medium text-muted-foreground mt-2">
-                                    {nextMatch?.isHome ? "Home" : "Away"}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-5 border-t border-border mt-auto">
-                            {nextMatch ? (
-                                <div className="flex flex-wrap items-center gap-4 text-sm text-foreground">
-                                    <div className="flex items-center gap-1.5 font-medium">
-                                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                                        {formatDate(nextMatch.date)}
-                                    </div>
-                                    <div className="flex items-center gap-1.5 font-medium">
-                                        <Clock className="h-4 w-4 text-muted-foreground" />
-                                        {nextMatch.time || "TBC"}
-                                    </div>
-                                </div>
+                {/* ========================================================= */}
+                {/* TOP HEADER: CLUB PULSE & HOME/AWAY SPLIT PILL             */}
+                {/* ========================================================= */}
+                <div className="bg-surface-1 border border-border rounded-2xl p-4 md:p-6 shadow-xs">
+                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                        {/* Club Identity + Standing + Recent Form */}
+                        <div className="flex items-center gap-3.5 min-w-0">
+                            {settings.logo ? (
+                                <img src={settings.logo} alt={settings.name} className="h-12 w-12 md:h-14 md:w-14 object-contain shrink-0 rounded-xl bg-surface-2 p-1 border border-border" />
                             ) : (
-                                <div className="text-sm text-muted-foreground">No upcoming fixtures.</div>
+                                <div className="h-12 w-12 md:h-14 md:w-14 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center shrink-0">
+                                    <Trophy className="h-6 w-6 text-brand" />
+                                </div>
                             )}
-                            
-                            <a href="/matchday-xi" className="inline-flex items-center justify-center px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 transition-colors shadow-sm">
-                                Matchday Hub
-                            </a>
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <h1 className="text-lg md:text-2xl font-black text-foreground tracking-tight truncate">
+                                        {settings.name || "Camden United"}
+                                    </h1>
+                                    <Link
+                                        href="/league"
+                                        className="inline-flex items-center gap-1 rounded-full bg-brand/15 text-brand border border-brand/30 px-2.5 py-0.5 text-xs font-extrabold shrink-0 hover:bg-brand/20 transition-colors"
+                                    >
+                                        <Trophy className="h-3 w-3" />
+                                        {displayLeaguePosition}
+                                    </Link>
+                                </div>
+
+                                {/* Recent 5 Form Pills */}
+                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                        Form:
+                                    </span>
+                                    <div className="inline-flex items-center gap-1">
+                                        {recentForm.length > 0 ? (
+                                            recentForm.map(m => {
+                                                const badgeStyle =
+                                                    m.result === "Win"
+                                                        ? "bg-emerald-500 text-white"
+                                                        : m.result === "Draw"
+                                                            ? "bg-amber-500 text-white"
+                                                            : "bg-rose-500 text-white";
+                                                return (
+                                                    <span
+                                                        key={m.id}
+                                                        title={`${m.result} (${m.scoreline || ""}) vs ${m.opponent}`}
+                                                        className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-black ${badgeStyle}`}
+                                                    >
+                                                        {m.result?.[0]}
+                                                    </span>
+                                                );
+                                            })
+                                        ) : (
+                                            <span className="text-xs text-muted-foreground">No competitive results yet</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Home vs Away Split Pill (Addition #4) */}
+                        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-3 lg:pt-0 border-t lg:border-t-0 border-border">
+                            <div className="flex items-center gap-2 bg-surface-2/80 border border-border rounded-xl px-3 py-2 min-w-0">
+                                <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
+                                    <Home className="h-3.5 w-3.5" />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                        Home Split
+                                    </div>
+                                    <div className="text-xs font-extrabold text-foreground truncate">
+                                        {homeAwayStats.home.w}W-{homeAwayStats.home.d}D-{homeAwayStats.home.l}L{" "}
+                                        <span className="text-emerald-500 font-bold">({homeAwayStats.home.ppg} PPG)</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 bg-surface-2/80 border border-border rounded-xl px-3 py-2 min-w-0">
+                                <div className="h-7 w-7 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0">
+                                    <Plane className="h-3.5 w-3.5" />
+                                </div>
+                                <div className="min-w-0">
+                                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                                        Away Split
+                                    </div>
+                                    <div className="text-xs font-extrabold text-foreground truncate">
+                                        {homeAwayStats.away.w}W-{homeAwayStats.away.d}D-{homeAwayStats.away.l}L{" "}
+                                        <span className="text-sky-500 font-bold">({homeAwayStats.away.ppg} PPG)</span>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
+                </div>
 
-                    {/* Next Training */}
-                    <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col justify-between">
-                        <div>
-                            <div className="flex justify-between items-start mb-6">
-                                <h3 className="text-sm uppercase font-semibold text-muted-foreground tracking-wider">Next Training</h3>
-                            </div>
-                            <div className="mb-8">
-                                <div className="text-2xl font-bold text-foreground leading-tight">
-                                    {nextTrainingSession ? nextTrainingSession.focus || "Team Session" : "No Session Scheduled"}
+                {/* ========================================================= */}
+                {/* #1: NEEDS ATTENTION / MANAGER'S TO-DO STRIP               */}
+                {/* ========================================================= */}
+                {actionItems.length > 0 && (
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between px-0.5">
+                            <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+                                Needs Attention ({actionItems.length})
+                            </span>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            {actionItems.map(item => {
+                                const toneClasses =
+                                    item.tone === "rose"
+                                        ? "border-rose-500/30 bg-rose-500/5"
+                                        : item.tone === "amber"
+                                            ? "border-amber-500/30 bg-amber-500/5"
+                                            : "border-brand/30 bg-brand/5";
+                                return (
+                                    <div
+                                        key={item.id}
+                                        className={`flex items-center justify-between gap-2.5 rounded-xl border p-3 transition-colors ${toneClasses}`}
+                                    >
+                                        <Link href={item.href} className="min-w-0 flex-1 group">
+                                            <p className="text-xs font-bold text-foreground truncate group-hover:text-brand transition-colors">
+                                                {item.label}
+                                            </p>
+                                            <p className="text-[11px] text-muted-foreground truncate mt-0.5">
+                                                {item.sub}
+                                            </p>
+                                        </Link>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <Link
+                                                href={item.href}
+                                                className="h-7 px-2.5 rounded-lg bg-surface-1 border border-border text-[11px] font-bold text-foreground hover:border-brand/40 flex items-center gap-1"
+                                            >
+                                                Open <ArrowRight className="h-3 w-3" />
+                                            </Link>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleDismissPriority(item.id)}
+                                                title="Dismiss for today"
+                                                className="h-7 w-7 rounded-lg bg-surface-1 border border-border text-muted-foreground hover:text-emerald-500 flex items-center justify-center"
+                                            >
+                                                <Check className="h-3.5 w-3.5" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* ========================================================= */}
+                {/* MATCHDAY & TRAINING BRIEFING ROW (3 CARDS)                */}
+                {/* Next Match + Next Training + Last Match Quick Recap       */}
+                {/* ========================================================= */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+                    {/* CARD A: NEXT MATCH + WHATSAPP COPY */}
+                    <Card className="border-border bg-surface-1 shadow-xs flex flex-col justify-between overflow-hidden">
+                        <CardContent className="p-4 md:p-5 flex flex-col justify-between h-full gap-4">
+                            <div>
+                                <div className="flex items-center justify-between gap-2 mb-3">
+                                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-brand flex items-center gap-1.5">
+                                        <Zap className="h-3.5 w-3.5 fill-brand text-brand" />
+                                        Next Match
+                                    </span>
+                                    {nextMatch && (
+                                        <div className="flex items-center gap-1.5">
+                                            {timeLeft && (
+                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20">
+                                                    {timeLeft.days > 0 ? `${timeLeft.days}d ${timeLeft.hours}h` : `${timeLeft.hours}h ${timeLeft.minutes}m`}
+                                                </span>
+                                            )}
+                                            <Badge variant="outline" className="text-[10px] font-bold px-2 py-0">
+                                                {nextMatch.competition || "League"}
+                                            </Badge>
+                                        </div>
+                                    )}
                                 </div>
-                                {nextTrainingSession && (
-                                    <div className="space-y-2 mt-4 text-sm text-foreground font-medium">
-                                        <div className="flex items-center gap-2">
-                                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                                            <span>{formatDate(nextTrainingSession.date)} - {nextTrainingSession.time || "TBC"}</span>
+
+                                {nextMatch ? (
+                                    <div className="space-y-2.5">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="text-xl md:text-2xl font-black text-foreground tracking-tight truncate">
+                                                vs {nextMatch.opponent}
+                                            </span>
+                                            {nextOppPos && (
+                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-extrabold bg-surface-2 border border-border text-muted-foreground">
+                                                    #{nextOppPos}
+                                                </span>
+                                            )}
+                                            <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
+                                                nextMatch.isHome
+                                                    ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30"
+                                                    : "bg-sky-500/15 text-sky-500 border border-sky-500/30"
+                                            }`}>
+                                                {nextMatch.isHome ? "Home" : "Away"}
+                                            </span>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <MapPin className="h-4 w-4 text-muted-foreground" />
-                                            <span>{nextTrainingSession.location || "Training Ground"}</span>
+
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground font-medium">
+                                            <span className="inline-flex items-center gap-1.5">
+                                                <Calendar className="h-3.5 w-3.5 text-brand" />
+                                                {formatDate(nextMatch.date)}
+                                            </span>
+                                            <span className="inline-flex items-center gap-1.5">
+                                                <Clock className="h-3.5 w-3.5 text-brand" />
+                                                KO {nextMatch.time || "TBC"}
+                                            </span>
+                                            {nextMatch.location && (
+                                                <span className="inline-flex items-center gap-1.5 truncate max-w-full">
+                                                    <MapPin className="h-3.5 w-3.5 text-brand shrink-0" />
+                                                    <span className="truncate">{nextMatch.location}</span>
+                                                </span>
+                                            )}
                                         </div>
+                                    </div>
+                                ) : (
+                                    <div className="py-6 text-center">
+                                        <p className="text-sm font-semibold text-muted-foreground">No upcoming fixture scheduled</p>
+                                        <Link href="/matches" className="text-xs font-bold text-brand hover:underline mt-1 inline-block">
+                                            + Add Fixture
+                                        </Link>
                                     </div>
                                 )}
                             </div>
-                        </div>
-                        
-                        <div className="pt-5 border-t border-border mt-auto">
-                            {nextTrainingSession ? (
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2 text-sm font-medium text-foreground">
-                                        <Users className="h-4 w-4 text-muted-foreground" />
-                                        {nextTrainingSession.attendance?.filter((a: any) => a.status === 'Present' || a.status === 'Late').length || 0} Confirmed
-                                    </div>
-                                    <a href="/training" className="text-sm font-medium text-primary hover:underline">Manage</a>
+
+                            {nextMatch && (
+                                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={copyMatchForWhatsApp}
+                                        className="h-8 text-xs font-semibold w-full truncate"
+                                    >
+                                        <Copy className="h-3.5 w-3.5 mr-1.5 shrink-0 text-emerald-500" />
+                                        <span className="truncate">
+                                            {copiedWhatsApp === "match" ? "Copied for WhatsApp!" : "WhatsApp Copy"}
+                                        </span>
+                                    </Button>
+                                    <Link
+                                        href="/matchday-xi"
+                                        className="h-8 px-3 rounded-md bg-brand hover:bg-brand/90 text-white text-xs font-bold inline-flex items-center justify-center gap-1 transition-colors"
+                                    >
+                                        Matchday XI <ArrowRight className="h-3.5 w-3.5" />
+                                    </Link>
                                 </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* CARD B: NEXT TRAINING + WHATSAPP COPY */}
+                    <Card className="border-border bg-surface-1 shadow-xs flex flex-col justify-between overflow-hidden">
+                        <CardContent className="p-4 md:p-5 flex flex-col justify-between h-full gap-4">
+                            <div>
+                                <div className="flex items-center justify-between gap-2 mb-3">
+                                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
+                                        <CalendarDays className="h-3.5 w-3.5" />
+                                        Next Training
+                                    </span>
+                                    {nextTrainingSession && (
+                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+                                            {nextTrainingSession.attendance?.filter((a: any) => a.status === "Present" || a.status === "Late").length || 0} Attending
+                                        </span>
+                                    )}
+                                </div>
+
+                                {nextTrainingSession ? (
+                                    <div className="space-y-2.5">
+                                        <div className="text-xl md:text-2xl font-black text-foreground tracking-tight truncate">
+                                            {nextTrainingSession.focus || nextTrainingSession.topic || "Team Training"}
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground font-medium">
+                                            <span className="inline-flex items-center gap-1.5">
+                                                <Calendar className="h-3.5 w-3.5 text-emerald-500" />
+                                                {formatDate(nextTrainingSession.date)}
+                                            </span>
+                                            <span className="inline-flex items-center gap-1.5">
+                                                <Clock className="h-3.5 w-3.5 text-emerald-500" />
+                                                {nextTrainingSession.time || "TBC"}
+                                            </span>
+                                            <span className="inline-flex items-center gap-1.5 truncate max-w-full">
+                                                <MapPin className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                                <span className="truncate">{nextTrainingSession.location || "Training Ground"}</span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="py-6 text-center">
+                                        <p className="text-sm font-semibold text-muted-foreground">No upcoming session scheduled</p>
+                                        <Link href="/training" className="text-xs font-bold text-emerald-500 hover:underline mt-1 inline-block">
+                                            + Schedule Training
+                                        </Link>
+                                    </div>
+                                )}
+                            </div>
+
+                            {nextTrainingSession && (
+                                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={copyTrainingForWhatsApp}
+                                        className="h-8 text-xs font-semibold w-full truncate"
+                                    >
+                                        <Copy className="h-3.5 w-3.5 mr-1.5 shrink-0 text-emerald-500" />
+                                        <span className="truncate">
+                                            {copiedWhatsApp === "training" ? "Copied for WhatsApp!" : "WhatsApp Copy"}
+                                        </span>
+                                    </Button>
+                                    <Link
+                                        href={`/training/${nextTrainingSession.id}`}
+                                        className="h-8 px-3 rounded-md bg-surface-2 hover:bg-accent border border-border text-foreground text-xs font-bold inline-flex items-center justify-center gap-1 transition-colors"
+                                    >
+                                        Register <ArrowRight className="h-3.5 w-3.5" />
+                                    </Link>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* CARD C: LAST MATCH QUICK RECAP (Addition #1) */}
+                    <Card className="border-border bg-surface-1 shadow-xs flex flex-col justify-between overflow-hidden">
+                        <CardContent className="p-4 md:p-5 flex flex-col justify-between h-full gap-4">
+                            <div>
+                                <div className="flex items-center justify-between gap-2 mb-3">
+                                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                        <Award className="h-3.5 w-3.5 text-amber-500" />
+                                        Last Match Recap
+                                    </span>
+                                    {lastMatch && (
+                                        <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border ${
+                                            lastMatch.result === "Win"
+                                                ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                                                : lastMatch.result === "Draw"
+                                                    ? "bg-amber-500/15 text-amber-500 border-amber-500/30"
+                                                    : "bg-rose-500/15 text-rose-500 border-rose-500/30"
+                                        }`}>
+                                            {lastMatch.result}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {lastMatch ? (
+                                    <div className="space-y-2">
+                                        <div className="flex items-baseline justify-between gap-2">
+                                            <div className="flex items-center gap-1.5 min-w-0">
+                                                <span className="text-lg md:text-xl font-black text-foreground truncate">
+                                                    vs {lastMatch.opponent}
+                                                </span>
+                                                {lastOppPos && (
+                                                    <span className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-surface-2 border border-border text-muted-foreground shrink-0">
+                                                        #{lastOppPos}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <span className="text-xl md:text-2xl font-black text-foreground font-mono shrink-0">
+                                                {lastMatch.scoreline || "—"}
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-1 pt-1 text-xs">
+                                            {lastMatch.goalscorers ? (
+                                                <p className="text-muted-foreground truncate" title={lastMatch.goalscorers}>
+                                                    ⚽ <strong className="text-foreground">Goals:</strong> {lastMatch.goalscorers}
+                                                </p>
+                                            ) : (
+                                                <p className="text-muted-foreground text-[11px]">No goalscorers logged</p>
+                                            )}
+                                            {lastMatch.assists && (
+                                                <p className="text-muted-foreground truncate" title={lastMatch.assists}>
+                                                    👟 <strong className="text-foreground">Assists:</strong> {lastMatch.assists}
+                                                </p>
+                                            )}
+                                            {lastMatch.motm && (
+                                                <p className="text-amber-500 font-bold truncate">
+                                                    ⭐ MOTM: {lastMatch.motm}
+                                                </p>
+                                            )}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="py-6 text-center">
+                                        <p className="text-sm font-semibold text-muted-foreground">No completed matches yet</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex items-center justify-between pt-3 border-t border-border text-xs">
+                                <span className="text-muted-foreground font-medium">
+                                    {lastMatch ? formatDate(lastMatch.date) : ""}
+                                </span>
+                                <Link href="/matches" className="font-bold text-brand hover:underline inline-flex items-center gap-1">
+                                    All Fixtures & Results <ArrowRight className="h-3.5 w-3.5" />
+                                </Link>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* ========================================================= */}
+                {/* #3: SEASON LEADERBOARDS AT A GLANCE                       */}
+                {/* ========================================================= */}
+                <div className="flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between px-0.5">
+                        <h2 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                            <Flame className="h-3.5 w-3.5 text-brand" />
+                            Season Leaderboards
+                        </h2>
+                        <Link href="/squad" className="text-xs font-bold text-brand hover:underline">
+                            Full Squad Stats &rarr;
+                        </Link>
+                    </div>
+
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-4">
+                        {/* Top Goalscorer */}
+                        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-3.5 md:p-4">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-brand truncate">
+                                Top Goalscorer
+                            </p>
+                            {leaderboards.topScorer ? (
+                                <>
+                                    <div className="flex items-baseline justify-between gap-2 mt-1">
+                                        <span className="text-sm md:text-base font-extrabold text-foreground truncate">
+                                            {formatPlayerName(leaderboards.topScorer)}
+                                        </span>
+                                        <span className="text-xl md:text-2xl font-black text-brand shrink-0">
+                                            {leaderboards.topScorer.goals}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                                        {leaderboards.secondScorer
+                                            ? `2nd: ${formatPlayerName(leaderboards.secondScorer)} (${leaderboards.secondScorer.goals})`
+                                            : `${leaderboards.topScorer.appearances || 0} apps`}
+                                    </p>
+                                </>
                             ) : (
-                                <a href="/training" className="text-sm font-medium text-muted-foreground hover:text-foreground">Schedule Session</a>
+                                <p className="text-xs text-muted-foreground mt-2">No goals logged yet</p>
+                            )}
+                        </div>
+
+                        {/* Most Assists */}
+                        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-3.5 md:p-4">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-sky-500 truncate">
+                                Most Assists
+                            </p>
+                            {leaderboards.topAssister ? (
+                                <>
+                                    <div className="flex items-baseline justify-between gap-2 mt-1">
+                                        <span className="text-sm md:text-base font-extrabold text-foreground truncate">
+                                            {formatPlayerName(leaderboards.topAssister)}
+                                        </span>
+                                        <span className="text-xl md:text-2xl font-black text-sky-500 shrink-0">
+                                            {leaderboards.topAssister.assists}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                                        {leaderboards.secondAssister
+                                            ? `2nd: ${formatPlayerName(leaderboards.secondAssister)} (${leaderboards.secondAssister.assists})`
+                                            : `${leaderboards.topAssister.appearances || 0} apps`}
+                                    </p>
+                                </>
+                            ) : (
+                                <p className="text-xs text-muted-foreground mt-2">No assists logged yet</p>
+                            )}
+                        </div>
+
+                        {/* Most MOTMs */}
+                        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-3.5 md:p-4">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500 truncate">
+                                Man of the Match
+                            </p>
+                            {leaderboards.topMotm ? (
+                                <>
+                                    <div className="flex items-baseline justify-between gap-2 mt-1">
+                                        <span className="text-sm md:text-base font-extrabold text-foreground truncate">
+                                            {leaderboards.topMotm.name}
+                                        </span>
+                                        <span className="text-xl md:text-2xl font-black text-amber-500 shrink-0">
+                                            {leaderboards.topMotm.count}
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                                        {leaderboards.secondMotm
+                                            ? `2nd: ${leaderboards.secondMotm.name} (${leaderboards.secondMotm.count})`
+                                            : "Season MOTM Leader"}
+                                    </p>
+                                </>
+                            ) : (
+                                <p className="text-xs text-muted-foreground mt-2">Awarded on match results</p>
+                            )}
+                        </div>
+
+                        {/* Highest Training Commitment */}
+                        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-3.5 md:p-4">
+                            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-500 truncate">
+                                Training Commitment
+                            </p>
+                            {leaderboards.topTrainingPlayer ? (
+                                <>
+                                    <div className="flex items-baseline justify-between gap-2 mt-1">
+                                        <span className="text-sm md:text-base font-extrabold text-foreground truncate">
+                                            {leaderboards.topTrainingPlayer.name}
+                                        </span>
+                                        <span className="text-xl md:text-2xl font-black text-emerald-500 shrink-0">
+                                            {leaderboards.topTrainingPlayer.rate}%
+                                        </span>
+                                    </div>
+                                    <p className="text-[11px] text-muted-foreground mt-1 truncate">
+                                        Squad avg: <strong className="text-foreground">{leaderboards.teamAvgAttendance}%</strong> attendance
+                                    </p>
+                                </>
+                            ) : (
+                                <p className="text-xs text-muted-foreground mt-2">Take register in Training</p>
                             )}
                         </div>
                     </div>
-                </section>
+                </div>
 
-                {/* LEVEL 5: Operational Alerts */}
-                {priorities.length > 0 && (
-                    <section>
-                        <h2 className="cf-section-title mb-4">Operational Alerts</h2>
-                        <div className="space-y-2">
-                            {priorities.map((task, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-4 bg-card border border-border rounded-xl text-sm transition-colors hover:bg-accent shadow-sm">
-                                    <div className="flex items-center gap-3">
-                                        <button
-                                            onClick={() => handleDismissPriority(task.label)}
-                                            className="p-1.5 rounded-md bg-secondary hover:bg-status-success/10 text-muted-foreground hover:text-status-success transition-colors border border-border"
-                                            title="Mark as Resolved"
-                                        >
-                                            <Check className="h-4 w-4" />
-                                        </button>
-                                        <span className="font-medium text-foreground">{task.label}</span>
-                                    </div>
+                {/* ========================================================= */}
+                {/* BOTTOM SPLIT: #4 (3-ROW MINI TABLE) & #2 (UNAVAILABLE)    */}
+                {/* ========================================================= */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+                    {/* #4: 3-ROW MINI LEAGUE TABLE CONTEXT */}
+                    <Card className="border-border bg-surface-1 shadow-xs overflow-hidden">
+                        <CardContent className="p-4 md:p-5 flex flex-col justify-between h-full gap-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <div>
+                                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                        <Trophy className="h-3.5 w-3.5 text-brand" />
+                                        League Table Context
+                                    </h3>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                        Immediate rivals around your current position
+                                    </p>
                                 </div>
-                            ))}
-                        </div>
-                    </section>
-                )}
+                                <div className="flex items-center gap-2">
+                                    {settings.leagueUrl && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            disabled={isSyncing}
+                                            onClick={syncLeague}
+                                            className="h-7 px-2 text-[11px]"
+                                        >
+                                            <RefreshCw className={`h-3 w-3 mr-1 ${isSyncing ? "animate-spin" : ""}`} />
+                                            {isSyncing ? "Syncing" : "Sync"}
+                                        </Button>
+                                    )}
+                                    <Link href="/league" className="text-xs font-bold text-brand hover:underline">
+                                        Full Table &rarr;
+                                    </Link>
+                                </div>
+                            </div>
 
-                {/* LEVEL 6: League Snapshot */}
-                <section>
-                    <h2 className="cf-section-title mb-4">League Snapshot</h2>
-                    <div className="bg-card border border-border p-6 rounded-2xl shadow-sm flex flex-col justify-center max-w-sm">
-                        <div className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider mb-2">Current Position</div>
-                        <div className="flex items-baseline gap-3">
-                            <span className="text-5xl font-bold text-foreground tracking-tight">{displayLeaguePosition}</span>
-                            <span className="text-sm font-medium text-muted-foreground truncate">{leagueNameState || "No League"}</span>
-                        </div>
-                    </div>
-                </section>
+                            {miniTableRows.length > 0 ? (
+                                <div className="rounded-xl border border-border overflow-hidden">
+                                    <table className="w-full text-xs text-left table-fixed">
+                                        <thead className="bg-surface-2 text-[10px] uppercase text-muted-foreground border-b border-border">
+                                            <tr>
+                                                <th className="w-9 pl-3 py-2 font-bold">#</th>
+                                                <th className="py-2 px-2 font-bold">Club</th>
+                                                <th className="w-9 py-2 text-center font-bold">P</th>
+                                                <th className="w-11 py-2 text-center font-bold">GD</th>
+                                                <th className="w-11 pr-3 py-2 text-center font-bold text-foreground">Pts</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {miniTableRows.map((r, i) => {
+                                                const isOurs = r.is_our_club || (settings.name && r.team_name.toLowerCase().includes(settings.name.toLowerCase()));
+                                                return (
+                                                    <tr
+                                                        key={i}
+                                                        className={`border-b last:border-b-0 border-border ${
+                                                            isOurs ? "bg-brand/10 border-l-4 border-l-brand font-bold" : ""
+                                                        }`}
+                                                    >
+                                                        <td className="pl-3 py-2.5 font-bold">{r.position}</td>
+                                                        <td className={`py-2.5 px-2 truncate ${isOurs ? "text-brand font-extrabold" : "text-foreground font-medium"}`}>
+                                                            {r.team_name}
+                                                        </td>
+                                                        <td className="py-2.5 text-center text-muted-foreground">{r.played}</td>
+                                                        <td className={`py-2.5 text-center font-mono text-[11px] ${
+                                                            r.goal_difference > 0 ? "text-emerald-500" : r.goal_difference < 0 ? "text-rose-500" : "text-muted-foreground"
+                                                        }`}>
+                                                            {r.goal_difference > 0 ? `+${r.goal_difference}` : r.goal_difference}
+                                                        </td>
+                                                        <td className="pr-3 py-2.5 text-center font-black text-foreground">{r.points}</td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            ) : (
+                                <div className="rounded-xl border border-dashed border-border p-6 text-center">
+                                    <p className="text-xs text-muted-foreground">No league standings connected yet.</p>
+                                    <Link href="/league" className="text-xs font-bold text-brand hover:underline mt-1 inline-block">
+                                        Connect League Table &rarr;
+                                    </Link>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* #2: WHO'S UNAVAILABLE FOR NEXT MATCH */}
+                    <Card className="border-border bg-surface-1 shadow-xs overflow-hidden">
+                        <CardContent className="p-4 md:p-5 flex flex-col justify-between h-full gap-3">
+                            <div className="flex items-center justify-between gap-2">
+                                <div>
+                                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                        <HeartPulse className="h-3.5 w-3.5 text-rose-500" />
+                                        Squad Availability & Absences
+                                    </h3>
+                                    <p className="text-[11px] text-muted-foreground mt-0.5">
+                                        <strong className="text-emerald-500">{availablePlayers.length} Available</strong> • {injuredPlayers.length} Injured/Doubtful • {suspendedPlayers.length} Suspended • {holidayPlayers.length} Away
+                                    </p>
+                                </div>
+                                <Link href="/squad" className="text-xs font-bold text-brand hover:underline shrink-0">
+                                    Manage Squad &rarr;
+                                </Link>
+                            </div>
+
+                            {unavailablePlayers.length > 0 ? (
+                                <div className="flex flex-col gap-2 max-h-[190px] overflow-y-auto pr-0.5">
+                                    {unavailablePlayers.map(p => {
+                                        const statusTone =
+                                            p.medicalStatus === "Suspended"
+                                                ? "bg-amber-500/15 text-amber-500 border-amber-500/30"
+                                                : p.medicalStatus === "Holiday"
+                                                    ? "bg-sky-500/15 text-sky-500 border-sky-500/30"
+                                                    : "bg-rose-500/15 text-rose-500 border-rose-500/30";
+                                        const detail =
+                                            p.medicalStatus === "Suspended"
+                                                ? [p.suspensionReason, p.suspensionDuration].filter(Boolean).join(" • ")
+                                                : [p.injuryType, p.injuryDuration].filter(Boolean).join(" • ");
+
+                                        return (
+                                            <Link
+                                                key={p.id}
+                                                href={`/squad/${p.id}`}
+                                                className="flex items-center justify-between gap-2 rounded-xl border border-border bg-surface-2/50 hover:bg-surface-2 px-3 py-2 transition-colors min-w-0"
+                                            >
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-surface-1 border border-border text-muted-foreground shrink-0">
+                                                        {p.position}
+                                                    </span>
+                                                    <div className="min-w-0">
+                                                        <p className="text-xs font-bold text-foreground truncate">
+                                                            {formatPlayerName(p)}
+                                                        </p>
+                                                        {detail && (
+                                                            <p className="text-[10px] text-muted-foreground truncate">
+                                                                {detail}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${statusTone}`}>
+                                                    {p.medicalStatus}
+                                                </span>
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-5 flex items-center justify-center gap-2.5 text-center">
+                                    <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                                    <span className="text-xs font-bold text-emerald-500">
+                                        Full Squad Available — 0 Injuries, Suspensions, or Absences
+                                    </span>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                </div>
             </div>
         </div>
     );
