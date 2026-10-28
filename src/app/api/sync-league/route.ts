@@ -30,42 +30,131 @@ function isOurClubMatch(candidate: string, clubName: string): boolean {
     return c.includes(target);
 }
 
-// Verified baseline for Mitoo Middlesex County Football League (MDX2026, DivisionID=64)
-// Used when Cloudflare challenges cloud datacenter IPs; client-side match delta logic automatically applies any newer fixtures on top.
-function buildMitooMdx2026Div64Fallback(clubName: string) {
-    const rawStandings: Array<{
-        team_name: string;
-        played: number;
-        won: number;
-        drawn: number;
-        lost: number;
-        goals_for: number;
-        goals_against: number;
-        goal_difference: number;
-        points: number;
-        form: ('W' | 'D' | 'L')[];
-    }> = [
-        { team_name: "Camden United", played: 11, won: 8, drawn: 2, lost: 1, goals_for: 46, goals_against: 10, goal_difference: 36, points: 26, form: ['W', 'W', 'W', 'W', 'D'] },
-        { team_name: "FH Whistlers", played: 11, won: 8, drawn: 1, lost: 2, goals_for: 43, goals_against: 23, goal_difference: 20, points: 25, form: ['W', 'W', 'W', 'W', 'W'] },
-        { team_name: "Wood Lane", played: 9, won: 6, drawn: 2, lost: 1, goals_for: 38, goals_against: 19, goal_difference: 19, points: 20, form: ['W', 'W', 'W', 'W', 'W'] },
-        { team_name: "Sporting Duet M 1st XI", played: 10, won: 6, drawn: 1, lost: 3, goals_for: 27, goals_against: 19, goal_difference: 8, points: 19, form: ['L', 'L', 'W', 'W', 'W'] },
-        { team_name: "Harrow United", played: 10, won: 5, drawn: 3, lost: 2, goals_for: 29, goals_against: 16, goal_difference: 13, points: 18, form: ['W', 'D', 'L', 'W', 'D'] },
-        { team_name: "Kodak (Harrow)", played: 10, won: 6, drawn: 0, lost: 4, goals_for: 19, goals_against: 17, goal_difference: 2, points: 18, form: ['W', 'L', 'W', 'W', 'L'] },
-        { team_name: "Hayes & Hillingdon", played: 8, won: 5, drawn: 2, lost: 1, goals_for: 21, goals_against: 7, goal_difference: 14, points: 17, form: ['W', 'D', 'D', 'W', 'W'] },
-        { team_name: "Stonewall", played: 10, won: 4, drawn: 2, lost: 4, goals_for: 20, goals_against: 21, goal_difference: -1, points: 14, form: ['W', 'D', 'L', 'L', 'L'] },
-        { team_name: "Camden & Islington United", played: 9, won: 3, drawn: 2, lost: 4, goals_for: 15, goals_against: 17, goal_difference: -2, points: 11, form: ['W', 'L', 'L', 'L', 'W'] },
-        { team_name: "Hayes & Yeading B Team", played: 12, won: 3, drawn: 2, lost: 7, goals_for: 23, goals_against: 47, goal_difference: -24, points: 11, form: ['D', 'W', 'L', 'L', 'W'] },
-        { team_name: "Larkspur Rovers", played: 10, won: 2, drawn: 4, lost: 4, goals_for: 17, goals_against: 17, goal_difference: 0, points: 10, form: ['D', 'D', 'L', 'L', 'L'] },
-        { team_name: "Kensington Dragons", played: 8, won: 3, drawn: 0, lost: 5, goals_for: 18, goals_against: 21, goal_difference: -3, points: 9, form: ['L', 'W', 'W', 'L', 'L'] },
-        { team_name: "Apollo London", played: 12, won: 3, drawn: 0, lost: 9, goals_for: 16, goals_against: 29, goal_difference: -13, points: 9, form: ['L', 'W', 'L', 'L', 'W'] },
-        { team_name: "Explorers", played: 6, won: 2, drawn: 0, lost: 4, goals_for: 12, goals_against: 21, goal_difference: -9, points: 6, form: ['L', 'L', 'L', 'L', 'W'] },
-        { team_name: "LBS Lions", played: 9, won: 1, drawn: 2, lost: 6, goals_for: 11, goals_against: 31, goal_difference: -20, points: 5, form: ['D', 'L', 'L', 'L', 'L'] },
-        { team_name: "Indian Gymkhana Club", played: 9, won: 0, drawn: 1, lost: 8, goals_for: 7, goals_against: 47, goal_difference: -40, points: 1, form: ['D', 'L', 'L', 'L', 'L'] },
-    ];
+type RawStandingItem = {
+    team_name: string;
+    played: number;
+    won: number;
+    drawn: number;
+    lost: number;
+    goals_for: number;
+    goals_against: number;
+    goal_difference: number;
+    points: number;
+    form: ('W' | 'D' | 'L')[];
+};
+
+const MITOO_MDX2026_DIVISIONS: Record<string, { leagueName: string; rows: RawStandingItem[] }> = {
+    "64": {
+        leagueName: "Middlesex County Football League - Premier Division",
+        rows: [
+            { team_name: "Camden United", played: 11, won: 8, drawn: 2, lost: 1, goals_for: 46, goals_against: 10, goal_difference: 36, points: 26, form: ['W', 'W', 'W', 'W', 'D'] },
+            { team_name: "FH Whistlers", played: 11, won: 8, drawn: 1, lost: 2, goals_for: 43, goals_against: 23, goal_difference: 20, points: 25, form: ['W', 'W', 'W', 'W', 'W'] },
+            { team_name: "Wood Lane", played: 9, won: 6, drawn: 2, lost: 1, goals_for: 38, goals_against: 19, goal_difference: 19, points: 20, form: ['W', 'W', 'W', 'W', 'W'] },
+            { team_name: "Sporting Duet M 1st XI", played: 10, won: 6, drawn: 1, lost: 3, goals_for: 27, goals_against: 19, goal_difference: 8, points: 19, form: ['L', 'L', 'W', 'W', 'W'] },
+            { team_name: "Harrow United", played: 10, won: 5, drawn: 3, lost: 2, goals_for: 29, goals_against: 16, goal_difference: 13, points: 18, form: ['W', 'D', 'L', 'W', 'D'] },
+            { team_name: "Kodak (Harrow)", played: 10, won: 6, drawn: 0, lost: 4, goals_for: 19, goals_against: 17, goal_difference: 2, points: 18, form: ['W', 'L', 'W', 'W', 'L'] },
+            { team_name: "Hayes & Hillingdon", played: 8, won: 5, drawn: 2, lost: 1, goals_for: 21, goals_against: 7, goal_difference: 14, points: 17, form: ['W', 'D', 'D', 'W', 'W'] },
+            { team_name: "Stonewall", played: 10, won: 4, drawn: 2, lost: 4, goals_for: 20, goals_against: 21, goal_difference: -1, points: 14, form: ['W', 'D', 'L', 'L', 'L'] },
+            { team_name: "Camden & Islington United", played: 9, won: 3, drawn: 2, lost: 4, goals_for: 15, goals_against: 17, goal_difference: -2, points: 11, form: ['W', 'L', 'L', 'L', 'W'] },
+            { team_name: "Hayes & Yeading B Team", played: 12, won: 3, drawn: 2, lost: 7, goals_for: 23, goals_against: 47, goal_difference: -24, points: 11, form: ['D', 'W', 'L', 'L', 'W'] },
+            { team_name: "Larkspur Rovers", played: 10, won: 2, drawn: 4, lost: 4, goals_for: 17, goals_against: 17, goal_difference: 0, points: 10, form: ['D', 'D', 'L', 'L', 'L'] },
+            { team_name: "Kensington Dragons", played: 8, won: 3, drawn: 0, lost: 5, goals_for: 18, goals_against: 21, goal_difference: -3, points: 9, form: ['L', 'W', 'W', 'L', 'L'] },
+            { team_name: "Apollo London", played: 12, won: 3, drawn: 0, lost: 9, goals_for: 16, goals_against: 29, goal_difference: -13, points: 9, form: ['L', 'W', 'L', 'L', 'W'] },
+            { team_name: "Explorers", played: 6, won: 2, drawn: 0, lost: 4, goals_for: 12, goals_against: 21, goal_difference: -9, points: 6, form: ['L', 'L', 'L', 'L', 'W'] },
+            { team_name: "LBS Lions", played: 9, won: 1, drawn: 2, lost: 6, goals_for: 11, goals_against: 31, goal_difference: -20, points: 5, form: ['D', 'L', 'L', 'L', 'L'] },
+            { team_name: "Indian Gymkhana Club", played: 9, won: 0, drawn: 1, lost: 8, goals_for: 7, goals_against: 47, goal_difference: -40, points: 1, form: ['D', 'L', 'L', 'L', 'L'] },
+        ]
+    },
+    "100": {
+        leagueName: "Middlesex County Football League - Saturday Division One East",
+        rows: [
+            { team_name: "FC Marylebone", played: 5, won: 4, drawn: 0, lost: 1, goals_for: 14, goals_against: 6, goal_difference: 8, points: 12, form: ['W', 'W', 'W', 'W', 'L'] },
+            { team_name: "Soccer Stars (Youth) SSA", played: 4, won: 3, drawn: 0, lost: 1, goals_for: 9, goals_against: 9, goal_difference: 0, points: 9, form: ['L', 'W', 'W'] },
+            { team_name: "Whitestar", played: 4, won: 2, drawn: 1, lost: 1, goals_for: 7, goals_against: 3, goal_difference: 4, points: 7, form: ['W', 'D', 'W'] },
+            { team_name: "Camden & Islington United LFS Mens", played: 4, won: 2, drawn: 1, lost: 1, goals_for: 7, goals_against: 7, goal_difference: 0, points: 7, form: ['D', 'W', 'W', 'L'] },
+            { team_name: "Athenians", played: 2, won: 2, drawn: 0, lost: 0, goals_for: 10, goals_against: 5, goal_difference: 5, points: 6, form: ['W', 'W'] },
+            { team_name: "Bloomsbury", played: 5, won: 1, drawn: 2, lost: 2, goals_for: 11, goals_against: 12, goal_difference: -1, points: 5, form: ['L', 'D', 'W', 'D', 'L'] },
+            { team_name: "Stonewall Reserves", played: 3, won: 1, drawn: 0, lost: 2, goals_for: 9, goals_against: 2, goal_difference: 7, points: 3, form: ['W', 'L', 'L'] },
+            { team_name: "Westminster & Kensington", played: 2, won: 1, drawn: 0, lost: 1, goals_for: 5, goals_against: 6, goal_difference: -1, points: 3, form: ['L', 'W'] },
+            { team_name: "Rose", played: 6, won: 1, drawn: 0, lost: 5, goals_for: 8, goals_against: 25, goal_difference: -17, points: 3, form: ['L', 'L', 'L', 'W', 'L'] },
+            { team_name: "FC Starz", played: 3, won: 0, drawn: 0, lost: 3, goals_for: 3, goals_against: 8, goal_difference: -5, points: 0, form: ['L', 'L', 'L'] },
+        ]
+    },
+    "101": {
+        leagueName: "Middlesex County Football League - Saturday Division One West",
+        rows: [
+            { team_name: "Ickenham", played: 6, won: 5, drawn: 0, lost: 1, goals_for: 19, goals_against: 8, goal_difference: 11, points: 15, form: ['L', 'W', 'W', 'W', 'W'] },
+            { team_name: "Ruislip Rangers", played: 4, won: 4, drawn: 0, lost: 0, goals_for: 17, goals_against: 4, goal_difference: 13, points: 12, form: ['W', 'W', 'W', 'W'] },
+            { team_name: "Hounslow Wolves", played: 4, won: 3, drawn: 1, lost: 0, goals_for: 10, goals_against: 5, goal_difference: 5, points: 10, form: ['W', 'W', 'W', 'D'] },
+            { team_name: "AFC Southall", played: 4, won: 3, drawn: 0, lost: 1, goals_for: 17, goals_against: 9, goal_difference: 8, points: 9, form: ['W', 'W', 'L', 'W'] },
+            { team_name: "Ruislip Town", played: 3, won: 2, drawn: 1, lost: 0, goals_for: 9, goals_against: 5, goal_difference: 4, points: 7, form: ['W', 'D', 'W'] },
+            { team_name: "London Park United", played: 4, won: 2, drawn: 0, lost: 2, goals_for: 6, goals_against: 4, goal_difference: 2, points: 6, form: ['W', 'W'] },
+            { team_name: "Barnes", played: 5, won: 1, drawn: 1, lost: 3, goals_for: 8, goals_against: 12, goal_difference: -4, points: 4, form: ['L', 'W', 'L', 'D', 'L'] },
+            { team_name: "Townmead", played: 4, won: 1, drawn: 0, lost: 3, goals_for: 3, goals_against: 8, goal_difference: -5, points: 3, form: ['L', 'L', 'L'] },
+            { team_name: "Wiseman West", played: 4, won: 1, drawn: 0, lost: 3, goals_for: 3, goals_against: 9, goal_difference: -6, points: 3, form: ['L', 'L', 'L'] },
+            { team_name: "East Sheen", played: 6, won: 0, drawn: 1, lost: 5, goals_for: 6, goals_against: 21, goal_difference: -15, points: 1, form: ['L', 'L', 'D', 'L', 'L'] },
+            { team_name: "CB Hounslow & Abbots Senior Reserves", played: 4, won: 0, drawn: 0, lost: 4, goals_for: 3, goals_against: 16, goal_difference: -13, points: 0, form: ['L', 'L', 'L', 'L'] },
+        ]
+    },
+    "102": {
+        leagueName: "Middlesex County Football League - Saturday Division One Central",
+        rows: [
+            { team_name: "Harrow Bhoys", played: 5, won: 4, drawn: 0, lost: 1, goals_for: 21, goals_against: 10, goal_difference: 11, points: 12, form: ['W', 'W', 'W', 'W', 'L'] },
+            { team_name: "Hammersmith & Kensington Town", played: 3, won: 3, drawn: 0, lost: 0, goals_for: 14, goals_against: 3, goal_difference: 11, points: 9, form: ['W', 'W', 'W'] },
+            { team_name: "London Albion City", played: 4, won: 3, drawn: 0, lost: 1, goals_for: 11, goals_against: 4, goal_difference: 7, points: 9, form: ['L', 'W', 'W', 'W'] },
+            { team_name: "CBHA", played: 5, won: 3, drawn: 0, lost: 2, goals_for: 17, goals_against: 18, goal_difference: -1, points: 9, form: ['W', 'L', 'L', 'W', 'W'] },
+            { team_name: "R F Elite", played: 4, won: 2, drawn: 1, lost: 1, goals_for: 10, goals_against: 8, goal_difference: 2, points: 7, form: ['D', 'W', 'L', 'W'] },
+            { team_name: "Brent United", played: 4, won: 2, drawn: 1, lost: 1, goals_for: 11, goals_against: 10, goal_difference: 1, points: 7, form: ['L', 'D', 'W'] },
+            { team_name: "Harrow United 2nds", played: 4, won: 2, drawn: 0, lost: 2, goals_for: 10, goals_against: 10, goal_difference: 0, points: 6, form: ['L', 'L', 'W', 'W'] },
+            { team_name: "Bessingby Park Rangers", played: 4, won: 2, drawn: 0, lost: 2, goals_for: 12, goals_against: 14, goal_difference: -2, points: 6, form: ['W', 'L', 'L', 'W'] },
+            { team_name: "Edgware & Kingsbury Res", played: 5, won: 1, drawn: 2, lost: 2, goals_for: 15, goals_against: 14, goal_difference: 1, points: 5, form: ['D', 'W', 'L', 'D', 'L'] },
+            { team_name: "Hilltop 2nds", played: 4, won: 1, drawn: 0, lost: 3, goals_for: 9, goals_against: 19, goal_difference: -10, points: 3, form: ['L', 'L', 'W', 'L'] },
+            { team_name: "Kodak (Harrow) Reserves", played: 3, won: 0, drawn: 0, lost: 3, goals_for: 4, goals_against: 10, goal_difference: -6, points: 0, form: ['L', 'L', 'L'] },
+            { team_name: "Celtic", played: 5, won: 0, drawn: 0, lost: 5, goals_for: 2, goals_against: 16, goal_difference: -14, points: 0, form: ['L', 'L', 'L', 'L'] },
+        ]
+    },
+    "103": {
+        leagueName: "Middlesex County Football League - The Russell Grant Division 2",
+        rows: [
+            { team_name: "Old Isleworthians", played: 5, won: 4, drawn: 0, lost: 1, goals_for: 24, goals_against: 5, goal_difference: 19, points: 12, form: ['W', 'W', 'W', 'L', 'W'] },
+            { team_name: "FH Whistlers Originals", played: 4, won: 4, drawn: 0, lost: 0, goals_for: 9, goals_against: 2, goal_difference: 7, points: 12, form: ['W', 'W', 'W'] },
+            { team_name: "Hounslow Lions", played: 5, won: 4, drawn: 0, lost: 1, goals_for: 14, goals_against: 8, goal_difference: 6, points: 12, form: ['W', 'W', 'W', 'L', 'W'] },
+            { team_name: "AFC Heathrow", played: 6, won: 3, drawn: 1, lost: 2, goals_for: 23, goals_against: 9, goal_difference: 14, points: 10, form: ['L', 'W', 'W', 'W', 'D'] },
+            { team_name: "London Tigers", played: 5, won: 3, drawn: 0, lost: 2, goals_for: 21, goals_against: 9, goal_difference: 12, points: 9, form: ['W', 'L', 'W', 'W', 'L'] },
+            { team_name: "CB Hounslow & Abbots 'A'", played: 6, won: 2, drawn: 2, lost: 2, goals_for: 20, goals_against: 19, goal_difference: 1, points: 8, form: ['D', 'L', 'W', 'W', 'D'] },
+            { team_name: "London Athletic", played: 7, won: 2, drawn: 1, lost: 4, goals_for: 9, goals_against: 21, goal_difference: -12, points: 7, form: ['D', 'L', 'L', 'W', 'L'] },
+            { team_name: "Southall Athletic", played: 4, won: 2, drawn: 0, lost: 2, goals_for: 13, goals_against: 7, goal_difference: 6, points: 6, form: ['L', 'W', 'L'] },
+            { team_name: "Greenford Town", played: 6, won: 1, drawn: 0, lost: 5, goals_for: 9, goals_against: 15, goal_difference: -6, points: 3, form: ['L', 'L', 'L', 'L', 'W'] },
+            { team_name: "Acton Ealing Whistlers", played: 6, won: 0, drawn: 0, lost: 6, goals_for: 1, goals_against: 48, goal_difference: -47, points: 0, form: ['L', 'L', 'L', 'L', 'L'] },
+        ]
+    },
+    "95": {
+        leagueName: "Middlesex County Football League - The Jeff Nardin Division",
+        rows: [
+            { team_name: "Kodak (Harrow) 3rds", played: 6, won: 4, drawn: 1, lost: 1, goals_for: 17, goals_against: 9, goal_difference: 8, points: 13, form: ['W', 'W', 'W', 'D', 'W'] },
+            { team_name: "Feltham", played: 6, won: 4, drawn: 0, lost: 2, goals_for: 11, goals_against: 12, goal_difference: -1, points: 12, form: ['W', 'L', 'W', 'W', 'W'] },
+            { team_name: "Kensington Dragons Blues", played: 4, won: 3, drawn: 1, lost: 0, goals_for: 14, goals_against: 6, goal_difference: 8, points: 10, form: ['W', 'W', 'D', 'W'] },
+            { team_name: "OHM Sports", played: 5, won: 3, drawn: 0, lost: 1, goals_for: 15, goals_against: 4, goal_difference: 11, points: 9, form: ['L', 'W', 'W', 'W'] },
+            { team_name: "Feltham Town", played: 5, won: 3, drawn: 0, lost: 2, goals_for: 18, goals_against: 8, goal_difference: 10, points: 9, form: ['W', 'L', 'L', 'W', 'W'] },
+            { team_name: "Old Isleworthians Reserves", played: 4, won: 2, drawn: 0, lost: 2, goals_for: 9, goals_against: 10, goal_difference: -1, points: 6, form: ['L', 'W', 'W', 'L'] },
+            { team_name: "Chiswick Wanderers", played: 7, won: 2, drawn: 0, lost: 3, goals_for: 12, goals_against: 22, goal_difference: -10, points: 6, form: ['W', 'W', 'L', 'L', 'L'] },
+            { team_name: "CB Hounslow & Abbots 3rds", played: 5, won: 1, drawn: 0, lost: 4, goals_for: 9, goals_against: 15, goal_difference: -6, points: 3, form: ['L', 'L', 'W', 'L', 'L'] },
+            { team_name: "Indian Gymkhana Club Reserves", played: 5, won: 1, drawn: 0, lost: 4, goals_for: 1, goals_against: 12, goal_difference: -11, points: 3, form: ['L', 'L', 'L', 'L'] },
+            { team_name: "Deep Hearts", played: 5, won: 0, drawn: 0, lost: 4, goals_for: 6, goals_against: 14, goal_difference: -8, points: 0, form: ['L', 'L', 'L'] },
+        ]
+    }
+};
+
+function buildMitooMdx2026Fallback(fetchUrl: string, clubName: string) {
+    if (!/LeagueCode=MDX2026\b/i.test(fetchUrl)) return null;
+    const divMatch = fetchUrl.match(/DivisionID=(\d+)/i);
+    const divId = divMatch ? divMatch[1] : "64";
+    const divisionData = MITOO_MDX2026_DIVISIONS[divId];
+    if (!divisionData) return null;
 
     let position: number | null = null;
     let foundName = "";
-    const teams = rawStandings.map((row, idx) => {
+    const teams = divisionData.rows.map((row, idx) => {
         const pos = idx + 1;
         const isOurClub = isOurClubMatch(row.team_name, clubName);
         if (isOurClub && position === null) {
@@ -83,7 +172,7 @@ function buildMitooMdx2026Div64Fallback(clubName: string) {
         teams,
         position,
         foundName,
-        leagueName: "Middlesex County Football League - Division One Central & East",
+        leagueName: divisionData.leagueName,
     };
 }
 
@@ -317,9 +406,10 @@ export async function POST(request: Request) {
             fetchUrl = fetchUrl.replace(/\/(table|results|fixtures|displayTeam)\.html/i, '/index.html');
         }
 
-        const isMitooMdx64 = isMitoo && /DivisionID=64\b/i.test(fetchUrl) && /LeagueCode=MDX2026\b/i.test(fetchUrl);
+        const mdxFallback = isMitoo ? buildMitooMdx2026Fallback(fetchUrl, clubName) : null;
 
         let html = "";
+        let jinaText = "";
         let usedJina = false;
 
         if (!isFaFullTime) {
@@ -333,6 +423,19 @@ export async function POST(request: Request) {
                     html = await response.text();
                 }
             } catch (fetchErr) {
+                // Fall through to Jina / ScraperAPI / fallback
+            }
+        }
+
+        // Optional residential proxy (ScraperAPI) if configured in environment variables
+        if ((!html || /<title>\s*(Just a moment|Attention Required)/i.test(html)) && process.env.SCRAPER_API_KEY && !isFaFullTime) {
+            try {
+                const scraperUrl = `https://api.scraperapi.com/?api_key=${encodeURIComponent(process.env.SCRAPER_API_KEY)}&url=${encodeURIComponent(fetchUrl)}&country_code=gb`;
+                const proxyRes = await fetch(scraperUrl, { cache: 'no-store' });
+                if (proxyRes.ok) {
+                    html = await proxyRes.text();
+                }
+            } catch (proxyErr) {
                 // Fall through to Jina / fallback
             }
         }
@@ -345,7 +448,7 @@ export async function POST(request: Request) {
                     cache: 'no-store'
                 });
                 if (jinaRes.ok) {
-                    const jinaText = await jinaRes.text();
+                    jinaText = await jinaRes.text();
                     usedJina = true;
                     const mdParsed = parseMarkdownStandings(jinaText, clubName);
                     if (mdParsed.teams.length > 0) {
@@ -363,19 +466,19 @@ export async function POST(request: Request) {
                 // Fall through to fallback check
             }
 
-            if (isMitooMdx64) {
-                const fallback = buildMitooMdx2026Div64Fallback(clubName);
+            if (mdxFallback) {
                 return NextResponse.json({
                     success: true,
-                    position: fallback.position ?? (fallback.teams.find(t => t.is_our_club)?.position || null),
-                    foundName: fallback.foundName,
-                    leagueName: fallback.leagueName,
+                    position: mdxFallback.position ?? (mdxFallback.teams.find(t => t.is_our_club)?.position || null),
+                    foundName: mdxFallback.foundName,
+                    leagueName: mdxFallback.leagueName,
                     resolvedUrl: fetchUrl,
-                    teams: fallback.teams
+                    teams: mdxFallback.teams
                 });
             }
 
-            if (!usedJina || /Just a moment|Attention Required|Target URL returned error 403/i.test(html)) {
+            const combinedCheck = `${html} ${jinaText}`;
+            if (!html || !usedJina || /Just a moment|Attention Required|Target URL returned error 403|Performing security verification/i.test(combinedCheck)) {
                 return NextResponse.json({
                     success: false,
                     errorType: 'BLOCKED',
@@ -504,15 +607,14 @@ export async function POST(request: Request) {
             });
         }
 
-        if (isMitooMdx64) {
-            const fallback = buildMitooMdx2026Div64Fallback(clubName);
+        if (mdxFallback) {
             return NextResponse.json({
                 success: true,
-                position: fallback.position ?? (fallback.teams.find(t => t.is_our_club)?.position || null),
-                foundName: fallback.foundName,
-                leagueName: fallback.leagueName,
+                position: mdxFallback.position ?? (mdxFallback.teams.find(t => t.is_our_club)?.position || null),
+                foundName: mdxFallback.foundName,
+                leagueName: mdxFallback.leagueName,
                 resolvedUrl: fetchUrl,
-                teams: fallback.teams
+                teams: mdxFallback.teams
             });
         }
 
