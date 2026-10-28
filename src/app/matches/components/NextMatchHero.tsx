@@ -179,40 +179,6 @@ export function NextMatchHero({
                     </div>
                 </div>
             </div>
-
-            {/* Folded Match Preparation Strip (#12) */}
-            <div className="px-6 py-2.5 bg-surface-2/70 border-t border-border flex flex-wrap items-center justify-between gap-3 text-xs">
-                <div className="flex flex-wrap items-center gap-4">
-                    <span className="font-semibold uppercase tracking-wider text-muted-foreground text-[10px]">Match Prep:</span>
-                    <Link
-                        href={`/matchday-xi?match=${match.id}`}
-                        className="inline-flex items-center gap-1.5 font-medium text-foreground hover:text-brand transition-colors"
-                    >
-                        {isSquadConfirmed ? (
-                            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-                        ) : (
-                            <Circle className="h-3.5 w-3.5 text-amber-500" />
-                        )}
-                        <span>{isSquadConfirmed ? "Starting XI Saved" : "Starting XI Not Set"}</span>
-                    </Link>
-
-                    <Link
-                        href="/training"
-                        className="inline-flex items-center gap-1.5 font-medium text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                        <Circle className="h-3.5 w-3.5 text-indigo-400" />
-                        <span>Training Plan</span>
-                    </Link>
-
-                    <Link
-                        href="/opposition"
-                        className="inline-flex items-center gap-1.5 font-medium text-muted-foreground hover:text-foreground transition-colors"
-                    >
-                        <FileText className="h-3.5 w-3.5 text-sky-400" />
-                        <span>Opposition Analysis</span>
-                    </Link>
-                </div>
-            </div>
         </Card>
     );
 }
