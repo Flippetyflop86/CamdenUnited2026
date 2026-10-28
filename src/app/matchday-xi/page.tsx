@@ -40,7 +40,7 @@ import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
-import { calculateMeetTime } from "@/lib/whatsapp-utils";
+import { calculateMeetTime, resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
 import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, computeMatchOutcome, extractLineupFromRawNotes } from "@/lib/match-stats-sync";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
@@ -449,11 +449,15 @@ export default function MatchdayXIPage() {
                 if (normalizedComp !== m.competition) {
                     supabase.from('matches').update({ competition: normalizedComp }).eq('id', m.id).then(() => {});
                 }
+                const normalizedTime = resolveFixtureKickoffTime(m.date, m.time);
+                if (normalizedTime !== (m.time || "").trim().slice(0, 5)) {
+                    supabase.from('matches').update({ time: normalizedTime }).eq('id', m.id).then(() => {});
+                }
                 return {
                     id: m.id,
                     opponent: m.opponent,
                     date: m.date,
-                    time: m.time,
+                    time: normalizedTime,
                     competition: normalizedComp,
                     isHome: m.is_home,
                     scoreline: m.scoreline || "",
@@ -504,8 +508,9 @@ export default function MatchdayXIPage() {
         const currentMatch = matches.find(m => m.id === selectedMatchId);
         if (!currentMatch) return;
 
+        const resolvedKo = resolveFixtureKickoffTime(currentMatch.date, currentMatch.time);
         setNextMatch(currentMatch);
-        setKoInputValue((currentMatch.time || "14:00").slice(0, 5));
+        setKoInputValue(resolvedKo);
 
         const currentKey = `${activeSquadTab}-${selectedMatchId}`;
         if (loadedLineupKeyRef.current === currentKey) {
@@ -514,7 +519,8 @@ export default function MatchdayXIPage() {
 
         fetchCurrentMatchStats(selectedMatchId);
 
-        const notesMeetTime = extractMeetTimeFromNotes(currentMatch.notes);
+        const rawNotesMeet = extractMeetTimeFromNotes(currentMatch.notes);
+        const notesMeetTime = (resolvedKo !== "14:00" && (rawNotesMeet === "13:00" || rawNotesMeet === "12:45")) ? "" : rawNotesMeet;
         const notesLocation = extractLocationFromNotes(currentMatch.notes);
         const defaultOffset = currentMatch.isHome ? 60 : 75;
 
@@ -524,9 +530,11 @@ export default function MatchdayXIPage() {
             const normalizedOffset = typeof parsed.meetOffsetMinutes === "number" && parsed.meetOffsetMinutes !== 0
                 ? Math.abs(parsed.meetOffsetMinutes)
                 : defaultOffset;
-            const resolvedMeetTime = (parsed.meetTime && parsed.meetTime.trim())
-                ? parsed.meetTime.trim()
-                : (notesMeetTime || calculateMeetTime((currentMatch.time || "14:00").slice(0, 5), -normalizedOffset));
+            const rawParsedMeet = (parsed.meetTime && parsed.meetTime.trim()) ? parsed.meetTime.trim() : "";
+            const effectiveParsedMeet = (resolvedKo !== "14:00" && (rawParsedMeet === "13:00" || rawParsedMeet === "12:45")) ? "" : rawParsedMeet;
+            const resolvedMeetTime = effectiveParsedMeet
+                ? effectiveParsedMeet
+                : (notesMeetTime || calculateMeetTime(resolvedKo, -normalizedOffset));
             const resolvedVenue = (parsed.venueNotes && parsed.venueNotes.trim())
                 ? parsed.venueNotes.trim()
                 : notesLocation;
@@ -565,7 +573,7 @@ export default function MatchdayXIPage() {
         }
 
         // Fallback to blank lineup with metadata hydrated from match notes
-        const fallbackMeetTime = notesMeetTime || calculateMeetTime((currentMatch.time || "14:00").slice(0, 5), -defaultOffset);
+        const fallbackMeetTime = notesMeetTime || calculateMeetTime(resolvedKo, -defaultOffset);
         setMeetInputValue(fallbackMeetTime);
         setLineup({
             id: `match-lineup-${selectedMatchId}`,

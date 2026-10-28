@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { getDefaultKickoffTime } from '@/lib/whatsapp-utils';
 
 const NON_OPPONENT_PATTERNS = [
     /^premier\s+division$/i,
@@ -266,7 +267,7 @@ export async function POST(request: Request) {
 
                     parsedFixtures.push({
                         date: currentDate,
-                        time: currentTime || defaultKickOff || "14:00",
+                        time: (timeMatch ? timeMatch[1].padStart(5, '0') : null) || getDefaultKickoffTime(currentDate),
                         opponent: extractedOpponent,
                         is_home: isHome,
                         competition: lineComp,
@@ -279,7 +280,7 @@ export async function POST(request: Request) {
         }
 
         // Fallback: What if the user pasted a simple list of opponents + dates WITHOUT typing "Camden United" on every line?
-        // e.g. "15/08/2026 14:00 Hackney Wick (H)" or "22/08/2026 Athletic Newham Away"
+        // e.g. "15/08/2026 15:00 Hackney Wick (H)" or "22/08/2026 Athletic Newham Away"
         if (parsedFixtures.length === 0) {
             for (const line of rawLines) {
                 if (isNonOpponentToken(line)) continue;
@@ -295,7 +296,7 @@ export async function POST(request: Request) {
                     if (dMatch) currentDate = dMatch.isoDate;
                     parsedFixtures.push({
                         date: currentDate,
-                        time: tMatch ? tMatch[1].padStart(5, '0') : (defaultKickOff || "14:00"),
+                        time: tMatch ? tMatch[1].padStart(5, '0') : getDefaultKickoffTime(currentDate),
                         opponent: resolveKnownOpponent(candidate),
                         is_home: !isAway,
                         competition: comp,
@@ -312,12 +313,7 @@ export async function POST(request: Request) {
             const warnings: string[] = [];
 
             if (!f.time) {
-                if (defaultKickOff) {
-                    f.time = defaultKickOff;
-                } else {
-                    status = 'warning';
-                    warnings.push('missing_time');
-                }
+                f.time = getDefaultKickoffTime(f.date);
             }
             if (!f.date) {
                 status = 'warning';

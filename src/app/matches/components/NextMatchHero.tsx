@@ -6,6 +6,7 @@ import { Calendar, Clock, MapPin, Share2, Users, FileText, Settings, Trash2, Tro
 import Link from "next/link";
 import { Match } from "@/types";
 import { useClub } from "@/context/club-context";
+import { resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
 
 interface NextMatchHeroProps {
     match: Match | null;
@@ -163,7 +164,7 @@ export function NextMatchHero({
                         </div>
                         <div className="px-2.5 py-1 rounded-lg bg-background border border-border text-center shrink-0">
                             <span className="text-xs font-black text-brand uppercase tracking-wider">
-                                {(match.time || "14:00").slice(0, 5)}
+                                {resolveFixtureKickoffTime(match.date, match.time)}
                             </span>
                         </div>
                         <div className="text-left min-w-0">
@@ -292,7 +293,7 @@ export function NextMatchHero({
                             </div>
                             <div className="flex items-center gap-1.5">
                                 <Clock className="h-4 w-4 text-muted-foreground/70" />
-                                <span>KO {(match.time || "14:00").slice(0, 5)}</span>
+                                <span>KO {resolveFixtureKickoffTime(match.date, match.time)}</span>
                                 {(match as any).meetTime && (
                                     <span className="text-amber-700 dark:text-amber-400 font-semibold ml-1">
                                         • Meet {(match as any).meetTime}

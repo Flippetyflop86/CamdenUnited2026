@@ -19,7 +19,7 @@ import { useAuth } from "@/context/auth-context";
 import { RefreshCw } from "lucide-react";
 import { MatchStatsDialog } from "@/components/matches/match-stats-dialog";
 import { FORMATIONS } from "@/lib/formations";
-import { calculateMeetTime, generateWhatsAppMessage } from "@/lib/whatsapp-utils";
+import { calculateMeetTime, generateWhatsAppMessage, getDefaultKickoffTime, resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
 import { FootballDataImportCentre } from "./components/FootballDataImportCentre";
 import { NextMatchHero } from "./components/NextMatchHero";
 import { UpcomingFixtures } from "./components/UpcomingFixtures";
@@ -59,7 +59,7 @@ export default function MatchesPage() {
 
     // Quick-Add Fixture Bar State (#3)
     const [quickDate, setQuickDate] = useState(() => new Date().toISOString().split("T")[0]);
-    const [quickTime, setQuickTime] = useState("14:00");
+    const [quickTime, setQuickTime] = useState(() => getDefaultKickoffTime(new Date().toISOString().split("T")[0]));
     const [quickIsHome, setQuickIsHome] = useState(true);
     const [quickOpponent, setQuickOpponent] = useState("");
     const [quickCompetition, setQuickCompetition] = useState("League");
@@ -429,14 +429,27 @@ export default function MatchesPage() {
             const surfaceMatch = notesToScan ? notesToScan.match(/\[Surface:\s*([^\]]*)\]/i) : null;
             const surface = surfaceMatch ? surfaceMatch[1].trim() : "4G";
 
+            const normalizedTime = resolveFixtureKickoffTime(m.date, m.time);
+            if (normalizedTime !== (m.time || "").trim().slice(0, 5)) {
+                supabase.from("matches").update({ time: normalizedTime }).eq("id", m.id).then(() => {});
+            }
+
             const meetTimeMatch = notesToScan ? notesToScan.match(/\[MeetTime:\s*([^\]]*)\]/i) : null;
             const rawMeetFromTag = meetTimeMatch ? meetTimeMatch[1].trim() : "";
             const fallbackOffset = typeof parsedLineup?.meetOffsetMinutes === "number" && parsedLineup.meetOffsetMinutes !== 0
                 ? -Math.abs(parsedLineup.meetOffsetMinutes)
                 : (m.is_home ? -60 : -75);
-            const meetTime = (parsedLineup?.meetTime && parsedLineup.meetTime.trim())
-                ? parsedLineup.meetTime.trim()
-                : (rawMeetFromTag || (m.time ? calculateMeetTime(m.time, fallbackOffset) : ""));
+
+            const isStale1400Meet = (val: string) =>
+                normalizedTime !== "14:00" && (val === "13:00" || val === "12:45");
+
+            const lineupMeet = parsedLineup?.meetTime ? parsedLineup.meetTime.trim() : "";
+            const effectiveLineupMeet = isStale1400Meet(lineupMeet) ? "" : lineupMeet;
+            const effectiveTagMeet = isStale1400Meet(rawMeetFromTag) ? "" : rawMeetFromTag;
+
+            const meetTime = effectiveLineupMeet
+                ? effectiveLineupMeet
+                : (effectiveTagMeet || (normalizedTime ? calculateMeetTime(normalizedTime, fallbackOffset) : ""));
 
             let cleanNotes = extracted.cleanNotes;
             cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/gi, "");
@@ -457,7 +470,7 @@ export default function MatchesPage() {
             return {
                 id: m.id,
                 date: m.date,
-                time: m.time,
+                time: normalizedTime,
                 meetTime: meetTime,
                 opponent: m.opponent,
                 isHome: m.is_home,
@@ -485,6 +498,21 @@ export default function MatchesPage() {
         return calculateMeetTime(kickoffTime, offset);
     };
 
+    const handleDateChange = (newDate: string) => {
+        setFormData((prev: any) => {
+            const currentKo = (prev.time || "").trim().slice(0, 5);
+            const isStandardDefault = !currentKo || currentKo === "15:00" || currentKo === "19:45" || currentKo === "14:00";
+            const nextTime = (!editingId || isStandardDefault) ? getDefaultKickoffTime(newDate) : prev.time;
+            const nextMeet = (!editingId || isStandardDefault) ? autoCalculateMeetTime(nextTime, prev.isHome) : prev.meetTime;
+            return {
+                ...prev,
+                date: newDate,
+                time: nextTime,
+                meetTime: nextMeet
+            };
+        });
+    };
+
     const handleKickoffChange = (newTime: string) => {
         const computed = autoCalculateMeetTime(newTime, formData.isHome);
         setFormData((prev: any) => ({
@@ -509,12 +537,13 @@ export default function MatchesPage() {
         if (!quickOpponent.trim() || !quickDate) return;
         setIsQuickAdding(true);
         try {
-            const meet = autoCalculateMeetTime(quickTime || "14:00", quickIsHome);
+            const resolvedKo = quickTime || getDefaultKickoffTime(quickDate);
+            const meet = autoCalculateMeetTime(resolvedKo, quickIsHome);
             const loc = quickIsHome ? (settings.homeGround || "Home") : "Away";
             const payload: any = {
                 club_id: clubId || undefined,
                 date: quickDate,
-                time: quickTime || "14:00",
+                time: resolvedKo,
                 opponent: quickOpponent.trim(),
                 is_home: quickIsHome,
                 competition: quickCompetition || "League",
@@ -568,7 +597,7 @@ export default function MatchesPage() {
                         const updatedLineupObj = { ...extracted.parsedLineup };
                         if (formData.meetTime) {
                             updatedLineupObj.meetTime = formData.meetTime.trim();
-                            const [koH, koM] = (formData.time || "14:00").split(":").map(Number);
+                            const [koH, koM] = (formData.time || getDefaultKickoffTime(formData.date)).split(":").map(Number);
                             const [mtH, mtM] = formData.meetTime.trim().split(":").map(Number);
                             if (!isNaN(koH) && !isNaN(koM) && !isNaN(mtH) && !isNaN(mtM)) {
                                 let diff = (koH * 60 + koM) - (mtH * 60 + mtM);
@@ -2047,7 +2076,7 @@ export default function MatchesPage() {
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
                                     <div className="col-span-1 space-y-1">
                                         <Label className="text-xs font-bold text-muted-foreground">Date</Label>
-                                        <Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="h-9 text-xs" />
+                                        <Input type="date" value={formData.date} onChange={e => handleDateChange(e.target.value)} className="h-9 text-xs" />
                                     </div>
                                     <div className="grid grid-cols-2 sm:contents gap-2.5">
                                         <div className="col-span-1 space-y-1">
@@ -2395,7 +2424,11 @@ export default function MatchesPage() {
                             <Input
                                 type="date"
                                 value={quickDate}
-                                onChange={(e) => setQuickDate(e.target.value)}
+                                onChange={(e) => {
+                                    const d = e.target.value;
+                                    setQuickDate(d);
+                                    setQuickTime(getDefaultKickoffTime(d));
+                                }}
                                 className="h-9 text-xs bg-surface-2 border-border"
                                 required
                             />
@@ -2462,7 +2495,11 @@ export default function MatchesPage() {
                     <Input
                         type="date"
                         value={quickDate}
-                        onChange={(e) => setQuickDate(e.target.value)}
+                        onChange={(e) => {
+                            const d = e.target.value;
+                            setQuickDate(d);
+                            setQuickTime(getDefaultKickoffTime(d));
+                        }}
                         className="h-8 text-xs bg-surface-2 border-border lg:w-36"
                         required
                     />

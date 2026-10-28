@@ -24,6 +24,40 @@ export function calculateMeetTime(kickoffTime: string, offsetMinutes: number = -
 }
 
 /**
+ * Returns the default kick-off time for a given date:
+ * - Midweek (Monday–Friday): "19:45" (7:45 PM)
+ * - Saturday (or any other day/unspecified): "15:00" (3:00 PM)
+ */
+export function getDefaultKickoffTime(dateStr?: string | null): string {
+    if (!dateStr) return "15:00";
+    const clean = dateStr.trim();
+    if (!clean) return "15:00";
+    const d = new Date(clean.includes("T") ? clean : `${clean}T12:00:00`);
+    if (isNaN(d.getTime())) return "15:00";
+    const day = d.getDay(); // 0 = Sun, 1..5 = Mon..Fri, 6 = Sat
+    if (day >= 1 && day <= 5) {
+        return "19:45";
+    }
+    return "15:00";
+}
+
+/**
+ * Resolves a fixture's kick-off time, upgrading legacy "14:00" or missing defaults
+ * to "19:45" for midweek fixtures (Mon–Fri) and "15:00" for Saturday fixtures.
+ */
+export function resolveFixtureKickoffTime(dateStr?: string | null, rawTime?: string | null): string {
+    const clean = (rawTime || "").trim().slice(0, 5);
+    const defaultForDate = getDefaultKickoffTime(dateStr);
+    if (!clean || clean === "14:00") {
+        return defaultForDate;
+    }
+    if (defaultForDate === "19:45" && clean === "15:00") {
+        return "19:45";
+    }
+    return clean;
+}
+
+/**
  * Replaces placeholders in the template string with match details and customized inputs.
  */
 export function generateWhatsAppMessage(

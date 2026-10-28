@@ -92,7 +92,7 @@ const defaultSettings: ClubSettings = {
     contractsEnabled: false,
     subsEnabled: true,
     measurementUnit: "metric",
-    defaultHomeKickOff: "14:00",
+    defaultHomeKickOff: "15:00",
     defaultTrainingVenue: null,
     preferredSurface: null,
     primaryKit: null,

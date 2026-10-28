@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { RefreshCw, Link2, FileSpreadsheet, ClipboardPaste, CheckCircle2, AlertTriangle, Trash2, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { getDefaultKickoffTime, resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
 
 interface ImportCentreProps {
     clubId: string;
@@ -48,7 +49,7 @@ export function FootballDataImportCentre({
                     body: JSON.stringify({
                         rawText: inputText,
                         clubName: clubName || "Camden United",
-                        defaultKickOff: clubSettings?.defaultHomeKickOff || "14:00",
+                        defaultKickOff: "15:00",
                         knownOpponents
                     })
                 });
@@ -57,7 +58,7 @@ export function FootballDataImportCentre({
                     setPreviewData(data.parsed);
                     setIsPreviewOpen(true);
                 } else if (data.success && (!data.parsed || data.parsed.length === 0)) {
-                    alert("No fixtures could be recognized from the pasted text. Try including a date and opponent name on each line (e.g. '15/08/2026 14:00 Camden United vs Hackney Wick').");
+                    alert("No fixtures could be recognized from the pasted text. Try including a date and opponent name on each line (e.g. '15/08/2026 15:00 Camden United vs Hackney Wick').");
                 } else {
                     alert(data.error || "Failed to parse schedule");
                 }
@@ -73,13 +74,13 @@ export function FootballDataImportCentre({
                     const mapped = rawList.map((f: any) => ({
                         id: Math.random().toString(36).substring(2, 9),
                         date: f.date,
-                        time: f.time || clubSettings?.defaultHomeKickOff || "14:00",
+                        time: resolveFixtureKickoffTime(f.date, f.time),
                         opponent: f.opponent,
                         is_home: f.is_home,
                         competition: f.competition || clubSettings?.defaultCompetition || "League",
                         venue: f.is_home ? (clubSettings?.homeGround || "Home") : "Away",
-                        status: (!f.time || !f.date || !f.opponent) ? 'warning' : 'ready',
-                        warnings: !f.time ? ['missing_time'] : []
+                        status: (!f.date || !f.opponent) ? 'warning' : 'ready',
+                        warnings: []
                     }));
                     setPreviewData(mapped);
                     setIsPreviewOpen(true);
@@ -95,10 +96,11 @@ export function FootballDataImportCentre({
                     const cols = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
                     if (cols.length < 2) continue;
                     if (i === 0 && /date|opponent|home/i.test(lines[i])) continue; // skip header row
+                    const rowDate = cols[0] || new Date().toISOString().split('T')[0];
                     parsedRows.push({
                         id: Math.random().toString(36).substring(2, 9),
-                        date: cols[0] || new Date().toISOString().split('T')[0],
-                        time: cols[1] || "14:00",
+                        date: rowDate,
+                        time: cols[1] || getDefaultKickoffTime(rowDate),
                         opponent: cols[2] || "",
                         is_home: cols[3] ? !/away|^a$/i.test(cols[3]) : true,
                         competition: cols[4] || "League",
@@ -137,6 +139,12 @@ export function FootballDataImportCentre({
         setPreviewData(prev => prev.map(item => {
             if (item.id !== id) return item;
             const updated = { ...item, [field]: value };
+            if (field === 'date') {
+                const curKo = (item.time || "").trim().slice(0, 5);
+                if (!curKo || curKo === "15:00" || curKo === "19:45" || curKo === "14:00") {
+                    updated.time = getDefaultKickoffTime(value);
+                }
+            }
             if (field === 'is_home') {
                 updated.venue = value ? (clubSettings?.homeGround || "Home") : "Away";
             }
@@ -151,7 +159,7 @@ export function FootballDataImportCentre({
             recomputeRowStatus({
                 id: Math.random().toString(36).substring(2, 9),
                 date: today,
-                time: clubSettings?.defaultHomeKickOff || "14:00",
+                time: getDefaultKickoffTime(today),
                 opponent: "",
                 is_home: true,
                 competition: "League",
@@ -175,7 +183,7 @@ export function FootballDataImportCentre({
             const toInsert = validRows.map(f => ({
                 club_id: clubId || undefined,
                 date: f.date,
-                time: f.time || "14:00",
+                time: f.time || getDefaultKickoffTime(f.date),
                 opponent: f.opponent.trim(),
                 is_home: f.is_home,
                 competition: f.competition || "League",

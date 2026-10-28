@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
+import { getDefaultKickoffTime } from '@/lib/whatsapp-utils';
 
 function parseDateToken(raw: string): string | null {
     // 1. Long date e.g. "Saturday, 31 October 2026"
@@ -199,7 +200,7 @@ export async function POST(request: Request) {
 
             matches.push({
                 date: dateIso,
-                time: "14:00",
+                time: getDefaultKickoffTime(dateIso),
                 opponent,
                 is_home: weAreHome,
                 result,

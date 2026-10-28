@@ -33,6 +33,7 @@ import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer } from "@/lib/utils";
 import { parseStatTextString } from "@/lib/match-stats-sync";
+import { resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
 
 type StandingsRow = {
     position: number;
@@ -125,7 +126,8 @@ export default function DashboardPage() {
     useEffect(() => {
         if (!nextMatch) return;
         const calculateTimeLeft = () => {
-            const matchDateTime = new Date(`${nextMatch.date}T${nextMatch.time || "14:00:00"}`);
+            const ko = resolveFixtureKickoffTime(nextMatch.date, nextMatch.time);
+            const matchDateTime = new Date(`${nextMatch.date}T${ko}:00`);
             const difference = matchDateTime.getTime() - new Date().getTime();
             if (difference <= 0) {
                 setTimeLeft(null);
@@ -192,10 +194,15 @@ export default function DashboardPage() {
                     .replace(/\[MOTM:.*?\]\n?/gi, "")
                     .trim();
 
+                const normalizedTime = resolveFixtureKickoffTime(m.date, m.time);
+                if (normalizedTime !== (m.time || "").trim().slice(0, 5)) {
+                    supabase.from('matches').update({ time: normalizedTime }).eq('id', m.id).then(() => {});
+                }
+
                 return {
                     id: m.id,
                     date: m.date,
-                    time: m.time,
+                    time: normalizedTime,
                     opponent: m.opponent,
                     isHome: m.is_home,
                     competition: m.competition,
