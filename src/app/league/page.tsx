@@ -30,15 +30,17 @@ export default function LeagueTablePage() {
     const { settings, updateSettings } = useClub();
     const { clubId } = useAuth();
     
-    // Default to 'text' since most grassroots leagues (FA Full-Time, Pitchero) block automated URL scrapers with Cloudflare
-    const [importMode, setImportMode] = useState<'text' | 'screenshot' | 'url'>('text');
+    // Default to 'url' for live auto-sync
+    const [importMode, setImportMode] = useState<'url' | 'text' | 'screenshot'>('url');
     const [urlInput, setUrlInput] = useState("");
     const [textInput, setTextInput] = useState("");
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     const [isExtracting, setIsExtracting] = useState(false);
+    const [isAutoSyncing, setIsAutoSyncing] = useState(false);
     const [extractionStatus, setExtractionStatus] = useState("");
     const [extractionError, setExtractionError] = useState<{title: string, message: string} | null>(null);
+    const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
     
     // Preview State
     const [previewData, setPreviewData] = useState<LeagueRow[] | null>(null);
@@ -48,13 +50,80 @@ export default function LeagueTablePage() {
     // Existing Data
     const [currentTable, setCurrentTable] = useState<LeagueRow[] | null>(null);
     const [showImporter, setShowImporter] = useState(false);
+    const hasAutoSyncedRef = useRef(false);
 
     const storageKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
 
-    // Load saved league table from localStorage or club settings
+    // Auto-sync live league table whenever page opens
+    const autoSyncFromUrl = async (targetUrl: string, silent = true) => {
+        if (!targetUrl) return;
+        if (silent) setIsAutoSyncing(true);
+        else {
+            setIsExtracting(true);
+            setExtractionError(null);
+            setExtractionStatus("Syncing live standings from league website...");
+        }
+
+        try {
+            const res = await fetch('/api/sync-league', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ url: targetUrl, clubName: settings.name || "Camden United" })
+            });
+            const data = await res.json();
+            if (data.success && Array.isArray(data.teams) && data.teams.length > 0) {
+                setCurrentTable(data.teams);
+                const nowIso = new Date().toISOString();
+                setLastSyncedAt(nowIso);
+                try {
+                    localStorage.setItem(storageKey, JSON.stringify(data.teams));
+                } catch (e) {}
+
+                const ourRow = data.teams.find((r: any) => r.is_our_club);
+                if (ourRow && ourRow.position && ourRow.position !== settings.leaguePosition) {
+                    updateSettings({
+                        leaguePosition: ourRow.position,
+                        leagueUrl: data.resolvedUrl || targetUrl
+                    }).catch(() => {});
+                }
+                setShowImporter(false);
+            } else if (!silent) {
+                if (data.errorType === 'BLOCKED') {
+                    setExtractionError({
+                        title: "This website blocks direct automated sync",
+                        message: "Use the Paste Table Text or Screenshot tab below for websites protected by Cloudflare CAPTCHA."
+                    });
+                    setImportMode('text');
+                } else {
+                    setExtractionError({
+                        title: "Could not find standings on that URL",
+                        message: data.error || "Please check the league URL or paste the table text."
+                    });
+                }
+            }
+        } catch (err) {
+            if (!silent) {
+                setExtractionError({
+                    title: "Connection error",
+                    message: "Could not reach the league website."
+                });
+            }
+        } finally {
+            setIsAutoSyncing(false);
+            setIsExtracting(false);
+            setExtractionStatus("");
+        }
+    };
+
+    // Load saved league table from localStorage AND auto-sync live from leagueUrl
     useEffect(() => {
-        if (settings.leagueUrl && !urlInput) {
-            setUrlInput(settings.leagueUrl);
+        const defaultMitooUrl = (settings.name || "").toLowerCase().includes("camden")
+            ? "https://mitoofootball.com/LeagueTab.cfm?TblName=Matches&DivisionID=64&LeagueCode=MDX2026"
+            : "";
+        const activeUrl = settings.leagueUrl || defaultMitooUrl;
+
+        if (activeUrl && !urlInput) {
+            setUrlInput(activeUrl);
         }
         try {
             const saved = localStorage.getItem(storageKey);
@@ -62,16 +131,19 @@ export default function LeagueTablePage() {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) {
                     setCurrentTable(parsed);
-                    return;
                 }
-            }
-            if (settings.lastImportHistory?.leagueTable && Array.isArray(settings.lastImportHistory.leagueTable) && settings.lastImportHistory.leagueTable.length > 0) {
+            } else if (settings.lastImportHistory?.leagueTable && Array.isArray(settings.lastImportHistory.leagueTable) && settings.lastImportHistory.leagueTable.length > 0) {
                 setCurrentTable(settings.lastImportHistory.leagueTable);
             }
         } catch (e) {
             console.warn("Failed to load cached league table:", e);
         }
-    }, [clubId, settings.leagueUrl, settings.lastImportHistory]);
+
+        if (activeUrl && !hasAutoSyncedRef.current) {
+            hasAutoSyncedRef.current = true;
+            autoSyncFromUrl(activeUrl, true);
+        }
+    }, [clubId, settings.leagueUrl, settings.name]);
 
     const isOurClubName = (teamName: string): boolean => {
         const clubLower = (settings.name || "Camden United").toLowerCase().trim();
@@ -97,9 +169,6 @@ export default function LeagueTablePage() {
                 continue;
             }
 
-            // Match optional leading position, team name, and trailing sequence of numbers (including negative GD like -5 or +12)
-            // Example 1: "1  Camden United  10  8  1  1  24  8  16  25"
-            // Example 2 (FA Full-Time expanded): "1  Camden United  10  4 1 0 12 4  4 0 1 12 4  16  25"
             const tokens = line.split(/\t+|\s{2,}|\s+/).filter(Boolean);
             if (tokens.length < 5) continue;
 
@@ -108,7 +177,6 @@ export default function LeagueTablePage() {
             let idx = tokens.length - 1;
             while (idx >= 0) {
                 const tok = tokens[idx].replace(/^\+/, '');
-                // Handle "24-8" or "24:8" F-A combined token
                 if (/^\d+[\-:]\d+$/.test(tok)) {
                     const [f, a] = tok.split(/[\-:]/).map(Number);
                     nums.unshift(f, a);
@@ -119,7 +187,6 @@ export default function LeagueTablePage() {
                     nums.unshift( parseInt(tok, 10) );
                     idx--;
                 } else {
-                    // Skip trailing form tokens like W, D, L, WWDLW
                     if (nums.length === 0 && /^[WDL\-]{1,6}$/i.test(tok)) {
                         idx--;
                         continue;
@@ -128,10 +195,8 @@ export default function LeagueTablePage() {
                 }
             }
 
-            // Need at least 4 stats numbers (e.g. P, W, D, L, Pts or P, GD, Pts)
             if (nums.length < 4) continue;
 
-            // Remaining tokens on the left are [optional Position] + Team Name
             const leftTokens = tokens.slice(0, idx + 1);
             let position = rows.length + 1;
             let nameTokens = leftTokens;
@@ -140,13 +205,11 @@ export default function LeagueTablePage() {
                 position = parseInt(leftTokens[0], 10);
                 nameTokens = leftTokens.slice(1);
             } else if (leftTokens.length === 0 && nums.length >= 7) {
-                // Position might have been absorbed if team name had no spaces? Unlikely, skip if no team name
                 continue;
             }
 
             const teamName = nameTokens
                 .join(" ")
-                .replace(/\b(first|reserves)\b$/i, (m) => m)
                 .replace(/^[\-\d\.\)]+\s*/, "")
                 .trim();
 
@@ -157,7 +220,6 @@ export default function LeagueTablePage() {
             let played = 0, won = 0, drawn = 0, lost = 0, goals_for = 0, goals_against = 0, goal_difference = 0, points = 0;
 
             if (nums.length >= 13) {
-                // FA Full-Time expanded: P, HW, HD, HL, HF, HA, AW, AD, AL, AF, AA, GD, PTS
                 const slice = nums.slice(-13);
                 played = slice[0];
                 won = slice[1] + slice[6];
@@ -168,7 +230,6 @@ export default function LeagueTablePage() {
                 goal_difference = slice[11];
                 points = slice[12];
             } else if (nums.length === 11) {
-                // P, HW, HD, HL, AW, AD, AL, GF, GA, GD, PTS
                 played = nums[0];
                 won = nums[1] + nums[4];
                 drawn = nums[2] + nums[5];
@@ -178,7 +239,6 @@ export default function LeagueTablePage() {
                 goal_difference = nums[9];
                 points = nums[10];
             } else if (nums.length >= 8) {
-                // Standard 8 numbers: P, W, D, L, GF, GA, GD, PTS
                 const slice = nums.slice(0, 8);
                 played = slice[0];
                 won = slice[1];
@@ -189,7 +249,6 @@ export default function LeagueTablePage() {
                 goal_difference = slice[6];
                 points = slice[7];
             } else if (nums.length === 7) {
-                // P, W, D, L, GF, GA, PTS (compute GD)
                 played = nums[0];
                 won = nums[1];
                 drawn = nums[2];
@@ -199,7 +258,6 @@ export default function LeagueTablePage() {
                 goal_difference = goals_for - goals_against;
                 points = nums[6];
             } else if (nums.length === 6) {
-                // P, W, D, L, GD, PTS
                 played = nums[0];
                 won = nums[1];
                 drawn = nums[2];
@@ -207,7 +265,6 @@ export default function LeagueTablePage() {
                 goal_difference = nums[4];
                 points = nums[5];
             } else if (nums.length >= 4) {
-                // Minimal: P, W, D, L (or P, W, D, Pts)
                 played = nums[0];
                 won = nums[1];
                 drawn = nums[2];
@@ -230,7 +287,6 @@ export default function LeagueTablePage() {
             });
         }
 
-        // Re-index positions sequentially if needed
         return rows.map((r, i) => ({
             ...r,
             position: r.position || i + 1
@@ -349,38 +405,8 @@ export default function LeagueTablePage() {
     };
 
     const handleExtractUrl = async () => {
-        if (!urlInput) return;
-        
-        setIsExtracting(true);
-        setExtractionError(null);
-        setExtractionStatus("Analysing webpage...");
-        
-        try {
-            const res = await fetch('/api/sync-league', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: urlInput, clubName: settings.name })
-            });
-
-            const data = await res.json();
-            
-            if (data.errorType === 'BLOCKED' || !data.success) {
-                setExtractionError({
-                    title: "League website blocks automated scrapers (Cloudflare)",
-                    message: "FA Full-Time and most league sites block bots. Just open your league page below, highlight the standings table (Ctrl+C), and paste it here!"
-                });
-                setImportMode('text');
-            }
-        } catch (error) {
-            setExtractionError({
-                title: "League website blocked direct connection",
-                message: "Switched to Paste Text — copy the table rows from your browser and paste them below."
-            });
-            setImportMode('text');
-        } finally {
-            setIsExtracting(false);
-            setExtractionStatus("");
-        }
+        if (!urlInput.trim()) return;
+        await autoSyncFromUrl(urlInput.trim(), false);
     };
 
     const handleExtractText = async () => {
@@ -565,22 +591,41 @@ export default function LeagueTablePage() {
                             <Trophy className="h-5 w-5 text-brand" />
                         </div>
                         <div>
-                            <h2 className="text-xl font-bold text-foreground">League Standings</h2>
+                            <h2 className="text-xl font-bold text-foreground flex items-center gap-2">
+                                <span>League Standings</span>
+                                {isAutoSyncing && (
+                                    <span className="text-xs font-normal text-emerald-500 animate-pulse">
+                                        Syncing live...
+                                    </span>
+                                )}
+                            </h2>
                             <p className="text-sm text-muted-foreground">
-                                {settings.lastImportHistory?.updatedAt
-                                    ? `Last updated ${new Date(settings.lastImportHistory.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
-                                    : "Saved division standings"}
+                                {lastSyncedAt
+                                    ? `Synced live from league website today at ${new Date(lastSyncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+                                    : settings.lastImportHistory?.updatedAt
+                                        ? `Last updated ${new Date(settings.lastImportHistory.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                                        : "Live division standings"}
                             </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        {settings.leagueUrl && (
-                            <Button variant="outline" size="sm" onClick={() => window.open(settings.leagueUrl!, '_blank')}>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {urlInput && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isAutoSyncing}
+                                onClick={() => autoSyncFromUrl(urlInput, false)}
+                            >
+                                {isAutoSyncing ? "Syncing..." : "🔄 Refresh Live Standings"}
+                            </Button>
+                        )}
+                        {urlInput && (
+                            <Button variant="outline" size="sm" onClick={() => window.open(urlInput, '_blank')}>
                                 <ExternalLink className="h-4 w-4 mr-1.5" /> Open League Website
                             </Button>
                         )}
                         <Button onClick={() => setShowImporter(true)} className="bg-brand hover:bg-brand/90 text-white" size="sm">
-                            Update Standings
+                            Change Source / Import
                         </Button>
                     </div>
                 </div>
@@ -636,13 +681,13 @@ export default function LeagueTablePage() {
                 <div className="mx-auto h-16 w-16 bg-brand/10 rounded-full flex items-center justify-center mb-4">
                     <Trophy className="h-8 w-8 text-brand" />
                 </div>
-                <h2 className="text-3xl font-bold text-foreground tracking-tight">Import League Table</h2>
+                <h2 className="text-3xl font-bold text-foreground tracking-tight">Connect League Table</h2>
                 <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-                    Copy & paste your league table text or upload a screenshot — works with FA Full-Time and any league site that blocks scrapers.
+                    Connect your league URL once and ClubFlow will automatically sync live standings every time you open this page.
                 </p>
                 {currentTable && currentTable.length > 0 && (
                     <Button variant="ghost" size="sm" onClick={() => setShowImporter(false)} className="mt-2 text-xs text-muted-foreground">
-                        ← Back to Saved Standings
+                        ← Back to Live Standings
                     </Button>
                 )}
             </div>
@@ -661,11 +706,18 @@ export default function LeagueTablePage() {
                 <CardHeader className="border-b border-border bg-surface-2/50">
                     <div className="flex gap-4">
                         <button 
+                            onClick={() => { setImportMode('url'); setExtractionError(null); }}
+                            className={`flex-1 pb-3 text-sm font-semibold transition-all border-b-2 ${importMode === 'url' ? 'border-brand text-brand' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                        >
+                            <LinkIcon className="h-4 w-4 mx-auto mb-1" />
+                            Live League URL (Auto-Sync)
+                        </button>
+                        <button 
                             onClick={() => { setImportMode('text'); setExtractionError(null); }}
                             className={`flex-1 pb-3 text-sm font-semibold transition-all border-b-2 ${importMode === 'text' ? 'border-brand text-brand' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                         >
                             <FileText className="h-4 w-4 mx-auto mb-1" />
-                            Paste Table Text (Recommended)
+                            Paste Table Text
                         </button>
                         <button 
                             onClick={() => { setImportMode('screenshot'); setExtractionError(null); }}
@@ -677,16 +729,41 @@ export default function LeagueTablePage() {
                     </div>
                 </CardHeader>
                 <CardContent className="p-6">
+                    {importMode === 'url' && (
+                        <div className="space-y-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="url">League Standings or Team URL</Label>
+                                <Input
+                                    id="url"
+                                    placeholder="https://mitoofootball.com/LeagueTab.cfm?..."
+                                    value={urlInput}
+                                    onChange={(e) => setUrlInput(e.target.value)}
+                                    className="bg-background"
+                                />
+                                <p className="text-xs text-muted-foreground">
+                                    Paste your Mitoo or League URL once — standings will automatically stay updated every week without re-importing.
+                                </p>
+                            </div>
+                            <Button
+                                onClick={handleExtractUrl}
+                                className="w-full bg-brand hover:bg-brand/90 text-white font-semibold"
+                                disabled={!urlInput.trim() || isExtracting}
+                            >
+                                {isExtracting ? extractionStatus || "Syncing Live Standings..." : "Connect & Sync Live Table"}
+                            </Button>
+                        </div>
+                    )}
+
                     {importMode === 'text' && (
                         <div className="space-y-4">
                             <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <Label htmlFor="text">Paste Standings Rows from FA Full-Time / League Website</Label>
-                                {settings.leagueUrl && (
+                                <Label htmlFor="text">Paste Standings Rows</Label>
+                                {urlInput && (
                                     <Button
                                         type="button"
                                         variant="outline"
                                         size="sm"
-                                        onClick={() => window.open(settings.leagueUrl!, '_blank')}
+                                        onClick={() => window.open(urlInput, '_blank')}
                                         className="h-7 text-xs"
                                     >
                                         <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Open My League Page ↗
@@ -694,11 +771,11 @@ export default function LeagueTablePage() {
                                 )}
                             </div>
                             <p className="text-xs text-muted-foreground">
-                                Highlight the standings table on your league website, press <strong>Ctrl+C</strong> (or Cmd+C), and paste it below. Both standard and expanded Home/Away FA Full-Time tables are supported.
+                                Fallback for websites behind a CAPTCHA: highlight the standings table, press <strong>Ctrl+C</strong>, and paste below.
                             </p>
                             <Textarea 
                                 id="text" 
-                                placeholder={"Example:\n1\tBroadfields United\t12\t9\t2\t1\t32\t11\t21\t29\n2\tCamden United\t12\t8\t2\t2\t28\t14\t14\t26"}
+                                placeholder={"Example:\n1\tCamden United\t11\t8\t2\t0\t45\t8\t+37\t26"}
                                 value={textInput}
                                 onChange={(e) => setTextInput(e.target.value)}
                                 className="min-h-[180px] bg-background font-mono text-xs"

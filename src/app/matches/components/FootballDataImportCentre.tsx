@@ -250,7 +250,20 @@ export function FootballDataImportCentre({
                         className={activeMode === 'paste' ? "bg-brand text-brand-foreground" : "bg-surface-2 border-border"}
                     >
                         <ClipboardPaste className="h-4 w-4 mr-2 text-emerald-500" />
-                        Paste Schedule Text (FA Full-Time / Text)
+                        Paste Schedule Text
+                    </Button>
+                    <Button
+                        type="button"
+                        variant={activeMode === 'url' ? 'default' : 'outline'}
+                        size="sm"
+                        onClick={() => {
+                            setActiveMode('url');
+                            setInputText(clubSettings?.leagueUrl || "https://mitoofootball.com/TeamHistAll.cfm?CI=68&TblName=Matches&LeagueCode=MDX2026&DivisionID=64");
+                        }}
+                        className={activeMode === 'url' ? "bg-brand text-brand-foreground" : "bg-surface-2 border-border"}
+                    >
+                        <Link2 className="h-4 w-4 mr-2 text-indigo-400" />
+                        Import from League URL
                     </Button>
                     <Button
                         type="button"
@@ -263,25 +276,28 @@ export function FootballDataImportCentre({
                         Import CSV
                     </Button>
                 </div>
-                {clubSettings?.leagueUrl && (
-                    <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.open(clubSettings.leagueUrl, '_blank')}
-                        className="h-8 text-xs bg-surface-2 border-border"
-                    >
-                        <Link2 className="h-3.5 w-3.5 mr-1.5 text-indigo-400" />
-                        Open League Page to Copy ↗
-                    </Button>
-                )}
             </div>
 
             <div className="pt-2 space-y-3">
+                {activeMode === 'url' && (
+                    <div className="flex flex-col sm:flex-row gap-2">
+                        <Input
+                            placeholder="https://mitoofootball.com/TeamHistAll.cfm?..."
+                            value={inputText}
+                            onChange={(e) => setInputText(e.target.value)}
+                            className="bg-surface-2 border-border flex-1"
+                        />
+                        <Button onClick={handleParse} disabled={isLoading || !inputText.trim()} className="bg-indigo-600 hover:bg-indigo-700 text-white shrink-0">
+                            {isLoading ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : null}
+                            Fetch & Review
+                        </Button>
+                    </div>
+                )}
+
                 {activeMode === 'paste' && (
                     <div className="space-y-3">
                         <p className="text-xs text-muted-foreground">
-                            Highlight and copy rows directly from <strong>FA Full-Time</strong>, WhatsApp, or an email and paste below. League &amp; Cup competitions are detected automatically, and you can review every row before saving.
+                            Highlight and copy rows directly from <strong>FA Full-Time / Mitoo</strong>, WhatsApp, or an email and paste below. League &amp; Cup competitions are detected automatically, and you can review every row before saving.
                         </p>
                         <Textarea
                             placeholder={"Example:\n15/08/2026 14:00  Camden United vs Hackney Wick\n22/08/2026 14:00  Athletic Newham vs Camden United"}

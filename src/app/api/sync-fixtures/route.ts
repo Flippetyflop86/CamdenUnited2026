@@ -1,202 +1,210 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 
+function parseDateToken(raw: string): string | null {
+    // 1. Long date e.g. "Saturday, 31 October 2026"
+    const longMatch = raw.match(/\b(?:(?:mon|tue|wed|thu|fri|sat|sun)[a-z]*,?\s+)?(\d{1,2})(?:st|nd|rd|th)?\s+(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\s+(\d{4}|\d{2})\b/i);
+    if (longMatch) {
+        const day = longMatch[1].padStart(2, '0');
+        const monthMap: Record<string, string> = {
+            jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06',
+            jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12'
+        };
+        const month = monthMap[longMatch[2].toLowerCase().slice(0, 3)] || '01';
+        const year = longMatch[3].length === 2 ? `20${longMatch[3]}` : longMatch[3];
+        return `${year}-${month}-${day}`;
+    }
+
+    // 2. Short date DD/MM/YYYY or DD/MM/YY
+    const shortMatch = raw.match(/\b(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})\b/);
+    if (shortMatch) {
+        const day = shortMatch[1].padStart(2, '0');
+        const month = shortMatch[2].padStart(2, '0');
+        const year = shortMatch[3].length === 2 ? `20${shortMatch[3]}` : shortMatch[3];
+        return `${year}-${month}-${day}`;
+    }
+
+    return null;
+}
+
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { url, clubName } = body;
+        let { url, clubName } = body;
 
         if (!url || !clubName) {
             return NextResponse.json({ success: false, error: 'Missing url or clubName' }, { status: 400 });
         }
 
-        // Fetch the league fixtures page with full browser headers to bypass bot protection
-        let response = await fetch(url, {
+        url = String(url).trim();
+        let fetchUrl = url;
+
+        // For Mitoo URLs, upgrade TeamHist.cfm -> TeamHistAll.cfm (which includes both League and Cup fixtures) and MDX2025 -> MDX2026
+        if (/mitoofootball\.com/i.test(fetchUrl)) {
+            fetchUrl = fetchUrl.replace(/LeagueCode=MDX2025/i, 'LeagueCode=MDX2026');
+            if (/TeamHist\.cfm/i.test(fetchUrl)) {
+                fetchUrl = fetchUrl.replace(/TeamHist\.cfm/i, 'TeamHistAll.cfm');
+            } else if (/LeagueTab\.cfm/i.test(fetchUrl)) {
+                // First fetch LeagueTab to find our club's CI parameter if not in URL
+                const tabRes = await fetch(fetchUrl, {
+                    headers: { 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8' },
+                    cache: 'no-store'
+                });
+                if (tabRes.ok) {
+                    const tabHtml = await tabRes.text();
+                    const $tab = cheerio.load(tabHtml);
+                    let teamHref = '';
+                    $tab('a').each((_, a) => {
+                        const txt = $tab(a).text().trim();
+                        const href = $tab(a).attr('href') || '';
+                        if (txt.toLowerCase() === clubName.toLowerCase().trim() && /TeamHist/i.test(href)) {
+                            teamHref = href;
+                        }
+                    });
+                    if (teamHref) {
+                        const base = new URL(fetchUrl);
+                        fetchUrl = `${base.origin}/${teamHref.replace(/^\//, '').replace(/TeamHist\.cfm/i, 'TeamHistAll.cfm')}`;
+                    }
+                }
+            }
+        }
+
+        const response = await fetch(fetchUrl, {
             headers: {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                'Accept-Language': 'en-GB,en-US;q=0.9,en;q=0.8',
-                'Cache-Control': 'no-cache',
-                'Pragma': 'no-cache',
-                'Sec-Ch-Ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-                'Sec-Ch-Ua-Mobile': '?0',
-                'Sec-Ch-Ua-Platform': '"Windows"',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Sec-Fetch-User': '?1',
-                'Upgrade-Insecure-Requests': '1'
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-GB,en;q=0.9',
             },
             cache: 'no-store'
         });
 
         if (!response.ok) {
-            console.warn(`Direct fetch failed. URL: ${url}, Status: ${response.status}. Attempting proxy...`);
-            // Fallback: If Vercel IPs are blocked by Cloudflare (HTTP 403), try a public open CORS proxy
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-            response = await fetch(proxyUrl, { cache: 'no-store' });
-            
-            if (!response.ok) {
-                console.error(`Proxy fetch also failed. Status: ${response.status}`);
-                return NextResponse.json({ success: false, error: `Failed to access the league website (HTTP ${response.status}). The site might be actively blocking scrapers.` }, { status: 400 });
-            }
+            return NextResponse.json({
+                success: false,
+                error: `Failed to access the league website (HTTP ${response.status}).`
+            }, { status: 400 });
         }
 
         const html = await response.text();
-        const $ = cheerio.load(html);
-
-        // 1. Auto-detect the exact team name used by FA Full-Time
-        // (Sometimes "Camden United" is listed as "Camden United FC" or "Broadfields United" on the site)
-        const teamCounts: Record<string, number> = {};
-        $('table tr, tbody tr').each((i, row) => {
-            const cells = $(row).find('td');
-            if (cells.length >= 3) {
-                const cellTexts = cells.map((i, cell) => $(cell).text().trim().replace(/\s+/g, ' ')).get();
-                const potentialTeams = cellTexts.filter(t => t.length > 3 && !t.match(/^[0-9:\/ -]+$/) && !['vs', 'v', 'postponed', 'cancelled', 'p-p', 'tbc'].includes(t.toLowerCase()));
-                potentialTeams.forEach(t => {
-                    teamCounts[t] = (teamCounts[t] || 0) + 1;
-                });
-            }
-        });
-
-        let autoDetectedClubName = clubName;
-        let maxCount = 0;
-        for (const [team, count] of Object.entries(teamCounts)) {
-            if (count > maxCount) {
-                maxCount = count;
-                autoDetectedClubName = team;
-            }
+        if (/<title>\s*(Just a moment|Attention Required)/i.test(html)) {
+            return NextResponse.json({
+                success: false,
+                error: `The league website requires a browser CAPTCHA challenge.`
+            }, { status: 403 });
         }
 
+        const $ = cheerio.load(html);
         const matches: any[] = [];
-        
-        // 2. Strategy: Scan all tables. Look for rows that contain our club's name (or the auto-detected name).
-        $('table tr, tbody tr').each((i, row) => {
-            const rowText = $(row).text().replace(/\s+/g, ' ').trim();
-            if (rowText.toLowerCase().includes(clubName.toLowerCase()) || rowText.toLowerCase().includes(autoDetectedClubName.toLowerCase())) {
-                const cells = $(row).find('td');
-                if (cells.length >= 3) {
-                    const cellTexts = cells.map((i, cell) => $(cell).text().trim().replace(/\s+/g, ' ')).get();
-                    
-                    // Simple heuristic: Find which cell matches our club name exactly or partially
-                    let homeIndex = -1;
-                    let awayIndex = -1;
-                    
-                    cellTexts.forEach((text, index) => {
-                        if (text.toLowerCase().includes(clubName.toLowerCase())) {
-                            if (homeIndex === -1 && awayIndex === -1) {
-                                // Just looping
-                            }
-                        }
-                    });
+        const clubLower = clubName.toLowerCase().trim();
+        const clubCore = clubLower.replace(/\bfc\b/g, '').trim();
 
-                    // A more robust heuristic for standard UK grassroots sites (FA Full-Time, Mitoo):
-                    // [0] Date/Time, [1] Home, [2] Result/VS, [3] Away, [4] Competition/Venue
-                    // Sometimes [0] Date, [1] Time, [2] Home...
-                    // Let's assume standard 5+ column format where team names are usually longest strings
-                    
-                    // Filter out short strings or common non-team words
-                    // Filter out short strings, common non-team words, and purely numeric stats
-                    const isCompOrRoundCell = (t: string) =>
-                        /\b(division(?:\s+(?:\d+|one|two|three|four|i|ii|iii|iv))?|league|cup|trophy|shield|plate|vase|quarter[\s\-]*finals?|semi[\s\-]*finals?|round\s+\d+|\d+(?:st|nd|rd|th)\s+round|preliminary\s+round|qualifying\s+round)\b/i.test(t) &&
-                        !t.toLowerCase().includes(clubName.toLowerCase()) &&
-                        !t.toLowerCase().includes(autoDetectedClubName.toLowerCase());
+        const isOurClub = (name: string): boolean => {
+            const n = name.toLowerCase().trim();
+            if (!n) return false;
+            if (n === clubLower || (clubCore.length >= 4 && n === clubCore)) return true;
+            // Avoid matching "Camden & Islington United" for "Camden United"
+            return n.includes(clubLower);
+        };
 
-                    const potentialTeams = cellTexts.filter(t =>
-                        t.length > 2 &&
-                        !t.match(/^[0-9:\/ -]+$/) &&
-                        !t.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/) &&
-                        !t.match(/\d{1,2}(st|nd|rd|th)?\s+(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{2,4}/i) &&
-                        !['vs', 'v', 'postponed', 'cancelled', 'p-p', 'tbc', 'home', 'away', 'overall', 'l', 'cup', 'f'].includes(t.toLowerCase()) &&
-                        !isCompOrRoundCell(t)
-                    );
-                    
-                    // If a row has too many pure numbers, it's a stats/league table (e.g. apps, goals, W, D, L, PTS)
-                    const pureNumberCells = cellTexts.filter(t => t.match(/^\d+$/));
-                    if (pureNumberCells.length > 3) return; // Skip stats row
-                    
-                    if (potentialTeams.length < 2) return; // A match must have at least 2 teams
+        $('table tr').each((_, row) => {
+            const rawCells = $(row).find('td').map((__, td) => $(td).text().trim().replace(/\s+/g, ' ')).get();
+            if (rawCells.length < 5 || rawCells.length > 10) return;
 
-                    const isHome = potentialTeams[0]?.toLowerCase().includes(clubName.toLowerCase()) || potentialTeams[0]?.toLowerCase().includes(autoDetectedClubName.toLowerCase());
-                    const isAway = potentialTeams.length > 1 && (potentialTeams[1]?.toLowerCase().includes(clubName.toLowerCase()) || potentialTeams[1]?.toLowerCase().includes(autoDetectedClubName.toLowerCase()));
-                    
-                    let opponent = "Unknown";
-                    if (isHome && potentialTeams.length > 1) opponent = potentialTeams[1];
-                    else if (isAway) opponent = potentialTeams[0];
-                    else return; // If we aren't home or away, it's not our match
+            // Skip void matches
+            if (rawCells.some(c => /\[\s*void\s*\]|^v$/i.test(c))) return;
 
-                    // Try to find a strict date: DD/MM/YY or 14 May 26
-                    let dateStr = cellTexts.find(t => t.match(/\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}/) || t.match(/\d{1,2}(st|nd|rd|th)? (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]* \d{2,4}/i));
-                    
-                    if (!dateStr) return; // Skip this row
-
-                    // Clean date - FA Fulltime often uses "DD/MM/YY"
-                    let formattedDate = "";
-                    if (dateStr.includes('/')) {
-                        const parts = dateStr.split('/');
-                        if (parts.length >= 3) {
-                            const year = parts[2].length === 2 ? `20${parts[2]}` : parts[2];
-                            formattedDate = `${year}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-                        }
-                    } else {
-                        // Strip 'st', 'nd', 'rd', 'th' if present before parsing
-                        const cleanStr = dateStr.replace(/(\d+)(st|nd|rd|th)/, '$1');
-                        const parsedDate = new Date(cleanStr);
-                        if (!isNaN(parsedDate.getTime())) {
-                            formattedDate = parsedDate.toISOString().split('T')[0];
-                        }
-                    }
-
-                    if (!formattedDate) return; // Invalid date parsed
-                    
-                    // Try to find time
-                    const timeStr = cellTexts.find(t => t.match(/^\d{1,2}:\d{2}$/)) || "14:00"; // default grassroot time
-
-                    // Try to find result (e.g. 2 - 1, 2-1)
-                    const resultStr = cellTexts.find(t => t.match(/^\d+\s*-\s*\d+$/));
-                    let result = "Pending";
-                    let scoreline = "";
-                    if (resultStr) {
-                        scoreline = resultStr;
-                        const [h, a] = resultStr.split('-').map(s => parseInt(s.trim()));
-                        if (isHome) {
-                            if (h > a) result = "Win";
-                            else if (h < a) result = "Loss";
-                            else result = "Draw";
-                        } else {
-                            if (a > h) result = "Win";
-                            else if (a < h) result = "Loss";
-                            else result = "Draw";
-                        }
-                    } else if (cellTexts.join(' ').toLowerCase().includes('postponed') || cellTexts.join(' ').toLowerCase().includes('p-p')) {
-                        result = "Pending";
-                        scoreline = "Postponed";
-                    }
-
-                    const detectedCompetition = /\b(cup|trophy|shield|plate|vase|quarter[\s\-]*finals?|semi[\s\-]*finals?|round\s+\d+|\d+(?:st|nd|rd|th)\s+round)\b/i.test(rowText)
-                        ? "Cup"
-                        : (/\b(friendly|pre-season|preseason)\b/i.test(rowText) ? "Friendly" : "League");
-
-                    if (opponent && opponent !== "Unknown" && opponent !== clubName && opponent !== autoDetectedClubName) {
-                        matches.push({
-                            date: formattedDate,
-                            time: timeStr,
-                            opponent,
-                            is_home: isHome || false,
-                            result,
-                            scoreline: scoreline || null,
-                            competition: detectedCompetition,
-                            notes: "Imported via Scraper"
-                        });
-                    }
+            // Check if any cell has a valid date
+            let dateIso: string | null = null;
+            for (const c of rawCells) {
+                const parsed = parseDateToken(c);
+                if (parsed) {
+                    dateIso = parsed;
+                    break;
                 }
             }
+            if (!dateIso) return;
+
+            // Mitoo TeamHistAll 7-column format:
+            // [0] Result ('W'|'D'|'L'|''), [1] Competition ('Premier Division' | 'Middlesex County FA Premier Cup Quarter Final'), [2] HomeTeam, [3] HomeScore, [4] AwayScore, [5] AwayTeam, [6] Date
+            // Mitoo TeamHist 6-column format:
+            // [0] Result, [1] HomeTeam, [2] HomeScore, [3] AwayScore, [4] AwayTeam, [5] Date
+            let compCell = '';
+            let homeTeam = '';
+            let homeScore = '';
+            let awayScore = '';
+            let awayTeam = '';
+
+            if (rawCells.length >= 7 && parseDateToken(rawCells[6])) {
+                compCell = rawCells[1];
+                homeTeam = rawCells[2];
+                homeScore = rawCells[3];
+                awayScore = rawCells[4];
+                awayTeam = rawCells[5];
+            } else if (rawCells.length >= 6 && parseDateToken(rawCells[5])) {
+                homeTeam = rawCells[1];
+                homeScore = rawCells[2];
+                awayScore = rawCells[3];
+                awayTeam = rawCells[4];
+            } else {
+                // Fallback generic row
+                const clubIdx = rawCells.findIndex(c => isOurClub(c));
+                if (clubIdx === -1) return;
+                compCell = rawCells.join(' ');
+                homeTeam = rawCells[clubIdx];
+                const otherTeam = rawCells.find((c, idx) => idx !== clubIdx && c.length > 2 && !parseDateToken(c) && !/^\d+$/.test(c) && !/^(w|d|l|vs?)$/i.test(c) && !/\b(division|cup|trophy|shield)\b/i.test(c));
+                if (!otherTeam) return;
+                const otherIdx = rawCells.indexOf(otherTeam);
+                if (clubIdx < otherIdx) {
+                    homeTeam = rawCells[clubIdx];
+                    awayTeam = otherTeam;
+                } else {
+                    homeTeam = otherTeam;
+                    awayTeam = rawCells[clubIdx];
+                }
+            }
+
+            const weAreHome = isOurClub(homeTeam);
+            const weAreAway = isOurClub(awayTeam);
+            if (!weAreHome && !weAreAway) return;
+
+            const opponent = (weAreHome ? awayTeam : homeTeam).replace(/\[\s*void\s*\]/gi, '').trim();
+            if (!opponent || isOurClub(opponent)) return;
+
+            const competition = /\b(cup|trophy|shield|plate|vase|quarter[\s\-]*finals?|semi[\s\-]*finals?|round\s+\d+)\b/i.test(compCell)
+                ? "Cup"
+                : (/\b(friendly|pre-season)\b/i.test(compCell) ? "Friendly" : "League");
+
+            let scoreline: string | null = null;
+            let result = "Pending";
+            if (/^\d+$/.test(homeScore) && /^\d+$/.test(awayScore)) {
+                const h = parseInt(homeScore, 10);
+                const a = parseInt(awayScore, 10);
+                scoreline = `${h} - ${a}`;
+                if (weAreHome) {
+                    result = h > a ? "Win" : (h < a ? "Loss" : "Draw");
+                } else {
+                    result = a > h ? "Win" : (a < h ? "Loss" : "Draw");
+                }
+            }
+
+            matches.push({
+                date: dateIso,
+                time: "14:00",
+                opponent,
+                is_home: weAreHome,
+                result,
+                scoreline,
+                competition,
+                notes: `[Location: ${weAreHome ? "Home" : "Away"}][Surface: 4G]`
+            });
         });
 
-        // Remove exact duplicates (sometimes tables render twice for mobile/desktop)
         const uniqueMatches = Array.from(new Set(matches.map(m => JSON.stringify(m)))).map(s => JSON.parse(s));
 
-        return NextResponse.json({ success: true, matches: uniqueMatches });
+        return NextResponse.json({
+            success: true,
+            matches: uniqueMatches,
+            fixtures: uniqueMatches
+        });
 
     } catch (error: any) {
         return NextResponse.json({ success: false, error: error.message }, { status: 500 });
