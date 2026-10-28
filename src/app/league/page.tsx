@@ -1329,22 +1329,22 @@ export default function LeagueTablePage() {
                                                         <span className="w-5 text-right">{row.position}</span>
                                                         {posDiff > 0 ? (
                                                             <span
-                                                                className="inline-flex items-center text-[10px] font-bold text-emerald-400 bg-emerald-500/15 px-1.5 py-0.5 rounded"
+                                                                className="inline-flex items-center text-[10px] font-bold text-white bg-emerald-600 px-1.5 py-0.5 rounded shadow-xs"
                                                                 title={`Up ${posDiff} from #${row.previous_position}`}
                                                             >
-                                                                <ArrowUp className="h-2.5 w-2.5 mr-0.5" />
+                                                                <ArrowUp className="h-2.5 w-2.5 mr-0.5 stroke-[3]" />
                                                                 {posDiff}
                                                             </span>
                                                         ) : posDiff < 0 ? (
                                                             <span
-                                                                className="inline-flex items-center text-[10px] font-bold text-red-400 bg-red-500/15 px-1.5 py-0.5 rounded"
+                                                                className="inline-flex items-center text-[10px] font-bold text-white bg-rose-600 px-1.5 py-0.5 rounded shadow-xs"
                                                                 title={`Down ${Math.abs(posDiff)} from #${row.previous_position}`}
                                                             >
-                                                                <ArrowDown className="h-2.5 w-2.5 mr-0.5" />
+                                                                <ArrowDown className="h-2.5 w-2.5 mr-0.5 stroke-[3]" />
                                                                 {Math.abs(posDiff)}
                                                             </span>
                                                         ) : (
-                                                            <span className="inline-flex items-center text-muted-foreground/40" title="No change">
+                                                            <span className="inline-flex items-center text-muted-foreground/50" title="No change">
                                                                 <Minus className="h-3 w-3" />
                                                             </span>
                                                         )}
@@ -1355,8 +1355,8 @@ export default function LeagueTablePage() {
                                                         <span>{row.team_name}</span>
                                                         {/* Feature #2: Next Opponent Spotlight Pill */}
                                                         {isNextOpp && (
-                                                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
-                                                                <Zap className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-500 text-white px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wide shadow-xs">
+                                                                <Zap className="h-3 w-3 fill-white text-white" />
                                                                 Next Up {formattedNextDate ? `• ${formattedNextDate}` : ""} ({nextOpponentInfo?.is_home ? "H" : "A"})
                                                             </span>
                                                         )}
@@ -1377,20 +1377,20 @@ export default function LeagueTablePage() {
                                                 {/* Feature #6: Last 5 Form Pills */}
                                                 <td className="px-4 py-3 text-center whitespace-nowrap">
                                                     {formItems.length > 0 ? (
-                                                        <div className="inline-flex items-center gap-1">
+                                                        <div className="inline-flex items-center gap-1.5">
                                                             {formItems.map((res, fIdx) => {
                                                                 const isLatest = fIdx === formItems.length - 1;
                                                                 const pillStyles =
                                                                     res === 'W'
-                                                                        ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+                                                                        ? 'bg-emerald-600 text-white border-emerald-700'
                                                                         : res === 'D'
-                                                                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                                                                            : 'bg-red-500/20 text-red-400 border-red-500/40';
+                                                                            ? 'bg-amber-500 text-white border-amber-600'
+                                                                            : 'bg-rose-600 text-white border-rose-700';
                                                                 return (
                                                                     <span
                                                                         key={fIdx}
-                                                                        className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-bold border ${pillStyles} ${isLatest ? 'ring-1 ring-white/30' : 'opacity-85'}`}
-                                                                        title={isLatest ? `Most recent: ${res}` : res}
+                                                                        className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-[11px] font-extrabold border shadow-xs ${pillStyles} ${isLatest ? 'ring-2 ring-offset-1 ring-foreground/25 scale-105' : ''}`}
+                                                                        title={isLatest ? `Latest match: ${res}` : res}
                                                                     >
                                                                         {res}
                                                                     </span>
