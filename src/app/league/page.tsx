@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ExternalLink, AlertCircle, Settings, Trophy, Link as LinkIcon, Image as ImageIcon, FileText, CheckCircle2 } from "lucide-react";
 import { useClub } from "@/context/club-context";
+import { useAuth } from "@/context/auth-context";
+import { supabase } from "@/lib/supabase";
 import { Textarea } from "@/components/ui/textarea";
 
 // Mock LeagueRow type
@@ -26,12 +28,12 @@ type LeagueRow = {
 
 export default function LeagueTablePage() {
     const { settings, updateSettings } = useClub();
+    const { clubId } = useAuth();
     
-    // Import State
-    const [importMode, setImportMode] = useState<'url' | 'screenshot' | 'text'>('url');
+    // Default to 'text' since most grassroots leagues (FA Full-Time, Pitchero) block automated URL scrapers with Cloudflare
+    const [importMode, setImportMode] = useState<'text' | 'screenshot' | 'url'>('text');
     const [urlInput, setUrlInput] = useState("");
     const [textInput, setTextInput] = useState("");
-    const [screenshotImage, setScreenshotImage] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     const [isExtracting, setIsExtracting] = useState(false);
@@ -45,13 +47,195 @@ export default function LeagueTablePage() {
 
     // Existing Data
     const [currentTable, setCurrentTable] = useState<LeagueRow[] | null>(null);
+    const [showImporter, setShowImporter] = useState(false);
 
-    // Mock fetching the canonical table
+    const storageKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
+
+    // Load saved league table from localStorage or club settings
     useEffect(() => {
-        // In reality, this would fetch from the new `league_table` Supabase table
-        // For now we leave it empty to show the empty state
-        setCurrentTable(null);
-    }, []);
+        if (settings.leagueUrl && !urlInput) {
+            setUrlInput(settings.leagueUrl);
+        }
+        try {
+            const saved = localStorage.getItem(storageKey);
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setCurrentTable(parsed);
+                    return;
+                }
+            }
+            if (settings.lastImportHistory?.leagueTable && Array.isArray(settings.lastImportHistory.leagueTable) && settings.lastImportHistory.leagueTable.length > 0) {
+                setCurrentTable(settings.lastImportHistory.leagueTable);
+            }
+        } catch (e) {
+            console.warn("Failed to load cached league table:", e);
+        }
+    }, [clubId, settings.leagueUrl, settings.lastImportHistory]);
+
+    const isOurClubName = (teamName: string): boolean => {
+        const clubLower = (settings.name || "Camden United").toLowerCase().trim();
+        const clubCore = clubLower.replace(/\bfc\b/g, "").trim();
+        const candidate = teamName.toLowerCase().trim();
+        return candidate === clubLower || candidate.includes(clubLower) || (clubCore.length >= 4 && candidate.includes(clubCore));
+    };
+
+    const parseLeagueStandingsText = (raw: string): LeagueRow[] => {
+        const lines = raw
+            .split(/\r?\n/)
+            .map(l => l.trim())
+            .filter(Boolean);
+
+        const rows: LeagueRow[] = [];
+
+        for (const line of lines) {
+            // Skip header rows
+            if (/^(pos|position|rank|#)?\s*(team|club|played|p\s+w\s+d\s+l|overall|home|away)\b/i.test(line) && !/\d+\s+\d+\s+\d+/.test(line)) {
+                continue;
+            }
+            if (/^(fa full-time|premier division|division\s+\d+|standings|table|key|legend|last updated)/i.test(line) && !/\d+\s+\d+\s+\d+/.test(line)) {
+                continue;
+            }
+
+            // Match optional leading position, team name, and trailing sequence of numbers (including negative GD like -5 or +12)
+            // Example 1: "1  Camden United  10  8  1  1  24  8  16  25"
+            // Example 2 (FA Full-Time expanded): "1  Camden United  10  4 1 0 12 4  4 0 1 12 4  16  25"
+            const tokens = line.split(/\t+|\s{2,}|\s+/).filter(Boolean);
+            if (tokens.length < 5) continue;
+
+            // Collect trailing numeric tokens from the right
+            const nums: number[] = [];
+            let idx = tokens.length - 1;
+            while (idx >= 0) {
+                const tok = tokens[idx].replace(/^\+/, '');
+                // Handle "24-8" or "24:8" F-A combined token
+                if (/^\d+[\-:]\d+$/.test(tok)) {
+                    const [f, a] = tok.split(/[\-:]/).map(Number);
+                    nums.unshift(f, a);
+                    idx--;
+                    continue;
+                }
+                if (/^-?\d+$/.test(tok)) {
+                    nums.unshift( parseInt(tok, 10) );
+                    idx--;
+                } else {
+                    // Skip trailing form tokens like W, D, L, WWDLW
+                    if (nums.length === 0 && /^[WDL\-]{1,6}$/i.test(tok)) {
+                        idx--;
+                        continue;
+                    }
+                    break;
+                }
+            }
+
+            // Need at least 4 stats numbers (e.g. P, W, D, L, Pts or P, GD, Pts)
+            if (nums.length < 4) continue;
+
+            // Remaining tokens on the left are [optional Position] + Team Name
+            const leftTokens = tokens.slice(0, idx + 1);
+            let position = rows.length + 1;
+            let nameTokens = leftTokens;
+
+            if (leftTokens.length > 1 && /^\d+\.?$/.test(leftTokens[0])) {
+                position = parseInt(leftTokens[0], 10);
+                nameTokens = leftTokens.slice(1);
+            } else if (leftTokens.length === 0 && nums.length >= 7) {
+                // Position might have been absorbed if team name had no spaces? Unlikely, skip if no team name
+                continue;
+            }
+
+            const teamName = nameTokens
+                .join(" ")
+                .replace(/\b(first|reserves)\b$/i, (m) => m)
+                .replace(/^[\-\d\.\)]+\s*/, "")
+                .trim();
+
+            if (!teamName || teamName.length < 2 || /^(total|overall|home|away|pos|team|club|p|w|d|l|pts)$/i.test(teamName)) {
+                continue;
+            }
+
+            let played = 0, won = 0, drawn = 0, lost = 0, goals_for = 0, goals_against = 0, goal_difference = 0, points = 0;
+
+            if (nums.length >= 13) {
+                // FA Full-Time expanded: P, HW, HD, HL, HF, HA, AW, AD, AL, AF, AA, GD, PTS
+                const slice = nums.slice(-13);
+                played = slice[0];
+                won = slice[1] + slice[6];
+                drawn = slice[2] + slice[7];
+                lost = slice[3] + slice[8];
+                goals_for = slice[4] + slice[9];
+                goals_against = slice[5] + slice[10];
+                goal_difference = slice[11];
+                points = slice[12];
+            } else if (nums.length === 11) {
+                // P, HW, HD, HL, AW, AD, AL, GF, GA, GD, PTS
+                played = nums[0];
+                won = nums[1] + nums[4];
+                drawn = nums[2] + nums[5];
+                lost = nums[3] + nums[6];
+                goals_for = nums[7];
+                goals_against = nums[8];
+                goal_difference = nums[9];
+                points = nums[10];
+            } else if (nums.length >= 8) {
+                // Standard 8 numbers: P, W, D, L, GF, GA, GD, PTS
+                const slice = nums.slice(0, 8);
+                played = slice[0];
+                won = slice[1];
+                drawn = slice[2];
+                lost = slice[3];
+                goals_for = slice[4];
+                goals_against = slice[5];
+                goal_difference = slice[6];
+                points = slice[7];
+            } else if (nums.length === 7) {
+                // P, W, D, L, GF, GA, PTS (compute GD)
+                played = nums[0];
+                won = nums[1];
+                drawn = nums[2];
+                lost = nums[3];
+                goals_for = nums[4];
+                goals_against = nums[5];
+                goal_difference = goals_for - goals_against;
+                points = nums[6];
+            } else if (nums.length === 6) {
+                // P, W, D, L, GD, PTS
+                played = nums[0];
+                won = nums[1];
+                drawn = nums[2];
+                lost = nums[3];
+                goal_difference = nums[4];
+                points = nums[5];
+            } else if (nums.length >= 4) {
+                // Minimal: P, W, D, L (or P, W, D, Pts)
+                played = nums[0];
+                won = nums[1];
+                drawn = nums[2];
+                lost = nums[3] ?? 0;
+                points = nums[nums.length - 1];
+            }
+
+            rows.push({
+                position: position || rows.length + 1,
+                team_name: teamName,
+                played,
+                won,
+                drawn,
+                lost,
+                goals_for,
+                goals_against,
+                goal_difference,
+                points,
+                is_our_club: isOurClubName(teamName)
+            });
+        }
+
+        // Re-index positions sequentially if needed
+        return rows.map((r, i) => ({
+            ...r,
+            position: r.position || i + 1
+        }));
+    };
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -89,7 +273,6 @@ export default function LeagueTablePage() {
         setExtractionStatus("Reading screenshot...");
         
         try {
-            // Sequence loading states
             const statusSequence = [
                 "Identifying teams...",
                 "Matching columns...",
@@ -116,7 +299,7 @@ export default function LeagueTablePage() {
             if (!data.success) {
                 setExtractionError({
                     title: "Extraction failed",
-                    message: data.error || "We couldn't read the table clearly."
+                    message: data.error || "We couldn't read the table clearly. Try pasting the table text instead."
                 });
             } else {
                 setPreviewData(data.teams);
@@ -148,12 +331,18 @@ export default function LeagueTablePage() {
         const newData = [...previewData];
         // @ts-ignore
         newData[index][field] = value;
+        if (field === 'team_name') {
+            newData[index].is_our_club = isOurClubName(String(value));
+        }
         
-        // Recalculate GD and Points if relevant
         if (['won', 'drawn', 'lost', 'goals_for', 'goals_against'].includes(field)) {
              const row = newData[index];
-             row.goal_difference = row.goals_for - row.goals_against;
-             row.points = (row.won * 3) + row.drawn;
+             if (field === 'goals_for' || field === 'goals_against') {
+                 row.goal_difference = row.goals_for - row.goals_against;
+             }
+             if (field === 'won' || field === 'drawn') {
+                 row.points = (row.won * 3) + row.drawn;
+             }
         }
         
         setPreviewData(newData);
@@ -175,26 +364,19 @@ export default function LeagueTablePage() {
 
             const data = await res.json();
             
-            if (data.errorType === 'BLOCKED') {
-                // Graceful fallback
+            if (data.errorType === 'BLOCKED' || !data.success) {
                 setExtractionError({
-                    title: "Security blocks detected",
-                    message: "We couldn't read that page directly because the league website is blocking automated access, but there's another quick way."
+                    title: "League website blocks automated scrapers (Cloudflare)",
+                    message: "FA Full-Time and most league sites block bots. Just open your league page below, highlight the standings table (Ctrl+C), and paste it here!"
                 });
-                setImportMode('text'); // Pivot to text
-            } else if (!data.success) {
-                setExtractionError({
-                    title: "Extraction failed",
-                    message: data.error || "Could not find a league table on this page."
-                });
-            } else {
-                // Mock preview data since sync-league only returns position for now
+                setImportMode('text');
             }
         } catch (error) {
             setExtractionError({
-                title: "Network error",
-                message: "Could not reach the extraction service."
+                title: "League website blocked direct connection",
+                message: "Switched to Paste Text — copy the table rows from your browser and paste them below."
             });
+            setImportMode('text');
         } finally {
             setIsExtracting(false);
             setExtractionStatus("");
@@ -202,36 +384,71 @@ export default function LeagueTablePage() {
     };
 
     const handleExtractText = async () => {
-        if (!textInput) return;
+        if (!textInput.trim()) return;
         
         setIsExtracting(true);
         setExtractionError(null);
-        setExtractionStatus("Analysing pasted text...");
+        setExtractionStatus("Parsing standings rows...");
         
         setTimeout(() => {
+            const parsed = parseLeagueStandingsText(textInput);
             setIsExtracting(false);
             setExtractionStatus("");
-            
-            // Mock preview data
-            setPreviewData([
-                { position: 1, team_name: "Camden United", played: 10, won: 8, drawn: 1, lost: 1, goals_for: 24, goals_against: 8, goal_difference: 16, points: 25, is_our_club: true },
-                { position: 2, team_name: "London FC", played: 10, won: 7, drawn: 2, lost: 1, goals_for: 20, goals_against: 10, goal_difference: 10, points: 23, is_our_club: false },
-            ]);
-        }, 2000);
+
+            if (parsed.length === 0) {
+                setExtractionError({
+                    title: "Couldn't detect table rows",
+                    message: "Make sure you highlight and copy the rows from the league table (including team names and numbers like P, W, D, L, Pts)."
+                });
+                return;
+            }
+            setPreviewData(parsed);
+        }, 250);
     };
 
     const handleConfirmImport = async () => {
-        if (!previewData) return;
+        if (!previewData || previewData.length === 0) return;
         setIsImporting(true);
         try {
-            // Wait we will implement real supabase call here next, mock for now
-            await fetch('/api/league/save', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ teams: previewData, clubName: settings.name })
-            });
+            // Save to localStorage immediately
+            localStorage.setItem(storageKey, JSON.stringify(previewData));
+
+            // Find our club's position and update club settings so Dashboard shows the live position
+            const ourRow = previewData.find(r => r.is_our_club || isOurClubName(r.team_name));
+            const newUpdates: any = {
+                lastImportHistory: {
+                    ...(settings.lastImportHistory || {}),
+                    leagueTable: previewData,
+                    updatedAt: new Date().toISOString()
+                }
+            };
+            if (ourRow && ourRow.position) {
+                newUpdates.leaguePosition = ourRow.position;
+            }
+            if (urlInput && urlInput.trim()) {
+                newUpdates.leagueUrl = urlInput.trim();
+            }
+            await updateSettings(newUpdates).catch(() => {});
+
+            // Also ensure all division opponent teams exist in league_teams for autocomplete
+            for (const row of previewData) {
+                if (!row.team_name || isOurClubName(row.team_name)) continue;
+                const { data: existing } = await supabase
+                    .from('league_teams')
+                    .select('id')
+                    .ilike('name', row.team_name.trim())
+                    .maybeSingle();
+                if (!existing) {
+                    await supabase.from('league_teams').insert({
+                        name: row.team_name.trim(),
+                        club_id: clubId || undefined
+                    }).then(() => {});
+                }
+            }
+
             setCurrentTable(previewData);
             setPreviewData(null);
+            setShowImporter(false);
             setIsSuccess(true);
         } catch (error) {
             console.error(error);
@@ -246,7 +463,7 @@ export default function LeagueTablePage() {
             <div className="h-full flex flex-col gap-6 max-w-4xl mx-auto py-8">
                 <div>
                     <h2 className="text-2xl font-bold text-foreground">Review League Table</h2>
-                    <p className="text-muted-foreground mt-1">Review the extracted data before importing. You can make manual corrections if necessary.</p>
+                    <p className="text-muted-foreground mt-1">Review the extracted standings before saving. Every cell is editable.</p>
                 </div>
                 
                 <Card className="border-border bg-surface-1">
@@ -261,18 +478,20 @@ export default function LeagueTablePage() {
                                         <th className="px-4 py-3 font-medium text-center">W</th>
                                         <th className="px-4 py-3 font-medium text-center">D</th>
                                         <th className="px-4 py-3 font-medium text-center">L</th>
+                                        <th className="px-4 py-3 font-medium text-center">GF</th>
+                                        <th className="px-4 py-3 font-medium text-center">GA</th>
                                         <th className="px-4 py-3 font-medium text-center">GD</th>
                                         <th className="px-4 py-3 font-medium text-center">Pts</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {previewData.map((row, idx) => (
-                                        <tr key={idx} className={`border-b border-border transition-colors ${row.is_our_club ? 'bg-primary/5 border-l-4 border-l-primary' : ''}`}>
+                                        <tr key={idx} className={`border-b border-border transition-colors ${row.is_our_club ? 'bg-primary/10 border-l-4 border-l-primary' : ''}`}>
                                             <td className="px-2 py-2">
-                                                <Input type="number" value={row.position} onChange={(e) => handleRowChange(idx, 'position', parseInt(e.target.value) || 0)} className="w-16 h-8 px-1 text-center font-semibold bg-transparent border-transparent hover:border-border focus:bg-background" />
+                                                <Input type="number" value={row.position} onChange={(e) => handleRowChange(idx, 'position', parseInt(e.target.value) || 0)} className="w-14 h-8 px-1 text-center font-semibold bg-transparent border-transparent hover:border-border focus:bg-background" />
                                             </td>
                                             <td className={`px-2 py-2 ${row.is_our_club ? 'font-bold text-primary' : 'font-medium text-foreground'}`}>
-                                                <Input type="text" value={row.team_name} onChange={(e) => handleRowChange(idx, 'team_name', e.target.value)} className="h-8 px-2 bg-transparent border-transparent hover:border-border focus:bg-background w-full min-w-[140px]" />
+                                                <Input type="text" value={row.team_name} onChange={(e) => handleRowChange(idx, 'team_name', e.target.value)} className="h-8 px-2 bg-transparent border-transparent hover:border-border focus:bg-background w-full min-w-[160px]" />
                                             </td>
                                             <td className="px-2 py-2">
                                                 <Input type="number" value={row.played} onChange={(e) => handleRowChange(idx, 'played', parseInt(e.target.value) || 0)} className="w-12 h-8 px-1 text-center bg-transparent border-transparent hover:border-border focus:bg-background" />
@@ -285,6 +504,12 @@ export default function LeagueTablePage() {
                                             </td>
                                             <td className="px-2 py-2">
                                                 <Input type="number" value={row.lost} onChange={(e) => handleRowChange(idx, 'lost', parseInt(e.target.value) || 0)} className="w-12 h-8 px-1 text-center bg-transparent border-transparent hover:border-border focus:bg-background" />
+                                            </td>
+                                            <td className="px-2 py-2">
+                                                <Input type="number" value={row.goals_for} onChange={(e) => handleRowChange(idx, 'goals_for', parseInt(e.target.value) || 0)} className="w-12 h-8 px-1 text-center bg-transparent border-transparent hover:border-border focus:bg-background" />
+                                            </td>
+                                            <td className="px-2 py-2">
+                                                <Input type="number" value={row.goals_against} onChange={(e) => handleRowChange(idx, 'goals_against', parseInt(e.target.value) || 0)} className="w-12 h-8 px-1 text-center bg-transparent border-transparent hover:border-border focus:bg-background" />
                                             </td>
                                             <td className="px-2 py-2 text-center text-muted-foreground font-mono text-xs">{row.goal_difference > 0 ? '+' + row.goal_difference : row.goal_difference}</td>
                                             <td className="px-2 py-2">
@@ -321,17 +546,17 @@ export default function LeagueTablePage() {
                     <CheckCircle2 className="h-8 w-8" />
                 </div>
                 <h2 className="text-2xl font-bold text-foreground">League table updated</h2>
-                <p className="text-muted-foreground">Your league table has been successfully saved and is now visible across ClubFlow.</p>
+                <p className="text-muted-foreground">Your standings and club position have been saved across ClubFlow.</p>
                 <div className="flex gap-3 mt-4 w-full">
-                    <Button variant="outline" className="flex-1" onClick={() => setIsSuccess(false)}>Import Another</Button>
-                    <Button className="flex-1 bg-brand hover:bg-brand/90 text-white" onClick={() => { setIsSuccess(false); setCurrentTable(currentTable || []); }}>View Table</Button>
+                    <Button variant="outline" className="flex-1" onClick={() => { setIsSuccess(false); setShowImporter(true); }}>Update Again</Button>
+                    <Button className="flex-1 bg-brand hover:bg-brand/90 text-white" onClick={() => { setIsSuccess(false); setShowImporter(false); }}>View Table</Button>
                 </div>
             </div>
         );
     }
 
-    // If we have an existing table, show it
-    if (currentTable) {
+    // If we have an existing table and aren't actively re-importing, show it
+    if (currentTable && currentTable.length > 0 && !showImporter) {
         return (
             <div className="h-full flex flex-col gap-6">
                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -341,12 +566,23 @@ export default function LeagueTablePage() {
                         </div>
                         <div>
                             <h2 className="text-xl font-bold text-foreground">League Standings</h2>
-                            <p className="text-sm text-muted-foreground">Canonical league data</p>
+                            <p className="text-sm text-muted-foreground">
+                                {settings.lastImportHistory?.updatedAt
+                                    ? `Last updated ${new Date(settings.lastImportHistory.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`
+                                    : "Saved division standings"}
+                            </p>
                         </div>
                     </div>
-                    <Button variant="outline" onClick={() => setCurrentTable(null)}>
-                        Update Table
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        {settings.leagueUrl && (
+                            <Button variant="outline" size="sm" onClick={() => window.open(settings.leagueUrl!, '_blank')}>
+                                <ExternalLink className="h-4 w-4 mr-1.5" /> Open League Website
+                            </Button>
+                        )}
+                        <Button onClick={() => setShowImporter(true)} className="bg-brand hover:bg-brand/90 text-white" size="sm">
+                            Update Standings
+                        </Button>
+                    </div>
                 </div>
                 
                 <Card className="border-border bg-surface-1">
@@ -361,13 +597,15 @@ export default function LeagueTablePage() {
                                         <th className="px-4 py-3 font-medium text-center">W</th>
                                         <th className="px-4 py-3 font-medium text-center">D</th>
                                         <th className="px-4 py-3 font-medium text-center">L</th>
+                                        <th className="px-4 py-3 font-medium text-center">GF</th>
+                                        <th className="px-4 py-3 font-medium text-center">GA</th>
                                         <th className="px-4 py-3 font-medium text-center">GD</th>
                                         <th className="px-4 py-3 font-medium text-center">Pts</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {currentTable.map((row, idx) => (
-                                        <tr key={idx} className={`border-b border-border transition-colors ${row.is_our_club ? 'bg-primary/5 border-l-4 border-l-primary' : ''}`}>
+                                        <tr key={idx} className={`border-b border-border transition-colors ${row.is_our_club ? 'bg-primary/10 border-l-4 border-l-primary' : ''}`}>
                                             <td className="px-4 py-3 font-semibold">{row.position}</td>
                                             <td className={`px-4 py-3 ${row.is_our_club ? 'font-bold text-primary' : 'font-medium text-foreground'}`}>
                                                 {row.team_name}
@@ -376,6 +614,8 @@ export default function LeagueTablePage() {
                                             <td className="px-4 py-3 text-center">{row.won}</td>
                                             <td className="px-4 py-3 text-center">{row.drawn}</td>
                                             <td className="px-4 py-3 text-center">{row.lost}</td>
+                                            <td className="px-4 py-3 text-center text-muted-foreground">{row.goals_for ?? "-"}</td>
+                                            <td className="px-4 py-3 text-center text-muted-foreground">{row.goals_against ?? "-"}</td>
                                             <td className="px-4 py-3 text-center font-mono text-xs text-muted-foreground">{row.goal_difference > 0 ? '+' + row.goal_difference : row.goal_difference}</td>
                                             <td className="px-4 py-3 text-center font-bold text-foreground">{row.points}</td>
                                         </tr>
@@ -386,28 +626,33 @@ export default function LeagueTablePage() {
                     </CardContent>
                 </Card>
             </div>
-        )
+        );
     }
 
-    // Empty State: Import Workflow
+    // Import Workflow
     return (
         <div className="h-full flex flex-col gap-6 max-w-2xl mx-auto py-12">
-            <div className="text-center mb-4">
+            <div className="text-center mb-2">
                 <div className="mx-auto h-16 w-16 bg-brand/10 rounded-full flex items-center justify-center mb-4">
                     <Trophy className="h-8 w-8 text-brand" />
                 </div>
                 <h2 className="text-3xl font-bold text-foreground tracking-tight">Import League Table</h2>
-                <p className="text-muted-foreground mt-2 text-lg">
-                    ClubFlow intelligently extracts standings from any league website.
+                <p className="text-muted-foreground mt-2 text-sm sm:text-base">
+                    Copy & paste your league table text or upload a screenshot — works with FA Full-Time and any league site that blocks scrapers.
                 </p>
+                {currentTable && currentTable.length > 0 && (
+                    <Button variant="ghost" size="sm" onClick={() => setShowImporter(false)} className="mt-2 text-xs text-muted-foreground">
+                        ← Back to Saved Standings
+                    </Button>
+                )}
             </div>
 
             {extractionError && (
-                <div className="bg-red-950 border border-red-900 rounded-xl p-4 flex gap-3 items-start animate-in fade-in slide-in-from-top-2">
-                    <AlertCircle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex gap-3 items-start animate-in fade-in slide-in-from-top-2">
+                    <AlertCircle className="h-5 w-5 text-amber-500 shrink-0 mt-0.5" />
                     <div>
-                        <h4 className="font-semibold text-red-400">{extractionError.title}</h4>
-                        <p className="text-sm text-red-300 mt-1">{extractionError.message}</p>
+                        <h4 className="font-semibold text-amber-500 text-sm">{extractionError.title}</h4>
+                        <p className="text-xs text-muted-foreground mt-1">{extractionError.message}</p>
                     </div>
                 </div>
             )}
@@ -416,11 +661,11 @@ export default function LeagueTablePage() {
                 <CardHeader className="border-b border-border bg-surface-2/50">
                     <div className="flex gap-4">
                         <button 
-                            onClick={() => { setImportMode('url'); setExtractionError(null); }}
-                            className={`flex-1 pb-3 text-sm font-semibold transition-all border-b-2 ${importMode === 'url' ? 'border-brand text-brand' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+                            onClick={() => { setImportMode('text'); setExtractionError(null); }}
+                            className={`flex-1 pb-3 text-sm font-semibold transition-all border-b-2 ${importMode === 'text' ? 'border-brand text-brand' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
                         >
-                            <LinkIcon className="h-4 w-4 mx-auto mb-1" />
-                            League URL
+                            <FileText className="h-4 w-4 mx-auto mb-1" />
+                            Paste Table Text (Recommended)
                         </button>
                         <button 
                             onClick={() => { setImportMode('screenshot'); setExtractionError(null); }}
@@ -429,57 +674,41 @@ export default function LeagueTablePage() {
                             <ImageIcon className="h-4 w-4 mx-auto mb-1" />
                             Screenshot
                         </button>
-                        <button 
-                            onClick={() => { setImportMode('text'); setExtractionError(null); }}
-                            className={`flex-1 pb-3 text-sm font-semibold transition-all border-b-2 ${importMode === 'text' ? 'border-brand text-brand' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
-                        >
-                            <FileText className="h-4 w-4 mx-auto mb-1" />
-                            Paste Text
-                        </button>
                     </div>
                 </CardHeader>
                 <CardContent className="p-6">
-                    {importMode === 'url' && (
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="url">League Website URL</Label>
-                                <Input 
-                                    id="url" 
-                                    placeholder="https://fulltime.thefa.com/..." 
-                                    value={urlInput}
-                                    onChange={(e) => setUrlInput(e.target.value)}
-                                    className="bg-background"
-                                />
-                                <p className="text-xs text-muted-foreground">We support FA Full-Time, Mitoo, and most standard league websites.</p>
-                            </div>
-                            <Button 
-                                onClick={handleExtractUrl} 
-                                className="w-full bg-brand hover:bg-brand/90 text-white" 
-                                disabled={!urlInput || isExtracting}
-                            >
-                                {isExtracting ? extractionStatus || "Connecting..." : "Sync League"}
-                            </Button>
-                        </div>
-                    )}
-
                     {importMode === 'text' && (
                         <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label htmlFor="text">Pasted Table Content</Label>
-                                <Textarea 
-                                    id="text" 
-                                    placeholder="Highlight the table on the website, press Ctrl+C, and paste it here..." 
-                                    value={textInput}
-                                    onChange={(e) => setTextInput(e.target.value)}
-                                    className="min-h-[160px] bg-background font-mono text-sm"
-                                />
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <Label htmlFor="text">Paste Standings Rows from FA Full-Time / League Website</Label>
+                                {settings.leagueUrl && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => window.open(settings.leagueUrl!, '_blank')}
+                                        className="h-7 text-xs"
+                                    >
+                                        <ExternalLink className="h-3.5 w-3.5 mr-1.5" /> Open My League Page ↗
+                                    </Button>
+                                )}
                             </div>
+                            <p className="text-xs text-muted-foreground">
+                                Highlight the standings table on your league website, press <strong>Ctrl+C</strong> (or Cmd+C), and paste it below. Both standard and expanded Home/Away FA Full-Time tables are supported.
+                            </p>
+                            <Textarea 
+                                id="text" 
+                                placeholder={"Example:\n1\tBroadfields United\t12\t9\t2\t1\t32\t11\t21\t29\n2\tCamden United\t12\t8\t2\t2\t28\t14\t14\t26"}
+                                value={textInput}
+                                onChange={(e) => setTextInput(e.target.value)}
+                                className="min-h-[180px] bg-background font-mono text-xs"
+                            />
                             <Button 
                                 onClick={handleExtractText} 
-                                className="w-full bg-brand hover:bg-brand/90 text-white" 
-                                disabled={!textInput || isExtracting}
+                                className="w-full bg-brand hover:bg-brand/90 text-white font-semibold" 
+                                disabled={!textInput.trim() || isExtracting}
                             >
-                                {isExtracting ? extractionStatus || "Analysing..." : "Extract from Text"}
+                                {isExtracting ? extractionStatus || "Parsing..." : "Parse & Review Standings"}
                             </Button>
                         </div>
                     )}
@@ -513,8 +742,8 @@ export default function LeagueTablePage() {
                                     <div className="w-14 h-14 rounded-full bg-surface-2 flex items-center justify-center mb-4 shadow-sm border border-border">
                                         <ImageIcon className="h-6 w-6 text-muted-foreground" />
                                     </div>
-                                    <h4 className="font-semibold text-foreground text-lg mb-1">Upload a screenshot</h4>
-                                    <p className="text-sm text-muted-foreground max-w-sm">Drag an image here, paste from your clipboard, or click to browse files.</p>
+                                    <h4 className="font-semibold text-foreground text-lg mb-1">Upload or Paste a Screenshot</h4>
+                                    <p className="text-sm text-muted-foreground max-w-sm">Drag an image here, press Ctrl+V to paste from your clipboard, or click to browse files.</p>
                                     <Button variant="outline" className="mt-6 border-border bg-surface-1 shadow-sm font-semibold px-6" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
                                         Browse Files
                                     </Button>
