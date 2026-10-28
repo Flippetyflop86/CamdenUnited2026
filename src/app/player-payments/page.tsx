@@ -81,6 +81,10 @@ interface ClubPayoutAccountConfig {
     sortCode: string;
     accountNumber: string;
     defaultFeeCoverage: "player" | "club";
+    accountHolderType: "individual" | "company" | "non_profit";
+    treasurerFirstName: string;
+    treasurerLastName: string;
+    treasurerEmail: string;
 }
 
 const DEFAULT_STANDARD_FINES: StandardFineRule[] = [
@@ -123,8 +127,13 @@ export default function PlayerPaymentsPage() {
         sortCode: "",
         accountNumber: "",
         defaultFeeCoverage: "player",
+        accountHolderType: "individual",
+        treasurerFirstName: "",
+        treasurerLastName: "",
+        treasurerEmail: "",
     });
     const [isEditingAccountModal, setIsEditingAccountModal] = useState(false);
+    const [copiedBankDetails, setCopiedBankDetails] = useState(false);
 
     // Standard Fine Master List (Tariff)
     const [fineRules, setFineRules] = useState<StandardFineRule[]>(DEFAULT_STANDARD_FINES);
@@ -186,6 +195,10 @@ export default function PlayerPaymentsPage() {
                     sortCode: parsedAcct.sortCode || "",
                     accountNumber: parsedAcct.accountNumber || parsedAcct.accountNumberLast4 || "",
                     defaultFeeCoverage: parsedAcct.defaultFeeCoverage === "club" ? "club" : "player",
+                    accountHolderType: parsedAcct.accountHolderType || "individual",
+                    treasurerFirstName: parsedAcct.treasurerFirstName || "",
+                    treasurerLastName: parsedAcct.treasurerLastName || "",
+                    treasurerEmail: parsedAcct.treasurerEmail || "",
                 });
                 setFeeCoverage(parsedAcct.defaultFeeCoverage === "club" ? "club" : "player");
             } else {
@@ -315,9 +328,14 @@ export default function PlayerPaymentsPage() {
         );
     };
 
-    const handleConnectStripe = async () => {
+    const handleConnectStripe = async (opts?: { resetAccount?: boolean; action?: "onboarding" | "dashboard" }) => {
         setOnboardingLoading(true);
         try {
+            // Persist current payoutAccount locally first so nothing is lost when redirecting to Stripe
+            try {
+                localStorage.setItem(accountStorageKey, JSON.stringify(payoutAccount));
+            } catch {}
+
             const { data: { session } } = await supabase.auth.getSession();
             const headers: Record<string, string> = { "Content-Type": "application/json" };
             if (session?.access_token) {
@@ -327,7 +345,15 @@ export default function PlayerPaymentsPage() {
             const res = await fetch("/api/checkout/connect-onboarding", {
                 method: "POST",
                 headers,
-                body: JSON.stringify({ clubId }),
+                body: JSON.stringify({
+                    clubId,
+                    accountHolderType: payoutAccount.accountHolderType,
+                    treasurerFirstName: payoutAccount.treasurerFirstName,
+                    treasurerLastName: payoutAccount.treasurerLastName,
+                    treasurerEmail: payoutAccount.treasurerEmail,
+                    resetAccount: opts?.resetAccount,
+                    action: opts?.action || "onboarding",
+                }),
             });
             const data = await res.json();
             if (data.url) {
@@ -804,7 +830,7 @@ export default function PlayerPaymentsPage() {
                         {isManager && (
                             <Button
                                 size="sm"
-                                onClick={handleConnectStripe}
+                                onClick={() => handleConnectStripe({ action: onboardingComplete ? "dashboard" : "onboarding" })}
                                 disabled={onboardingLoading}
                                 className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
                             >
@@ -812,8 +838,8 @@ export default function PlayerPaymentsPage() {
                                 {onboardingLoading
                                     ? "Opening Stripe..."
                                     : onboardingComplete
-                                    ? "Manage Stripe Bank Account"
-                                    : "Link Bank with Stripe"}
+                                    ? "Manage Stripe Payouts"
+                                    : "Link Bank with Stripe (Express)"}
                             </Button>
                         )}
                     </div>
@@ -1465,21 +1491,114 @@ export default function PlayerPaymentsPage() {
 
             {/* Club Payment Account & Stripe Configuration Modal */}
             <Dialog open={isEditingAccountModal} onOpenChange={setIsEditingAccountModal}>
-                <DialogContent className="sm:max-w-[480px]">
+                <DialogContent className="sm:max-w-[540px] max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
-                            <Building2 className="h-5 w-5 text-brand" /> Club Payment Account &amp; Stripe Setup
+                            <Building2 className="h-5 w-5 text-brand" /> Club Payment Account &amp; Guided Stripe Setup
                         </DialogTitle>
                         <DialogDescription className="text-xs">
-                            Set the club payment account name displayed on every payment request and link your bank account via Stripe Connect for automatic payouts.
+                            ClubFlow pre-fills your club&apos;s Sports Club industry code, website, and description for Stripe Express so you can link your UK bank account in under 2 minutes.
                         </DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4 py-2">
+                        {/* Account Holder Type Selector */}
                         <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold">Payment Account Name (Shown on Requests)</Label>
+                            <Label className="text-xs font-semibold">1. Club Structure / Account Holder Type</Label>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setPayoutAccount({ ...payoutAccount, accountHolderType: "individual" })
+                                    }
+                                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                                        payoutAccount.accountHolderType === "individual"
+                                            ? "bg-brand/15 border-brand text-foreground"
+                                            : "bg-surface-1 border-border text-muted-foreground hover:text-foreground"
+                                    }`}
+                                >
+                                    <span className="block text-xs font-bold">Unincorporated / Treasurer</span>
+                                    <span className="block text-[10px] text-muted-foreground mt-0.5">
+                                        Best for grassroots clubs (No Companies House # needed)
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setPayoutAccount({ ...payoutAccount, accountHolderType: "non_profit" })
+                                    }
+                                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                                        payoutAccount.accountHolderType === "non_profit"
+                                            ? "bg-brand/15 border-brand text-foreground"
+                                            : "bg-surface-1 border-border text-muted-foreground hover:text-foreground"
+                                    }`}
+                                >
+                                    <span className="block text-xs font-bold">Non-Profit / Charity</span>
+                                    <span className="block text-[10px] text-muted-foreground mt-0.5">
+                                        Registered CASC or charity club
+                                    </span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setPayoutAccount({ ...payoutAccount, accountHolderType: "company" })
+                                    }
+                                    className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
+                                        payoutAccount.accountHolderType === "company"
+                                            ? "bg-brand/15 border-brand text-foreground"
+                                            : "bg-surface-1 border-border text-muted-foreground hover:text-foreground"
+                                    }`}
+                                >
+                                    <span className="block text-xs font-bold">Registered Ltd Company</span>
+                                    <span className="block text-[10px] text-muted-foreground mt-0.5">
+                                        Incorporated football club (Ltd)
+                                    </span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Treasurer / Representative Pre-Fill (for Express) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                            <div className="space-y-1">
+                                <Label className="text-[11px] font-semibold">Treasurer First Name</Label>
+                                <Input
+                                    placeholder="e.g. Leon"
+                                    value={payoutAccount.treasurerFirstName}
+                                    onChange={e =>
+                                        setPayoutAccount({ ...payoutAccount, treasurerFirstName: e.target.value })
+                                    }
+                                    className="h-8 text-xs"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[11px] font-semibold">Treasurer Last Name</Label>
+                                <Input
+                                    placeholder="e.g. Smith"
+                                    value={payoutAccount.treasurerLastName}
+                                    onChange={e =>
+                                        setPayoutAccount({ ...payoutAccount, treasurerLastName: e.target.value })
+                                    }
+                                    className="h-8 text-xs"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <Label className="text-[11px] font-semibold">Treasurer Email</Label>
+                                <Input
+                                    type="email"
+                                    placeholder="club@email.com"
+                                    value={payoutAccount.treasurerEmail}
+                                    onChange={e =>
+                                        setPayoutAccount({ ...payoutAccount, treasurerEmail: e.target.value })
+                                    }
+                                    className="h-8 text-xs"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-semibold">2. Payment Account Name (Shown on Player Requests)</Label>
                             <Input
-                                placeholder="e.g. Camden United First Team Kitty"
+                                placeholder="e.g. Camden United Club Account"
                                 value={payoutAccount.accountName}
                                 onChange={e =>
                                     setPayoutAccount({ ...payoutAccount, accountName: e.target.value })
@@ -1519,7 +1638,7 @@ export default function PlayerPaymentsPage() {
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label className="text-xs font-semibold">Default Transaction Fee Setting</Label>
+                            <Label className="text-xs font-semibold">3. Default Transaction Fee Setting</Label>
                             <select
                                 value={payoutAccount.defaultFeeCoverage}
                                 onChange={e =>
@@ -1539,36 +1658,91 @@ export default function PlayerPaymentsPage() {
                             </select>
                         </div>
 
+                        {/* Pre-Filled Express Setup Summary */}
                         <div className="p-3.5 rounded-xl bg-surface-1 border border-border space-y-2.5">
                             <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold text-foreground">Stripe Direct Payout Connection</span>
+                                <span className="text-xs font-bold text-foreground">
+                                    Stripe Express Direct Payout Connection
+                                </span>
                                 {onboardingComplete ? (
                                     <Badge className="bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30 text-[10px]">
-                                        Connected
+                                        ✓ Connected
                                     </Badge>
                                 ) : (
-                                    <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px]">
-                                        Not Yet Linked
+                                    <Badge className="bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30 text-[10px]">
+                                        Pre-Filled by ClubFlow
                                     </Badge>
                                 )}
                             </div>
-                            <p className="text-[11px] text-muted-foreground">
-                                Linking your club bank account with Stripe enables instant Apple Pay, Google Pay, and Card checkout for your players, with automatic split payouts to your club and ClubFlow.
-                            </p>
-                            <Button
-                                type="button"
-                                size="sm"
-                                onClick={handleConnectStripe}
-                                disabled={onboardingLoading}
-                                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
-                            >
-                                <CreditCard className="h-3.5 w-3.5 mr-1.5" />
-                                {onboardingLoading
-                                    ? "Opening Stripe Onboarding..."
-                                    : onboardingComplete
-                                    ? "Update Connected Bank Account in Stripe"
-                                    : "Link Club Bank Account via Stripe"}
-                            </Button>
+
+                            <div className="text-[11px] text-muted-foreground space-y-1 bg-background/60 p-2.5 rounded-lg border border-border/60">
+                                <p className="font-semibold text-foreground text-xs mb-1">
+                                    What ClubFlow automatically fills in for you on Stripe:
+                                </p>
+                                <p>✓ <strong>Industry Code:</strong> Sports Clubs / Amateur Athletics (MCC 7941)</p>
+                                <p>✓ <strong>Club Website:</strong> Your ClubFlow Pay Portal URL (no external site needed)</p>
+                                <p>✓ <strong>Statement Descriptor:</strong> {(settings.name || "CLUBFLOW").toUpperCase().slice(0, 22)}</p>
+                                <p>✓ <strong>Daily Auto-Payouts:</strong> Enabled to your UK Sort Code &amp; Account Number</p>
+                            </div>
+
+                            {(payoutAccount.sortCode || payoutAccount.accountNumber) && (
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                        navigator.clipboard.writeText(
+                                            `Sort Code: ${payoutAccount.sortCode} | Account Number: ${payoutAccount.accountNumber}`
+                                        );
+                                        setCopiedBankDetails(true);
+                                        setTimeout(() => setCopiedBankDetails(false), 2000);
+                                    }}
+                                    className="w-full h-8 text-xs font-semibold"
+                                >
+                                    {copiedBankDetails ? (
+                                        <>
+                                            <Check className="h-3.5 w-3.5 mr-1.5 text-emerald-500" />
+                                            Copied Sort Code &amp; Account Number!
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Copy className="h-3.5 w-3.5 mr-1.5" />
+                                            Copy Sort Code ({payoutAccount.sortCode}) &amp; Acc ({payoutAccount.accountNumber}) for Stripe
+                                        </>
+                                    )}
+                                </Button>
+                            )}
+
+                            <div className="flex flex-col sm:flex-row gap-2">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => handleConnectStripe({ action: "onboarding" })}
+                                    disabled={onboardingLoading}
+                                    className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold"
+                                >
+                                    <CreditCard className="h-3.5 w-3.5 mr-1.5" />
+                                    {onboardingLoading
+                                        ? "Launching Pre-Filled Stripe Express..."
+                                        : onboardingComplete
+                                        ? "Update Bank Account in Stripe Express"
+                                        : "Launch Guided Stripe Express Setup"}
+                                </Button>
+
+                                {connectAccount && !onboardingComplete && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handleConnectStripe({ resetAccount: true, action: "onboarding" })}
+                                        disabled={onboardingLoading}
+                                        className="text-xs font-semibold"
+                                        title="Start a fresh Stripe Express account with the pre-filled settings above"
+                                    >
+                                        Start Fresh Express Account
+                                    </Button>
+                                )}
+                            </div>
                         </div>
                     </div>
 
