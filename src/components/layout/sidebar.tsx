@@ -69,7 +69,6 @@ const navItems: NavItem[] = [
             { label: "Players", href: "/squad" },
             { label: "Matchday XI", href: "/matchday-xi" },
             { label: "Squad Planner", href: "/squad-planner" },
-            { label: "Fines & Kitty", href: "/player-payments" },
         ]
     },
     { label: "Training", href: "/training", icon: Activity },
@@ -78,9 +77,8 @@ const navItems: NavItem[] = [
     {
         label: "Analysis",
         icon: Target,
-        href: "/analysis",
+        href: "/opposition",
         subItems: [
-            { label: "Match Analysis", href: "/analysis" },
             { label: "Opposition Reports", href: "/opposition" },
             { label: "Statistics", href: "/stats" },
         ]
@@ -97,7 +95,6 @@ const navItems: NavItem[] = [
             { label: "Documents", href: "/documents" },
             { label: "Staff", href: "/staff" },
             { label: "Settings", href: "/admin" },
-            { label: "Billing & Subscriptions", href: "/dashboard/billing" },
         ]
     }
 ];
