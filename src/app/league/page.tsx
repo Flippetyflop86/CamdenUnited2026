@@ -686,7 +686,7 @@ export default function LeagueTablePage() {
         }
     }, [clubId, settings.leagueUrl, settings.name]);
 
-    // Render Social Media Standings Graphic onto HTML5 Canvas (Feature #7)
+    // Render Social Media Standings Graphic onto HTML5 Canvas (Feature #7) — 2x Retina Ultra-HD
     useEffect(() => {
         if (!showShareModal || !shareCanvasRef.current || !currentTable || currentTable.length === 0) return;
 
@@ -694,17 +694,18 @@ export default function LeagueTablePage() {
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
+        const scale = 2; // 2x Retina Ultra-HD (2160px wide) for crystal-clear text on phones & social media
         const rowsToDraw = graphicScope === 'top8' ? currentTable.slice(0, 8) : currentTable;
         const width = 1080;
-        const rowHeight = graphicScope === 'top8' ? 76 : Math.max(54, Math.min(68, Math.floor(960 / Math.max(rowsToDraw.length, 1))));
+        const rowHeight = graphicScope === 'top8' ? 76 : Math.max(56, Math.min(68, Math.floor(960 / Math.max(rowsToDraw.length, 1))));
         const headerHeight = 340;
         const tableHeaderHeight = 58;
         const footerHeight = 110;
         const calculatedHeight = headerHeight + tableHeaderHeight + rowsToDraw.length * rowHeight + footerHeight;
         const height = graphicFormat === 'story' ? Math.max(1920, calculatedHeight) : Math.max(1350, calculatedHeight);
 
-        canvas.width = width;
-        canvas.height = height;
+        canvas.width = width * scale;
+        canvas.height = height * scale;
 
         const brandHex = (settings.primaryColor || settings.homeKitShirt || "#dc2626").trim();
         const secondaryHex = (settings.secondaryColor || "#111827").trim();
@@ -735,6 +736,11 @@ export default function LeagueTablePage() {
             : { r: Math.round(sRgb.r * 0.35), g: Math.round(sRgb.g * 0.35), b: Math.round(sRgb.b * 0.4) };
 
         const drawGraphic = (logoImg?: HTMLImageElement) => {
+            ctx.save();
+            ctx.scale(scale, scale);
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = "high";
+
             // Club-coloured background gradient derived from the user's club colours
             const bgGrad = ctx.createLinearGradient(0, 0, width, height);
             bgGrad.addColorStop(0, `rgb(${Math.round(pRgb.r * 0.36)}, ${Math.round(pRgb.g * 0.36)}, ${Math.round(pRgb.b * 0.38)})`);
@@ -774,12 +780,12 @@ export default function LeagueTablePage() {
                 textStartX = 200;
             }
 
-            ctx.fillStyle = "rgba(255,255,255,0.85)";
-            ctx.font = "800 24px Inter, system-ui, sans-serif";
+            ctx.fillStyle = "rgba(255,255,255,0.92)";
+            ctx.font = "800 25px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
             ctx.fillText((settings.name || "CAMDEN UNITED").toUpperCase(), textStartX, 116);
 
             ctx.fillStyle = "#ffffff";
-            ctx.font = "900 68px Inter, system-ui, sans-serif";
+            ctx.font = "900 68px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
             ctx.fillText("AS IT STANDS", textStartX, 182);
 
             const kpiY = 228;
@@ -789,34 +795,34 @@ export default function LeagueTablePage() {
                 { label: "RECORD", value: `${ourRow.won}W ${ourRow.drawn}D ${ourRow.lost}L` },
                 { label: "GOAL DIFF", value: ourRow.goal_difference > 0 ? `+${ourRow.goal_difference}` : `${ourRow.goal_difference}` }
             ];
-            const cardW = (width - 128 - 36) / 4;
+            const cardW = Math.floor((width - 128 - 36) / 4);
             kpis.forEach((k, i) => {
-                const x = 64 + i * (cardW + 12);
-                ctx.fillStyle = i === 0 ? `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.35)` : "rgba(255,255,255,0.06)";
-                ctx.strokeStyle = i === 0 ? brandHex : `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.25)`;
+                const x = Math.round(64 + i * (cardW + 12));
+                ctx.fillStyle = i === 0 ? `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.38)` : "rgba(255,255,255,0.08)";
+                ctx.strokeStyle = i === 0 ? brandHex : `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.3)`;
                 ctx.lineWidth = 2;
                 ctx.beginPath();
                 ctx.roundRect(x, kpiY, cardW, 78, 14);
                 ctx.fill();
                 ctx.stroke();
 
-                ctx.fillStyle = "rgba(255,255,255,0.65)";
-                ctx.font = "bold 15px Inter, system-ui, sans-serif";
+                ctx.fillStyle = "rgba(255,255,255,0.78)";
+                ctx.font = "700 15px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
                 ctx.fillText(k.label, x + 20, kpiY + 28);
 
                 ctx.fillStyle = "#ffffff";
-                ctx.font = "900 28px Inter, system-ui, sans-serif";
-                ctx.fillText(k.value, x + 20, kpiY + 60);
+                ctx.font = "900 29px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+                ctx.fillText(k.value, x + 20, kpiY + 61);
             });
 
             const tableTop = headerHeight;
-            ctx.fillStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.22)`;
+            ctx.fillStyle = `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.28)`;
             ctx.beginPath();
             ctx.roundRect(64, tableTop, width - 128, tableHeaderHeight, [14, 14, 0, 0]);
             ctx.fill();
 
-            ctx.fillStyle = "rgba(255,255,255,0.75)";
-            ctx.font = "bold 20px Inter, system-ui, sans-serif";
+            ctx.fillStyle = "rgba(255,255,255,0.9)";
+            ctx.font = "800 20px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
             ctx.textAlign = "center";
             ctx.fillText("POS", 110, tableTop + 36);
             ctx.textAlign = "left";
@@ -833,15 +839,15 @@ export default function LeagueTablePage() {
             cols.forEach(c => ctx.fillText(c.label, c.x, tableTop + 36));
 
             rowsToDraw.forEach((row, idx) => {
-                const y = tableTop + tableHeaderHeight + idx * rowHeight;
+                const y = Math.round(tableTop + tableHeaderHeight + idx * rowHeight);
                 const isOurs = row.is_our_club;
                 const isNextOpp = nextOpponentInfo && !isOurs && isMatchingTeamName(row.team_name, nextOpponentInfo.opponent);
 
                 ctx.fillStyle = isOurs
-                    ? `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.38)`
+                    ? `rgba(${pRgb.r}, ${pRgb.g}, ${pRgb.b}, 0.42)`
                     : idx % 2 === 0
-                        ? "rgba(255,255,255,0.04)"
-                        : "rgba(255,255,255,0.015)";
+                        ? "rgba(255,255,255,0.05)"
+                        : "rgba(255,255,255,0.02)";
                 ctx.fillRect(64, y, width - 128, rowHeight);
 
                 if (isOurs) {
@@ -852,47 +858,54 @@ export default function LeagueTablePage() {
                     ctx.fillRect(64, y, 6, rowHeight);
                 }
 
-                ctx.fillStyle = "rgba(255,255,255,0.07)";
+                ctx.fillStyle = "rgba(255,255,255,0.09)";
                 ctx.fillRect(64, y + rowHeight - 1, width - 128, 1);
 
-                const textY = y + rowHeight / 2 + 8;
+                const textY = Math.round(y + rowHeight / 2 + 8);
                 ctx.textAlign = "center";
-                ctx.fillStyle = isOurs ? "#ffffff" : "#e2e8f0";
-                ctx.font = isOurs ? "900 24px Inter, system-ui, sans-serif" : "bold 22px Inter, system-ui, sans-serif";
+                ctx.fillStyle = "#ffffff";
+                ctx.font = isOurs
+                    ? "900 25px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+                    : "700 23px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
                 ctx.fillText(String(row.position), 110, textY);
 
                 ctx.textAlign = "left";
                 ctx.fillStyle = "#ffffff";
-                ctx.font = isOurs ? "900 25px Inter, system-ui, sans-serif" : "600 23px Inter, system-ui, sans-serif";
+                ctx.font = isOurs
+                    ? "900 26px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+                    : "700 24px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
                 const maxClubName = row.team_name.length > 24 ? row.team_name.slice(0, 23) + "…" : row.team_name;
                 ctx.fillText(maxClubName, 165, textY);
 
                 if (isNextOpp) {
                     const nameWidth = ctx.measureText(maxClubName).width;
-                    const badgeX = Math.min(165 + nameWidth + 14, 510);
-                    ctx.fillStyle = "rgba(245, 158, 11, 0.25)";
+                    const badgeX = Math.round(Math.min(165 + nameWidth + 14, 510));
+                    ctx.fillStyle = "rgba(245, 158, 11, 0.28)";
                     ctx.beginPath();
-                    ctx.roundRect(badgeX, y + rowHeight / 2 - 14, 92, 26, 6);
+                    ctx.roundRect(badgeX, Math.round(y + rowHeight / 2 - 14), 92, 26, 6);
                     ctx.fill();
                     ctx.fillStyle = "#fbbf24";
-                    ctx.font = "bold 13px Inter, system-ui, sans-serif";
-                    ctx.fillText("NEXT UP", badgeX + 14, y + rowHeight / 2 + 4);
+                    ctx.font = "800 13px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+                    ctx.fillText("NEXT UP", badgeX + 14, Math.round(y + rowHeight / 2 + 4));
                 }
 
                 ctx.textAlign = "center";
-                ctx.font = isOurs ? "bold 23px Inter, system-ui, sans-serif" : "500 22px Inter, system-ui, sans-serif";
-                ctx.fillStyle = isOurs ? "#ffffff" : "#e2e8f0";
+                ctx.font = isOurs
+                    ? "800 24px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+                    : "600 23px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
+                ctx.fillStyle = "#ffffff";
                 ctx.fillText(String(row.played), 640, textY);
                 ctx.fillText(String(row.won), 705, textY);
                 ctx.fillText(String(row.drawn), 770, textY);
                 ctx.fillText(String(row.lost), 835, textY);
 
                 const gdStr = row.goal_difference > 0 ? `+${row.goal_difference}` : String(row.goal_difference);
-                ctx.fillStyle = row.goal_difference > 0 ? "#4ade80" : row.goal_difference < 0 ? "#f87171" : "#cbd5e1";
+                ctx.fillStyle = row.goal_difference > 0 ? "#4ade80" : row.goal_difference < 0 ? "#f87171" : "#e2e8f0";
+                ctx.font = "700 23px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
                 ctx.fillText(gdStr, 905, textY);
 
                 ctx.fillStyle = "#ffffff";
-                ctx.font = "900 25px Inter, system-ui, sans-serif";
+                ctx.font = "900 26px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
                 ctx.fillText(String(row.points), 975, textY);
             });
 
@@ -903,9 +916,11 @@ export default function LeagueTablePage() {
             ctx.fill();
 
             ctx.textAlign = "left";
-            ctx.fillStyle = "rgba(255,255,255,0.65)";
-            ctx.font = "600 20px Inter, system-ui, sans-serif";
+            ctx.fillStyle = "rgba(255,255,255,0.82)";
+            ctx.font = "700 21px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
             ctx.fillText(`Powered by ClubFlow • ${settings.name || "Camden United"}`, 88, height - 42);
+
+            ctx.restore();
         };
 
         if (settings.logo) {
@@ -924,14 +939,25 @@ export default function LeagueTablePage() {
         const link = document.createElement('a');
         const slug = (settings.name || "club").toLowerCase().replace(/[^a-z0-9]+/g, '-');
         link.download = `${slug}-league-standings.png`;
-        link.href = shareCanvasRef.current.toDataURL('image/png');
+        link.href = shareCanvasRef.current.toDataURL('image/png', 1.0);
         link.click();
     };
 
     const handleCopyGraphic = async () => {
         if (!shareCanvasRef.current) return;
         try {
-            const blob = await new Promise<Blob | null>(resolve => shareCanvasRef.current?.toBlob(resolve, 'image/png'));
+            const blob = await new Promise<Blob | null>(resolve => shareCanvasRef.current?.toBlob(resolve, 'image/png', 1.0));
+            if (blob && typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
+                const slug = (settings.name || "club").toLowerCase().replace(/[^a-z0-9]+/g, '-');
+                const file = new File([blob], `${slug}-league-standings.png`, { type: 'image/png' });
+                if (navigator.canShare({ files: [file] })) {
+                    await navigator.share({
+                        files: [file],
+                        title: `${settings.name || "Club"} League Standings`,
+                    });
+                    return;
+                }
+            }
             if (blob && navigator.clipboard && (window as any).ClipboardItem) {
                 await navigator.clipboard.write([new (window as any).ClipboardItem({ 'image/png': blob })]);
                 setCopiedGraphic(true);
@@ -1524,7 +1550,7 @@ export default function LeagueTablePage() {
                             className="h-8 px-2 text-[11px] font-semibold border-brand/30 text-brand hover:bg-brand/10 w-full truncate"
                         >
                             <Share2 className="h-3.5 w-3.5 mr-1 shrink-0" />
-                            <span className="truncate">Share Graphic</span>
+                            <span className="truncate">Share</span>
                         </Button>
                         {urlInput ? (
                             <Button
@@ -1600,7 +1626,7 @@ export default function LeagueTablePage() {
                             className="border-brand/30 text-brand hover:bg-brand/10"
                         >
                             <Share2 className="h-4 w-4 mr-1.5" />
-                            Share Table Graphic
+                            Share
                         </Button>
 
                         {urlInput && (
@@ -2384,9 +2410,9 @@ export default function LeagueTablePage() {
                             </div>
 
                             <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-1">
-                                <Button variant="outline" onClick={handleCopyGraphic} className="w-full sm:w-auto">
-                                    <Copy className="h-4 w-4 mr-1.5" />
-                                    {copiedGraphic ? "Copied to Clipboard!" : "Copy for WhatsApp / Social"}
+                                <Button variant="outline" onClick={handleCopyGraphic} className="w-full sm:w-auto font-semibold">
+                                    <Share2 className="h-4 w-4 mr-1.5" />
+                                    {copiedGraphic ? "Copied to Clipboard!" : "Share"}
                                 </Button>
                                 <Button onClick={handleDownloadGraphic} className="bg-brand hover:bg-brand/90 text-white font-semibold w-full sm:w-auto">
                                     <Download className="h-4 w-4 mr-1.5" />
