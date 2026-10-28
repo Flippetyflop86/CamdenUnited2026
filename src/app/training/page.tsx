@@ -1236,17 +1236,165 @@ export default function TrainingPage() {
         document.body.removeChild(link);
     };
 
+    const trackedPlayersForKpi = scopedPlayerStats.filter(p => p.stats.total > 0);
+    const mobileSquadAvgRate = trackedPlayersForKpi.length > 0
+        ? Math.round(trackedPlayersForKpi.reduce((sum, p) => sum + p.stats.percentage, 0) / trackedPlayersForKpi.length)
+        : 0;
+    const mobileBestStreak = trackedPlayersForKpi.reduce((max, p) => Math.max(max, p.stats.streak), 0);
+
     return (
-        <div className="space-y-8 pb-12">
-            <PageHeader 
-                title="Training Schedule" 
-                description="Plan the week and prepare your squad for the next football activity." 
-            />
+        <div className="space-y-4 md:space-y-8 pb-12">
+            {/* =========================================================
+                MOBILE TRAINING HEADER & 4-STAT BENTO STRIP (< 768px)
+               ========================================================= */}
+            <div className="md:hidden space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                    <div>
+                        <h1 className="text-xl font-black tracking-tight text-foreground leading-none">
+                            Training Hub
+                        </h1>
+                        <p className="text-[11px] text-muted-foreground font-medium mt-1">
+                            Sessions, registers &amp; commitment tracker
+                        </p>
+                    </div>
+                    <Button
+                        size="sm"
+                        className="bg-brand hover:bg-brand/90 text-white font-bold h-9 px-3 rounded-xl shadow-sm shrink-0"
+                        onClick={handleOpenNew}
+                    >
+                        <Plus className="h-4 w-4 mr-1" /> Schedule
+                    </Button>
+                </div>
+
+                <div className="grid grid-cols-4 gap-2">
+                    <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-xs">
+                        <span className="text-[9px] uppercase tracking-wider font-extrabold text-indigo-600 dark:text-indigo-400 block">
+                            Upcoming
+                        </span>
+                        <span className="text-lg font-black text-foreground leading-tight block mt-0.5">
+                            {trueUpcomingSessions.length}
+                        </span>
+                    </div>
+                    <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-xs">
+                        <span className="text-[9px] uppercase tracking-wider font-extrabold text-muted-foreground block">
+                            Tracked
+                        </span>
+                        <span className="text-lg font-black text-foreground leading-tight block mt-0.5">
+                            {leaderboardSessions.length}
+                        </span>
+                    </div>
+                    <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-xs">
+                        <span className="text-[9px] uppercase tracking-wider font-extrabold text-emerald-600 dark:text-emerald-400 block">
+                            Squad Avg
+                        </span>
+                        <span className="text-lg font-black text-foreground leading-tight block mt-0.5">
+                            {mobileSquadAvgRate}%
+                        </span>
+                    </div>
+                    <div className="bg-surface-1 border border-border rounded-xl p-2.5 shadow-xs">
+                        <span className="text-[9px] uppercase tracking-wider font-extrabold text-amber-600 dark:text-amber-400 block truncate">
+                            Best Streak
+                        </span>
+                        <span className="text-lg font-black text-foreground leading-tight block mt-0.5">
+                            🔥 {mobileBestStreak}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            {/* =========================================================
+                DESKTOP PAGE HEADER (>= 768px) — UNTOUCHED
+               ========================================================= */}
+            <div className="hidden md:block">
+                <PageHeader 
+                    title="Training Schedule" 
+                    description="Plan the week and prepare your squad for the next football activity." 
+                />
+            </div>
 
             {/* LEVEL 0: Football Week */}
             <WeeklyFootballCalendar title="Training Week" />
 
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            {/* =========================================================
+                MOBILE WORKSPACE SWITCHER & FILTER BAR (< 768px)
+               ========================================================= */}
+            <div className="md:hidden space-y-2.5">
+                <div className="grid grid-cols-2 gap-1.5 bg-surface-1 p-1 rounded-xl border border-border shadow-xs">
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('sessions')}
+                        className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                            activeTab === 'sessions'
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        <CalendarDays className="h-3.5 w-3.5 text-brand" />
+                        <span>Schedule ({displaySessions.length})</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('stats')}
+                        className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold transition-all ${
+                            activeTab === 'stats'
+                                ? 'bg-background text-foreground shadow-sm'
+                                : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                    >
+                        <BarChart3 className="h-3.5 w-3.5 text-emerald-500" />
+                        <span>Attendance ({playerStats.length})</span>
+                    </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                    <select
+                        value={squadFilter}
+                        onChange={(e) => setSquadFilter(e.target.value)}
+                        className="h-9 w-full rounded-xl border border-border bg-surface-1 px-2.5 text-xs font-bold text-foreground shadow-xs focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer"
+                    >
+                        <option value="All">All Squads</option>
+                        {currentSquads.map((squad) => (
+                            <option key={squad} value={squad}>
+                                {squad}
+                            </option>
+                        ))}
+                    </select>
+
+                    {activeTab === 'sessions' ? (
+                        <select
+                            value={timeFilter}
+                            onChange={(e: any) => setTimeFilter(e.target.value)}
+                            className="h-9 w-full rounded-xl border border-border bg-surface-1 px-2.5 text-xs font-bold text-foreground shadow-xs focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer"
+                        >
+                            <option value="upcoming">Upcoming Sessions</option>
+                            <option value="past">Past Sessions</option>
+                            <option value="all">All Sessions</option>
+                        </select>
+                    ) : (
+                        <select
+                            value={`${attendanceSortBy}:${attendanceSortDir}`}
+                            onChange={(e) => {
+                                const [col, dir] = e.target.value.split(":") as [any, "asc" | "desc"];
+                                setAttendanceSortBy(col);
+                                setAttendanceSortDir(dir);
+                            }}
+                            className="h-9 w-full rounded-xl border border-border bg-surface-1 px-2.5 text-xs font-bold text-foreground shadow-xs focus:outline-none focus:ring-1 focus:ring-brand cursor-pointer"
+                        >
+                            <option value="percentage:desc">Sort: Highest %</option>
+                            <option value="percentage:asc">Sort: Lowest %</option>
+                            <option value="attended:desc">Sort: Most Attended</option>
+                            <option value="last5:desc">Sort: Best Last 5</option>
+                            <option value="late:desc">Sort: Most Late</option>
+                            <option value="player:asc">Sort: Name (A–Z)</option>
+                        </select>
+                    )}
+                </div>
+            </div>
+
+            {/* =========================================================
+                DESKTOP FILTER BAR (>= 768px) — UNTOUCHED
+               ========================================================= */}
+            <div className="hidden md:flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-wrap items-center gap-3">
                     <div className="flex bg-surface-1 p-1 rounded-lg border border-border">
                         <button
@@ -1295,194 +1443,669 @@ export default function TrainingPage() {
             </div>
 
             {activeTab === 'sessions' ? (
-                <div className="space-y-8">
-                    {/* The Next Session (Command Center) */}
-                    {trueUpcomingSessions.length > 0 && (
-                        <PageSection>
-                            <div className="flex flex-col space-y-4">
-                                <div className="flex flex-col sm:flex-row sm:items-baseline gap-2">
-                                    <h3 className="text-xl font-bold tracking-tight text-foreground">Next Session</h3>
-                                    <span className="text-sm text-muted-foreground font-medium">Preparing for {trueUpcomingSessions[0].topic || "next match"}</span>
+                <>
+                    {/* =========================================================
+                        MOBILE SCHEDULE VIEW (< 768px)
+                       ========================================================= */}
+                    <div className="md:hidden space-y-5">
+                        {/* Next Session Mobile Command Card */}
+                        {trueUpcomingSessions.length > 0 && timeFilter !== "past" && (
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between px-0.5">
+                                    <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
+                                        Next Session
+                                    </span>
+                                    <span className="text-[11px] font-semibold text-brand">
+                                        {formatSquad(trueUpcomingSessions[0].squad)}
+                                    </span>
                                 </div>
 
-                                <Card className="overflow-hidden border-border bg-background shadow-md">
-                                    <div className="p-6 md:p-8 flex flex-col md:flex-row gap-8">
-                                        {/* Left Col: Coaching Objective & Session Info */}
-                                        <div className="flex-1 space-y-6">
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <Badge variant="secondary" className="bg-brand/10 text-brand hover:bg-brand/20">{formatSquad(trueUpcomingSessions[0].squad)}</Badge>
-                                                </div>
-                                                <h4 className="text-3xl font-bold tracking-tight text-foreground">
-                                                    {trueUpcomingSessions[0].topic || "General Preparation"}
-                                                </h4>
+                                <div className="rounded-2xl border border-border bg-surface-1 p-4 shadow-sm space-y-3.5">
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-1.5 mb-1">
+                                                <Badge variant="secondary" className="bg-brand/10 text-brand text-[10px] font-bold px-2 py-0">
+                                                    {formatSquad(trueUpcomingSessions[0].squad)}
+                                                </Badge>
+                                                <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border border-emerald-500/25 px-1.5 py-0 rounded">
+                                                    UPCOMING
+                                                </span>
                                             </div>
+                                            <h3 className="text-lg font-black text-foreground tracking-tight leading-snug">
+                                                {trueUpcomingSessions[0].topic || "General Preparation"}
+                                            </h3>
+                                        </div>
 
-                                            <div className="flex flex-col gap-3 text-slate-600 font-medium">
-                                                <div className="flex items-center gap-3">
-                                                    <CalendarDays className="h-5 w-5 text-muted-foreground" />
-                                                    <span>{formatTrainingDate(trueUpcomingSessions[0].date)}</span>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <Clock className="h-5 w-5 text-muted-foreground" />
-                                                    <span>{formatTime12h(trueUpcomingSessions[0].time).time}</span>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <MapPin className="h-5 w-5 text-muted-foreground" />
-                                                    <span>{trueUpcomingSessions[0].location}</span>
-                                                </div>
-                                            </div>
-                                            
-                                            <div className="flex gap-3 pt-2">
-                                                <Button className="bg-brand hover:bg-brand/90" asChild>
-                                                    <Link href={`/training/${trueUpcomingSessions[0].id}`}>Manage Session</Link>
-                                                </Button>
-                                                <Button variant="outline" className="border-border text-foreground" onClick={() => handleEdit(trueUpcomingSessions[0])}>
-                                                    <Pencil className="h-4 w-4 mr-2" /> Edit Session
-                                                </Button>
-                                            </div>
+                                        <div className="flex items-center gap-1 shrink-0">
+                                            <button
+                                                type="button"
+                                                onClick={() => handleOpenShare(trueUpcomingSessions[0])}
+                                                className="h-8 w-8 rounded-lg border border-border bg-surface-2 flex items-center justify-center text-muted-foreground hover:text-emerald-600 active:scale-95 transition-all"
+                                                title="Share WhatsApp Poll"
+                                            >
+                                                <MessageCircle className="h-3.5 w-3.5" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={(e) => handleRepeatNextWeek(trueUpcomingSessions[0], e)}
+                                                className="h-8 w-8 rounded-lg border border-border bg-surface-2 flex items-center justify-center text-muted-foreground hover:text-brand active:scale-95 transition-all"
+                                                title="Repeat Next Week"
+                                            >
+                                                <Repeat className="h-3.5 w-3.5" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleEdit(trueUpcomingSessions[0])}
+                                                className="h-8 w-8 rounded-lg border border-border bg-surface-2 flex items-center justify-center text-muted-foreground hover:text-foreground active:scale-95 transition-all"
+                                                title="Edit Session"
+                                            >
+                                                <Pencil className="h-3.5 w-3.5" />
+                                            </button>
                                         </div>
                                     </div>
-                                </Card>
-                            </div>
-                        </PageSection>
-                    )}
 
-                    {/* Upcoming Journey */}
-                    {trueUpcomingSessions.length > 1 && (
-                        <PageSection>
-                            <SectionHeader title="Upcoming Journey" description="Future sessions leading to the match." />
-                            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                                {trueUpcomingSessions.slice(1).map((session) => (
-                                    <Card 
-                                        key={session.id} 
-                                        onClick={() => window.location.href = `/training/${session.id}`}
-                                        className="hover:shadow-md transition-shadow cursor-pointer border-border group relative bg-card"
-                                    >
-                                        <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-brand" onClick={(e) => handleRepeatNextWeek(session, e)} title="Repeat Next Week">
-                                                <Repeat className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-600" onClick={(e) => { e.stopPropagation(); handleEdit(session); }}>
-                                                <Pencil className="h-4 w-4" />
-                                            </Button>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-status-error" onClick={(e) => { e.stopPropagation(); handleDelete(session.id); }}>
-                                                <Trash2 className="h-4 w-4" />
-                                            </Button>
+                                    {/* Compact Info Strip */}
+                                    <div className="bg-surface-2/60 rounded-xl p-2.5 border border-border/60 space-y-1.5 text-xs">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <span className="inline-flex items-center gap-1.5 font-semibold text-foreground">
+                                                <CalendarDays className="h-3.5 w-3.5 text-brand shrink-0" />
+                                                {formatTrainingDate(trueUpcomingSessions[0].date)}
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 font-bold text-foreground shrink-0">
+                                                <Clock className="h-3.5 w-3.5 text-brand shrink-0" />
+                                                {formatTime12h(trueUpcomingSessions[0].time).time}
+                                            </span>
                                         </div>
-                                        <CardHeader className="pb-2">
-                                            <div className="flex justify-between items-start pr-16">
-                                                <Badge variant="secondary" className="bg-surface-1 text-muted-foreground border-border">{formatSquad(session.squad)}</Badge>
+                                        {trueUpcomingSessions[0].location && (
+                                            <div className="flex items-center gap-1.5 text-muted-foreground font-medium pt-1 border-t border-border/50">
+                                                <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                <span className="truncate">{trueUpcomingSessions[0].location}</span>
                                             </div>
-                                            <CardTitle className="text-lg mt-2 text-foreground">{session.topic || "General Preparation"}</CardTitle>
-                                            <CardDescription className="flex items-center gap-1 font-medium">
-                                                <CalendarDays className="h-3 w-3" /> {formatDate(session.date)} • {formatTime12h(session.time).time}
-                                            </CardDescription>
-                                        </CardHeader>
-                                    </Card>
-                                ))}
+                                        )}
+                                    </div>
+
+                                    {/* Mobile Action Row */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Button className="w-full bg-brand hover:bg-brand/90 text-white font-bold h-9 rounded-xl text-xs shadow-xs" asChild>
+                                            <Link href={`/training/${trueUpcomingSessions[0].id}`}>
+                                                Manage Register
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            className="w-full border-border bg-surface-2/60 text-foreground font-bold h-9 rounded-xl text-xs"
+                                            onClick={() => handleOpenShare(trueUpcomingSessions[0])}
+                                        >
+                                            <MessageCircle className="h-3.5 w-3.5 mr-1.5 text-emerald-500" />
+                                            WhatsApp Poll
+                                        </Button>
+                                    </div>
+                                </div>
                             </div>
-                        </PageSection>
-                    )}
+                        )}
 
-                    {/* Historical Record */}
-                    {displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]).length > 0 && (
-                        <PageSection>
-                            <SectionHeader title="Historical Record" description="Past sessions, squad turnout %, punctuality, and trialist records." />
-                            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                                {displaySessions
-                                    .filter(s => s.date < new Date().toISOString().split("T")[0])
-                                    .map((session) => {
-                                        const stats = getSessionAttendanceStats(session);
-                                        const turnoutTier =
-                                            stats.percentage >= 75
-                                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/35"
-                                                : stats.percentage >= 50
-                                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/35"
-                                                : "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/35";
-                                        const barColor =
-                                            stats.percentage >= 75
-                                                ? "bg-emerald-500"
-                                                : stats.percentage >= 50
-                                                ? "bg-amber-500"
-                                                : "bg-rose-500";
-
-                                        return (
-                                            <Card 
-                                                key={session.id} 
-                                                onClick={() => window.location.href = `/training/${session.id}`}
-                                                className="hover:shadow-md transition-all cursor-pointer border-border bg-card hover:bg-surface-1/60 group"
-                                            >
-                                                <CardHeader className="pb-2.5">
-                                                    <div className="flex justify-between items-start gap-2">
-                                                        <CardTitle className="text-base font-bold text-foreground group-hover:text-brand transition-colors line-clamp-1">
-                                                            {session.topic || "General Preparation"}
-                                                        </CardTitle>
-                                                        <Badge variant="secondary" className="bg-surface-1 text-muted-foreground border-border text-[11px] shrink-0">
+                        {/* Upcoming Journey (Mobile Cards with Always-Visible Action Buttons) */}
+                        {trueUpcomingSessions.length > 1 && timeFilter !== "past" && (
+                            <div className="space-y-2.5">
+                                <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground block px-0.5">
+                                    Upcoming Journey ({trueUpcomingSessions.slice(1).length})
+                                </span>
+                                <div className="space-y-2.5">
+                                    {trueUpcomingSessions.slice(1).map((session) => (
+                                        <div
+                                            key={`mob-up-${session.id}`}
+                                            onClick={() => window.location.href = `/training/${session.id}`}
+                                            className="rounded-xl border border-border bg-surface-1 p-3.5 shadow-xs active:bg-surface-2/60 transition-colors cursor-pointer space-y-2"
+                                        >
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-1.5 mb-1">
+                                                        <Badge variant="secondary" className="bg-surface-2 text-muted-foreground border-border text-[10px] font-semibold px-1.5 py-0">
                                                             {formatSquad(session.squad)}
                                                         </Badge>
                                                     </div>
-                                                    <CardDescription className="flex items-center gap-1.5 text-xs font-medium">
-                                                        <CalendarDays className="h-3 w-3 text-muted-foreground shrink-0" />
-                                                        <span>{formatDate(session.date)} • {formatTime12h(session.time).time}</span>
-                                                        {session.location && (
-                                                            <>
-                                                                <span>•</span>
-                                                                <span className="truncate max-w-[130px]">{session.location}</span>
-                                                            </>
-                                                        )}
-                                                    </CardDescription>
-                                                </CardHeader>
-                                                <CardContent className="space-y-2.5 pt-0">
-                                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                                        <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                                                            <span className="h-4 w-4 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-[10px]">✓</span>
+                                                    <h4 className="text-sm font-bold text-foreground truncate">
+                                                        {session.topic || "General Preparation"}
+                                                    </h4>
+                                                </div>
+
+                                                {/* Touch-Friendly Action Buttons (Always visible on mobile) */}
+                                                <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleRepeatNextWeek(session, e)}
+                                                        className="h-7 w-7 rounded-lg border border-border bg-surface-2 flex items-center justify-center text-muted-foreground hover:text-brand"
+                                                        title="Repeat Next Week"
+                                                    >
+                                                        <Repeat className="h-3.5 w-3.5" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleEdit(session)}
+                                                        className="h-7 w-7 rounded-lg border border-border bg-surface-2 flex items-center justify-center text-muted-foreground hover:text-blue-600"
+                                                        title="Edit Session"
+                                                    >
+                                                        <Pencil className="h-3.5 w-3.5" />
+                                                    </button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDelete(session.id)}
+                                                        className="h-7 w-7 rounded-lg border border-border bg-surface-2 flex items-center justify-center text-muted-foreground hover:text-status-error"
+                                                        title="Delete Session"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground font-medium pt-1 border-t border-border/50">
+                                                <span className="inline-flex items-center gap-1">
+                                                    <CalendarDays className="h-3 w-3 shrink-0" />
+                                                    {formatDate(session.date)} • {formatTime12h(session.time).time}
+                                                </span>
+                                                {session.location && (
+                                                    <span className="truncate max-w-[140px]">{session.location}</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Historical Record (Mobile Cards) */}
+                        {displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]).length > 0 && (
+                            <div className="space-y-2.5">
+                                <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground block px-0.5">
+                                    Historical Record ({displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]).length})
+                                </span>
+                                <div className="space-y-2.5">
+                                    {displaySessions
+                                        .filter(s => s.date < new Date().toISOString().split("T")[0])
+                                        .map((session) => {
+                                            const stats = getSessionAttendanceStats(session);
+                                            const turnoutTier =
+                                                stats.percentage >= 75
+                                                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/35"
+                                                    : stats.percentage >= 50
+                                                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/35"
+                                                    : "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/35";
+                                            const barColor =
+                                                stats.percentage >= 75
+                                                    ? "bg-emerald-500"
+                                                    : stats.percentage >= 50
+                                                    ? "bg-amber-500"
+                                                    : "bg-rose-500";
+
+                                            return (
+                                                <div
+                                                    key={`mob-hist-${session.id}`}
+                                                    onClick={() => window.location.href = `/training/${session.id}`}
+                                                    className="rounded-xl border border-border bg-surface-1 p-3.5 shadow-xs active:bg-surface-2/60 transition-colors cursor-pointer space-y-2.5"
+                                                >
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="min-w-0 flex-1">
+                                                            <h4 className="text-sm font-bold text-foreground truncate">
+                                                                {session.topic || "General Preparation"}
+                                                            </h4>
+                                                            <p className="text-[11px] text-muted-foreground font-medium flex items-center gap-1 mt-0.5">
+                                                                <CalendarDays className="h-3 w-3 shrink-0" />
+                                                                <span>{formatDate(session.date)} • {formatTime12h(session.time).time}</span>
+                                                            </p>
+                                                        </div>
+                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold border shrink-0 ${turnoutTier}`}>
+                                                            {stats.percentage}% Turnout
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between gap-2 text-[11px]">
+                                                        <div className="font-semibold text-foreground flex items-center gap-1.5">
+                                                            <span className="h-4 w-4 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-[10px]">
+                                                                ✓
+                                                            </span>
                                                             <span>
                                                                 {stats.regAttendedCount}
                                                                 <span className="text-muted-foreground font-normal">/{stats.totalEligible} Attended</span>
                                                             </span>
                                                         </div>
-                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                        <div className="flex items-center gap-1">
                                                             {stats.lateCount > 0 && (
-                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/35">
-                                                                    🕒 {stats.lateCount} Late
+                                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/35">
+                                                                    🕒 {stats.lateCount}L
                                                                 </span>
                                                             )}
                                                             {stats.trialistAttendedCount > 0 && (
-                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/35">
-                                                                    +{stats.trialistAttendedCount} Trialist{stats.trialistAttendedCount > 1 ? 's' : ''}
+                                                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/35">
+                                                                    +{stats.trialistAttendedCount} Trialist
                                                                 </span>
                                                             )}
-                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${turnoutTier}`}>
-                                                                {stats.percentage}% Turnout
-                                                            </span>
+                                                            <Badge variant="secondary" className="bg-surface-2 text-muted-foreground border-border text-[10px] px-1.5 py-0">
+                                                                {formatSquad(session.squad)}
+                                                            </Badge>
                                                         </div>
                                                     </div>
-                                                    <div className="w-full bg-surface-1 border border-border rounded-full h-1.5 overflow-hidden">
+
+                                                    <div className="w-full bg-surface-2 border border-border/60 rounded-full h-1.5 overflow-hidden">
                                                         <div
                                                             className={`h-full transition-all ${barColor}`}
                                                             style={{ width: `${Math.min(100, stats.percentage)}%` }}
                                                         />
                                                     </div>
-                                                </CardContent>
-                                            </Card>
-                                        );
-                                    })}
+                                                </div>
+                                            );
+                                        })}
+                                </div>
                             </div>
-                        </PageSection>
-                    )}
+                        )}
 
-                    {displaySessions.length === 0 && (
-                        <div className="col-span-full py-16 text-center border-2 border-dashed border-border rounded-xl bg-surface-1">
-                            <h3 className="text-lg font-semibold text-foreground">No sessions planned</h3>
-                            <p className="text-muted-foreground mt-1">Schedule your first training session to begin preparation.</p>
-                            <Button className="bg-brand hover:bg-brand/90 mt-4 text-white" onClick={handleOpenNew}>
-                                Schedule Session
-                            </Button>
-                        </div>
-                    )}
-                </div>
+                        {displaySessions.length === 0 && (
+                            <div className="py-12 px-4 text-center border-2 border-dashed border-border rounded-2xl bg-surface-1">
+                                <h3 className="text-base font-bold text-foreground">No sessions planned</h3>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                    Schedule your first training session to begin preparation.
+                                </p>
+                                <Button className="bg-brand hover:bg-brand/90 mt-3 text-white text-xs font-bold h-9 rounded-xl" onClick={handleOpenNew}>
+                                    Schedule Session
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* =========================================================
+                        DESKTOP SCHEDULE VIEW (>= 768px) — UNTOUCHED
+                       ========================================================= */}
+                    <div className="hidden md:block space-y-8">
+                        {/* The Next Session (Command Center) */}
+                        {trueUpcomingSessions.length > 0 && (
+                            <PageSection>
+                                <div className="flex flex-col space-y-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-baseline gap-2">
+                                        <h3 className="text-xl font-bold tracking-tight text-foreground">Next Session</h3>
+                                        <span className="text-sm text-muted-foreground font-medium">Preparing for {trueUpcomingSessions[0].topic || "next match"}</span>
+                                    </div>
+
+                                    <Card className="overflow-hidden border-border bg-background shadow-md">
+                                        <div className="p-6 md:p-8 flex flex-col md:flex-row gap-8">
+                                            {/* Left Col: Coaching Objective & Session Info */}
+                                            <div className="flex-1 space-y-6">
+                                                <div>
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <Badge variant="secondary" className="bg-brand/10 text-brand hover:bg-brand/20">{formatSquad(trueUpcomingSessions[0].squad)}</Badge>
+                                                    </div>
+                                                    <h4 className="text-3xl font-bold tracking-tight text-foreground">
+                                                        {trueUpcomingSessions[0].topic || "General Preparation"}
+                                                    </h4>
+                                                </div>
+
+                                                <div className="flex flex-col gap-3 text-slate-600 font-medium">
+                                                    <div className="flex items-center gap-3">
+                                                        <CalendarDays className="h-5 w-5 text-muted-foreground" />
+                                                        <span>{formatTrainingDate(trueUpcomingSessions[0].date)}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <Clock className="h-5 w-5 text-muted-foreground" />
+                                                        <span>{formatTime12h(trueUpcomingSessions[0].time).time}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-3">
+                                                        <MapPin className="h-5 w-5 text-muted-foreground" />
+                                                        <span>{trueUpcomingSessions[0].location}</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div className="flex gap-3 pt-2">
+                                                    <Button className="bg-brand hover:bg-brand/90" asChild>
+                                                        <Link href={`/training/${trueUpcomingSessions[0].id}`}>Manage Session</Link>
+                                                    </Button>
+                                                    <Button variant="outline" className="border-border text-foreground" onClick={() => handleEdit(trueUpcomingSessions[0])}>
+                                                        <Pencil className="h-4 w-4 mr-2" /> Edit Session
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                </div>
+                            </PageSection>
+                        )}
+
+                        {/* Upcoming Journey */}
+                        {trueUpcomingSessions.length > 1 && (
+                            <PageSection>
+                                <SectionHeader title="Upcoming Journey" description="Future sessions leading to the match." />
+                                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                                    {trueUpcomingSessions.slice(1).map((session) => (
+                                        <Card 
+                                            key={session.id} 
+                                            onClick={() => window.location.href = `/training/${session.id}`}
+                                            className="hover:shadow-md transition-shadow cursor-pointer border-border group relative bg-card"
+                                        >
+                                            <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-brand" onClick={(e) => handleRepeatNextWeek(session, e)} title="Repeat Next Week">
+                                                    <Repeat className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-blue-600" onClick={(e) => { e.stopPropagation(); handleEdit(session); }}>
+                                                    <Pencil className="h-4 w-4" />
+                                                </Button>
+                                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-status-error" onClick={(e) => { e.stopPropagation(); handleDelete(session.id); }}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                            <CardHeader className="pb-2">
+                                                <div className="flex justify-between items-start pr-16">
+                                                    <Badge variant="secondary" className="bg-surface-1 text-muted-foreground border-border">{formatSquad(session.squad)}</Badge>
+                                                </div>
+                                                <CardTitle className="text-lg mt-2 text-foreground">{session.topic || "General Preparation"}</CardTitle>
+                                                <CardDescription className="flex items-center gap-1 font-medium">
+                                                    <CalendarDays className="h-3 w-3" /> {formatDate(session.date)} • {formatTime12h(session.time).time}
+                                                </CardDescription>
+                                            </CardHeader>
+                                        </Card>
+                                    ))}
+                                </div>
+                            </PageSection>
+                        )}
+
+                        {/* Historical Record */}
+                        {displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]).length > 0 && (
+                            <PageSection>
+                                <SectionHeader title="Historical Record" description="Past sessions, squad turnout %, punctuality, and trialist records." />
+                                <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+                                    {displaySessions
+                                        .filter(s => s.date < new Date().toISOString().split("T")[0])
+                                        .map((session) => {
+                                            const stats = getSessionAttendanceStats(session);
+                                            const turnoutTier =
+                                                stats.percentage >= 75
+                                                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/35"
+                                                    : stats.percentage >= 50
+                                                    ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/35"
+                                                    : "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/35";
+                                            const barColor =
+                                                stats.percentage >= 75
+                                                    ? "bg-emerald-500"
+                                                    : stats.percentage >= 50
+                                                    ? "bg-amber-500"
+                                                    : "bg-rose-500";
+
+                                            return (
+                                                <Card 
+                                                    key={session.id} 
+                                                    onClick={() => window.location.href = `/training/${session.id}`}
+                                                    className="hover:shadow-md transition-all cursor-pointer border-border bg-card hover:bg-surface-1/60 group"
+                                                >
+                                                    <CardHeader className="pb-2.5">
+                                                        <div className="flex justify-between items-start gap-2">
+                                                            <CardTitle className="text-base font-bold text-foreground group-hover:text-brand transition-colors line-clamp-1">
+                                                                {session.topic || "General Preparation"}
+                                                            </CardTitle>
+                                                            <Badge variant="secondary" className="bg-surface-1 text-muted-foreground border-border text-[11px] shrink-0">
+                                                                {formatSquad(session.squad)}
+                                                            </Badge>
+                                                        </div>
+                                                        <CardDescription className="flex items-center gap-1.5 text-xs font-medium">
+                                                            <CalendarDays className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                            <span>{formatDate(session.date)} • {formatTime12h(session.time).time}</span>
+                                                            {session.location && (
+                                                                <>
+                                                                    <span>•</span>
+                                                                    <span className="truncate max-w-[130px]">{session.location}</span>
+                                                                </>
+                                                            )}
+                                                        </CardDescription>
+                                                    </CardHeader>
+                                                    <CardContent className="space-y-2.5 pt-0">
+                                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                                            <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                                                                <span className="h-4 w-4 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-[10px]">✓</span>
+                                                                <span>
+                                                                    {stats.regAttendedCount}
+                                                                    <span className="text-muted-foreground font-normal">/{stats.totalEligible} Attended</span>
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                {stats.lateCount > 0 && (
+                                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/35">
+                                                                        🕒 {stats.lateCount} Late
+                                                                    </span>
+                                                                )}
+                                                                {stats.trialistAttendedCount > 0 && (
+                                                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/35">
+                                                                        +{stats.trialistAttendedCount} Trialist{stats.trialistAttendedCount > 1 ? 's' : ''}
+                                                                    </span>
+                                                                )}
+                                                                <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${turnoutTier}`}>
+                                                                    {stats.percentage}% Turnout
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="w-full bg-surface-1 border border-border rounded-full h-1.5 overflow-hidden">
+                                                            <div
+                                                                className={`h-full transition-all ${barColor}`}
+                                                                style={{ width: `${Math.min(100, stats.percentage)}%` }}
+                                                            />
+                                                        </div>
+                                                    </CardContent>
+                                                </Card>
+                                            );
+                                        })}
+                                </div>
+                            </PageSection>
+                        )}
+
+                        {displaySessions.length === 0 && (
+                            <div className="col-span-full py-16 text-center border-2 border-dashed border-border rounded-xl bg-surface-1">
+                                <h3 className="text-lg font-semibold text-foreground">No sessions planned</h3>
+                                <p className="text-muted-foreground mt-1">Schedule your first training session to begin preparation.</p>
+                                <Button className="bg-brand hover:bg-brand/90 mt-4 text-white" onClick={handleOpenNew}>
+                                    Schedule Session
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </>
             ) : (
+                <>
+                    {/* =========================================================
+                        MOBILE ATTENDANCE LEADERBOARD (< 768px)
+                       ========================================================= */}
+                    <div className="md:hidden space-y-3">
+                        {/* Mobile Action & Filter Card */}
+                        <div className="bg-surface-1 border border-border rounded-xl p-3 space-y-2.5 shadow-xs">
+                            <div className="flex items-center justify-between gap-2">
+                                <div>
+                                    <p className="text-xs font-extrabold text-foreground">Training Commitment</p>
+                                    <p className="text-[10px] text-muted-foreground font-medium">
+                                        {displaySeasonLabel} • {leaderboardSessions.length} {leaderboardSessions.length === 1 ? "session" : "sessions"}
+                                    </p>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setShowTrainingGraphicModal(true)}
+                                        className="h-8 px-2.5 text-[11px] bg-brand hover:bg-brand/90 text-white font-bold"
+                                    >
+                                        <Share2 className="h-3.5 w-3.5 mr-1" /> Graphic
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={downloadStatsExcel}
+                                        className="h-8 px-2.5 text-[11px] border-border font-semibold"
+                                    >
+                                        <Download className="h-3.5 w-3.5 mr-1" /> Excel
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Scrollable Position Pills + Active Squad Only Toggle */}
+                            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                                {([
+                                    { key: "ALL", label: "All", count: positionCounts.ALL },
+                                    { key: "GK", label: "GK", count: positionCounts.GK },
+                                    { key: "DEF", label: "DEF", count: positionCounts.DEF },
+                                    { key: "MID", label: "MID", count: positionCounts.MID },
+                                    { key: "FWD", label: "FWD", count: positionCounts.FWD },
+                                ] as const).map((pos) => {
+                                    const active = positionFilter === pos.key;
+                                    return (
+                                        <button
+                                            key={pos.key}
+                                            type="button"
+                                            onClick={() => setPositionFilter(pos.key)}
+                                            className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all border ${
+                                                active
+                                                    ? "bg-brand text-white border-brand shadow-xs"
+                                                    : "bg-background text-muted-foreground border-border"
+                                            }`}
+                                        >
+                                            <span>{pos.label}</span>
+                                            <span className={`px-1 rounded-full text-[9px] font-extrabold ${active ? "bg-white/20 text-white" : "bg-surface-1 text-muted-foreground"}`}>
+                                                {pos.count}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveSquadOnly(prev => !prev)}
+                                    className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all border ${
+                                        activeSquadOnly
+                                            ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                                            : "bg-background text-muted-foreground border-border"
+                                    }`}
+                                >
+                                    <span>{activeSquadOnly ? "✓ Active Only" : `+ Former (${formerPlayersCount})`}</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Mobile Player Leaderboard Cards */}
+                        <div className="bg-surface-1 border border-border rounded-xl divide-y divide-border overflow-hidden shadow-xs">
+                            {playerStats.map((player, idx) => {
+                                const pct = player.stats.percentage;
+                                const pctColor =
+                                    pct >= 80
+                                        ? "bg-status-success/15 text-status-success border-status-success/30"
+                                        : pct >= 50
+                                        ? "bg-status-warning/15 text-status-warning border-status-warning/30"
+                                        : "bg-status-error/15 text-status-error border-status-error/30";
+
+                                return (
+                                    <div key={player.id} className="p-3 flex items-center justify-between gap-2.5">
+                                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                            <span className="text-[11px] font-extrabold text-muted-foreground w-4 text-center shrink-0 tabular-nums">
+                                                {idx + 1}
+                                            </span>
+                                            <Avatar className="h-9 w-9 ring-1 ring-border shrink-0">
+                                                <AvatarImage src={player.imageUrl || settings?.logo || undefined} />
+                                                <AvatarFallback className="bg-background text-muted-foreground text-xs font-bold">
+                                                    {player.firstName[0]}{player.lastName[0]}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div className="min-w-0 flex-1 space-y-1">
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="font-bold text-xs text-foreground truncate">
+                                                        {player.firstName} {player.lastName}
+                                                    </span>
+                                                    {player.position && (
+                                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-extrabold uppercase bg-background text-muted-foreground border border-border shrink-0">
+                                                            {player.position}
+                                                        </span>
+                                                    )}
+                                                    {player.stats.streak >= 5 && (
+                                                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35 shrink-0">
+                                                            🔥 {player.stats.streak}
+                                                        </span>
+                                                    )}
+                                                    {player.playerIsFormer && (
+                                                        <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/35 shrink-0">
+                                                            Left
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Bottom Row: Last 5 Pills + Start Date / Late Chips */}
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <div className="inline-flex items-center gap-0.5">
+                                                        {player.stats.last5.length > 0 ? (
+                                                            player.stats.last5.map((sessionItem) => {
+                                                                const pillStyle =
+                                                                    sessionItem.status === "Present"
+                                                                        ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/45"
+                                                                        : sessionItem.status === "Late"
+                                                                        ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/45"
+                                                                        : "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/45";
+                                                                const symbol =
+                                                                    sessionItem.status === "Present"
+                                                                        ? "✓"
+                                                                        : sessionItem.status === "Late"
+                                                                        ? "L"
+                                                                        : "×";
+                                                                return (
+                                                                    <span
+                                                                        key={sessionItem.id}
+                                                                        className={`w-4 h-4 rounded text-[9px] font-bold inline-flex items-center justify-center select-none ${pillStyle}`}
+                                                                    >
+                                                                        {symbol}
+                                                                    </span>
+                                                                );
+                                                            })
+                                                        ) : (
+                                                            <span className="text-[10px] text-muted-foreground">No sessions</span>
+                                                        )}
+                                                    </div>
+
+                                                    {player.stats.late > 0 && (
+                                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/35">
+                                                            {player.stats.late} Late
+                                                        </span>
+                                                    )}
+
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleOpenAmendStartDate(player)}
+                                                        className={`inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[9px] font-semibold border transition-colors ${
+                                                            player.joinedMidSeason && player.effectiveStartDate
+                                                                ? "bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-500/25"
+                                                                : "bg-background text-muted-foreground border-border"
+                                                        }`}
+                                                    >
+                                                        <CalendarDays className="h-2.5 w-2.5" />
+                                                        <span>
+                                                            {player.joinedMidSeason && player.effectiveStartDate
+                                                                ? `Joined ${new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(player.effectiveStartDate))}`
+                                                                : "Start Date"}
+                                                        </span>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Right Side: Percentage + Attended/Total */}
+                                        <div className="flex flex-col items-end shrink-0">
+                                            <span className={`px-2 py-0.5 rounded-md text-xs font-extrabold border tabular-nums ${pctColor}`}>
+                                                {pct}%
+                                            </span>
+                                            <span className="text-[10px] font-bold text-foreground mt-1 tabular-nums">
+                                                {player.stats.attended}<span className="text-muted-foreground font-normal">/{player.stats.total}</span>
+                                            </span>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+
+                            {playerStats.length === 0 && (
+                                <div className="p-8 text-center text-xs text-muted-foreground font-medium">
+                                    No training stats available for this filter yet.
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* =========================================================
+                        DESKTOP ATTENDANCE LEADERBOARD (>= 768px) — UNTOUCHED
+                       ========================================================= */}
+                    <div className="hidden md:block">
                 <Card className="border-border shadow-sm overflow-hidden">
                     <CardHeader className="bg-surface-1 border-b border-border space-y-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1765,36 +2388,40 @@ export default function TrainingPage() {
                         </div>
                     </CardContent>
                 </Card>
+                    </div>
+                </>
             )}
 
             {isDialogOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
-                    <div className="bg-background rounded-xl shadow-2xl border border-border w-full max-w-md overflow-hidden">
-                        <div className="p-5 border-b border-border bg-surface-1 flex justify-between items-center">
-                            <h3 className="font-bold text-lg text-foreground">{editingSessionId ? "Edit Session" : "Schedule Preparation"}</h3>
-                            <button onClick={() => setIsDialogOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors">×</button>
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-3 sm:p-4 backdrop-blur-sm">
+                    <div className="bg-background rounded-xl shadow-2xl border border-border w-full max-w-md max-h-[90dvh] flex flex-col overflow-hidden">
+                        <div className="p-4 sm:p-5 border-b border-border bg-surface-1 flex justify-between items-center shrink-0">
+                            <h3 className="font-bold text-base sm:text-lg text-foreground">{editingSessionId ? "Edit Session" : "Schedule Preparation"}</h3>
+                            <button onClick={() => setIsDialogOpen(false)} className="text-muted-foreground hover:text-foreground transition-colors text-xl leading-none p-1">×</button>
                         </div>
-                        <div className="p-5 space-y-5">
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-foreground">Date</label>
-                                <Input
-                                    type="date"
-                                    value={newSession.date}
-                                    onChange={(e) => setNewSession({ ...newSession, date: e.target.value })}
-                                    className="border-border bg-background text-foreground"
-                                />
+                        <div className="p-4 sm:p-5 space-y-4 overflow-y-auto flex-1">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs sm:text-sm font-semibold text-foreground">Date</label>
+                                    <Input
+                                        type="date"
+                                        value={newSession.date}
+                                        onChange={(e) => setNewSession({ ...newSession, date: e.target.value })}
+                                        className="border-border bg-background text-foreground"
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs sm:text-sm font-semibold text-foreground">Time</label>
+                                    <Input
+                                        type="time"
+                                        value={newSession.time}
+                                        onChange={(e) => setNewSession({ ...newSession, time: e.target.value })}
+                                        className="border-border bg-background text-foreground"
+                                    />
+                                </div>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-foreground">Time</label>
-                                <Input
-                                    type="time"
-                                    value={newSession.time}
-                                    onChange={(e) => setNewSession({ ...newSession, time: e.target.value })}
-                                    className="border-border bg-background text-foreground"
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-foreground">Location</label>
+                            <div className="space-y-1.5">
+                                <label className="text-xs sm:text-sm font-semibold text-foreground">Location</label>
                                 <Input
                                     value={newSession.location}
                                     onChange={(e) => setNewSession({ ...newSession, location: e.target.value })}
@@ -1802,8 +2429,8 @@ export default function TrainingPage() {
                                     className="border-border bg-background text-foreground"
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-foreground">Squad</label>
+                            <div className="space-y-1.5">
+                                <label className="text-xs sm:text-sm font-semibold text-foreground">Squad</label>
                                 <select
                                     className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand"
                                     value={newSession.squad}
@@ -1815,8 +2442,8 @@ export default function TrainingPage() {
                                     ))}
                                 </select>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-foreground">Coaching Objective</label>
+                            <div className="space-y-1.5">
+                                <label className="text-xs sm:text-sm font-semibold text-foreground">Coaching Objective</label>
                                 <Input
                                     value={newSession.topic}
                                     onChange={(e) => setNewSession({ ...newSession, topic: e.target.value })}
@@ -1825,9 +2452,9 @@ export default function TrainingPage() {
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-3 pb-2 border-b border-dashed border-border">
-                                <div className="space-y-2">
-                                    <label className="text-sm font-semibold text-foreground">Availability Lock</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2 border-b border-dashed border-border">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs sm:text-sm font-semibold text-foreground">Availability Lock</label>
                                     <select
                                         className="flex h-10 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-brand text-foreground"
                                         value={newSession.lockType || "Never"}
@@ -1841,8 +2468,8 @@ export default function TrainingPage() {
                                     </select>
                                 </div>
                                 {newSession.lockType === "Custom" && (
-                                    <div className="space-y-2">
-                                        <label className="text-sm font-semibold text-foreground">Custom Lock Time</label>
+                                    <div className="space-y-1.5">
+                                        <label className="text-xs sm:text-sm font-semibold text-foreground">Custom Lock Time</label>
                                         <Input
                                             type="datetime-local"
                                             value={newSession.lockTime || ""}
@@ -1854,7 +2481,7 @@ export default function TrainingPage() {
                             </div>
 
                             {!editingSessionId && (
-                                <div className="space-y-3 pt-2">
+                                <div className="space-y-3 pt-1">
                                     <div className="flex items-center gap-2">
                                         <input 
                                             type="checkbox" 
@@ -1881,7 +2508,7 @@ export default function TrainingPage() {
                                 </div>
                             )}
                         </div>
-                        <div className="p-5 border-t border-border bg-surface-1 flex justify-end gap-3">
+                        <div className="p-4 sm:p-5 border-t border-border bg-surface-1 flex justify-end gap-2.5 shrink-0">
                             <Button variant="outline" className="border-border text-foreground" onClick={() => setIsDialogOpen(false)}>Cancel</Button>
                             <Button className="bg-brand hover:bg-brand/90 text-white" onClick={handleSchedule} disabled={!newSession.date}>
                                 {editingSessionId ? "Save Changes" : "Schedule Preparation"}
@@ -1908,7 +2535,7 @@ export default function TrainingPage() {
                             {/* Toggle switches/checkboxes */}
                             <div className="space-y-2 border-b border-border pb-3">
                                 <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider block">Include Details:</Label>
-                                <div className="grid grid-cols-3 gap-2">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                                     <label className="flex items-center gap-2 text-sm font-medium text-foreground cursor-pointer p-1.5 hover:bg-surface-1 rounded transition-colors">
                                         <input
                                             type="checkbox"
@@ -1993,11 +2620,11 @@ export default function TrainingPage() {
 
             {/* Amend Player Start Date & Backfill Attendance Modal */}
             <Dialog open={!!editingStartDatePlayer} onOpenChange={(open) => !open && setEditingStartDatePlayer(null)}>
-                <DialogContent className="sm:max-w-[520px] bg-background border-border text-foreground">
+                <DialogContent className="sm:max-w-[520px] max-h-[88dvh] overflow-y-auto bg-background border-border text-foreground">
                     <DialogHeader>
-                        <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                            <CalendarDays className="h-5 w-5 text-brand" />
-                            Amend Start Date — {editingStartDatePlayer?.firstName} {editingStartDatePlayer?.lastName}
+                        <DialogTitle className="text-base sm:text-xl font-bold flex items-center gap-2">
+                            <CalendarDays className="h-5 w-5 text-brand shrink-0" />
+                            <span>Amend Start Date — {editingStartDatePlayer?.firstName} {editingStartDatePlayer?.lastName}</span>
                         </DialogTitle>
                         <DialogDescription className="text-muted-foreground text-xs">
                             Set the exact date this player started training with the squad, and log or adjust their attendance for sessions since that date.
@@ -2055,7 +2682,7 @@ export default function TrainingPage() {
                                     <Label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
                                         Sessions From Start Date ({leaderboardSessions.filter(s => !customStartDateInput || s.date >= customStartDateInput).length})
                                     </Label>
-                                    <span className="text-[11px] text-muted-foreground">Tap to mark Present / Late / Absent</span>
+                                    <span className="text-[11px] text-muted-foreground">Tap to mark</span>
                                 </div>
                                 <div className="max-h-[240px] overflow-y-auto divide-y divide-border border border-border rounded-lg bg-surface-1/50">
                                     {leaderboardSessions
@@ -2065,12 +2692,12 @@ export default function TrainingPage() {
                                         .map((s) => {
                                             const st = sessionStatusOverrides[s.id] || "Absent";
                                             return (
-                                                <div key={s.id} className="flex items-center justify-between px-3 py-2 text-xs">
-                                                    <div>
-                                                        <p className="font-semibold text-foreground">{formatDate(s.date)}</p>
-                                                        <p className="text-[11px] text-muted-foreground">{s.topic || "General Preparation"}</p>
+                                                <div key={s.id} className="flex items-center justify-between gap-2 px-3 py-2 text-xs">
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="font-semibold text-foreground truncate">{formatDate(s.date)}</p>
+                                                        <p className="text-[11px] text-muted-foreground truncate">{s.topic || "General Preparation"}</p>
                                                     </div>
-                                                    <div className="inline-flex items-center gap-1">
+                                                    <div className="inline-flex items-center gap-1 shrink-0">
                                                         {(["Present", "Late", "Absent"] as const).map((opt) => {
                                                             const active = st === opt;
                                                             const activeClass =
@@ -2089,13 +2716,13 @@ export default function TrainingPage() {
                                                                             [s.id]: opt
                                                                         }))
                                                                     }
-                                                                    className={`px-2.5 py-1 rounded text-[11px] font-bold border transition-all ${
+                                                                    className={`px-2 py-1 rounded text-[10px] sm:text-[11px] font-bold border transition-all ${
                                                                         active
                                                                             ? activeClass
                                                                             : "bg-background text-muted-foreground border-border hover:text-foreground"
                                                                     }`}
                                                                 >
-                                                                    {opt === "Present" ? "✓ Present" : opt === "Late" ? "L Late" : "× Absent"}
+                                                                    {opt === "Present" ? "✓" : opt === "Late" ? "L" : "×"} <span className="hidden sm:inline">{opt}</span>
                                                                 </button>
                                                             );
                                                         })}
@@ -2125,73 +2752,73 @@ export default function TrainingPage() {
 
             {/* Shareable Training Commitment Graphic Studio Modal */}
             {showTrainingGraphicModal && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-                    <div className="bg-surface-1 border border-border rounded-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 shadow-2xl my-auto">
-                        <div className="flex items-center justify-between border-b border-border pb-3">
+                <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                    <div className="bg-surface-1 border border-border rounded-2xl max-w-2xl w-full p-4 sm:p-6 space-y-3 sm:space-y-4 shadow-2xl my-auto max-h-[92dvh] flex flex-col overflow-hidden">
+                        <div className="flex items-center justify-between border-b border-border pb-3 shrink-0">
                             <div>
-                                <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                                    <Share2 className="h-5 w-5 text-brand" />
+                                <h3 className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
+                                    <Share2 className="h-4 w-4 sm:h-5 sm:w-5 text-brand shrink-0" />
                                     <span>Share Training Commitment Graphic</span>
                                 </h3>
-                                <p className="text-xs text-muted-foreground">
+                                <p className="text-[11px] sm:text-xs text-muted-foreground">
                                     Club-branded leaderboard ready for your WhatsApp Squad Chat or Instagram Story.
                                 </p>
                             </div>
-                            <Button variant="ghost" size="sm" onClick={() => setShowTrainingGraphicModal(false)} className="h-8 w-8 p-0">
+                            <Button variant="ghost" size="sm" onClick={() => setShowTrainingGraphicModal(false)} className="h-8 w-8 p-0 shrink-0">
                                 <X className="h-4 w-4" />
                             </Button>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div className="flex items-center gap-1.5 bg-background p-1 rounded-lg border border-border">
+                        <div className="flex flex-wrap items-center justify-between gap-2 shrink-0">
+                            <div className="flex items-center gap-1 bg-background p-1 rounded-lg border border-border w-full sm:w-auto">
                                 <button
                                     type="button"
                                     onClick={() => setTrainingGraphicFormat("post")}
-                                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${trainingGraphicFormat === "post" ? "bg-brand text-white" : "text-muted-foreground hover:text-foreground"}`}
+                                    className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold transition-colors ${trainingGraphicFormat === "post" ? "bg-brand text-white" : "text-muted-foreground hover:text-foreground"}`}
                                 >
                                     Feed Post (4:5)
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setTrainingGraphicFormat("story")}
-                                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${trainingGraphicFormat === "story" ? "bg-brand text-white" : "text-muted-foreground hover:text-foreground"}`}
+                                    className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold transition-colors ${trainingGraphicFormat === "story" ? "bg-brand text-white" : "text-muted-foreground hover:text-foreground"}`}
                                 >
-                                    Instagram / WhatsApp Story (9:16)
+                                    Story (9:16)
                                 </button>
                             </div>
 
-                            <div className="flex items-center gap-1.5 bg-background p-1 rounded-lg border border-border">
+                            <div className="flex items-center gap-1 bg-background p-1 rounded-lg border border-border w-full sm:w-auto">
                                 <button
                                     type="button"
                                     onClick={() => setTrainingGraphicScope("top10")}
-                                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${trainingGraphicScope === "top10" ? "bg-brand text-white" : "text-muted-foreground hover:text-foreground"}`}
+                                    className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold transition-colors ${trainingGraphicScope === "top10" ? "bg-brand text-white" : "text-muted-foreground hover:text-foreground"}`}
                                 >
                                     Top 10 Spotlight
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setTrainingGraphicScope("full")}
-                                    className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${trainingGraphicScope === "full" ? "bg-brand text-white" : "text-muted-foreground hover:text-foreground"}`}
+                                    className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-md text-[11px] sm:text-xs font-semibold transition-colors ${trainingGraphicScope === "full" ? "bg-brand text-white" : "text-muted-foreground hover:text-foreground"}`}
                                 >
                                     Full Squad ({scopedPlayerStats.filter(p => p.stats.total > 0).length})
                                 </button>
                             </div>
                         </div>
 
-                        <div className="bg-black/50 border border-border rounded-xl p-3 flex justify-center max-h-[55vh] overflow-y-auto">
+                        <div className="bg-black/50 border border-border rounded-xl p-2 sm:p-3 flex justify-center overflow-y-auto flex-1 min-h-0">
                             <canvas
                                 ref={trainingShareCanvasRef}
-                                className="max-w-full h-auto rounded-lg shadow-lg"
-                                style={{ maxHeight: "50vh" }}
+                                className="max-w-full h-auto rounded-lg shadow-lg object-contain"
+                                style={{ maxHeight: "46vh" }}
                             />
                         </div>
 
-                        <div className="flex items-center justify-end gap-2.5 pt-2">
-                            <Button variant="outline" onClick={handleCopyTrainingGraphic}>
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-1 shrink-0">
+                            <Button variant="outline" onClick={handleCopyTrainingGraphic} className="w-full sm:w-auto text-xs sm:text-sm">
                                 <Copy className="h-4 w-4 mr-1.5" />
                                 {copiedTrainingGraphic ? "Copied to Clipboard!" : "Copy for WhatsApp / Social"}
                             </Button>
-                            <Button onClick={handleDownloadTrainingGraphic} className="bg-brand hover:bg-brand/90 text-white font-semibold">
+                            <Button onClick={handleDownloadTrainingGraphic} className="w-full sm:w-auto bg-brand hover:bg-brand/90 text-white font-semibold text-xs sm:text-sm">
                                 <Download className="h-4 w-4 mr-1.5" />
                                 Download PNG
                             </Button>

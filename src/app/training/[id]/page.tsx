@@ -489,7 +489,279 @@ export default function TrainingSessionPage() {
     const injuredCount = session.attendance.filter(a => a.status === 'Injured').length;
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 pb-20 md:pb-0">
+            {/* =====================================================================
+                MOBILE SESSION REGISTER VIEW (< 768px)
+               ===================================================================== */}
+            <div className="md:hidden space-y-3.5">
+                {/* Mobile Top Navigation & Action Bar */}
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <Button variant="outline" size="icon" asChild className="h-9 w-9 shrink-0 rounded-xl border-border bg-surface-1">
+                            <Link href="/training"><ArrowLeft className="h-4 w-4" /></Link>
+                        </Button>
+                        <div className="min-w-0">
+                            <h1 className="text-base font-extrabold text-foreground truncate leading-tight">Session Register</h1>
+                            <p className="text-[11px] text-muted-foreground font-medium truncate">
+                                {formatSquad(session.squad as string)} • {session.date}
+                            </p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        <Button variant="outline" size="sm" onClick={downloadSessionCSV} className="h-8 px-2.5 text-xs border-border bg-surface-1">
+                            <Download className="h-3.5 w-3.5 mr-1" /> Export
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={handleSave}
+                            disabled={!unsavedChanges}
+                            className={`h-8 px-3 text-xs font-bold ${unsavedChanges ? "bg-brand hover:bg-brand/90 text-white shadow-sm" : ""}`}
+                        >
+                            {unsavedChanges ? "Save" : "Saved ✓"}
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Mobile Session Summary & Counter Bento Card */}
+                <div className="bg-surface-1 border border-border border-l-4 border-l-brand rounded-xl p-3.5 space-y-3 shadow-xs">
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Coaching Objective</span>
+                            {unsavedChanges && (
+                                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold uppercase bg-brand/15 text-brand border border-brand/30 animate-pulse">
+                                    Unsaved Changes
+                                </span>
+                            )}
+                        </div>
+                        <div className="relative flex items-center">
+                            <Input
+                                value={session.topic || ""}
+                                placeholder="General Session"
+                                onChange={(e) => {
+                                    setSession({ ...session, topic: e.target.value });
+                                    setUnsavedChanges(true);
+                                }}
+                                className="h-9 text-sm font-bold pr-8 bg-background border-border text-foreground"
+                            />
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground absolute right-2.5 pointer-events-none" />
+                        </div>
+                    </div>
+
+                    {/* Date / Time / Location Pills */}
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted-foreground pt-0.5">
+                        <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                            <CalendarDays className="h-3.5 w-3.5 text-brand shrink-0" />
+                            {session.date}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 font-medium text-foreground">
+                            <Clock className="h-3.5 w-3.5 text-brand shrink-0" />
+                            {session.time}
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 font-medium text-foreground truncate max-w-full">
+                            <MapPin className="h-3.5 w-3.5 text-brand shrink-0" />
+                            <span className="truncate">{session.location}</span>
+                        </span>
+                    </div>
+
+                    {/* 3-Column Bento Counters */}
+                    <div className="grid grid-cols-3 gap-2 pt-1">
+                        <div className="bg-emerald-500/10 border border-emerald-500/25 rounded-lg py-2 px-2 text-center">
+                            <p className="text-lg font-extrabold text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">{presentCount}</p>
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 mt-1">Present</p>
+                        </div>
+                        <div className="bg-background border border-border rounded-lg py-2 px-2 text-center">
+                            <p className="text-lg font-extrabold text-foreground leading-none tabular-nums">{absentCount}</p>
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground mt-1">Absent</p>
+                        </div>
+                        <div className="bg-rose-500/10 border border-rose-500/25 rounded-lg py-2 px-2 text-center">
+                            <p className="text-lg font-extrabold text-rose-600 dark:text-rose-400 leading-none tabular-nums">{injuredCount}</p>
+                            <p className="text-[9px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300 mt-1">Injured</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Mobile Attendance Register Card */}
+                <div className="bg-surface-1 border border-border rounded-xl p-3 space-y-3 shadow-xs">
+                    <div className="flex items-center justify-between gap-2">
+                        <div>
+                            <h2 className="text-xs font-extrabold uppercase tracking-wider text-foreground">Tap Player to Mark Present</h2>
+                            <p className="text-[10px] text-muted-foreground">Tap again for Absent • Tap 🚑 for Injured</p>
+                        </div>
+                    </div>
+
+                    {/* Add Guest Input Row */}
+                    <div className="flex gap-2">
+                        <Input
+                            placeholder="Add guest / trialist name..."
+                            value={guestName}
+                            onChange={e => setGuestName(e.target.value)}
+                            className="h-9 text-xs bg-background border-border flex-1"
+                        />
+                        <Button onClick={handleAddGuest} size="sm" variant="outline" className="h-9 px-3 text-xs font-bold border-border shrink-0">
+                            + Guest
+                        </Button>
+                    </div>
+
+                    {/* 2-Column Touch Grid */}
+                    <div className="grid grid-cols-2 gap-2.5">
+                        {eligiblePlayers.map((player) => {
+                            const record = session.attendance.find(a => a.playerId === player.id);
+                            const status = record?.status ?? 'Absent';
+                            const isPresent = status === 'Present';
+                            const isInjured = status === 'Injured';
+                            const isFormerOrDeleted = isFormerPlayer(player) || isPlayerInDeletedSquad(player.squad, currentSquads);
+
+                            const statRecord = attendanceStats[player.id];
+                            const attendancePercent = statRecord && statRecord.total > 0
+                                ? Math.round((statRecord.present / statRecord.total) * 100)
+                                : null;
+
+                            return (
+                                <div
+                                    key={player.id}
+                                    onClick={() => handleTogglePresent(player.id)}
+                                    className={`
+                                        relative flex flex-col items-center justify-center p-3 rounded-xl border-2 cursor-pointer
+                                        transition-all duration-150 select-none text-center gap-0.5 min-h-[96px] active:scale-[0.98]
+                                        ${isPresent
+                                            ? 'bg-emerald-600 border-emerald-400 shadow-sm text-white'
+                                            : isInjured
+                                                ? 'bg-rose-500/10 border-rose-500/40 text-foreground'
+                                                : 'bg-background border-border text-foreground'
+                                        }
+                                    `}
+                                >
+                                    {/* Injured toggle button — larger 28x28 touch target on mobile */}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleMarkInjured(player.id, e)}
+                                        title="Toggle Injured"
+                                        className={`absolute top-1.5 right-1.5 rounded-full w-6 h-6 text-[11px] flex items-center justify-center transition-colors z-10 border
+                                            ${isInjured
+                                                ? 'bg-rose-500 text-white border-rose-400'
+                                                : isPresent
+                                                    ? 'bg-black/20 text-white border-white/20'
+                                                    : 'bg-surface-1 text-muted-foreground border-border'
+                                            }`}
+                                    >
+                                        🚑
+                                    </button>
+
+                                    <div className="flex items-center gap-1">
+                                        <span className={`text-[10px] font-extrabold uppercase tracking-wider ${isPresent ? 'text-emerald-100' : 'text-muted-foreground'}`}>
+                                            {player.position}
+                                        </span>
+                                        {attendancePercent !== null && (
+                                            <span className={`text-[9px] font-bold ${isPresent ? 'text-emerald-100' : 'text-muted-foreground'}`}>
+                                                ({attendancePercent}%)
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className={`text-sm font-extrabold leading-tight truncate max-w-full px-1 ${isPresent ? 'text-white' : isInjured ? 'text-rose-600 dark:text-rose-400' : 'text-foreground'}`}>
+                                        {player.firstName}
+                                    </span>
+                                    <span className={`text-[11px] font-medium leading-tight truncate max-w-full px-1 ${isPresent ? 'text-emerald-100' : 'text-muted-foreground'}`}>
+                                        {player.lastName}
+                                    </span>
+                                    {isFormerOrDeleted && (
+                                        <span className="mt-0.5 px-1.5 py-0.2 rounded text-[8px] font-bold uppercase bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-400/50">
+                                            Left Club
+                                        </span>
+                                    )}
+                                    <div className={`mt-1.5 text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full
+                                        ${isPresent
+                                            ? 'bg-white/20 text-white'
+                                            : isInjured
+                                                ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300'
+                                                : 'bg-surface-1 text-muted-foreground border border-border'
+                                        }`}>
+                                        {isPresent ? '✓ Present' : isInjured ? 'Injured' : 'Absent'}
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {/* Guest Players */}
+                        {session.attendance.filter(a => a.playerId.startsWith('guest:')).map((record) => {
+                            const guestNameClean = record.playerId.split(':')[1].split('_')[0];
+                            const isPresent = record.status === 'Present';
+                            return (
+                                <div
+                                    key={record.playerId}
+                                    onClick={() => handleTogglePresent(record.playerId)}
+                                    className={`
+                                        relative flex flex-col items-center justify-center p-3 rounded-xl border-2 cursor-pointer
+                                        transition-all duration-150 select-none text-center gap-0.5 min-h-[96px] active:scale-[0.98]
+                                        ${isPresent
+                                            ? 'bg-gradient-to-br from-amber-500 to-yellow-600 border-amber-400 text-white shadow-sm'
+                                            : 'bg-amber-500/10 border-amber-500/30 text-foreground'
+                                        }
+                                    `}
+                                >
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm("Remove guest player?")) {
+                                                const updated = session.attendance.filter(a => a.playerId !== record.playerId);
+                                                setSession({ ...session, attendance: updated });
+                                                setUnsavedChanges(true);
+                                            }
+                                        }}
+                                        title="Remove Guest"
+                                        className="absolute top-1.5 right-1.5 rounded-full w-6 h-6 bg-black/20 text-white text-[10px] flex items-center justify-center z-10"
+                                    >
+                                        ✕
+                                    </button>
+                                    <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border
+                                        ${isPresent
+                                            ? 'bg-amber-400/30 text-white border-amber-300/40'
+                                            : 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30'
+                                        }`}
+                                    >
+                                        Trialist
+                                    </span>
+                                    <span className={`text-sm font-extrabold leading-tight mt-1 truncate max-w-full px-1 ${isPresent ? 'text-white' : 'text-foreground'}`}>
+                                        {guestNameClean}
+                                    </span>
+                                    <div className={`mt-1.5 text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full
+                                        ${isPresent ? 'bg-white/20 text-white' : 'bg-surface-1 text-muted-foreground'}`}>
+                                        {isPresent ? '✓ Present' : 'Absent'}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {eligiblePlayers.length === 0 && (
+                        <div className="text-center py-8 text-xs text-muted-foreground">No players found for this squad.</div>
+                    )}
+                </div>
+
+                {/* Sticky Mobile Floating Save Bar when unsavedChanges is true */}
+                {unsavedChanges && (
+                    <div className="fixed bottom-20 left-4 right-4 z-40 bg-surface-1/95 backdrop-blur-md border border-brand/40 rounded-xl p-2.5 shadow-xl flex items-center justify-between gap-3">
+                        <div className="min-w-0 pl-1">
+                            <p className="text-xs font-extrabold text-foreground">Unsaved Register Changes</p>
+                            <p className="text-[10px] text-muted-foreground truncate">
+                                {presentCount} Present • {absentCount} Absent • {injuredCount} Injured
+                            </p>
+                        </div>
+                        <Button
+                            size="sm"
+                            onClick={handleSave}
+                            className="bg-brand hover:bg-brand/90 text-white font-bold h-9 px-4 shrink-0 shadow-sm"
+                        >
+                            Save Register
+                        </Button>
+                    </div>
+                )}
+            </div>
+
+            {/* =====================================================================
+                DESKTOP SESSION REGISTER VIEW (>= 768px) — UNTOUCHED
+               ===================================================================== */}
+            <div className="hidden md:block space-y-6">
             {/* Header */}
             <div className="flex items-center gap-4">
                 <Button variant="ghost" size="icon" asChild>
@@ -718,6 +990,7 @@ export default function TrainingSessionPage() {
                     )}
                 </CardContent>
             </Card>
+            </div>
         </div>
     );
 }

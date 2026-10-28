@@ -201,7 +201,82 @@ export function WeeklyFootballCalendar({
 
             {!isCollapsed && (
                 <Card className="bg-surface-1 border-border shadow-sm overflow-hidden">
-                    <div className="grid grid-cols-2 sm:grid-cols-7 divide-y sm:divide-y-0 sm:divide-x divide-border">
+                    {/* Mobile Horizontal Swipeable 14-Day Strip (< 640px) */}
+                    <div className="sm:hidden flex overflow-x-auto no-scrollbar divide-x divide-border">
+                        {calendarDays.map((dayObj, i) => {
+                            const { dateStr, events } = getEventsForDate(dayObj);
+                            const isToday = dateStr === todayStr;
+                            const dayName = new Intl.DateTimeFormat('en-GB', { weekday: 'short' }).format(dayObj);
+                            const dayNumber = dayObj.getDate();
+                            const monthShort = new Intl.DateTimeFormat('en-GB', { month: 'short' }).format(dayObj);
+
+                            return (
+                                <div
+                                    key={`mob-${dateStr}`}
+                                    className={`p-2 min-w-[88px] shrink-0 flex flex-col justify-between transition-colors ${
+                                        isToday ? 'bg-brand/5' : ''
+                                    }`}
+                                >
+                                    <div className="flex items-center justify-between gap-1 mb-1.5">
+                                        <span className={`text-[10px] font-bold uppercase tracking-wider ${isToday ? 'text-brand' : 'text-muted-foreground'}`}>
+                                            {dayName}
+                                        </span>
+                                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full flex items-center justify-center ${
+                                            isToday ? 'bg-brand text-brand-foreground' : 'text-foreground'
+                                        }`}>
+                                            {dayNumber} {(dayNumber === 1 || i === 0) ? monthShort : ''}
+                                        </span>
+                                    </div>
+
+                                    <div className="flex-1 flex flex-col gap-1 justify-center min-h-[44px]">
+                                        {events.length === 0 ? (
+                                            <div className="text-center py-1">
+                                                <span className="text-[10px] font-medium text-muted-foreground/30 select-none">—</span>
+                                            </div>
+                                        ) : (
+                                            events.map((ev, idx) => (
+                                                ev.type === 'match' ? (
+                                                    <button
+                                                        type="button"
+                                                        key={`mob-${ev.id}-${idx}`}
+                                                        onClick={() => onSelectMatch && onSelectMatch(ev.id)}
+                                                        className={`text-left p-1 rounded border flex flex-col gap-0.5 transition-all cursor-pointer ${
+                                                            ev.isHome
+                                                                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500 dark:text-emerald-400'
+                                                                : 'bg-sky-500/10 border-sky-500/30 text-sky-500 dark:text-sky-400'
+                                                        }`}
+                                                    >
+                                                        <div className="flex items-center gap-1 text-[9px] font-bold leading-tight truncate">
+                                                            <Trophy className="h-2.5 w-2.5 shrink-0" />
+                                                            <span className="truncate">{ev.title}</span>
+                                                        </div>
+                                                        <div className="flex items-center justify-between text-[8px] opacity-85 font-semibold">
+                                                            <span>{ev.time}</span>
+                                                            <span>{ev.score || (ev.isHome ? 'H' : 'A')}</span>
+                                                        </div>
+                                                    </button>
+                                                ) : (
+                                                    <div
+                                                        key={`mob-${ev.id}-${idx}`}
+                                                        className="p-1 rounded bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 dark:text-indigo-400 flex flex-col gap-0.5"
+                                                    >
+                                                        <div className="flex items-center gap-1 text-[9px] font-bold leading-tight">
+                                                            <Dumbbell className="h-2.5 w-2.5 shrink-0" />
+                                                            <span className="truncate">{ev.title}</span>
+                                                        </div>
+                                                        <span className="text-[8px] opacity-80 pl-3">{ev.time}</span>
+                                                    </div>
+                                                )
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Desktop 7-Column Grid (>= 640px) — UNTOUCHED */}
+                    <div className="hidden sm:grid sm:grid-cols-7 divide-y sm:divide-y-0 sm:divide-x divide-border">
                         {calendarDays.map((dayObj, i) => {
                             const { dateStr, events } = getEventsForDate(dayObj);
                             const isToday = dateStr === todayStr;
