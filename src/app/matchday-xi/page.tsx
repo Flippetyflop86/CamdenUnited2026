@@ -440,12 +440,16 @@ export default function MatchdayXIPage() {
                 if (extracted.wasRepaired && extracted.normalizedRawNotes) {
                     supabase.from('matches').update({ notes: extracted.normalizedRawNotes }).eq('id', m.id).then(() => {});
                 }
+                const normalizedComp = m.competition === "Cup" ? "League" : (m.competition || "League");
+                if (m.competition === "Cup") {
+                    supabase.from('matches').update({ competition: 'League' }).eq('id', m.id).then(() => {});
+                }
                 return {
                     id: m.id,
                     opponent: m.opponent,
                     date: m.date,
                     time: m.time,
-                    competition: m.competition || "League",
+                    competition: normalizedComp,
                     isHome: m.is_home,
                     scoreline: m.scoreline || "",
                     result: m.result,

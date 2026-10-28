@@ -140,7 +140,7 @@ export async function POST(request: Request) {
 
             // Track competition context if a standalone header line appears
             if (isNonOpponentToken(line) && !isOurClub(line)) {
-                if (/\b(cup|trophy|shield|plate)\b/i.test(line)) {
+                if (/\b(cup|trophy|shield|plate|vase)\b/i.test(line)) {
                     currentCompetition = "Cup";
                 } else if (/\b(friendly|pre-season)\b/i.test(line)) {
                     currentCompetition = "Friendly";
@@ -151,6 +151,9 @@ export async function POST(request: Request) {
 
             const dateFound = parseDateFromLine(line);
             if (dateFound) {
+                if (currentDate && dateFound.isoDate !== currentDate && !/\b(cup|trophy|shield|plate|vase)\b/i.test(line)) {
+                    currentCompetition = "League";
+                }
                 currentDate = dateFound.isoDate;
             }
 
@@ -161,9 +164,11 @@ export async function POST(request: Request) {
 
             // Does this line contain our club name?
             if (isOurClub(line)) {
-                const lineComp = detectCompetitionFromText(line) !== "League"
-                    ? detectCompetitionFromText(line)
-                    : currentCompetition;
+                const detectedOnLine = detectCompetitionFromText(line);
+                const hasExplicitLeagueOnLine = /\b(premier\s+division|division\s+\d+|division\s+one|division\s+two|league)\b/i.test(line) && !/\b(cup|trophy|shield|plate|vase)\b/i.test(line);
+                const lineComp = detectedOnLine !== "League"
+                    ? detectedOnLine
+                    : (hasExplicitLeagueOnLine ? "League" : currentCompetition);
 
                 // Strip date and time tokens from the line before extracting teams
                 let workLine = line;
@@ -264,6 +269,7 @@ export async function POST(request: Request) {
                         venue: isHome ? "Home" : "Away",
                         status: 'ready'
                     });
+                    currentCompetition = "League";
                 }
             }
         }

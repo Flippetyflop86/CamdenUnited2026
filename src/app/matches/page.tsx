@@ -341,6 +341,11 @@ export default function MatchesPage() {
             cleanNotes = cleanNotes.replace(/(?:,?\s*["']usedSubstitutes["']\s*:\s*\[\]\s*\}\s*)+/g, "");
             cleanNotes = cleanNotes.replace(/^,\s*/, "").replace(/^[,\s\}\{]+/, "").trim();
             
+            const normalizedCompetition = m.competition === "Cup" ? "League" : (m.competition || "League");
+            if (m.competition === "Cup") {
+                supabase.from("matches").update({ competition: "League" }).eq("id", m.id).then(() => {});
+            }
+
             return {
                 id: m.id,
                 date: m.date,
@@ -348,7 +353,7 @@ export default function MatchesPage() {
                 meetTime: meetTime,
                 opponent: m.opponent,
                 isHome: m.is_home,
-                competition: m.competition,
+                competition: normalizedCompetition,
                 scoreline: m.scoreline,
                 result: m.result,
                 goalscorers: m.goalscorers,
