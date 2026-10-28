@@ -446,12 +446,12 @@ export default function OppositionReportsPage() {
     };
 
     const handleEditReport = () => {
-        if (!selectedReport) return;
+        const base = selectedReport || editedReport || createBlankReport();
         setEditedReport({
-            ...selectedReport,
-            dangerMenList: [...(selectedReport.dangerMenList || [])],
-            playerProfiles: [...(selectedReport.playerProfiles || [])],
-            lineup: [...(selectedReport.lineup || [])]
+            ...base,
+            dangerMenList: [...(base.dangerMenList || [])],
+            playerProfiles: [...(base.playerProfiles || [])],
+            lineup: [...(base.lineup || [])]
         });
         setIsEditing(true);
     };
@@ -559,7 +559,7 @@ export default function OppositionReportsPage() {
 
     // Danger Men structured list helpers
     const handleAddDangerMan = () => {
-        if (!isEditing || !editedReport) return;
+        const base = isEditing && editedReport ? editedReport : selectedReport || createBlankReport();
         const newItem: DangerManItem = {
             id: Math.random().toString(36).substring(2, 9),
             number: "",
@@ -569,9 +569,12 @@ export default function OppositionReportsPage() {
             notes: ""
         };
         setEditedReport({
-            ...editedReport,
-            dangerMenList: [...(editedReport.dangerMenList || []), newItem]
+            ...base,
+            dangerMenList: [...(base.dangerMenList || []), newItem],
+            playerProfiles: [...(base.playerProfiles || [])],
+            lineup: [...(base.lineup || [])]
         });
+        setIsEditing(true);
     };
 
     const handleUpdateDangerMan = (id: string, field: keyof DangerManItem, value: string) => {
@@ -1449,18 +1452,16 @@ export default function OppositionReportsPage() {
                                         Shirt #, position, foot &amp; how to stop them
                                     </p>
                                 </div>
-                                {isEditing && (
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={handleAddDangerMan}
-                                        className="h-7 px-2.5 text-[11px] font-extrabold border-amber-500/40 text-amber-500"
-                                    >
-                                        <Plus className="h-3 w-3 mr-1" />
-                                        Player
-                                    </Button>
-                                )}
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleAddDangerMan}
+                                    className="h-7 px-2.5 text-[11px] font-extrabold border-amber-500/40 text-amber-500"
+                                >
+                                    <Plus className="h-3 w-3 mr-1" />
+                                    Player
+                                </Button>
                             </div>
 
                             {(activeReport.dangerMenList || []).length > 0 && (
@@ -1526,7 +1527,10 @@ export default function OppositionReportsPage() {
                                                     />
                                                 </>
                                             ) : (
-                                                <div className="space-y-1">
+                                                <div
+                                                    onClick={handleEditReport}
+                                                    className="space-y-1 cursor-pointer"
+                                                >
                                                     <div className="flex items-center justify-between gap-2">
                                                         <div className="flex items-center gap-1.5 flex-wrap">
                                                             {dm.number && (
@@ -1571,12 +1575,18 @@ export default function OppositionReportsPage() {
                                     className="w-full min-h-[75px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none"
                                 />
                             ) : activeReport.dangerMen ? (
-                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                <p
+                                    onClick={handleEditReport}
+                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text"
+                                >
                                     {activeReport.dangerMen}
                                 </p>
                             ) : (activeReport.dangerMenList || []).length === 0 ? (
-                                <p className="text-xs text-muted-foreground italic">
-                                    No danger men logged yet. Tap Edit to add key opposition players.
+                                <p
+                                    onClick={handleEditReport}
+                                    className="text-xs text-muted-foreground italic cursor-text py-1"
+                                >
+                                    No danger men logged yet. Tap here or + Player to add key threats...
                                 </p>
                             ) : null}
                         </div>
@@ -1599,9 +1609,14 @@ export default function OppositionReportsPage() {
                                     className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
                                 />
                             ) : (
-                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                <p
+                                    onClick={handleEditReport}
+                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                >
                                     {activeReport.strengths || (
-                                        <span className="text-muted-foreground italic">No strengths logged yet.</span>
+                                        <span className="text-muted-foreground italic">
+                                            No strengths logged yet. Tap here to type...
+                                        </span>
                                     )}
                                 </p>
                             )}
@@ -1625,9 +1640,14 @@ export default function OppositionReportsPage() {
                                     className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
                                 />
                             ) : (
-                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                <p
+                                    onClick={handleEditReport}
+                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                >
                                     {activeReport.weaknesses || (
-                                        <span className="text-muted-foreground italic">No weaknesses logged yet.</span>
+                                        <span className="text-muted-foreground italic">
+                                            No weaknesses logged yet. Tap here to type...
+                                        </span>
                                     )}
                                 </p>
                             )}
@@ -1656,10 +1676,13 @@ export default function OppositionReportsPage() {
                                     className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
                                 />
                             ) : (
-                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                <p
+                                    onClick={handleEditReport}
+                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                >
                                     {activeReport.inPossession || (
                                         <span className="text-muted-foreground italic">
-                                            No in-possession notes logged yet.
+                                            No in-possession notes logged yet. Tap here to type...
                                         </span>
                                     )}
                                 </p>
@@ -1684,10 +1707,13 @@ export default function OppositionReportsPage() {
                                     className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
                                 />
                             ) : (
-                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                <p
+                                    onClick={handleEditReport}
+                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                >
                                     {activeReport.outOfPossession || (
                                         <span className="text-muted-foreground italic">
-                                            No out-of-possession notes logged yet.
+                                            No out-of-possession notes logged yet. Tap here to type...
                                         </span>
                                     )}
                                 </p>
@@ -1712,10 +1738,13 @@ export default function OppositionReportsPage() {
                                     className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
                                 />
                             ) : (
-                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                <p
+                                    onClick={handleEditReport}
+                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                >
                                     {activeReport.transition || (
                                         <span className="text-muted-foreground italic">
-                                            No transition notes logged yet.
+                                            No transition notes logged yet. Tap here to type...
                                         </span>
                                     )}
                                 </p>
@@ -1740,10 +1769,13 @@ export default function OppositionReportsPage() {
                                     className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
                                 />
                             ) : (
-                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                <p
+                                    onClick={handleEditReport}
+                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                >
                                     {activeReport.setPieces || (
                                         <span className="text-muted-foreground italic">
-                                            No set-piece notes logged yet.
+                                            No set-piece notes logged yet. Tap here to type...
                                         </span>
                                     )}
                                 </p>
@@ -1886,10 +1918,21 @@ export default function OppositionReportsPage() {
                 {(mobileTab === "all" || mobileTab === "review") && (
                     <div className="space-y-3">
                         <div className="rounded-2xl bg-surface-1 border border-border p-3.5 space-y-2 shadow-xs">
-                            <h3 className="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-1.5">
-                                <ClipboardCheck className="h-4 w-4 text-brand" />
-                                Post-Match Review &amp; Notes for Next Time
-                            </h3>
+                            <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-1.5">
+                                    <ClipboardCheck className="h-4 w-4 text-brand" />
+                                    Post-Match Review &amp; Notes for Next Time
+                                </h3>
+                                {!isEditing && (
+                                    <button
+                                        type="button"
+                                        onClick={handleEditReport}
+                                        className="text-[11px] font-bold text-brand"
+                                    >
+                                        + Add Note
+                                    </button>
+                                )}
+                            </div>
                             {isEditing ? (
                                 <textarea
                                     value={editedReport?.postMatchReview || ""}
@@ -1902,10 +1945,13 @@ export default function OppositionReportsPage() {
                                     className="w-full min-h-[85px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
                                 />
                             ) : (
-                                <p className="text-xs text-foreground whitespace-pre-wrap leading-relaxed">
+                                <p
+                                    onClick={handleEditReport}
+                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                >
                                     {activeReport.postMatchReview || activeReport.generalNotes || (
                                         <span className="text-muted-foreground italic">
-                                            No post-match notes recorded yet.
+                                            No post-match notes recorded yet. Tap here to type...
                                         </span>
                                     )}
                                 </p>
@@ -2538,18 +2584,16 @@ export default function OppositionReportsPage() {
                                     Log their standout players by shirt number, position, preferred foot &amp; how to stop them
                                 </p>
                             </div>
-                            {isEditing && (
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={handleAddDangerMan}
-                                    className="h-8 text-xs font-bold border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
-                                >
-                                    <Plus className="h-3.5 w-3.5 mr-1" />
-                                    Add Player
-                                </Button>
-                            )}
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={handleAddDangerMan}
+                                className="h-8 text-xs font-bold border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
+                            >
+                                <Plus className="h-3.5 w-3.5 mr-1" />
+                                Add Player
+                            </Button>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-3">
                             {/* Structured Danger Men Cards */}
@@ -2616,7 +2660,10 @@ export default function OppositionReportsPage() {
                                                     />
                                                 </>
                                             ) : (
-                                                <div className="flex items-start gap-2.5">
+                                                <div
+                                                    onClick={handleEditReport}
+                                                    className="flex items-start gap-2.5 cursor-pointer"
+                                                >
                                                     <div className="h-8 min-w-8 px-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-500 font-black text-xs flex items-center justify-center shrink-0">
                                                         {dm.number ? `#${dm.number.replace(/^#/, "")}` : dm.position || "!"}
                                                     </div>
@@ -2660,12 +2707,18 @@ export default function OppositionReportsPage() {
                                     className="w-full min-h-[72px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-amber-500 outline-none resize-y"
                                 />
                             ) : activeReport.dangerMen ? (
-                                <p className="text-xs md:text-sm text-foreground whitespace-pre-wrap bg-surface-2/60 rounded-xl p-3 border border-border">
+                                <p
+                                    onClick={handleEditReport}
+                                    className="text-xs md:text-sm text-foreground whitespace-pre-wrap bg-surface-2/60 hover:bg-surface-2 rounded-xl p-3 border border-border cursor-text transition-colors"
+                                >
                                     {activeReport.dangerMen}
                                 </p>
                             ) : (activeReport.dangerMenList || []).length === 0 ? (
-                                <p className="text-xs text-muted-foreground italic">
-                                    No danger men logged yet. Click &ldquo;Edit Report&rdquo; to add key opposition threats.
+                                <p
+                                    onClick={handleEditReport}
+                                    className="text-xs text-muted-foreground italic cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                >
+                                    No danger men logged yet. Click here or &ldquo;Add Player&rdquo; to enter key threats...
                                 </p>
                             ) : null}
                         </CardContent>
@@ -2679,11 +2732,20 @@ export default function OppositionReportsPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* 1. STRENGTHS */}
                         <Card className="bg-surface-1 border-border border-l-4 border-l-emerald-500 shadow-xs">
-                            <CardHeader className="p-4 pb-2">
+                            <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                                 <CardTitle className="text-xs font-black uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
                                     <Sparkles className="h-3.5 w-3.5" />
                                     Their Strengths
                                 </CardTitle>
+                                {!isEditing && (
+                                    <button
+                                        type="button"
+                                        onClick={handleEditReport}
+                                        className="text-[11px] font-bold text-muted-foreground hover:text-emerald-500 transition-colors"
+                                    >
+                                        + Edit
+                                    </button>
+                                )}
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
@@ -2698,9 +2760,14 @@ export default function OppositionReportsPage() {
                                         className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-emerald-500 outline-none resize-y"
                                     />
                                 ) : (
-                                    <p className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px]">
+                                    <p
+                                        onClick={handleEditReport}
+                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                    >
                                         {activeReport.strengths || (
-                                            <span className="text-muted-foreground italic">No strengths logged yet.</span>
+                                            <span className="text-muted-foreground italic">
+                                                No strengths logged yet. Click here to type...
+                                            </span>
                                         )}
                                     </p>
                                 )}
@@ -2709,11 +2776,20 @@ export default function OppositionReportsPage() {
 
                         {/* 2. WEAKNESSES */}
                         <Card className="bg-surface-1 border-border border-l-4 border-l-rose-500 shadow-xs">
-                            <CardHeader className="p-4 pb-2">
+                            <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                                 <CardTitle className="text-xs font-black uppercase tracking-wider text-rose-500 flex items-center gap-1.5">
                                     <Target className="h-3.5 w-3.5" />
                                     Their Weaknesses (How We Hurt Them)
                                 </CardTitle>
+                                {!isEditing && (
+                                    <button
+                                        type="button"
+                                        onClick={handleEditReport}
+                                        className="text-[11px] font-bold text-muted-foreground hover:text-rose-500 transition-colors"
+                                    >
+                                        + Edit
+                                    </button>
+                                )}
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
@@ -2728,9 +2804,14 @@ export default function OppositionReportsPage() {
                                         className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-rose-500 outline-none resize-y"
                                     />
                                 ) : (
-                                    <p className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px]">
+                                    <p
+                                        onClick={handleEditReport}
+                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                    >
                                         {activeReport.weaknesses || (
-                                            <span className="text-muted-foreground italic">No weaknesses logged yet.</span>
+                                            <span className="text-muted-foreground italic">
+                                                No weaknesses logged yet. Click here to type...
+                                            </span>
                                         )}
                                     </p>
                                 )}
@@ -2739,11 +2820,20 @@ export default function OppositionReportsPage() {
 
                         {/* 3. IN POSSESSION */}
                         <Card className="bg-surface-1 border-border border-l-4 border-l-blue-500 shadow-xs">
-                            <CardHeader className="p-4 pb-2">
+                            <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                                 <CardTitle className="text-xs font-black uppercase tracking-wider text-blue-500 flex items-center gap-1.5">
                                     <Users className="h-3.5 w-3.5" />
                                     In Possession (Build-Up &amp; Shape)
                                 </CardTitle>
+                                {!isEditing && (
+                                    <button
+                                        type="button"
+                                        onClick={handleEditReport}
+                                        className="text-[11px] font-bold text-muted-foreground hover:text-blue-500 transition-colors"
+                                    >
+                                        + Edit
+                                    </button>
+                                )}
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
@@ -2758,10 +2848,13 @@ export default function OppositionReportsPage() {
                                         className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-blue-500 outline-none resize-y"
                                     />
                                 ) : (
-                                    <p className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px]">
+                                    <p
+                                        onClick={handleEditReport}
+                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                    >
                                         {activeReport.inPossession || (
                                             <span className="text-muted-foreground italic">
-                                                No in-possession notes logged yet.
+                                                No in-possession notes logged yet. Click here to type...
                                             </span>
                                         )}
                                     </p>
@@ -2771,11 +2864,20 @@ export default function OppositionReportsPage() {
 
                         {/* 4. OUT OF POSSESSION */}
                         <Card className="bg-surface-1 border-border border-l-4 border-l-purple-500 shadow-xs">
-                            <CardHeader className="p-4 pb-2">
+                            <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                                 <CardTitle className="text-xs font-black uppercase tracking-wider text-purple-500 flex items-center gap-1.5">
                                     <Swords className="h-3.5 w-3.5" />
                                     Out of Possession (Defensive Shape &amp; Press)
                                 </CardTitle>
+                                {!isEditing && (
+                                    <button
+                                        type="button"
+                                        onClick={handleEditReport}
+                                        className="text-[11px] font-bold text-muted-foreground hover:text-purple-500 transition-colors"
+                                    >
+                                        + Edit
+                                    </button>
+                                )}
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
@@ -2790,10 +2892,13 @@ export default function OppositionReportsPage() {
                                         className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-purple-500 outline-none resize-y"
                                     />
                                 ) : (
-                                    <p className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px]">
+                                    <p
+                                        onClick={handleEditReport}
+                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                    >
                                         {activeReport.outOfPossession || (
                                             <span className="text-muted-foreground italic">
-                                                No out-of-possession notes logged yet.
+                                                No out-of-possession notes logged yet. Click here to type...
                                             </span>
                                         )}
                                     </p>
@@ -2803,11 +2908,20 @@ export default function OppositionReportsPage() {
 
                         {/* 5. TRANSITION */}
                         <Card className="bg-surface-1 border-border border-l-4 border-l-orange-500 shadow-xs">
-                            <CardHeader className="p-4 pb-2">
+                            <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                                 <CardTitle className="text-xs font-black uppercase tracking-wider text-orange-500 flex items-center gap-1.5">
                                     <Zap className="h-3.5 w-3.5" />
                                     Transition (Attacking &amp; Defensive)
                                 </CardTitle>
+                                {!isEditing && (
+                                    <button
+                                        type="button"
+                                        onClick={handleEditReport}
+                                        className="text-[11px] font-bold text-muted-foreground hover:text-orange-500 transition-colors"
+                                    >
+                                        + Edit
+                                    </button>
+                                )}
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
@@ -2822,10 +2936,13 @@ export default function OppositionReportsPage() {
                                         className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-orange-500 outline-none resize-y"
                                     />
                                 ) : (
-                                    <p className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px]">
+                                    <p
+                                        onClick={handleEditReport}
+                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                    >
                                         {activeReport.transition || (
                                             <span className="text-muted-foreground italic">
-                                                No transition notes logged yet.
+                                                No transition notes logged yet. Click here to type...
                                             </span>
                                         )}
                                     </p>
@@ -2835,11 +2952,20 @@ export default function OppositionReportsPage() {
 
                         {/* 6. SET PIECES */}
                         <Card className="bg-surface-1 border-border border-l-4 border-l-cyan-500 shadow-xs">
-                            <CardHeader className="p-4 pb-2">
+                            <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
                                 <CardTitle className="text-xs font-black uppercase tracking-wider text-cyan-500 flex items-center gap-1.5">
                                     <Flag className="h-3.5 w-3.5" />
                                     Set Pieces (Corners, Free Kicks &amp; Throws)
                                 </CardTitle>
+                                {!isEditing && (
+                                    <button
+                                        type="button"
+                                        onClick={handleEditReport}
+                                        className="text-[11px] font-bold text-muted-foreground hover:text-cyan-500 transition-colors"
+                                    >
+                                        + Edit
+                                    </button>
+                                )}
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
@@ -2854,10 +2980,13 @@ export default function OppositionReportsPage() {
                                         className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-cyan-500 outline-none resize-y"
                                     />
                                 ) : (
-                                    <p className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px]">
+                                    <p
+                                        onClick={handleEditReport}
+                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                    >
                                         {activeReport.setPieces || (
                                             <span className="text-muted-foreground italic">
-                                                No set-piece notes logged yet.
+                                                No set-piece notes logged yet. Click here to type...
                                             </span>
                                         )}
                                     </p>
@@ -2870,14 +2999,38 @@ export default function OppositionReportsPage() {
                     {/* #15: POST-MATCH REVIEW / NOTES FOR NEXT TIME              */}
                     {/* ========================================================= */}
                     <Card className="bg-surface-1 border-border shadow-xs">
-                        <CardHeader className="p-4 pb-2">
-                            <CardTitle className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                <ClipboardCheck className="h-4 w-4 text-brand" />
-                                Post-Match Review &amp; Notes for Next Meeting
-                            </CardTitle>
-                            <p className="text-[11px] text-muted-foreground">
-                                Log what worked after full-time so you have it ready for the reverse fixture
-                            </p>
+                        <CardHeader className="p-4 pb-2 flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle className="text-xs font-black uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                    <ClipboardCheck className="h-4 w-4 text-brand" />
+                                    Post-Match Review &amp; Notes for Next Meeting
+                                </CardTitle>
+                                <p className="text-[11px] text-muted-foreground">
+                                    Log what worked after full-time so you have it ready for the reverse fixture
+                                </p>
+                            </div>
+                            {isEditing ? (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={handleSaveReport}
+                                    className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"
+                                >
+                                    <Save className="h-3.5 w-3.5 mr-1.5" />
+                                    Save Notes
+                                </Button>
+                            ) : (
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleEditReport}
+                                    className="h-8 text-xs font-bold border-border bg-surface-2 text-foreground"
+                                >
+                                    <Edit2 className="h-3.5 w-3.5 mr-1.5 text-brand" />
+                                    Add / Edit Notes
+                                </Button>
+                            )}
                         </CardHeader>
                         <CardContent className="p-4 pt-1 space-y-2">
                             {isEditing ? (
@@ -2892,10 +3045,13 @@ export default function OppositionReportsPage() {
                                     className="w-full min-h-[85px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-brand outline-none resize-y"
                                 />
                             ) : (
-                                <p className="text-xs md:text-sm text-foreground whitespace-pre-wrap">
+                                <p
+                                    onClick={handleEditReport}
+                                    className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[48px] cursor-text rounded-xl p-2.5 -m-2.5 hover:bg-surface-2/60 transition-colors"
+                                >
                                     {activeReport.postMatchReview || activeReport.generalNotes || (
                                         <span className="text-muted-foreground italic">
-                                            No post-match notes recorded yet.
+                                            No post-match notes recorded yet. Click here to type...
                                         </span>
                                     )}
                                 </p>
@@ -3044,6 +3200,30 @@ export default function OppositionReportsPage() {
                     </Card>
                 </div>
             </div>
+
+            {isEditing && (
+                <div className="fixed bottom-6 right-6 z-40 rounded-2xl bg-surface-1/95 backdrop-blur-md border border-brand/40 px-4 py-3 shadow-2xl flex items-center gap-3">
+                    <span className="text-xs font-extrabold text-foreground">
+                        Editing: <span className="text-brand">{editedReport?.name || "New Report"}</span>
+                    </span>
+                    <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleCancelEdit}
+                        className="h-8 px-3 rounded-xl border-border bg-surface-2 text-xs font-bold"
+                    >
+                        Cancel
+                    </Button>
+                    <Button
+                        size="sm"
+                        onClick={handleSaveReport}
+                        className="h-8 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-xs"
+                    >
+                        <Save className="h-3.5 w-3.5 mr-1.5" />
+                        Save Report
+                    </Button>
+                </div>
+            )}
             </div>
 
             {/* Position Profile Modal (for Pitch Visualizer) */}
