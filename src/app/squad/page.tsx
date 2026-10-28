@@ -1547,32 +1547,9 @@ export default function SquadPage() {
                 {/* 1. Compact Mobile Top Header */}
                 <div className="px-4 pt-4 pb-3 bg-surface-1 border-b border-border space-y-3">
                     <div className="flex items-center justify-between gap-2">
-                        <div>
-                            <h1 className="text-xl font-black text-foreground tracking-tight leading-none">
-                                Squad
-                            </h1>
-                            <div className="flex items-center gap-2 mt-1.5 text-[11px] font-semibold">
-                                <span className="text-status-success">
-                                    {activeSquadPlayers.filter((p) => p.medicalStatus === "Available").length} Fit
-                                </span>
-                                <span className="text-muted-foreground">•</span>
-                                <span className="text-muted-foreground">
-                                    {activeSquadPlayers.length} Active
-                                </span>
-                                {activeInjuredCount > 0 && (
-                                    <>
-                                        <span className="text-muted-foreground">•</span>
-                                        <span className="text-status-error">{activeInjuredCount} Injured</span>
-                                    </>
-                                )}
-                                {activeHolidayCount > 0 && (
-                                    <>
-                                        <span className="text-muted-foreground">•</span>
-                                        <span className="text-blue-500">{activeHolidayCount} Away</span>
-                                    </>
-                                )}
-                            </div>
-                        </div>
+                        <h1 className="text-xl font-black text-foreground tracking-tight leading-none">
+                            Squad
+                        </h1>
 
                         <div className="flex items-center gap-1.5">
                             <Button
@@ -1629,6 +1606,42 @@ export default function SquadPage() {
                             >
                                 <Plus className="h-3.5 w-3.5 mr-1" /> Add
                             </Button>
+                        </div>
+                    </div>
+
+                    {/* Structured 4-Column Squad Status Strip */}
+                    <div className="grid grid-cols-4 divide-x divide-border rounded-xl border border-border bg-background shadow-2xs overflow-hidden text-center">
+                        <div className="py-2 px-1">
+                            <p className="text-sm font-black text-foreground leading-none">
+                                {activeSquadPlayers.length}
+                            </p>
+                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">
+                                Active
+                            </p>
+                        </div>
+                        <div className="py-2 px-1">
+                            <p className="text-sm font-black text-status-success leading-none">
+                                {activeSquadPlayers.filter((p) => p.medicalStatus === "Available").length}
+                            </p>
+                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">
+                                Fit
+                            </p>
+                        </div>
+                        <div className="py-2 px-1">
+                            <p className="text-sm font-black text-status-error leading-none">
+                                {activeInjuredCount + activeSuspendedCount}
+                            </p>
+                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">
+                                {activeSuspendedCount > 0 ? "Inj / Susp" : "Injured"}
+                            </p>
+                        </div>
+                        <div className="py-2 px-1">
+                            <p className="text-sm font-black text-blue-500 leading-none">
+                                {activeHolidayCount + activeParentClubCount}
+                            </p>
+                            <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mt-1">
+                                Away
+                            </p>
                         </div>
                     </div>
 
