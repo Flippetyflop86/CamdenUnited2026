@@ -64,6 +64,7 @@ export default function MatchesPage() {
     const [quickOpponent, setQuickOpponent] = useState("");
     const [quickCompetition, setQuickCompetition] = useState("League");
     const [isQuickAdding, setIsQuickAdding] = useState(false);
+    const [isMobileQuickAddOpen, setIsMobileQuickAddOpen] = useState(false);
 
     const [opponentInstagram, setOpponentInstagram] = useState("");
     const [opponentBadgeUrl, setOpponentBadgeUrl] = useState("");
@@ -1098,10 +1099,314 @@ export default function MatchesPage() {
         const clubExpectedGoals = parsedScore ? parsedScore.clubGoals : null;
         const hasGoalMismatch = isPast && clubExpectedGoals !== null && clubExpectedGoals > 0 && totalLoggedGoals !== clubExpectedGoals;
 
+        const isHome = Boolean(match.isHome);
+        const homeTeamName = isHome ? settings.name : match.opponent;
+        const awayTeamName = !isHome ? settings.name : match.opponent;
+        const shortDateStr = new Date(match.date).toLocaleDateString("en-GB", {
+            weekday: "short",
+            day: "numeric",
+            month: "short",
+        });
+
         return (
+            <div id={`match-card-${match.id}`}>
+                {/* =============================================================
+                    MOBILE MATCH CARD (< 768px)
+                   ============================================================= */}
+                <div
+                    className={`md:hidden rounded-xl border border-border bg-surface-1 overflow-hidden shadow-xs transition-all ${
+                        isNextUp ? "border-l-4 border-l-brand" : ""
+                    } ${isSelectedForBulk ? "ring-2 ring-brand bg-brand/5" : ""}`}
+                >
+                    {/* Top Metadata Bar */}
+                    <div className="px-3 py-2 bg-surface-2/60 border-b border-border flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                            {isBulkSelectMode && (
+                                <button
+                                    type="button"
+                                    onClick={() => toggleSelectMatch(match.id)}
+                                    className="text-foreground hover:text-brand transition-colors mr-0.5 shrink-0"
+                                >
+                                    {isSelectedForBulk ? (
+                                        <CheckSquare className="h-4 w-4 text-brand" />
+                                    ) : (
+                                        <Square className="h-4 w-4 text-muted-foreground" />
+                                    )}
+                                </button>
+                            )}
+                            {isNextUp && (
+                                <span className="bg-brand text-brand-foreground text-[9px] uppercase font-extrabold px-1.5 py-0.5 rounded shrink-0">
+                                    Next Up
+                                </span>
+                            )}
+                            <span
+                                className={`px-1.5 py-0.5 rounded text-[10px] font-bold border truncate max-w-[130px] ${
+                                    (match.competition || "").toLowerCase().includes("cup")
+                                        ? "bg-amber-100/90 dark:bg-amber-500/15 border-amber-400/70 dark:border-amber-500/40 text-amber-800 dark:text-amber-300"
+                                        : "bg-surface-2 border-border text-foreground"
+                                }`}
+                            >
+                                {match.competition || "League"}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground font-semibold truncate">
+                                {shortDateStr}
+                                {match.time ? ` • ${match.time.slice(0, 5)}` : ""}
+                                {!isPast && (match as any).meetTime ? ` (Meet ${(match as any).meetTime})` : ""}
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0">
+                            {match.result && match.result !== "Pending" && (
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] uppercase font-extrabold border ${getResultColor(match.result)}`}>
+                                    {match.result === "Win" ? "W" : match.result === "Loss" ? "L" : "D"}
+                                </span>
+                            )}
+                            <button
+                                type="button"
+                                onClick={() => handleEditMatch(match)}
+                                className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-surface-2 transition-colors"
+                                title="Edit Match"
+                            >
+                                <Edit2 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => handleDeleteMatch(match.id)}
+                                className="h-7 w-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                                title="Delete Match"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Center Horizontal Scoreboard Row */}
+                    <div className="p-3 space-y-2.5">
+                        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                            {/* Home Team */}
+                            <div className="flex items-center justify-end gap-1.5 text-right min-w-0">
+                                <div className="min-w-0">
+                                    <p className={`text-xs font-extrabold leading-tight truncate ${isHome ? "text-foreground" : "text-muted-foreground"}`}>
+                                        {homeTeamName}
+                                    </p>
+                                    <span className="text-[9px] font-bold uppercase text-muted-foreground">Home</span>
+                                </div>
+                                {isHome && settings.logo ? (
+                                    <img src={settings.logo} alt="Logo" className="h-6 w-6 object-contain shrink-0 rounded-full" />
+                                ) : !isHome && teamInfo?.badge_url ? (
+                                    <img src={teamInfo.badge_url} alt="Badge" className="h-6 w-6 object-contain shrink-0" />
+                                ) : null}
+                            </div>
+
+                            {/* Tappable Scorebox */}
+                            <button
+                                type="button"
+                                onClick={() => setQuickResultMatch(match)}
+                                className="px-2.5 py-1.5 rounded-lg bg-surface-2/90 border border-border hover:border-brand/50 transition-colors min-w-[66px] text-center shrink-0 shadow-2xs"
+                                title="Tap to log or edit scoreline & scorers"
+                            >
+                                {match.scoreline ? (
+                                    <span className="text-sm font-black text-foreground tracking-tight tabular-nums">
+                                        {match.scoreline.includes("-")
+                                            ? `${match.scoreline.split("-")[0].trim() || "0"} - ${match.scoreline.split("-")[1].trim() || "0"}`
+                                            : match.scoreline}
+                                    </span>
+                                ) : (
+                                    <span className="text-xs font-extrabold text-brand uppercase">
+                                        {match.time ? match.time.slice(0, 5) : "VS"}
+                                    </span>
+                                )}
+                            </button>
+
+                            {/* Away Team */}
+                            <div className="flex items-center justify-start gap-1.5 text-left min-w-0">
+                                {!isHome && settings.logo ? (
+                                    <img src={settings.logo} alt="Logo" className="h-6 w-6 object-contain shrink-0 rounded-full" />
+                                ) : isHome && teamInfo?.badge_url ? (
+                                    <img src={teamInfo.badge_url} alt="Badge" className="h-6 w-6 object-contain shrink-0" />
+                                ) : null}
+                                <div className="min-w-0">
+                                    <p className={`text-xs font-extrabold leading-tight truncate ${!isHome ? "text-foreground" : "text-muted-foreground"}`}>
+                                        {awayTeamName}
+                                    </p>
+                                    <span className="text-[9px] font-bold uppercase text-muted-foreground">Away</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Location & Weather Row */}
+                        {(match.location || (dayWeather && !isPast)) && (
+                            <div className="flex flex-wrap items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
+                                {match.location && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-2/80 border border-border truncate max-w-[210px]">
+                                        <MapPin className="h-2.5 w-2.5 shrink-0" />
+                                        <span className="truncate">{match.location}</span>
+                                    </span>
+                                )}
+                                {dayWeather && !isPast && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-2/80 border border-border">
+                                        {weatherIcon}
+                                        <span>{dayWeather.tempMin}°–{dayWeather.tempMax}°C</span>
+                                    </span>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Weather Warning */}
+                        {isWarning && warningText && (
+                            <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[10px] text-amber-500 font-semibold flex items-center gap-1.5">
+                                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                                <span>{warningText}</span>
+                            </div>
+                        )}
+
+                        {/* Scorers, Assists & Lineup Pills */}
+                        {(goalTokens.length > 0 || assistTokens.length > 0 || hasGoalMismatch || match.lineup) && (
+                            <div className="pt-2 border-t border-border/70 flex flex-col items-center space-y-2">
+                                {(goalTokens.length > 0 || assistTokens.length > 0 || hasGoalMismatch) && (
+                                    <div className="flex flex-wrap items-center justify-center gap-1">
+                                        {goalTokens.map((g, idx) => (
+                                            <button
+                                                type="button"
+                                                key={`mg-${idx}`}
+                                                onClick={() => setQuickResultMatch(match)}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100/90 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-400/70 dark:border-emerald-500/30"
+                                            >
+                                                <span>⚽</span>
+                                                <span>{g.rawName}{g.count > 1 ? ` (${g.count})` : ""}</span>
+                                            </button>
+                                        ))}
+                                        {assistTokens.map((a, idx) => (
+                                            <button
+                                                type="button"
+                                                key={`ma-${idx}`}
+                                                onClick={() => setQuickResultMatch(match)}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100/90 dark:bg-sky-500/15 text-sky-800 dark:text-sky-300 border border-sky-400/70 dark:border-sky-500/30"
+                                            >
+                                                <span>👟</span>
+                                                <span>{a.rawName}{a.count > 1 ? ` (${a.count})` : ""}</span>
+                                            </button>
+                                        ))}
+                                        {hasGoalMismatch && (
+                                            <button
+                                                type="button"
+                                                onClick={() => setQuickResultMatch(match)}
+                                                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 dark:bg-amber-500/20 text-amber-900 dark:text-amber-300 border border-amber-400 dark:border-amber-500/40"
+                                            >
+                                                <AlertTriangle className="h-3 w-3 shrink-0" />
+                                                <span>
+                                                    {totalLoggedGoals === 0
+                                                        ? `+ Add Scorers (${clubExpectedGoals} unassigned)`
+                                                        : `${totalLoggedGoals}/${clubExpectedGoals} goals assigned`}
+                                                </span>
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
+
+                                {match.lineup && (
+                                    <div className="w-full flex flex-col items-center">
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowLineup(!showLineup)}
+                                            className="text-[10px] font-bold bg-surface-2 hover:bg-surface-3 text-foreground border border-border px-2.5 py-1 rounded-full flex items-center gap-1"
+                                        >
+                                            <span>📋</span>
+                                            <span>{showLineup ? "Hide Lineup" : `Saved Lineup (${match.lineup.formation})`}</span>
+                                        </button>
+
+                                        {showLineup && (
+                                            <div className="w-full mt-2 p-2.5 rounded-lg bg-surface-2/80 border border-border text-left space-y-2">
+                                                <div>
+                                                    <span className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground">Starting XI</span>
+                                                    <div className="mt-1 flex flex-wrap gap-1">
+                                                        {Object.entries(match.lineup.starters || {})
+                                                            .filter(([, id]) => id)
+                                                            .map(([pos, id]) => {
+                                                                const p = players.find(x => x.id === id);
+                                                                const name = p ? `${p.first_name[0]}.${p.last_name}` : "Unknown";
+                                                                return (
+                                                                    <span key={pos} className="inline-flex items-center bg-surface-1 border border-border px-1.5 py-0.5 rounded text-[10px]">
+                                                                        <span className="text-[8px] uppercase font-extrabold text-muted-foreground mr-1">{pos}:</span>
+                                                                        <span className="font-semibold text-foreground">{name}</span>
+                                                                    </span>
+                                                                );
+                                                            })}
+                                                    </div>
+                                                </div>
+                                                {match.lineup.substitutes && match.lineup.substitutes.filter(id => id).length > 0 && (
+                                                    <div className="border-t border-border pt-1.5">
+                                                        <span className="text-[9px] uppercase font-bold tracking-wider text-muted-foreground">Subs</span>
+                                                        <div className="mt-1 flex flex-wrap gap-1">
+                                                            {match.lineup.substitutes
+                                                                .filter(id => id)
+                                                                .map((id, index) => {
+                                                                    const p = players.find(x => x.id === id);
+                                                                    const name = p ? `${p.first_name[0]}.${p.last_name}` : "Unknown";
+                                                                    return (
+                                                                        <span key={index} className="inline-flex items-center bg-surface-1 border border-border px-1.5 py-0.5 rounded text-[10px] font-semibold text-foreground">
+                                                                            {name}
+                                                                        </span>
+                                                                    );
+                                                                })}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Bottom Touch Action Strip */}
+                    <div className={`px-2.5 py-2 bg-surface-2/50 border-t border-border grid ${!isPast ? "grid-cols-4" : "grid-cols-3"} gap-1.5`}>
+                        <button
+                            type="button"
+                            onClick={() => setQuickResultMatch(match)}
+                            className="h-8 rounded-lg text-[11px] font-bold bg-emerald-100/90 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-400/70 dark:border-emerald-500/30 flex items-center justify-center gap-1"
+                        >
+                            <span>⚽</span>
+                            <span>{match.scoreline ? "Scorers" : "Result"}</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => router.push(`/matchday-xi?match=${match.id}`)}
+                            className="h-8 rounded-lg text-[11px] font-bold bg-surface-1 text-foreground border border-border flex items-center justify-center gap-1"
+                        >
+                            <Users className="h-3 w-3 text-brand shrink-0" />
+                            <span>Match XI</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSelectedExpenseMatch(match);
+                                setIsExpenseOpen(true);
+                            }}
+                            className="h-8 rounded-lg text-[11px] font-bold bg-surface-1 text-foreground border border-border flex items-center justify-center gap-1"
+                        >
+                            <Coins className="h-3 w-3 text-amber-500 shrink-0" />
+                            <span>Expense</span>
+                        </button>
+                        {!isPast && (
+                            <button
+                                type="button"
+                                onClick={() => (match.isHome ? handleOpenConfirmDetails(match) : handleOpenShare(match))}
+                                className="h-8 rounded-lg text-[11px] font-bold bg-surface-1 text-foreground border border-border flex items-center justify-center gap-1"
+                            >
+                                <Share2 className="h-3 w-3 text-sky-400 shrink-0" />
+                                <span>{match.isHome ? "Confirm" : "Poll"}</span>
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* =============================================================
+                    DESKTOP MATCH CARD (>= 768px) — UNTOUCHED
+                   ============================================================= */}
             <Card
-                id={`match-card-${match.id}`}
-                className={`overflow-hidden hover:shadow-md transition-all border-border bg-surface-1 ${
+                className={`hidden md:block overflow-hidden hover:shadow-md transition-all border-border bg-surface-1 ${
                     isNextUp ? "border-l-4 border-l-brand" : ""
                 } ${isSelectedForBulk ? "ring-2 ring-brand bg-brand/5" : ""}`}
             >
@@ -1396,11 +1701,35 @@ export default function MatchesPage() {
                     </div>
                 )}
             </Card>
+            </div>
         );
     };
 
+    // Mobile Season Summary Stats (computed from filtered pastMatches)
+    const mobileSeasonStats = pastMatches.reduce(
+        (acc, m) => {
+            if (!m.scoreline || !m.scoreline.includes("-")) return acc;
+            const parts = m.scoreline.split("-");
+            const homeScore = parseInt(parts[0]?.trim() || "", 10);
+            const awayScore = parseInt(parts[1]?.trim() || "", 10);
+            if (isNaN(homeScore) || isNaN(awayScore)) return acc;
+
+            const ourScore = m.isHome ? homeScore : awayScore;
+            const theirScore = m.isHome ? awayScore : homeScore;
+
+            acc.played += 1;
+            acc.gf += ourScore;
+            acc.ga += theirScore;
+            if (ourScore > theirScore) acc.wins += 1;
+            else if (ourScore === theirScore) acc.draws += 1;
+            else acc.losses += 1;
+            return acc;
+        },
+        { played: 0, wins: 0, draws: 0, losses: 0, gf: 0, ga: 0 }
+    );
+
     return (
-        <div className="space-y-6">
+        <div className="space-y-4 md:space-y-6 pb-8 md:pb-0">
             {/* Shared Opponent Autocomplete Datalist (#4) */}
             <datalist id="known-opponents-list">
                 {knownOpponents.map(opp => (
@@ -1408,8 +1737,100 @@ export default function MatchesPage() {
                 ))}
             </datalist>
 
-            {/* Header & Controls (#5, #10) */}
-            <div className="flex flex-col md:flex-row gap-4 md:items-center justify-between">
+            {/* ================================================================= */}
+            {/* MOBILE HEADER & 4-STAT SEASON BENTO STRIP (< 768px)               */}
+            {/* ================================================================= */}
+            <div className="md:hidden space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                    <div>
+                        <h2 className="text-xl font-black tracking-tight text-foreground">Fixtures &amp; Results</h2>
+                        <p className="text-[11px] text-muted-foreground">Matchday schedule, results &amp; squads</p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsImportModalOpen(true)}
+                            className="h-8 px-2.5 text-xs bg-surface-1 border-border font-bold"
+                        >
+                            <ClipboardPaste className="h-3.5 w-3.5 mr-1 text-emerald-500" />
+                            Import
+                        </Button>
+                        <Button
+                            size="sm"
+                            onClick={() => {
+                                resetForm();
+                                setIsAddOpen(true);
+                            }}
+                            className="h-8 px-3 text-xs bg-red-600 hover:bg-red-700 text-white font-bold shadow-sm"
+                        >
+                            <Plus className="h-3.5 w-3.5 mr-1" />
+                            Match
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Undo Import Banner on Mobile if active */}
+                {lastImportedIds.length > 0 && (
+                    <div className="flex items-center justify-between bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2">
+                        <span className="text-[11px] font-bold text-amber-400">
+                            Imported {lastImportedIds.length} fixtures
+                        </span>
+                        <button
+                            type="button"
+                            onClick={handleUndoLastImport}
+                            className="inline-flex items-center gap-1 text-[11px] font-black text-amber-300 bg-amber-500/20 px-2.5 py-1 rounded-lg border border-amber-500/30"
+                        >
+                            <RotateCcw className="h-3 w-3" />
+                            Undo
+                        </button>
+                    </div>
+                )}
+
+                {/* 4-Stat Season Bento Strip */}
+                <div className="grid grid-cols-4 gap-2">
+                    <div className="bg-surface-1 border border-border rounded-xl p-2.5 flex flex-col justify-between">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground">Upcoming</span>
+                        <div className="flex items-baseline gap-1 mt-1">
+                            <span className="text-base font-black text-foreground tabular-nums">{upcomingMatches.length}</span>
+                            <span className="text-[9px] font-semibold text-muted-foreground">left</span>
+                        </div>
+                    </div>
+                    <div className="bg-surface-1 border border-border rounded-xl p-2.5 flex flex-col justify-between">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground">Played</span>
+                        <div className="flex items-baseline gap-1 mt-1">
+                            <span className="text-base font-black text-foreground tabular-nums">{mobileSeasonStats.played}</span>
+                            <span className="text-[9px] font-semibold text-muted-foreground">games</span>
+                        </div>
+                    </div>
+                    <div className="bg-surface-1 border border-border rounded-xl p-2.5 flex flex-col justify-between">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground">Record</span>
+                        <div className="flex items-center gap-1 mt-1 text-xs font-black tabular-nums">
+                            <span className="text-emerald-500">{mobileSeasonStats.wins}W</span>
+                            <span className="text-muted-foreground/50">·</span>
+                            <span className="text-amber-500">{mobileSeasonStats.draws}D</span>
+                            <span className="text-muted-foreground/50">·</span>
+                            <span className="text-rose-500">{mobileSeasonStats.losses}L</span>
+                        </div>
+                    </div>
+                    <div className="bg-surface-1 border border-border rounded-xl p-2.5 flex flex-col justify-between">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground">Goals</span>
+                        <div className="flex items-baseline gap-1 mt-1">
+                            <span className="text-sm font-black text-foreground tabular-nums">
+                                {mobileSeasonStats.gf}:{mobileSeasonStats.ga}
+                            </span>
+                            <span className={`text-[9px] font-bold tabular-nums ${mobileSeasonStats.gf - mobileSeasonStats.ga >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
+                                ({mobileSeasonStats.gf - mobileSeasonStats.ga >= 0 ? `+${mobileSeasonStats.gf - mobileSeasonStats.ga}` : mobileSeasonStats.gf - mobileSeasonStats.ga})
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* ================================================================= */}
+            {/* DESKTOP HEADER & CONTROLS (>= 768px — UNTOUCHED)                  */}
+            {/* ================================================================= */}
+            <div className="hidden md:flex flex-col md:flex-row gap-4 md:items-center justify-between">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight text-foreground">Fixtures &amp; Results</h2>
                     <p className="text-sm text-muted-foreground">Manage your schedule, results, goalscorers, and matchday squads.</p>
@@ -1462,309 +1883,318 @@ export default function MatchesPage() {
                         Paste / Import
                     </Button>
 
-                    <Dialog open={isAddOpen} onOpenChange={(open: boolean) => {
-                        setIsAddOpen(open);
-                        if (!open) resetForm();
-                    }}>
-                        <DialogTrigger asChild>
-                            <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white font-semibold">
-                                <Plus className="h-4 w-4 mr-1.5" /> Add Match
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[600px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
-                            <DialogHeader className="p-6 pb-2 shrink-0">
-                                <DialogTitle>{editingId ? "Edit Match" : "Add New Match"}</DialogTitle>
-                                <DialogDescription>{editingId ? "Update match details." : "Enter fixture details and scoreline."}</DialogDescription>
-                            </DialogHeader>
+                    <Button
+                        size="sm"
+                        onClick={() => {
+                            resetForm();
+                            setIsAddOpen(true);
+                        }}
+                        className="bg-red-600 hover:bg-red-700 text-white font-semibold"
+                    >
+                        <Plus className="h-4 w-4 mr-1.5" /> Add Match
+                    </Button>
+                </div>
+            </div>
 
-                            <Tabs defaultValue="fixture" className="flex-1 flex flex-col min-h-0">
-                                <TabsList className="grid grid-cols-2 mx-6 my-2 shrink-0">
-                                    <TabsTrigger value="fixture" className="text-xs font-bold">1. Fixture Info</TabsTrigger>
-                                    <TabsTrigger value="result" className="text-xs font-bold">2. Match Record</TabsTrigger>
-                                </TabsList>
+            {/* Shared Add / Edit Match Dialog (Mobile & Desktop) */}
+            <Dialog open={isAddOpen} onOpenChange={(open: boolean) => {
+                setIsAddOpen(open);
+                if (!open) resetForm();
+            }}>
+                <DialogContent className="z-[60] w-[95vw] sm:max-w-[600px] max-h-[90dvh] flex flex-col p-0 overflow-hidden rounded-2xl">
+                    <DialogHeader className="p-4 sm:p-6 pb-2 shrink-0">
+                        <DialogTitle>{editingId ? "Edit Match" : "Add New Match"}</DialogTitle>
+                        <DialogDescription>{editingId ? "Update match details." : "Enter fixture details and scoreline."}</DialogDescription>
+                    </DialogHeader>
 
-                                <div className="flex-1 overflow-y-auto px-6 py-2 space-y-4">
-                                    <TabsContent value="fixture" className="space-y-3 mt-0 py-1">
-                                        <div className="grid grid-cols-3 gap-3">
-                                            <div className="col-span-1 space-y-1">
-                                                <Label className="text-xs font-bold text-muted-foreground">Date</Label>
-                                                <Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="h-9 text-xs" />
-                                            </div>
-                                            <div className="col-span-1 space-y-1">
-                                                <Label className="text-xs font-bold text-muted-foreground">Time (Kick Off)</Label>
-                                                <Input type="time" value={formData.time} onChange={e => handleKickoffChange(e.target.value)} className="h-9 text-xs" />
-                                            </div>
-                                            <div className="col-span-1 space-y-1">
-                                                <Label className="text-xs font-bold text-muted-foreground flex items-center justify-between">
-                                                    <span>Meet Time</span>
-                                                    <span className="text-[9px] text-slate-400 font-normal lowercase">(auto)</span>
-                                                </Label>
-                                                <Input type="time" value={formData.meetTime} onChange={e => setFormData({ ...formData, meetTime: e.target.value })} className="h-9 text-xs" />
-                                            </div>
+                    <Tabs defaultValue="fixture" className="flex-1 flex flex-col min-h-0">
+                        <TabsList className="grid grid-cols-2 mx-4 sm:mx-6 my-2 shrink-0">
+                            <TabsTrigger value="fixture" className="text-xs font-bold">1. Fixture Info</TabsTrigger>
+                            <TabsTrigger value="result" className="text-xs font-bold">2. Match Record</TabsTrigger>
+                        </TabsList>
+
+                        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-2 space-y-4">
+                            <TabsContent value="fixture" className="space-y-3 mt-0 py-1">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+                                    <div className="col-span-1 space-y-1">
+                                        <Label className="text-xs font-bold text-muted-foreground">Date</Label>
+                                        <Input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="h-9 text-xs" />
+                                    </div>
+                                    <div className="grid grid-cols-2 sm:contents gap-2.5">
+                                        <div className="col-span-1 space-y-1">
+                                            <Label className="text-xs font-bold text-muted-foreground">Time (Kick Off)</Label>
+                                            <Input type="time" value={formData.time} onChange={e => handleKickoffChange(e.target.value)} className="h-9 text-xs" />
                                         </div>
+                                        <div className="col-span-1 space-y-1">
+                                            <Label className="text-xs font-bold text-muted-foreground flex items-center justify-between">
+                                                <span>Meet Time</span>
+                                                <span className="text-[9px] text-slate-400 font-normal lowercase">(auto)</span>
+                                            </Label>
+                                            <Input type="time" value={formData.meetTime} onChange={e => setFormData({ ...formData, meetTime: e.target.value })} className="h-9 text-xs" />
+                                        </div>
+                                    </div>
+                                </div>
 
-                                        <div className="grid grid-cols-3 gap-3">
-                                            <div className="col-span-1 space-y-1">
-                                                <Label className="text-xs font-bold text-muted-foreground">Venue</Label>
-                                                <Select
-                                                    value={formData.isHome ? "Home" : "Away"}
-                                                    onValueChange={(v: string) => handleVenueChange(v === "Home")}
-                                                >
-                                                    <SelectTrigger className="h-9 text-xs">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="Home" className="text-xs">Home</SelectItem>
-                                                        <SelectItem value="Away" className="text-xs">Away</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div className="col-span-2 space-y-1">
-                                                <Label className="text-xs font-bold text-muted-foreground">Opponent</Label>
+                                <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+                                    <div className="col-span-1 space-y-1">
+                                        <Label className="text-xs font-bold text-muted-foreground">Venue</Label>
+                                        <Select
+                                            value={formData.isHome ? "Home" : "Away"}
+                                            onValueChange={(v: string) => handleVenueChange(v === "Home")}
+                                        >
+                                            <SelectTrigger className="h-9 text-xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="z-[70]">
+                                                <SelectItem value="Home" className="text-xs">Home</SelectItem>
+                                                <SelectItem value="Away" className="text-xs">Away</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="col-span-2 space-y-1">
+                                        <Label className="text-xs font-bold text-muted-foreground">Opponent</Label>
+                                        <Input
+                                            list="known-opponents-list"
+                                            placeholder="Type opponent name"
+                                            value={formData.opponent}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                setFormData({ ...formData, opponent: val });
+                                                const teamMatch = leagueTeams.find(t => (t.name || t.team_name || "").toLowerCase() === val.toLowerCase());
+                                                if (teamMatch) {
+                                                    setOpponentInstagram(teamMatch.instagram_handle || "");
+                                                    setOpponentBadgeUrl(teamMatch.badge_url || "");
+                                                } else {
+                                                    setOpponentInstagram("");
+                                                    setOpponentBadgeUrl("");
+                                                }
+                                            }}
+                                            className="h-9 text-xs"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-bold text-muted-foreground">Competition</Label>
+                                        <Select
+                                            value={formData.competition}
+                                            onValueChange={(v: string) => setFormData({ ...formData, competition: v })}
+                                        >
+                                            <SelectTrigger className="h-9 text-xs">
+                                                <SelectValue placeholder="Competition" />
+                                            </SelectTrigger>
+                                            <SelectContent className="z-[70]">
+                                                <SelectItem value="League Match" className="text-xs">League Match</SelectItem>
+                                                <SelectItem value="Alec Smith Premier Division Cup" className="text-xs">Alec Smith Cup</SelectItem>
+                                                <SelectItem value="Middlesex Cup" className="text-xs">Middlesex Cup</SelectItem>
+                                                <SelectItem value="Friendly" className="text-xs">Friendly</SelectItem>
+                                                <SelectItem value="Trial Match" className="text-xs">Trial Match</SelectItem>
+                                                {formData.competition && !["League Match", "Alec Smith Premier Division Cup", "Middlesex Cup", "Friendly", "Trial Match"].includes(formData.competition) && (
+                                                    <SelectItem value={formData.competition} className="text-xs">{formData.competition}</SelectItem>
+                                                )}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-bold text-muted-foreground">Surface</Label>
+                                        <Select
+                                            value={formData.surface || "4G"}
+                                            onValueChange={(v) => setFormData({ ...formData, surface: v as "4G" | "Grass" })}
+                                        >
+                                            <SelectTrigger className="h-9 text-xs">
+                                                <SelectValue placeholder="Surface" />
+                                            </SelectTrigger>
+                                            <SelectContent className="z-[70]">
+                                                <SelectItem value="Grass" className="text-xs">Grass</SelectItem>
+                                                <SelectItem value="4G" className="text-xs">4G</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold text-muted-foreground">Location / Venue Address</Label>
+                                    <Input
+                                        placeholder="e.g. Market Road Pitches, N7 9PL"
+                                        value={formData.location || ""}
+                                        onChange={e => setFormData({ ...formData, location: e.target.value })}
+                                        className="h-9 text-xs"
+                                    />
+                                </div>
+
+                                {formData.opponent && (
+                                    <div className="bg-surface-2 p-2.5 rounded-lg border border-border space-y-2 mt-1">
+                                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Opponent Info</h4>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <div className="space-y-0.5">
+                                                <Label className="text-[10px] font-bold text-slate-505">Instagram</Label>
                                                 <Input
-                                                    list="known-opponents-list"
-                                                    placeholder="Type opponent name"
-                                                    value={formData.opponent}
-                                                    onChange={e => {
-                                                        const val = e.target.value;
-                                                        setFormData({ ...formData, opponent: val });
-                                                        const teamMatch = leagueTeams.find(t => (t.name || t.team_name || "").toLowerCase() === val.toLowerCase());
-                                                        if (teamMatch) {
-                                                            setOpponentInstagram(teamMatch.instagram_handle || "");
-                                                            setOpponentBadgeUrl(teamMatch.badge_url || "");
-                                                        } else {
-                                                            setOpponentInstagram("");
-                                                            setOpponentBadgeUrl("");
-                                                        }
-                                                    }}
-                                                    className="h-9 text-xs"
+                                                    placeholder="e.g. camden_utd"
+                                                    value={opponentInstagram}
+                                                    onChange={e => setOpponentInstagram(e.target.value)}
+                                                    className="h-8 text-[11px]"
                                                 />
                                             </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-muted-foreground">Competition</Label>
-                                                <Select
-                                                    value={formData.competition}
-                                                    onValueChange={(v: string) => setFormData({ ...formData, competition: v })}
-                                                >
-                                                    <SelectTrigger className="h-9 text-xs">
-                                                        <SelectValue placeholder="Competition" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="League Match" className="text-xs">League Match</SelectItem>
-                                                        <SelectItem value="Alec Smith Premier Division Cup" className="text-xs">Alec Smith Cup</SelectItem>
-                                                        <SelectItem value="Middlesex Cup" className="text-xs">Middlesex Cup</SelectItem>
-                                                        <SelectItem value="Friendly" className="text-xs">Friendly</SelectItem>
-                                                        <SelectItem value="Trial Match" className="text-xs">Trial Match</SelectItem>
-                                                        {formData.competition && !["League Match", "Alec Smith Premier Division Cup", "Middlesex Cup", "Friendly", "Trial Match"].includes(formData.competition) && (
-                                                            <SelectItem value={formData.competition} className="text-xs">{formData.competition}</SelectItem>
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-muted-foreground">Surface</Label>
-                                                <Select
-                                                    value={formData.surface || "4G"}
-                                                    onValueChange={(v) => setFormData({ ...formData, surface: v as "4G" | "Grass" })}
-                                                >
-                                                    <SelectTrigger className="h-9 text-xs">
-                                                        <SelectValue placeholder="Surface" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="Grass" className="text-xs">Grass</SelectItem>
-                                                        <SelectItem value="4G" className="text-xs">4G</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
+                                            <div className="space-y-0.5">
+                                                <Label className="text-[10px] font-bold text-slate-505">Badge Image URL</Label>
+                                                <Input
+                                                    placeholder="https://..."
+                                                    value={opponentBadgeUrl}
+                                                    onChange={e => setOpponentBadgeUrl(e.target.value)}
+                                                    className="h-8 text-[11px]"
+                                                />
                                             </div>
                                         </div>
 
                                         <div className="space-y-1">
-                                            <Label className="text-xs font-bold text-muted-foreground">Location / Venue Address</Label>
-                                            <Input
-                                                placeholder="e.g. Market Road Pitches, N7 9PL"
-                                                value={formData.location || ""}
-                                                onChange={e => setFormData({ ...formData, location: e.target.value })}
-                                                className="h-9 text-xs"
-                                            />
-                                        </div>
-
-                                        {formData.opponent && (
-                                            <div className="bg-surface-2 p-2.5 rounded-lg border border-border space-y-2 mt-1">
-                                                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Opponent Info</h4>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div className="space-y-0.5">
-                                                        <Label className="text-[10px] font-bold text-slate-505">Instagram</Label>
-                                                        <Input
-                                                            placeholder="e.g. camden_utd"
-                                                            value={opponentInstagram}
-                                                            onChange={e => setOpponentInstagram(e.target.value)}
-                                                            className="h-8 text-[11px]"
-                                                        />
-                                                    </div>
-                                                    <div className="space-y-0.5">
-                                                        <Label className="text-[10px] font-bold text-slate-505">Badge Image URL</Label>
-                                                        <Input
-                                                            placeholder="https://..."
-                                                            value={opponentBadgeUrl}
-                                                            onChange={e => setOpponentBadgeUrl(e.target.value)}
-                                                            className="h-8 text-[11px]"
-                                                        />
-                                                    </div>
-                                                </div>
-
-                                                <div className="space-y-1">
-                                                    <div
-                                                        onDragOver={e => e.preventDefault()}
-                                                        onDrop={handleBadgeDrop}
-                                                        onPaste={handleBadgePaste}
-                                                        className="border border-dashed border-border rounded-lg p-2 flex items-center justify-center bg-surface-2 cursor-pointer hover:border-indigo-400 transition-colors relative"
-                                                    >
-                                                        <input
-                                                            type="file"
-                                                            accept="image/*"
-                                                            onChange={handleBadgeFileChange}
-                                                            className="absolute inset-0 opacity-0 cursor-pointer"
-                                                        />
-                                                        <Upload className="h-4 w-4 text-slate-400 mr-1.5" />
-                                                        <span className="text-[10px] text-muted-foreground font-medium">
-                                                            {isUploadingBadge ? "Uploading..." : "Upload or paste opponent badge"}
-                                                        </span>
-                                                    </div>
-                                                    {opponentBadgeUrl && (
-                                                        <div className="flex items-center gap-2 mt-1.5 bg-surface-2 p-1.5 rounded border border-border">
-                                                            <img src={opponentBadgeUrl} alt="Badge Preview" className="h-6 w-6 object-contain rounded" />
-                                                            <span className="text-[10px] text-slate-400 truncate flex-1">{opponentBadgeUrl}</span>
-                                                            <Button type="button" variant="ghost" size="sm" className="h-5 text-red-500 hover:text-red-650 p-1 text-[10px]" onClick={() => setOpponentBadgeUrl("")}>Remove</Button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </TabsContent>
-
-                                    <TabsContent value="result" className="space-y-3 mt-0 py-1">
-                                        <div className="space-y-1">
-                                            <Label className="text-xs font-bold text-muted-foreground">Scoreline</Label>
-                                            <div className="flex items-center gap-3">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs font-bold text-muted-foreground w-10 text-right">Home</span>
-                                                    <Input
-                                                        className="w-14 h-8 text-center font-bold text-sm"
-                                                        placeholder="0"
-                                                        value={(formData.scoreline || "").split('-')[0]?.trim() || ""}
-                                                        onChange={e => {
-                                                            const home = e.target.value;
-                                                            const away = (formData.scoreline || "").split('-')[1]?.trim() || "";
-                                                            setFormData({ ...formData, scoreline: `${home}-${away}` });
-                                                        }}
-                                                    />
-                                                </div>
-                                                <span className="text-slate-300 font-bold">-</span>
-                                                <div className="flex items-center gap-2">
-                                                    <Input
-                                                        className="w-14 h-8 text-center font-bold text-sm"
-                                                        placeholder="0"
-                                                        value={(formData.scoreline || "").split('-')[1]?.trim() || ""}
-                                                        onChange={e => {
-                                                            const home = (formData.scoreline || "").split('-')[0]?.trim() || "";
-                                                            const away = e.target.value;
-                                                            setFormData({ ...formData, scoreline: `${home}-${away}` });
-                                                        }}
-                                                    />
-                                                    <span className="text-xs font-bold text-muted-foreground w-10">Away</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-muted-foreground">Yellow Cards</Label>
-                                                <Textarea
-                                                    placeholder="e.g. J.Smith, P.Maldini"
-                                                    value={formData.yellow_cards}
-                                                    onChange={(e) => setFormData({ ...formData, yellow_cards: e.target.value })}
-                                                    className="h-14 text-xs"
+                                            <div
+                                                onDragOver={e => e.preventDefault()}
+                                                onDrop={handleBadgeDrop}
+                                                onPaste={handleBadgePaste}
+                                                className="border border-dashed border-border rounded-lg p-2 flex items-center justify-center bg-surface-2 cursor-pointer hover:border-indigo-400 transition-colors relative"
+                                            >
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handleBadgeFileChange}
+                                                    className="absolute inset-0 opacity-0 cursor-pointer"
                                                 />
+                                                <Upload className="h-4 w-4 text-slate-400 mr-1.5" />
+                                                <span className="text-[10px] text-muted-foreground font-medium">
+                                                    {isUploadingBadge ? "Uploading..." : "Upload or paste opponent badge"}
+                                                </span>
                                             </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-muted-foreground">Red Cards</Label>
-                                                <Textarea
-                                                    placeholder="e.g. S.Ramos"
-                                                    value={formData.red_cards}
-                                                    onChange={(e) => setFormData({ ...formData, red_cards: e.target.value })}
-                                                    className="h-14 text-xs"
-                                                />
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-3 mt-2 pb-2 border-b border-dashed border-border">
-                                            <div className="space-y-1">
-                                                <Label className="text-xs font-bold text-muted-foreground">Availability Lock</Label>
-                                                <Select
-                                                    value={formData.lockType || "Never"}
-                                                    onValueChange={(v) => setFormData({ ...formData, lockType: v })}
-                                                >
-                                                    <SelectTrigger className="h-9 text-xs">
-                                                        <SelectValue placeholder="Select Lock Type" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="Never">Never Lock</SelectItem>
-                                                        <SelectItem value="Start">At Match Start</SelectItem>
-                                                        <SelectItem value="30m">30 Mins Before</SelectItem>
-                                                        <SelectItem value="1h">1 Hour Before</SelectItem>
-                                                        <SelectItem value="Custom">Custom Time</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            {formData.lockType === "Custom" && (
-                                                <div className="space-y-1">
-                                                    <Label className="text-xs font-bold text-muted-foreground">Custom Lock Time</Label>
-                                                    <Input
-                                                        type="datetime-local"
-                                                        value={formData.lockTime || ""}
-                                                        onChange={(e) => setFormData({ ...formData, lockTime: e.target.value })}
-                                                        className="h-9 text-xs"
-                                                    />
+                                            {opponentBadgeUrl && (
+                                                <div className="flex items-center gap-2 mt-1.5 bg-surface-2 p-1.5 rounded border border-border">
+                                                    <img src={opponentBadgeUrl} alt="Badge Preview" className="h-6 w-6 object-contain rounded" />
+                                                    <span className="text-[10px] text-slate-400 truncate flex-1">{opponentBadgeUrl}</span>
+                                                    <Button type="button" variant="ghost" size="sm" className="h-5 text-red-500 hover:text-red-650 p-1 text-[10px]" onClick={() => setOpponentBadgeUrl("")}>Remove</Button>
                                                 </div>
                                             )}
                                         </div>
+                                    </div>
+                                )}
+                            </TabsContent>
 
-                                        <div className="space-y-1">
-                                            <Label className="text-xs font-bold text-muted-foreground">Notes / Adjustments</Label>
-                                            <Textarea
-                                                className="min-h-[50px] text-xs"
-                                                placeholder="Any special notes (e.g. Points adjustment)"
-                                                value={formData.notes || ""}
-                                                onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                            <TabsContent value="result" className="space-y-3 mt-0 py-1">
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold text-muted-foreground">Scoreline</Label>
+                                    <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs font-bold text-muted-foreground w-10 text-right">Home</span>
+                                            <Input
+                                                className="w-14 h-8 text-center font-bold text-sm"
+                                                placeholder="0"
+                                                value={(formData.scoreline || "").split('-')[0]?.trim() || ""}
+                                                onChange={e => {
+                                                    const home = e.target.value;
+                                                    const away = (formData.scoreline || "").split('-')[1]?.trim() || "";
+                                                    setFormData({ ...formData, scoreline: `${home}-${away}` });
+                                                }}
                                             />
                                         </div>
-                                    </TabsContent>
+                                        <span className="text-slate-300 font-bold">-</span>
+                                        <div className="flex items-center gap-2">
+                                            <Input
+                                                className="w-14 h-8 text-center font-bold text-sm"
+                                                placeholder="0"
+                                                value={(formData.scoreline || "").split('-')[1]?.trim() || ""}
+                                                onChange={e => {
+                                                    const home = (formData.scoreline || "").split('-')[0]?.trim() || "";
+                                                    const away = e.target.value;
+                                                    setFormData({ ...formData, scoreline: `${home}-${away}` });
+                                                }}
+                                            />
+                                            <span className="text-xs font-bold text-muted-foreground w-10">Away</span>
+                                        </div>
+                                    </div>
                                 </div>
-                            </Tabs>
 
-                            <DialogFooter className="gap-2 sm:gap-0 p-4 border-t bg-surface-2 shrink-0">
-                                {editingId && formData.scoreline && (
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setFormData({ ...formData, scoreline: "", goalscorers: "", assists: "", yellow_cards: "", red_cards: "", notes: "" })}
-                                        className="h-9 text-xs text-muted-foreground bg-amber-50 hover:bg-amber-100 border border-amber-200 mr-auto"
-                                    >
-                                        Reset to Upcoming
-                                    </Button>
-                                )}
-                                <Button variant="outline" onClick={resetForm} className="h-9 text-xs">Cancel</Button>
-                                <Button onClick={handleSaveMatch} className="bg-red-600 hover:bg-red-700 h-9 text-xs">
-                                    {editingId ? "Update Match" : "Save Match"}
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
-                </div>
-            </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-bold text-muted-foreground">Yellow Cards</Label>
+                                        <Textarea
+                                            placeholder="e.g. J.Smith, P.Maldini"
+                                            value={formData.yellow_cards}
+                                            onChange={(e) => setFormData({ ...formData, yellow_cards: e.target.value })}
+                                            className="h-14 text-xs"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-bold text-muted-foreground">Red Cards</Label>
+                                        <Textarea
+                                            placeholder="e.g. S.Ramos"
+                                            value={formData.red_cards}
+                                            onChange={(e) => setFormData({ ...formData, red_cards: e.target.value })}
+                                            className="h-14 text-xs"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2 pb-2 border-b border-dashed border-border">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-bold text-muted-foreground">Availability Lock</Label>
+                                        <Select
+                                            value={formData.lockType || "Never"}
+                                            onValueChange={(v) => setFormData({ ...formData, lockType: v })}
+                                        >
+                                            <SelectTrigger className="h-9 text-xs">
+                                                <SelectValue placeholder="Select Lock Type" />
+                                            </SelectTrigger>
+                                            <SelectContent className="z-[70]">
+                                                <SelectItem value="Never">Never Lock</SelectItem>
+                                                <SelectItem value="Start">At Match Start</SelectItem>
+                                                <SelectItem value="30m">30 Mins Before</SelectItem>
+                                                <SelectItem value="1h">1 Hour Before</SelectItem>
+                                                <SelectItem value="Custom">Custom Time</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {formData.lockType === "Custom" && (
+                                        <div className="space-y-1">
+                                            <Label className="text-xs font-bold text-muted-foreground">Custom Lock Time</Label>
+                                            <Input
+                                                type="datetime-local"
+                                                value={formData.lockTime || ""}
+                                                onChange={(e) => setFormData({ ...formData, lockTime: e.target.value })}
+                                                className="h-9 text-xs"
+                                            />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-1">
+                                    <Label className="text-xs font-bold text-muted-foreground">Notes / Adjustments</Label>
+                                    <Textarea
+                                        className="min-h-[50px] text-xs"
+                                        placeholder="Any special notes (e.g. Points adjustment)"
+                                        value={formData.notes || ""}
+                                        onChange={e => setFormData({ ...formData, notes: e.target.value })}
+                                    />
+                                </div>
+                            </TabsContent>
+                        </div>
+                    </Tabs>
+
+                    <DialogFooter className="flex-row items-center justify-end gap-2 p-3 sm:p-4 border-t bg-surface-2 shrink-0">
+                        {editingId && formData.scoreline && (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setFormData({ ...formData, scoreline: "", goalscorers: "", assists: "", yellow_cards: "", red_cards: "", notes: "" })}
+                                className="h-9 text-xs text-muted-foreground bg-amber-50 hover:bg-amber-100 border border-amber-200 mr-auto"
+                            >
+                                Reset to Upcoming
+                            </Button>
+                        )}
+                        <Button variant="outline" onClick={resetForm} className="h-9 text-xs">Cancel</Button>
+                        <Button onClick={handleSaveMatch} className="bg-red-600 hover:bg-red-700 h-9 text-xs">
+                            {editingId ? "Update Match" : "Save Match"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* 14-Day Calendar Strip synced directly with matches (#9, #13, #14, #15) */}
             <WeeklyFootballCalendar
@@ -1796,10 +2226,105 @@ export default function MatchesPage() {
                 />
             )}
 
-            {/* 1-Line Quick-Add Fixture Bar (#3) */}
+            {/* ================================================================= */}
+            {/* MOBILE COLLAPSIBLE QUICK-ADD FIXTURE DRAWER (< 768px)             */}
+            {/* ================================================================= */}
+            <div className="md:hidden">
+                {!isMobileQuickAddOpen ? (
+                    <button
+                        type="button"
+                        onClick={() => setIsMobileQuickAddOpen(true)}
+                        className="w-full py-2.5 px-3.5 rounded-xl bg-surface-1 hover:bg-surface-2 border border-dashed border-border flex items-center justify-between text-xs font-bold text-muted-foreground transition-colors"
+                    >
+                        <span className="flex items-center gap-1.5 text-foreground">
+                            <Plus className="h-3.5 w-3.5 text-brand" />
+                            Quick-Add Single Fixture
+                        </span>
+                        <span className="text-[10px] font-semibold text-muted-foreground">Tap to expand</span>
+                    </button>
+                ) : (
+                    <form
+                        onSubmit={(e) => {
+                            handleQuickAddFixture(e);
+                            setIsMobileQuickAddOpen(false);
+                        }}
+                        className="bg-surface-1 border border-border rounded-xl p-3 shadow-sm space-y-2.5"
+                    >
+                        <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-brand">
+                                Quick-Add Fixture
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setIsMobileQuickAddOpen(false)}
+                                className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+                            >
+                                Close ✕
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            <Input
+                                type="date"
+                                value={quickDate}
+                                onChange={(e) => setQuickDate(e.target.value)}
+                                className="h-9 text-xs bg-surface-2 border-border"
+                                required
+                            />
+                            <Input
+                                type="time"
+                                value={quickTime}
+                                onChange={(e) => setQuickTime(e.target.value)}
+                                className="h-9 text-xs bg-surface-2 border-border"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setQuickIsHome(h => !h)}
+                                className={`h-9 px-3 rounded-lg text-xs font-black border transition-colors ${
+                                    quickIsHome
+                                        ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                                        : "bg-sky-500/15 text-sky-400 border-sky-500/30"
+                                }`}
+                            >
+                                {quickIsHome ? "HOME (H)" : "AWAY (A)"}
+                            </button>
+                            <select
+                                value={quickCompetition}
+                                onChange={(e) => setQuickCompetition(e.target.value)}
+                                className="h-9 rounded-lg border border-border bg-surface-2 px-2.5 text-xs text-foreground font-semibold outline-none"
+                            >
+                                <option value="League">League</option>
+                                <option value="Middlesex Cup">Cup</option>
+                                <option value="Friendly">Friendly</option>
+                            </select>
+                            <Input
+                                type="text"
+                                list="known-opponents-list"
+                                placeholder="Opponent name (e.g. Hackney Wick)..."
+                                value={quickOpponent}
+                                onChange={(e) => setQuickOpponent(e.target.value)}
+                                className="h-9 text-xs bg-surface-2 border-border col-span-2 font-medium"
+                                required
+                            />
+                        </div>
+                        <Button
+                            type="submit"
+                            size="sm"
+                            disabled={isQuickAdding || !quickOpponent.trim()}
+                            className="w-full h-9 bg-brand hover:bg-brand/90 text-brand-foreground font-bold text-xs"
+                        >
+                            <Plus className="h-3.5 w-3.5 mr-1" />
+                            Add Fixture to Schedule
+                        </Button>
+                    </form>
+                )}
+            </div>
+
+            {/* ================================================================= */}
+            {/* DESKTOP 1-LINE QUICK-ADD FIXTURE BAR (>= 768px — UNTOUCHED)       */}
+            {/* ================================================================= */}
             <form
                 onSubmit={handleQuickAddFixture}
-                className="bg-surface-1 border border-border rounded-xl p-3 shadow-sm flex flex-col lg:flex-row lg:items-center gap-2.5"
+                className="hidden md:flex bg-surface-1 border border-border rounded-xl p-3 shadow-sm flex-col lg:flex-row lg:items-center gap-2.5"
             >
                 <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground shrink-0 px-1">
                     Quick Add:
@@ -1860,8 +2385,154 @@ export default function MatchesPage() {
                 </Button>
             </form>
 
-            {/* Sub-Tabs + Search + Competition & Season Filters (#11) */}
-            <div className="flex flex-col gap-3 pb-3 border-b border-border">
+            {/* ================================================================= */}
+            {/* MOBILE SUB-TABS, SEARCH & SCROLLABLE FILTERS (< 768px)            */}
+            {/* ================================================================= */}
+            <div className="md:hidden space-y-2.5 pb-2 border-b border-border">
+                {/* Full-Width 3-Tab Switcher */}
+                <div className="grid grid-cols-3 gap-1 bg-surface-1 p-1 rounded-xl border border-border">
+                    <button
+                        type="button"
+                        onClick={() => setViewSection("all")}
+                        className={`py-2 rounded-lg text-xs font-extrabold transition-colors text-center ${
+                            viewSection === "all"
+                                ? "bg-brand text-brand-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                        }`}
+                    >
+                        All ({upcomingMatches.length + pastMatches.length})
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setViewSection("upcoming")}
+                        className={`py-2 rounded-lg text-xs font-extrabold transition-colors text-center ${
+                            viewSection === "upcoming"
+                                ? "bg-brand text-brand-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                        }`}
+                    >
+                        Upcoming ({upcomingMatches.length})
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setViewSection("results")}
+                        className={`py-2 rounded-lg text-xs font-extrabold transition-colors text-center ${
+                            viewSection === "results"
+                                ? "bg-brand text-brand-foreground shadow-sm"
+                                : "text-muted-foreground hover:text-foreground"
+                        }`}
+                    >
+                        Results ({pastMatches.length})
+                    </button>
+                </div>
+
+                {/* 2-Column Search + Season Selector */}
+                <div className="grid grid-cols-[1fr_auto] gap-2">
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                        <Input
+                            placeholder="Search opponent..."
+                            value={opponentSearch}
+                            onChange={(e) => setOpponentSearch(e.target.value)}
+                            className="pl-8 h-9 text-xs bg-surface-1 border-border rounded-xl"
+                        />
+                    </div>
+                    <Select value={seasonFilter} onValueChange={setSeasonFilter}>
+                        <SelectTrigger className="h-9 w-[125px] text-xs bg-surface-1 border-border rounded-xl font-bold">
+                            <SelectValue placeholder="Season" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All">All Seasons</SelectItem>
+                            {availableSeasons.map(season => (
+                                <SelectItem key={season} value={season}>20{season.split('/')[0]}/{season.split('/')[1]}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Horizontal Scrollable Competition Pills + Bulk Select Toggle */}
+                <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar pb-0.5">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setFilterType("all")}
+                            className={`px-3 py-1 rounded-full text-[11px] font-bold transition-colors ${
+                                filterType === "all"
+                                    ? "bg-foreground text-background"
+                                    : "bg-surface-1 text-muted-foreground border border-border"
+                            }`}
+                        >
+                            All
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFilterType("league")}
+                            className={`px-3 py-1 rounded-full text-[11px] font-bold transition-colors ${
+                                filterType === "league"
+                                    ? "bg-foreground text-background"
+                                    : "bg-surface-1 text-muted-foreground border border-border"
+                            }`}
+                        >
+                            League
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFilterType("cup")}
+                            className={`px-3 py-1 rounded-full text-[11px] font-bold transition-colors ${
+                                filterType === "cup"
+                                    ? "bg-foreground text-background"
+                                    : "bg-surface-1 text-muted-foreground border border-border"
+                            }`}
+                        >
+                            Cups
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setFilterType("friendly")}
+                            className={`px-3 py-1 rounded-full text-[11px] font-bold transition-colors ${
+                                filterType === "friendly"
+                                    ? "bg-foreground text-background"
+                                    : "bg-surface-1 text-muted-foreground border border-border"
+                            }`}
+                        >
+                            Friendlies
+                        </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        {isBulkSelectMode && selectedMatchIds.size > 0 && (
+                            <button
+                                type="button"
+                                onClick={handleBulkDelete}
+                                className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-600 text-white flex items-center gap-1"
+                            >
+                                <Trash2 className="h-3 w-3" />
+                                Delete ({selectedMatchIds.size})
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsBulkSelectMode(prev => !prev);
+                                setSelectedMatchIds(new Set());
+                            }}
+                            className={`px-2.5 py-1 rounded-full text-[11px] font-bold border transition-colors flex items-center gap-1 ${
+                                isBulkSelectMode
+                                    ? "bg-brand/15 text-brand border-brand/40"
+                                    : "bg-surface-1 text-muted-foreground border-border"
+                            }`}
+                        >
+                            <CheckSquare className="h-3 w-3" />
+                            {isBulkSelectMode ? "Done" : "Select"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* ================================================================= */}
+            {/* DESKTOP SUB-TABS, SEARCH & FILTERS (>= 768px — UNTOUCHED)         */}
+            {/* ================================================================= */}
+            <div className="hidden md:flex flex-col gap-3 pb-3 border-b border-border">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     {/* View Section Switcher */}
                     <div className="flex items-center gap-1 bg-surface-1 p-1 rounded-xl border border-border w-fit">
@@ -2015,9 +2686,8 @@ export default function MatchesPage() {
             )}
 
             {/* Share WhatsApp Poll Modal */}
-            {/* Share WhatsApp Poll Modal */}
             <Dialog open={activeShareMatch !== null} onOpenChange={(open) => { if (!open) setActiveShareMatch(null); }}>
-                <DialogContent className="sm:max-w-[620px] max-h-[85vh] overflow-y-auto">
+                <DialogContent className="z-[60] w-[95vw] sm:max-w-[620px] max-h-[88dvh] overflow-y-auto rounded-2xl">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-emerald-700">
                             <MessageCircle className="h-5 w-5" /> Generate Match Availability Poll
@@ -2158,7 +2828,7 @@ export default function MatchesPage() {
 
             {/* Opposition & Referee Confirmation Modal */}
             <Dialog open={selectedConfirmMatch !== null} onOpenChange={(open) => { if (!open) setSelectedConfirmMatch(null); }}>
-                <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+                <DialogContent className="z-[60] w-[95vw] sm:max-w-[800px] max-h-[90dvh] overflow-y-auto rounded-2xl">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-blue-700">
                             <Share2 className="h-5 w-5" /> Home Game Confirmation Details
@@ -2191,7 +2861,7 @@ export default function MatchesPage() {
                                             <SelectTrigger className="text-xs border-border">
                                                 <SelectValue />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent className="z-[70]">
                                                 <SelectItem value="3G Pitch">3G Pitch</SelectItem>
                                                 <SelectItem value="4G Pitch">4G Pitch</SelectItem>
                                                 <SelectItem value="Grass">Grass</SelectItem>
@@ -2205,7 +2875,7 @@ export default function MatchesPage() {
                                             <SelectTrigger className="text-xs border-border">
                                                 <SelectValue />
                                             </SelectTrigger>
-                                            <SelectContent>
+                                            <SelectContent className="z-[70]">
                                                 <SelectItem value="-30">30m before KO</SelectItem>
                                                 <SelectItem value="-45">45m before KO</SelectItem>
                                                 <SelectItem value="-60">60m before KO</SelectItem>
@@ -2263,7 +2933,7 @@ export default function MatchesPage() {
                                                 <SelectTrigger className="text-xs border-border">
                                                     <SelectValue />
                                                 </SelectTrigger>
-                                                <SelectContent>
+                                                <SelectContent className="z-[70]">
                                                     <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
                                                     <SelectItem value="Cash">Cash</SelectItem>
                                                     <SelectItem value="Paid by Club">Paid by Club</SelectItem>
@@ -2352,7 +3022,7 @@ export default function MatchesPage() {
 
             {/* Quick Match Expense Modal */}
             <Dialog open={isExpenseOpen} onOpenChange={setIsExpenseOpen}>
-                <DialogContent className="sm:max-w-[400px]">
+                <DialogContent className="z-[60] w-[95vw] sm:max-w-[400px] rounded-2xl">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2 text-slate-900">
                             <Coins className="h-5 w-5 text-amber-500" /> Log Matchday Expense
@@ -2402,7 +3072,7 @@ export default function MatchesPage() {
                         </div>
                     </div>
 
-                    <DialogFooter>
+                    <DialogFooter className="flex-row justify-end gap-2">
                         <Button variant="outline" onClick={() => setIsExpenseOpen(false)}>Cancel</Button>
                         <Button onClick={handleSaveExpense} className="bg-amber-600 hover:bg-amber-700 text-white">Save Expense</Button>
                     </DialogFooter>

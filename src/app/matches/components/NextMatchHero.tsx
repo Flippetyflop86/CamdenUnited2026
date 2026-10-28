@@ -69,7 +69,145 @@ export function NextMatchHero({
     );
 
     return (
-        <Card className="border-border bg-surface-1 overflow-hidden shadow-lg border-l-4 border-l-brand">
+        <>
+            {/* =================================================================
+                MOBILE NEXT MATCH HERO (< 768px)
+               ================================================================= */}
+            <Card className="md:hidden border-border bg-surface-1 overflow-hidden shadow-md border-l-4 border-l-brand">
+                <div className="p-3.5 space-y-3">
+                    {/* Top Bar: Badges + Edit/Delete */}
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                            <span className="bg-brand text-brand-foreground text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded">
+                                Next Match
+                            </span>
+                            <span className="text-[11px] font-bold text-brand truncate">
+                                {match.competition || "League"}
+                            </span>
+                            <span className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase border ${
+                                isHome
+                                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30"
+                                    : "bg-sky-500/15 text-sky-700 dark:text-sky-300 border-sky-500/30"
+                            }`}>
+                                {isHome ? "HOME" : "AWAY"}
+                            </span>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => onShareMatch(match)}
+                                className="h-7 w-7 rounded-lg bg-surface-2 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground"
+                                title="Share Availability Poll"
+                            >
+                                <Share2 className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => onManageMatch(match)}
+                                className="h-7 w-7 rounded-lg bg-surface-2 border border-border flex items-center justify-center text-muted-foreground hover:text-foreground"
+                                title="Edit Match"
+                            >
+                                <Settings className="h-3.5 w-3.5" />
+                            </button>
+                            {onDeleteMatch && (
+                                <button
+                                    type="button"
+                                    onClick={() => onDeleteMatch(match.id)}
+                                    className="h-7 w-7 rounded-lg bg-surface-2 border border-border flex items-center justify-center text-rose-500 hover:bg-rose-500/10"
+                                    title="Delete Match"
+                                >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </button>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Horizontal Matchup Banner */}
+                    <div className="bg-surface-2/60 border border-border rounded-xl p-3 grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                        <div className="text-right min-w-0">
+                            <p className={`text-sm font-extrabold leading-tight truncate ${isHome ? "text-foreground" : "text-muted-foreground"}`}>
+                                {homeTeam}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground font-semibold uppercase mt-0.5">Home</p>
+                        </div>
+                        <div className="px-2.5 py-1 rounded-lg bg-background border border-border text-center shrink-0">
+                            <span className="text-xs font-black text-brand uppercase tracking-wider">
+                                {(match.time || "14:00").slice(0, 5)}
+                            </span>
+                        </div>
+                        <div className="text-left min-w-0">
+                            <p className={`text-sm font-extrabold leading-tight truncate ${!isHome ? "text-foreground" : "text-muted-foreground"}`}>
+                                {awayTeam}
+                            </p>
+                            <p className="text-[10px] text-muted-foreground font-semibold uppercase mt-0.5">Away</p>
+                        </div>
+                    </div>
+
+                    {/* Metadata Strip */}
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                        <div className="flex items-center gap-3 flex-wrap">
+                            <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+                                <Calendar className="h-3.5 w-3.5 text-brand shrink-0" />
+                                {formattedDate}
+                            </span>
+                            {(match as any).meetTime && (
+                                <span className="inline-flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400">
+                                    <Clock className="h-3.5 w-3.5 shrink-0" />
+                                    Meet {(match as any).meetTime}
+                                </span>
+                            )}
+                            <span className="inline-flex items-center gap-1 truncate max-w-[200px]">
+                                <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                <span className="truncate">{displayLocation}</span>
+                            </span>
+                        </div>
+
+                        {opponentStats && (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-2 border border-border text-[10px] font-bold text-foreground">
+                                <span>Opp #{opponentStats.position}</span>
+                                <span className="text-muted-foreground">•</span>
+                                <span>{opponentStats.points}pts</span>
+                            </span>
+                        )}
+                    </div>
+
+                    {/* Primary Mobile CTA Row */}
+                    <div className="grid grid-cols-2 gap-2 pt-0.5">
+                        <Button asChild size="sm" className="h-9 bg-brand hover:bg-brand/90 text-brand-foreground font-bold text-xs w-full">
+                            <Link href={`/matchday-xi?match=${match.id}`}>
+                                <Users className="h-3.5 w-3.5 mr-1.5" />
+                                Matchday XI
+                            </Link>
+                        </Button>
+                        {onQuickLogResult ? (
+                            <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-9 bg-emerald-100/90 dark:bg-emerald-500/15 hover:bg-emerald-200/80 dark:hover:bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 border border-emerald-400/70 dark:border-emerald-500/30 font-bold text-xs w-full"
+                                onClick={() => onQuickLogResult(match)}
+                            >
+                                <Trophy className="h-3.5 w-3.5 mr-1.5" />
+                                Log Result
+                            </Button>
+                        ) : (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-9 text-xs font-bold w-full border-border"
+                                onClick={() => onShareMatch(match)}
+                            >
+                                <Share2 className="h-3.5 w-3.5 mr-1.5" />
+                                WhatsApp Poll
+                            </Button>
+                        )}
+                    </div>
+                </div>
+            </Card>
+
+            {/* =================================================================
+                DESKTOP NEXT MATCH HERO (>= 768px) — UNTOUCHED
+               ================================================================= */}
+            <Card className="hidden md:block border-border bg-surface-1 overflow-hidden shadow-lg border-l-4 border-l-brand">
             <div className="p-6 md:p-7">
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
                     {/* Left: Metadata & Teams */}
@@ -169,5 +307,6 @@ export function NextMatchHero({
                 </div>
             </div>
         </Card>
+        </>
     );
 }
