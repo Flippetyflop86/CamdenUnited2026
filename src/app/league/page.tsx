@@ -1486,20 +1486,20 @@ export default function LeagueTablePage() {
         });
 
         return (
-            <div className="h-full flex flex-col gap-3.5 md:gap-6 pb-20 md:pb-6">
+            <div className="h-full w-full max-w-full overflow-x-hidden min-w-0 flex flex-col gap-3.5 md:gap-6 pb-20 md:pb-6">
                 <div ref={hiddenFaContainerRef} className="hidden" aria-hidden="true" />
 
                 {/* ================================================================= */}
                 {/* MOBILE HEADER & ACTION BAR (< 768px)                              */}
                 {/* ================================================================= */}
-                <div className="md:hidden flex flex-col gap-2.5">
-                    <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2.5 min-w-0">
+                <div className="md:hidden flex flex-col gap-2.5 w-full min-w-0">
+                    <div className="flex items-center justify-between gap-2 min-w-0">
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
                             <div className="h-9 w-9 shrink-0 bg-brand/10 rounded-xl flex items-center justify-center border border-brand/20">
                                 <Trophy className="h-4 w-4 text-brand" />
                             </div>
-                            <div className="min-w-0">
-                                <div className="flex items-center gap-1.5">
+                            <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5 min-w-0">
                                     <h2 className="text-base font-extrabold text-foreground truncate">League Standings</h2>
                                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-500 border border-emerald-500/20 shrink-0">
                                         <span className={`h-1.5 w-1.5 rounded-full bg-emerald-500 ${isAutoSyncing ? 'animate-ping' : ''}`} />
@@ -1515,41 +1515,52 @@ export default function LeagueTablePage() {
                         </div>
                     </div>
 
-                    {/* Compact Mobile Action Strip */}
-                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                    {/* Compact Mobile Action Grid — fits 100% inside viewport with zero overhang */}
+                    <div className="grid grid-cols-2 gap-1.5 w-full">
                         <Button
                             variant="outline"
                             size="sm"
                             onClick={() => setShowShareModal(true)}
-                            className="h-8 px-2.5 text-xs font-semibold border-brand/30 text-brand hover:bg-brand/10 shrink-0"
+                            className="h-8 px-2 text-[11px] font-semibold border-brand/30 text-brand hover:bg-brand/10 w-full truncate"
                         >
-                            <Share2 className="h-3.5 w-3.5 mr-1" />
-                            Share Graphic
+                            <Share2 className="h-3.5 w-3.5 mr-1 shrink-0" />
+                            <span className="truncate">Share Graphic</span>
                         </Button>
-                        {urlInput && (
+                        {urlInput ? (
                             <Button
                                 variant="outline"
                                 size="sm"
                                 disabled={isAutoSyncing}
                                 onClick={() => autoSyncFromUrl(urlInput, false)}
-                                className="h-8 px-2.5 text-xs shrink-0"
+                                className="h-8 px-2 text-[11px] w-full truncate"
                             >
-                                {isAutoSyncing ? "Syncing..." : "🔄 Refresh"}
+                                {isAutoSyncing ? "Syncing..." : "🔄 Refresh Table"}
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPreviewData(currentTable)}
+                                className="h-8 px-2 text-[11px] w-full truncate"
+                            >
+                                Edit Standings
                             </Button>
                         )}
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPreviewData(currentTable)}
-                            className="h-8 px-2.5 text-xs shrink-0"
-                        >
-                            Edit
-                        </Button>
+                        {urlInput && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setPreviewData(currentTable)}
+                                className="h-8 px-2 text-[11px] w-full truncate"
+                            >
+                                Edit Table
+                            </Button>
+                        )}
                         <Button
                             onClick={() => setShowImporter(true)}
                             variant="outline"
                             size="sm"
-                            className="h-8 px-2.5 text-xs shrink-0"
+                            className={`h-8 px-2 text-[11px] w-full truncate ${!urlInput ? 'col-span-2' : ''}`}
                         >
                             Change League
                         </Button>
@@ -1768,14 +1779,14 @@ export default function LeagueTablePage() {
                 {/* ================================================================= */}
                 {/* MOBILE STANDINGS VIEW (< 768px)                                   */}
                 {/* ================================================================= */}
-                <div className="md:hidden flex flex-col gap-2">
-                    {/* Mobile Table View Mode Switcher */}
-                    <div className="flex items-center justify-between gap-2">
-                        <div className="inline-flex items-center bg-surface-2 p-1 rounded-xl border border-border">
+                <div className="md:hidden flex flex-col gap-2 w-full min-w-0">
+                    {/* Mobile Table View Mode Switcher — full-width 3-col bar so nothing overflows */}
+                    <div className="flex flex-col gap-1 w-full min-w-0">
+                        <div className="grid grid-cols-3 bg-surface-2 p-1 rounded-xl border border-border w-full">
                             <button
                                 type="button"
                                 onClick={() => setMobileTableView('overview')}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                                className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-colors text-center truncate ${
                                     mobileTableView === 'overview'
                                         ? 'bg-brand text-white shadow-xs'
                                         : 'text-muted-foreground hover:text-foreground'
@@ -1786,7 +1797,7 @@ export default function LeagueTablePage() {
                             <button
                                 type="button"
                                 onClick={() => setMobileTableView('full')}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                                className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-colors text-center truncate ${
                                     mobileTableView === 'full'
                                         ? 'bg-brand text-white shadow-xs'
                                         : 'text-muted-foreground hover:text-foreground'
@@ -1797,7 +1808,7 @@ export default function LeagueTablePage() {
                             <button
                                 type="button"
                                 onClick={() => setMobileTableView('form')}
-                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                                className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-colors text-center truncate ${
                                     mobileTableView === 'form'
                                         ? 'bg-brand text-white shadow-xs'
                                         : 'text-muted-foreground hover:text-foreground'
@@ -1806,13 +1817,13 @@ export default function LeagueTablePage() {
                                 Form & PPG
                             </button>
                         </div>
-                        <span className="text-[10px] text-muted-foreground font-medium">
-                            Tap any club for full stats
-                        </span>
+                        <p className="text-[10px] text-muted-foreground font-medium text-right px-0.5 truncate">
+                            Tap any club row to expand full stats
+                        </p>
                     </div>
 
                     {/* Mobile Standings Card */}
-                    <Card className="border-border bg-surface-1 overflow-hidden">
+                    <Card className="border-border bg-surface-1 overflow-hidden w-full">
                         <CardContent className="p-0">
                             <table className="w-full text-xs text-left table-fixed">
                                 <thead className="text-[10px] text-muted-foreground uppercase bg-surface-2 border-b border-border select-none">
@@ -1820,30 +1831,30 @@ export default function LeagueTablePage() {
                                         <tr>
                                             <th
                                                 onClick={() => handleSortColumn('position')}
-                                                className="w-11 pl-2.5 pr-1 py-2.5 font-bold cursor-pointer"
+                                                className="w-9 pl-2 pr-0.5 py-2.5 font-bold cursor-pointer"
                                             >
-                                                # {sortField === 'position' && (sortDir === 'asc' ? '▲' : '▼')}
+                                                #
                                             </th>
-                                            <th className="py-2.5 px-1.5 font-bold">Club</th>
+                                            <th className="py-2.5 px-1 font-bold">Club</th>
                                             <th
                                                 onClick={() => handleSortColumn('played')}
-                                                className="w-8 py-2.5 text-center font-bold cursor-pointer"
+                                                className="w-[26px] py-2.5 text-center font-bold cursor-pointer"
                                             >
                                                 P
                                             </th>
                                             <th
                                                 onClick={() => handleSortColumn('goal_difference')}
-                                                className="w-10 py-2.5 text-center font-bold cursor-pointer"
+                                                className="w-8 py-2.5 text-center font-bold cursor-pointer"
                                             >
                                                 GD
                                             </th>
                                             <th
                                                 onClick={() => handleSortColumn('points')}
-                                                className="w-10 py-2.5 text-center font-bold cursor-pointer text-foreground"
+                                                className="w-8 py-2.5 text-center font-bold cursor-pointer text-foreground"
                                             >
                                                 Pts
                                             </th>
-                                            <th className="w-[68px] pr-2.5 py-2.5 text-right font-bold">Form</th>
+                                            <th className="w-[86px] pl-0.5 pr-2 py-2.5 text-right font-bold">Form</th>
                                         </tr>
                                     )}
                                     {mobileTableView === 'full' && (
@@ -1867,15 +1878,15 @@ export default function LeagueTablePage() {
                                         <tr>
                                             <th
                                                 onClick={() => handleSortColumn('position')}
-                                                className="w-8 pl-2.5 pr-1 py-2.5 font-bold cursor-pointer"
+                                                className="w-8 pl-2 pr-0.5 py-2.5 font-bold cursor-pointer"
                                             >
                                                 #
                                             </th>
-                                            <th className="py-2.5 px-1.5 font-bold">Club</th>
+                                            <th className="py-2.5 px-1 font-bold">Club</th>
                                             <th onClick={() => handleSortColumn('ppg')} className="w-11 py-2.5 text-center font-bold cursor-pointer">
                                                 PPG
                                             </th>
-                                            <th className="w-[104px] pr-2.5 py-2.5 text-right font-bold">Last 5</th>
+                                            <th className="w-[114px] pl-1 pr-2 py-2.5 text-right font-bold">Last 5</th>
                                         </tr>
                                     )}
                                 </thead>
@@ -1929,9 +1940,9 @@ export default function LeagueTablePage() {
                                                     }`}
                                                 >
                                                     {/* Position cell */}
-                                                    <td className={`${mobileTableView === 'full' ? 'pl-2 pr-0.5' : 'pl-2.5 pr-1'} py-2.5 font-bold whitespace-nowrap`}>
-                                                        <div className="flex items-center gap-1">
-                                                            <span className="w-4 text-right">{row.position}</span>
+                                                    <td className="pl-2 pr-0.5 py-2.5 font-bold whitespace-nowrap">
+                                                        <div className="flex items-center gap-0.5">
+                                                            <span className="w-4 text-right text-[11px]">{row.position}</span>
                                                             {mobileTableView !== 'full' && (
                                                                 posDiff > 0 ? (
                                                                     <ArrowUp className="h-2.5 w-2.5 text-emerald-500 stroke-[3] shrink-0" />
@@ -1945,21 +1956,21 @@ export default function LeagueTablePage() {
                                                     </td>
 
                                                     {/* Club Name + Sub-badges */}
-                                                    <td className={`py-2.5 ${mobileTableView === 'full' ? 'px-1' : 'px-1.5'} min-w-0`}>
-                                                        <div className="flex flex-col min-w-0">
+                                                    <td className="py-2.5 px-1 min-w-0 overflow-hidden">
+                                                        <div className="flex flex-col min-w-0 overflow-hidden">
                                                             <span className={`truncate leading-tight ${row.is_our_club ? 'font-extrabold text-primary' : 'font-semibold text-foreground'}`}>
                                                                 {row.team_name}
                                                             </span>
                                                             {(isNextOpp || streakLabel) && (
                                                                 <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                                                                     {isNextOpp && (
-                                                                        <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500 text-white px-1.5 py-0 text-[9px] font-extrabold uppercase tracking-tight">
-                                                                            <Zap className="h-2.5 w-2.5 fill-white text-white" />
-                                                                            Next {formattedNextDate ? `• ${formattedNextDate}` : ""} ({nextOpponentInfo?.is_home ? "H" : "A"})
+                                                                        <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500 text-white px-1.5 py-0 text-[9px] font-extrabold uppercase tracking-tight max-w-full truncate">
+                                                                            <Zap className="h-2.5 w-2.5 fill-white text-white shrink-0" />
+                                                                            <span className="truncate">Next {formattedNextDate ? `• ${formattedNextDate}` : ""} ({nextOpponentInfo?.is_home ? "H" : "A"})</span>
                                                                         </span>
                                                                     )}
                                                                     {streakLabel && (
-                                                                        <span className="inline-flex items-center rounded-full bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/35 px-1.5 py-0 text-[9px] font-bold">
+                                                                        <span className="inline-flex items-center rounded-full bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/35 px-1.5 py-0 text-[9px] font-bold max-w-full truncate">
                                                                             {streakLabel}
                                                                         </span>
                                                                     )}
@@ -1975,9 +1986,9 @@ export default function LeagueTablePage() {
                                                                 {row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}
                                                             </td>
                                                             <td className="py-2.5 text-center font-extrabold text-foreground">{row.points}</td>
-                                                            <td className="pr-2.5 py-2.5 text-right whitespace-nowrap">
+                                                            <td className="pl-0.5 pr-2 py-2.5 text-right whitespace-nowrap overflow-hidden">
                                                                 {formItems.length > 0 ? (
-                                                                    <div className="inline-flex items-center justify-end gap-0.5">
+                                                                    <div className="inline-flex items-center justify-end gap-[2px]">
                                                                         {formItems.map((res, fIdx) => {
                                                                             const dotColor =
                                                                                 res === 'W'
@@ -1988,7 +1999,7 @@ export default function LeagueTablePage() {
                                                                             return (
                                                                                 <span
                                                                                     key={fIdx}
-                                                                                    className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-[3px] text-[8px] font-black ${dotColor}`}
+                                                                                    className={`inline-flex items-center justify-center w-[13px] h-[15px] rounded-[3px] text-[8px] font-black leading-none shrink-0 ${dotColor}`}
                                                                                 >
                                                                                     {res}
                                                                                 </span>
@@ -2020,7 +2031,7 @@ export default function LeagueTablePage() {
                                                             <td className="py-2.5 text-center font-mono text-[11px] font-semibold text-muted-foreground">
                                                                 {rowPpg}
                                                             </td>
-                                                            <td className="pr-2.5 py-2.5 text-right whitespace-nowrap">
+                                                            <td className="pl-1 pr-2 py-2.5 text-right whitespace-nowrap overflow-hidden">
                                                                 {formItems.length > 0 ? (
                                                                     <div className="inline-flex items-center justify-end gap-1">
                                                                         {formItems.map((res, fIdx) => {
@@ -2033,7 +2044,7 @@ export default function LeagueTablePage() {
                                                                             return (
                                                                                 <span
                                                                                     key={fIdx}
-                                                                                    className={`inline-flex items-center justify-center w-4 h-4 rounded text-[9px] font-bold border ${pillStyles}`}
+                                                                                    className={`inline-flex items-center justify-center w-[17px] h-[17px] rounded text-[9px] font-bold border shrink-0 ${pillStyles}`}
                                                                                 >
                                                                                     {res}
                                                                                 </span>
