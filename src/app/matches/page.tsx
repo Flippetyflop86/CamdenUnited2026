@@ -286,12 +286,115 @@ export default function MatchesPage() {
     useEffect(() => {
         if (clubId) {
             fetchMatches();
+            fetchLeagueTeams();
         }
-    }, [clubId]);
+    }, [clubId, settings.lastImportHistory]);
+
+    const normalizeLeagueTeamKey = (name: string): string =>
+        (name || "")
+            .toLowerCase()
+            .replace(/\b(fc|afc|first|1st|reserves|united|utd)\b/g, (m) =>
+                m === "utd" ? "united" : m === "fc" || m === "afc" || m === "first" || m === "1st" || m === "reserves" ? "" : m
+            )
+            .replace(/[^a-z0-9]/g, "")
+            .trim();
+
+    const isMatchingLeagueTeam = (a: string, b: string): boolean => {
+        if (!a || !b) return false;
+        const cleanA = a.toLowerCase().trim();
+        const cleanB = b.toLowerCase().trim();
+        if (cleanA === cleanB) return true;
+        const normA = normalizeLeagueTeamKey(a);
+        const normB = normalizeLeagueTeamKey(b);
+        return normA.length >= 3 && normB.length >= 3 && (normA === normB || normA.includes(normB) || normB.includes(normA));
+    };
 
     async function fetchLeagueTeams() {
-        const { data } = await supabase.from("league_teams").select("*");
-        if (data) setLeagueTeams(data);
+        const { data: dbTeams } = await supabase.from("league_teams").select("*");
+        let standingsRows: any[] = [];
+
+        // 1. Check localStorage cache first
+        try {
+            const storageKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
+            const localRaw = localStorage.getItem(storageKey) || localStorage.getItem("clubflow_league_table");
+            if (localRaw) {
+                const parsed = JSON.parse(localRaw);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    standingsRows = parsed;
+                }
+            }
+        } catch (e) {}
+
+        // 2. Fallback to club settings import history
+        if (
+            standingsRows.length === 0 &&
+            settings.lastImportHistory?.leagueTable &&
+            Array.isArray(settings.lastImportHistory.leagueTable)
+        ) {
+            standingsRows = settings.lastImportHistory.leagueTable;
+        }
+
+        // 3. Fallback to Supabase LEAGUE_TABLE_CACHE document (cross-device sync)
+        if (standingsRows.length === 0) {
+            try {
+                let docQuery = supabase
+                    .from("documents")
+                    .select("url")
+                    .eq("category", "LEAGUE_TABLE_CACHE");
+                if (clubId) docQuery = docQuery.eq("club_id", clubId);
+                const { data: remoteDoc } = await docQuery.maybeSingle();
+                if (remoteDoc?.url) {
+                    const parsedPayload = JSON.parse(remoteDoc.url);
+                    if (Array.isArray(parsedPayload?.teams) && parsedPayload.teams.length > 0) {
+                        standingsRows = parsedPayload.teams;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // Merge dbTeams (badges/instagram) with standingsRows (position, points, GD, form)
+        const baseList = Array.isArray(dbTeams) ? [...dbTeams] : [];
+        const mergedMap = new Map<string, any>();
+
+        for (const t of baseList) {
+            const tName = t.name || t.team_name || "";
+            const key = normalizeLeagueTeamKey(tName) || tName.toLowerCase();
+            mergedMap.set(key, { ...t, name: tName, team_name: tName });
+        }
+
+        for (const row of standingsRows) {
+            const rName = row.team_name || row.name || "";
+            if (!rName) continue;
+            const key = normalizeLeagueTeamKey(rName) || rName.toLowerCase();
+            let existingKey: string | null = mergedMap.has(key) ? key : null;
+            if (!existingKey) {
+                for (const [k, val] of mergedMap.entries()) {
+                    if (isMatchingLeagueTeam(val.name || val.team_name || "", rName)) {
+                        existingKey = k;
+                        break;
+                    }
+                }
+            }
+            if (existingKey) {
+                const prev = mergedMap.get(existingKey);
+                mergedMap.set(existingKey, {
+                    ...prev,
+                    ...row,
+                    name: prev.name || rName,
+                    team_name: rName || prev.team_name,
+                    badge_url: prev.badge_url || row.badge_url,
+                    instagram_handle: prev.instagram_handle || row.instagram_handle,
+                });
+            } else {
+                mergedMap.set(key, {
+                    ...row,
+                    name: rName,
+                    team_name: rName,
+                });
+            }
+        }
+
+        setLeagueTeams(Array.from(mergedMap.values()));
     }
 
     function extractLineupBlock(rawNotesStr: string) {
@@ -1046,7 +1149,11 @@ export default function MatchesPage() {
 
     const MatchCard = ({ match, isPast, isNextUp }: { match: Match; isPast?: boolean; isNextUp?: boolean }) => {
         const [showLineup, setShowLineup] = useState(false);
-        const teamInfo = leagueTeams.find(t => (t.name || t.team_name || "").toLowerCase() === (match.opponent || "").toLowerCase());
+        const teamInfo = leagueTeams.find(t => isMatchingLeagueTeam(t.name || t.team_name || "", match.opponent || ""));
+        const ourClubInfo = leagueTeams.find(t => t.is_our_club || isMatchingLeagueTeam(t.name || t.team_name || "", settings.name || "Camden United"));
+        const isLeagueComp = getCompetitionType(match.competition) === "league";
+        const oppPos = isLeagueComp ? (teamInfo?.position || null) : null;
+        const ourPos = isLeagueComp ? (ourClubInfo?.position || settings.leaguePosition || null) : null;
         const isSelectedForBulk = selectedMatchIds.has(match.id);
 
         const localDate = getLocalDateString(match.date);
@@ -1148,6 +1255,11 @@ export default function MatchesPage() {
                             >
                                 {match.competition || "League"}
                             </span>
+                            {oppPos && (
+                                <span className="px-1.5 py-0.5 rounded bg-brand/15 text-brand border border-brand/30 text-[9px] font-black tabular-nums shrink-0">
+                                    Opp #{oppPos}
+                                </span>
+                            )}
                             <span className="text-[11px] text-muted-foreground font-semibold truncate">
                                 {shortDateStr}
                                 {match.time ? ` • ${match.time.slice(0, 5)}` : ""}
@@ -1189,7 +1301,14 @@ export default function MatchesPage() {
                                     <p className={`text-xs font-extrabold leading-tight truncate ${isHome ? "text-foreground" : "text-muted-foreground"}`}>
                                         {homeTeamName}
                                     </p>
-                                    <span className="text-[9px] font-bold uppercase text-muted-foreground">Home</span>
+                                    <div className="flex items-center justify-end gap-1 mt-0.5">
+                                        {(isHome ? ourPos : oppPos) && (
+                                            <span className="px-1 py-0 rounded bg-brand/15 text-brand border border-brand/30 text-[8px] font-black tabular-nums">
+                                                #{isHome ? ourPos : oppPos}
+                                            </span>
+                                        )}
+                                        <span className="text-[9px] font-bold uppercase text-muted-foreground">Home</span>
+                                    </div>
                                 </div>
                                 {isHome && settings.logo ? (
                                     <img src={settings.logo} alt="Logo" className="h-6 w-6 object-contain shrink-0 rounded-full" />
@@ -1229,7 +1348,14 @@ export default function MatchesPage() {
                                     <p className={`text-xs font-extrabold leading-tight truncate ${!isHome ? "text-foreground" : "text-muted-foreground"}`}>
                                         {awayTeamName}
                                     </p>
-                                    <span className="text-[9px] font-bold uppercase text-muted-foreground">Away</span>
+                                    <div className="flex items-center justify-start gap-1 mt-0.5">
+                                        <span className="text-[9px] font-bold uppercase text-muted-foreground">Away</span>
+                                        {(!isHome ? ourPos : oppPos) && (
+                                            <span className="px-1 py-0 rounded bg-brand/15 text-brand border border-brand/30 text-[8px] font-black tabular-nums">
+                                                #{!isHome ? ourPos : oppPos}
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1434,6 +1560,11 @@ export default function MatchesPage() {
                         <Badge variant="outline" className={`font-semibold ${(match.competition || "").toLowerCase().includes("cup") ? "bg-amber-100/90 dark:bg-amber-500/15 border-amber-400/70 dark:border-amber-500/40 text-amber-800 dark:text-amber-300" : "bg-surface-2 border-border"}`}>
                             {match.competition || "League"}
                         </Badge>
+                        {oppPos && (
+                            <span className="px-2 py-0.5 rounded-md bg-brand/15 text-brand border border-brand/30 text-xs font-extrabold tabular-nums">
+                                Opp #{oppPos}{teamInfo?.points !== undefined ? ` · ${teamInfo.points}pts` : ""}
+                            </span>
+                        )}
                         <span className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1 font-medium">
                             <CalendarDays className="h-3.5 w-3.5" />
                             {new Date(match.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
@@ -1511,8 +1642,13 @@ export default function MatchesPage() {
                             {!match.isHome && teamInfo?.badge_url && (
                                 <img src={teamInfo.badge_url} alt="Badge" className="h-6 w-6 object-contain shrink-0" />
                             )}
-                            <span className={`font-bold text-lg ${match.isHome ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            <span className={`font-bold text-lg flex items-center gap-2 ${match.isHome ? 'text-foreground' : 'text-muted-foreground'}`}>
                                 {match.isHome ? settings.name : match.opponent}
+                                {(match.isHome ? ourPos : oppPos) && (
+                                    <span className="text-xs font-extrabold px-1.5 py-0.5 rounded bg-brand/15 text-brand border border-brand/30 tabular-nums shrink-0">
+                                        #{match.isHome ? ourPos : oppPos}
+                                    </span>
+                                )}
                             </span>
                             {match.isHome && <span className="text-xs px-1.5 py-0.5 bg-surface-2 border border-border text-muted-foreground rounded shrink-0">H</span>}
                         </div>
@@ -1558,6 +1694,11 @@ export default function MatchesPage() {
                                     <img src={teamInfo.badge_url} alt="Badge" className="h-6 w-6 object-contain shrink-0" />
                                 )}
                                 {!match.isHome ? settings.name : match.opponent}
+                                {(!match.isHome ? ourPos : oppPos) && (
+                                    <span className="text-xs font-extrabold px-1.5 py-0.5 rounded bg-brand/15 text-brand border border-brand/30 tabular-nums shrink-0">
+                                        #{!match.isHome ? ourPos : oppPos}
+                                    </span>
+                                )}
                             </span>
                             {match.isHome && teamInfo?.instagram_handle && (
                                 <a href={`https://instagram.com/${teamInfo.instagram_handle.replace(/^@/, '')}`} target="_blank" rel="noopener noreferrer" className="text-pink-500 hover:text-pink-400 transition-colors shrink-0">
@@ -1787,40 +1928,38 @@ export default function MatchesPage() {
                     </div>
                 )}
 
-                {/* 4-Stat Season Bento Strip */}
-                <div className="grid grid-cols-4 gap-2">
-                    <div className="bg-surface-1 border border-border rounded-xl p-2.5 flex flex-col justify-between">
-                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground">Upcoming</span>
-                        <div className="flex items-baseline gap-1 mt-1">
-                            <span className="text-base font-black text-foreground tabular-nums">{upcomingMatches.length}</span>
-                            <span className="text-[9px] font-semibold text-muted-foreground">left</span>
+                {/* 4-Stat Season Bento Strip (Overflow-proof on 320px-430px screens) */}
+                <div className="grid grid-cols-4 gap-1.5">
+                    <div className="bg-surface-1 border border-border rounded-xl px-2 py-2 flex flex-col justify-between min-w-0 overflow-hidden">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground truncate">Upcoming</span>
+                        <div className="flex items-baseline gap-1 mt-1 min-w-0">
+                            <span className="text-sm font-black text-foreground tabular-nums">{upcomingMatches.length}</span>
+                            <span className="text-[9px] font-semibold text-muted-foreground truncate">left</span>
                         </div>
                     </div>
-                    <div className="bg-surface-1 border border-border rounded-xl p-2.5 flex flex-col justify-between">
-                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground">Played</span>
-                        <div className="flex items-baseline gap-1 mt-1">
-                            <span className="text-base font-black text-foreground tabular-nums">{mobileSeasonStats.played}</span>
-                            <span className="text-[9px] font-semibold text-muted-foreground">games</span>
+                    <div className="bg-surface-1 border border-border rounded-xl px-2 py-2 flex flex-col justify-between min-w-0 overflow-hidden">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground truncate">Played</span>
+                        <div className="flex items-baseline gap-1 mt-1 min-w-0">
+                            <span className="text-sm font-black text-foreground tabular-nums">{mobileSeasonStats.played}</span>
+                            <span className="text-[9px] font-semibold text-muted-foreground truncate">games</span>
                         </div>
                     </div>
-                    <div className="bg-surface-1 border border-border rounded-xl p-2.5 flex flex-col justify-between">
-                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground">Record</span>
-                        <div className="flex items-center gap-1 mt-1 text-xs font-black tabular-nums">
+                    <div className="bg-surface-1 border border-border rounded-xl px-2 py-2 flex flex-col justify-between min-w-0 overflow-hidden">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground truncate">Record</span>
+                        <div className="flex items-center justify-between gap-0.5 mt-1 text-[11px] font-black tabular-nums whitespace-nowrap">
                             <span className="text-emerald-500">{mobileSeasonStats.wins}W</span>
-                            <span className="text-muted-foreground/50">·</span>
                             <span className="text-amber-500">{mobileSeasonStats.draws}D</span>
-                            <span className="text-muted-foreground/50">·</span>
                             <span className="text-rose-500">{mobileSeasonStats.losses}L</span>
                         </div>
                     </div>
-                    <div className="bg-surface-1 border border-border rounded-xl p-2.5 flex flex-col justify-between">
-                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground">Goals</span>
-                        <div className="flex items-baseline gap-1 mt-1">
-                            <span className="text-sm font-black text-foreground tabular-nums">
+                    <div className="bg-surface-1 border border-border rounded-xl px-2 py-2 flex flex-col justify-between min-w-0 overflow-hidden">
+                        <span className="text-[9px] font-extrabold uppercase tracking-wider text-muted-foreground truncate">Goals</span>
+                        <div className="flex items-baseline justify-between gap-0.5 mt-1 min-w-0 whitespace-nowrap">
+                            <span className="text-xs font-black text-foreground tabular-nums">
                                 {mobileSeasonStats.gf}:{mobileSeasonStats.ga}
                             </span>
                             <span className={`text-[9px] font-bold tabular-nums ${mobileSeasonStats.gf - mobileSeasonStats.ga >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                                ({mobileSeasonStats.gf - mobileSeasonStats.ga >= 0 ? `+${mobileSeasonStats.gf - mobileSeasonStats.ga}` : mobileSeasonStats.gf - mobileSeasonStats.ga})
+                                {mobileSeasonStats.gf - mobileSeasonStats.ga >= 0 ? `+${mobileSeasonStats.gf - mobileSeasonStats.ga}` : mobileSeasonStats.gf - mobileSeasonStats.ga}
                             </span>
                         </div>
                     </div>

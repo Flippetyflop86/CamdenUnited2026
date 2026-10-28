@@ -53,14 +53,38 @@ export function NextMatchHero({
         }
     }
 
-    // Attempt to find opponent in league table for context
-    const oppLower = (match.opponent || "").toLowerCase();
-    const opponentStats = oppLower
-        ? leagueTeams.find((t) => {
-              const tName = (t.team_name || t.name || "").toLowerCase();
-              return tName && (tName.includes(oppLower) || oppLower.includes(tName));
-          })
+    // Normalize team names (strip FC/AFC/First/1st/Reserves, normalize Utd->United) so opponents match the synced League Table
+    const normalizeTeamKey = (name: string): string =>
+        (name || "")
+            .toLowerCase()
+            .replace(/\b(fc|afc|first|1st|reserves|united|utd)\b/g, (m) =>
+                m === "utd" ? "united" : m === "fc" || m === "afc" || m === "first" || m === "1st" || m === "reserves" ? "" : m
+            )
+            .replace(/[^a-z0-9]/g, "")
+            .trim();
+
+    const isMatchingTeam = (a: string, b: string): boolean => {
+        if (!a || !b) return false;
+        const cleanA = a.toLowerCase().trim();
+        const cleanB = b.toLowerCase().trim();
+        if (cleanA === cleanB) return true;
+        const normA = normalizeTeamKey(a);
+        const normB = normalizeTeamKey(b);
+        return normA.length >= 3 && normB.length >= 3 && (normA === normB || normA.includes(normB) || normB.includes(normA));
+    };
+
+    const isLeagueCompetition = !(match.competition || "League").toLowerCase().match(/cup|trophy|shield|friendly/);
+
+    // Attempt to find opponent and our club in league table for context
+    const opponentStats = match.opponent
+        ? leagueTeams.find((t) => isMatchingTeam(t.team_name || t.name || "", match.opponent))
         : undefined;
+
+    const ourClubStats = leagueTeams.find(
+        (t) => t.is_our_club || isMatchingTeam(t.team_name || t.name || "", settings.name || "Camden United")
+    );
+    const ourPos = ourClubStats?.position || settings.leaguePosition || null;
+    const oppPos = opponentStats?.position || null;
 
     const isSquadConfirmed = Boolean(
         match.is_squad_confirmed ||
@@ -128,7 +152,14 @@ export function NextMatchHero({
                             <p className={`text-sm font-extrabold leading-tight truncate ${isHome ? "text-foreground" : "text-muted-foreground"}`}>
                                 {homeTeam}
                             </p>
-                            <p className="text-[10px] text-muted-foreground font-semibold uppercase mt-0.5">Home</p>
+                            <div className="flex items-center justify-end gap-1 mt-0.5">
+                                {isLeagueCompetition && (isHome ? ourPos : oppPos) && (
+                                    <span className="px-1.5 py-0.2 rounded bg-brand/15 text-brand border border-brand/30 text-[9px] font-black tabular-nums">
+                                        #{isHome ? ourPos : oppPos}
+                                    </span>
+                                )}
+                                <span className="text-[10px] text-muted-foreground font-semibold uppercase">Home</span>
+                            </div>
                         </div>
                         <div className="px-2.5 py-1 rounded-lg bg-background border border-border text-center shrink-0">
                             <span className="text-xs font-black text-brand uppercase tracking-wider">
@@ -139,7 +170,14 @@ export function NextMatchHero({
                             <p className={`text-sm font-extrabold leading-tight truncate ${!isHome ? "text-foreground" : "text-muted-foreground"}`}>
                                 {awayTeam}
                             </p>
-                            <p className="text-[10px] text-muted-foreground font-semibold uppercase mt-0.5">Away</p>
+                            <div className="flex items-center justify-start gap-1 mt-0.5">
+                                <span className="text-[10px] text-muted-foreground font-semibold uppercase">Away</span>
+                                {isLeagueCompetition && (!isHome ? ourPos : oppPos) && (
+                                    <span className="px-1.5 py-0.2 rounded bg-brand/15 text-brand border border-brand/30 text-[9px] font-black tabular-nums">
+                                        #{!isHome ? ourPos : oppPos}
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -162,11 +200,15 @@ export function NextMatchHero({
                             </span>
                         </div>
 
-                        {opponentStats && (
+                        {opponentStats?.position && (
                             <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-surface-2 border border-border text-[10px] font-bold text-foreground">
                                 <span>Opp #{opponentStats.position}</span>
-                                <span className="text-muted-foreground">•</span>
-                                <span>{opponentStats.points}pts</span>
+                                {opponentStats.points !== undefined && (
+                                    <>
+                                        <span className="text-muted-foreground">•</span>
+                                        <span>{opponentStats.points}pts</span>
+                                    </>
+                                )}
                             </span>
                         )}
                     </div>
@@ -223,9 +265,23 @@ export function NextMatchHero({
 
                         <div className="space-y-1">
                             <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
-                                <span className={isHome ? "text-foreground" : "text-muted-foreground"}>{homeTeam}</span>
+                                <span className={`inline-flex items-center gap-2 ${isHome ? "text-foreground" : "text-muted-foreground"}`}>
+                                    {homeTeam}
+                                    {isLeagueCompetition && (isHome ? ourPos : oppPos) && (
+                                        <span className="text-xs font-extrabold px-2 py-0.5 rounded-md bg-brand/15 text-brand border border-brand/30 tabular-nums">
+                                            #{isHome ? ourPos : oppPos}
+                                        </span>
+                                    )}
+                                </span>
                                 <span className="text-muted-foreground font-light text-xl">vs</span>
-                                <span className={!isHome ? "text-foreground" : "text-muted-foreground"}>{awayTeam}</span>
+                                <span className={`inline-flex items-center gap-2 ${!isHome ? "text-foreground" : "text-muted-foreground"}`}>
+                                    {awayTeam}
+                                    {isLeagueCompetition && (!isHome ? ourPos : oppPos) && (
+                                        <span className="text-xs font-extrabold px-2 py-0.5 rounded-md bg-brand/15 text-brand border border-brand/30 tabular-nums">
+                                            #{!isHome ? ourPos : oppPos}
+                                        </span>
+                                    )}
+                                </span>
                             </h1>
                         </div>
 
@@ -249,7 +305,7 @@ export function NextMatchHero({
                             </div>
                         </div>
 
-                        {opponentStats && (
+                        {opponentStats?.position && (
                             <div className="inline-flex items-center gap-3 px-3 py-1.5 rounded-md bg-surface-2 text-xs font-medium text-muted-foreground border border-border">
                                 <span>Opposition Info:</span>
                                 <span className="text-foreground">Pos: #{opponentStats.position}</span>
