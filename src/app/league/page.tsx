@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -98,6 +98,8 @@ export default function LeagueTablePage() {
     const [graphicFormat, setGraphicFormat] = useState<'story' | 'post'>('post');
     const [graphicScope, setGraphicScope] = useState<'full' | 'top8'>('full');
     const [copiedGraphic, setCopiedGraphic] = useState(false);
+    const [mobileTableView, setMobileTableView] = useState<'overview' | 'full' | 'form'>('overview');
+    const [expandedMobileTeam, setExpandedMobileTeam] = useState<string | null>(null);
     const shareCanvasRef = useRef<HTMLCanvasElement>(null);
 
     const storageKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
@@ -1237,13 +1239,125 @@ export default function LeagueTablePage() {
 
     if (previewData) {
         return (
-            <div className="h-full flex flex-col gap-6 max-w-4xl mx-auto py-8">
-                <div>
-                    <h2 className="text-2xl font-bold text-foreground">Edit League Standings</h2>
-                    <p className="text-muted-foreground mt-1">Adjust any row below and click Save.</p>
+            <div className="h-full flex flex-col gap-4 md:gap-6 max-w-4xl mx-auto py-3 md:py-8 pb-24 md:pb-8">
+                <div className="flex items-center justify-between gap-2">
+                    <div>
+                        <h2 className="text-xl md:text-2xl font-bold text-foreground">Edit League Standings</h2>
+                        <p className="text-xs md:text-sm text-muted-foreground mt-0.5 md:mt-1">Adjust any row below and tap Save.</p>
+                    </div>
+                    <span className="md:hidden text-xs font-semibold px-2.5 py-1 rounded-full bg-surface-2 border border-border text-muted-foreground">
+                        {previewData.length} teams
+                    </span>
                 </div>
 
-                <Card className="border-border bg-surface-1">
+                {/* MOBILE EDIT VIEW (< 768px) */}
+                <div className="md:hidden flex flex-col gap-2.5">
+                    {previewData.map((row, idx) => (
+                        <div
+                            key={idx}
+                            className={`rounded-xl border p-3 transition-colors ${
+                                row.is_our_club
+                                    ? 'bg-primary/10 border-primary/40 border-l-4 border-l-primary'
+                                    : 'bg-surface-1 border-border'
+                            }`}
+                        >
+                            <div className="flex items-center gap-2 mb-2.5">
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <span className="text-[10px] font-bold uppercase text-muted-foreground">#</span>
+                                    <Input
+                                        type="number"
+                                        value={row.position}
+                                        onChange={(e) => handleRowChange(idx, 'position', parseInt(e.target.value) || 0)}
+                                        className="w-11 h-8 px-1 text-center font-bold text-xs bg-background border-border"
+                                    />
+                                </div>
+                                <Input
+                                    type="text"
+                                    value={row.team_name}
+                                    onChange={(e) => handleRowChange(idx, 'team_name', e.target.value)}
+                                    className={`h-8 px-2.5 text-xs flex-1 min-w-0 bg-background border-border ${
+                                        row.is_our_club ? 'font-bold text-primary' : 'font-semibold text-foreground'
+                                    }`}
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-8 gap-1 text-center">
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] font-bold uppercase text-muted-foreground">P</span>
+                                    <Input
+                                        type="number"
+                                        value={row.played}
+                                        onChange={(e) => handleRowChange(idx, 'played', parseInt(e.target.value) || 0)}
+                                        className="h-7 px-0.5 text-center text-xs bg-background border-border"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] font-bold uppercase text-muted-foreground">W</span>
+                                    <Input
+                                        type="number"
+                                        value={row.won}
+                                        onChange={(e) => handleRowChange(idx, 'won', parseInt(e.target.value) || 0)}
+                                        className="h-7 px-0.5 text-center text-xs bg-background border-border"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] font-bold uppercase text-muted-foreground">D</span>
+                                    <Input
+                                        type="number"
+                                        value={row.drawn}
+                                        onChange={(e) => handleRowChange(idx, 'drawn', parseInt(e.target.value) || 0)}
+                                        className="h-7 px-0.5 text-center text-xs bg-background border-border"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] font-bold uppercase text-muted-foreground">L</span>
+                                    <Input
+                                        type="number"
+                                        value={row.lost}
+                                        onChange={(e) => handleRowChange(idx, 'lost', parseInt(e.target.value) || 0)}
+                                        className="h-7 px-0.5 text-center text-xs bg-background border-border"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] font-bold uppercase text-muted-foreground">GF</span>
+                                    <Input
+                                        type="number"
+                                        value={row.goals_for}
+                                        onChange={(e) => handleRowChange(idx, 'goals_for', parseInt(e.target.value) || 0)}
+                                        className="h-7 px-0.5 text-center text-xs bg-background border-border"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] font-bold uppercase text-muted-foreground">GA</span>
+                                    <Input
+                                        type="number"
+                                        value={row.goals_against}
+                                        onChange={(e) => handleRowChange(idx, 'goals_against', parseInt(e.target.value) || 0)}
+                                        className="h-7 px-0.5 text-center text-xs bg-background border-border"
+                                    />
+                                </div>
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] font-bold uppercase text-muted-foreground">GD</span>
+                                    <div className="h-7 flex items-center justify-center rounded-md bg-surface-2 text-[11px] font-mono font-semibold text-muted-foreground">
+                                        {row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[9px] font-bold uppercase text-brand">Pts</span>
+                                    <Input
+                                        type="number"
+                                        value={row.points}
+                                        onChange={(e) => handleRowChange(idx, 'points', parseInt(e.target.value) || 0)}
+                                        className="h-7 px-0.5 text-center text-xs font-bold bg-background border-brand/40 text-foreground"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* DESKTOP EDIT TABLE (>= 768px) — UNTOUCHED */}
+                <Card className="hidden md:block border-border bg-surface-1">
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
@@ -1301,12 +1415,12 @@ export default function LeagueTablePage() {
                 </Card>
 
                 <div className="flex justify-between items-center mt-2">
-                    <span className="text-sm font-medium text-muted-foreground">{previewData.length} teams</span>
-                    <div className="flex gap-3">
-                        <Button variant="outline" onClick={() => setPreviewData(null)} disabled={isImporting}>
+                    <span className="hidden md:inline text-sm font-medium text-muted-foreground">{previewData.length} teams</span>
+                    <div className="flex gap-2.5 w-full md:w-auto">
+                        <Button variant="outline" onClick={() => setPreviewData(null)} disabled={isImporting} className="flex-1 md:flex-initial">
                             Cancel
                         </Button>
-                        <Button onClick={handleConfirmImport} className="bg-brand hover:bg-brand/90 text-white" disabled={isImporting}>
+                        <Button onClick={handleConfirmImport} className="bg-brand hover:bg-brand/90 text-white flex-1 md:flex-initial font-semibold" disabled={isImporting}>
                             {isImporting ? "Saving..." : "Save League Table"}
                         </Button>
                     </div>
@@ -1361,12 +1475,91 @@ export default function LeagueTablePage() {
         const defenceRank = Math.max(1, defenceSorted.findIndex(r => r.team_name === ourRow.team_name) + 1);
         const gaPerGame = ourRow.played > 0 ? ((ourRow.goals_against || 0) / ourRow.played).toFixed(2) : "0.00";
 
+        const sortedRows = [...currentTable].sort((a, b) => {
+            const getVal = (r: LeagueRow) => {
+                if (sortField === 'ppg') return r.played > 0 ? r.points / r.played : 0;
+                return Number((r as any)[sortField] ?? 0);
+            };
+            const diff = getVal(a) - getVal(b);
+            if (diff !== 0) return sortDir === 'asc' ? diff : -diff;
+            return a.position - b.position;
+        });
+
         return (
-            <div className="h-full flex flex-col gap-6">
+            <div className="h-full flex flex-col gap-3.5 md:gap-6 pb-20 md:pb-6">
                 <div ref={hiddenFaContainerRef} className="hidden" aria-hidden="true" />
 
-                {/* Top Header & Action Bar */}
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                {/* ================================================================= */}
+                {/* MOBILE HEADER & ACTION BAR (< 768px)                              */}
+                {/* ================================================================= */}
+                <div className="md:hidden flex flex-col gap-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="h-9 w-9 shrink-0 bg-brand/10 rounded-xl flex items-center justify-center border border-brand/20">
+                                <Trophy className="h-4 w-4 text-brand" />
+                            </div>
+                            <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                    <h2 className="text-base font-extrabold text-foreground truncate">League Standings</h2>
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-semibold text-emerald-500 border border-emerald-500/20 shrink-0">
+                                        <span className={`h-1.5 w-1.5 rounded-full bg-emerald-500 ${isAutoSyncing ? 'animate-ping' : ''}`} />
+                                        {isAutoSyncing ? "Syncing" : "Live"}
+                                    </span>
+                                </div>
+                                <p className="text-[11px] text-muted-foreground truncate">
+                                    {lastSyncedAt
+                                        ? `Synced • Checked ${new Date(lastSyncedAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+                                        : "Auto-updates from league feed & results"}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Compact Mobile Action Strip */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setShowShareModal(true)}
+                            className="h-8 px-2.5 text-xs font-semibold border-brand/30 text-brand hover:bg-brand/10 shrink-0"
+                        >
+                            <Share2 className="h-3.5 w-3.5 mr-1" />
+                            Share Graphic
+                        </Button>
+                        {urlInput && (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={isAutoSyncing}
+                                onClick={() => autoSyncFromUrl(urlInput, false)}
+                                className="h-8 px-2.5 text-xs shrink-0"
+                            >
+                                {isAutoSyncing ? "Syncing..." : "🔄 Refresh"}
+                            </Button>
+                        )}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPreviewData(currentTable)}
+                            className="h-8 px-2.5 text-xs shrink-0"
+                        >
+                            Edit
+                        </Button>
+                        <Button
+                            onClick={() => setShowImporter(true)}
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2.5 text-xs shrink-0"
+                        >
+                            Change League
+                        </Button>
+                    </div>
+                </div>
+
+                {/* ================================================================= */}
+                {/* DESKTOP HEADER & ACTION BAR (>= 768px) — UNTOUCHED                */}
+                {/* ================================================================= */}
+                <div className="hidden md:flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
                     <div className="flex items-center gap-3">
                         <div className="h-10 w-10 bg-brand/10 rounded-full flex items-center justify-center">
                             <Trophy className="h-5 w-5 text-brand" />
@@ -1418,8 +1611,83 @@ export default function LeagueTablePage() {
                     </div>
                 </div>
 
-                {/* Club Performance Hero Strip */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                {/* ================================================================= */}
+                {/* MOBILE 2x2 PERFORMANCE BENTO GRID (< 768px)                       */}
+                {/* ================================================================= */}
+                <div className="md:hidden grid grid-cols-2 gap-2">
+                    <div className="min-w-0 overflow-hidden rounded-xl border border-brand/30 bg-brand/5 p-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-brand truncate">
+                            Standing
+                        </p>
+                        <div className="flex items-baseline gap-1.5 mt-0.5">
+                            <span className="text-xl font-black text-foreground leading-tight">
+                                {ordinal(ourRow.position)}
+                            </span>
+                            <span className="text-[11px] font-medium text-muted-foreground truncate">
+                                of {totalTeams}
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 truncate" title={standingSubtext}>
+                            {standingSubtext}
+                        </p>
+                    </div>
+
+                    <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface-1 p-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate">
+                            Points / Game
+                        </p>
+                        <div className="flex items-baseline gap-1.5 mt-0.5">
+                            <span className="text-xl font-black text-foreground leading-tight">
+                                {ourPpg.toFixed(2)}
+                            </span>
+                            <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                                PPG
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                            Pace: <strong className="text-foreground">{projectedPoints} pts</strong> ({fullSeasonGames}g)
+                        </p>
+                    </div>
+
+                    <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface-1 p-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate">
+                            Attack Rank
+                        </p>
+                        <div className="flex items-baseline gap-1.5 mt-0.5">
+                            <span className="text-xl font-black text-foreground leading-tight">
+                                #{attackRank}
+                            </span>
+                            <span className="text-[11px] font-medium text-muted-foreground truncate">
+                                ({ourRow.goals_for ?? 0} GF)
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                            {gfPerGame} goals / game
+                        </p>
+                    </div>
+
+                    <div className="min-w-0 overflow-hidden rounded-xl border border-border bg-surface-1 p-2.5">
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground truncate">
+                            Defence Rank
+                        </p>
+                        <div className="flex items-baseline gap-1.5 mt-0.5">
+                            <span className="text-xl font-black text-foreground leading-tight">
+                                #{defenceRank}
+                            </span>
+                            <span className="text-[11px] font-medium text-muted-foreground truncate">
+                                ({ourRow.goals_against ?? 0} GA)
+                            </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
+                            {gaPerGame}/gm • {ourRow.goal_difference > 0 ? `+${ourRow.goal_difference}` : ourRow.goal_difference} GD
+                        </p>
+                    </div>
+                </div>
+
+                {/* ================================================================= */}
+                {/* DESKTOP 4-CARD PERFORMANCE HERO STRIP (>= 768px) — UNTOUCHED      */}
+                {/* ================================================================= */}
+                <div className="hidden md:grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
                     <Card className="border-brand/30 bg-brand/5 shadow-xs">
                         <CardContent className="p-4">
                             <p className="text-[11px] font-bold uppercase tracking-wider text-brand">
@@ -1497,8 +1765,343 @@ export default function LeagueTablePage() {
                     </Card>
                 </div>
 
-                {/* Standings Table */}
-                <Card className="border-border bg-surface-1">
+                {/* ================================================================= */}
+                {/* MOBILE STANDINGS VIEW (< 768px)                                   */}
+                {/* ================================================================= */}
+                <div className="md:hidden flex flex-col gap-2">
+                    {/* Mobile Table View Mode Switcher */}
+                    <div className="flex items-center justify-between gap-2">
+                        <div className="inline-flex items-center bg-surface-2 p-1 rounded-xl border border-border">
+                            <button
+                                type="button"
+                                onClick={() => setMobileTableView('overview')}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                                    mobileTableView === 'overview'
+                                        ? 'bg-brand text-white shadow-xs'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                            >
+                                Table
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMobileTableView('full')}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                                    mobileTableView === 'full'
+                                        ? 'bg-brand text-white shadow-xs'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                            >
+                                Full W/D/L
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMobileTableView('form')}
+                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-colors ${
+                                    mobileTableView === 'form'
+                                        ? 'bg-brand text-white shadow-xs'
+                                        : 'text-muted-foreground hover:text-foreground'
+                                }`}
+                            >
+                                Form & PPG
+                            </button>
+                        </div>
+                        <span className="text-[10px] text-muted-foreground font-medium">
+                            Tap any club for full stats
+                        </span>
+                    </div>
+
+                    {/* Mobile Standings Card */}
+                    <Card className="border-border bg-surface-1 overflow-hidden">
+                        <CardContent className="p-0">
+                            <table className="w-full text-xs text-left table-fixed">
+                                <thead className="text-[10px] text-muted-foreground uppercase bg-surface-2 border-b border-border select-none">
+                                    {mobileTableView === 'overview' && (
+                                        <tr>
+                                            <th
+                                                onClick={() => handleSortColumn('position')}
+                                                className="w-11 pl-2.5 pr-1 py-2.5 font-bold cursor-pointer"
+                                            >
+                                                # {sortField === 'position' && (sortDir === 'asc' ? '▲' : '▼')}
+                                            </th>
+                                            <th className="py-2.5 px-1.5 font-bold">Club</th>
+                                            <th
+                                                onClick={() => handleSortColumn('played')}
+                                                className="w-8 py-2.5 text-center font-bold cursor-pointer"
+                                            >
+                                                P
+                                            </th>
+                                            <th
+                                                onClick={() => handleSortColumn('goal_difference')}
+                                                className="w-10 py-2.5 text-center font-bold cursor-pointer"
+                                            >
+                                                GD
+                                            </th>
+                                            <th
+                                                onClick={() => handleSortColumn('points')}
+                                                className="w-10 py-2.5 text-center font-bold cursor-pointer text-foreground"
+                                            >
+                                                Pts
+                                            </th>
+                                            <th className="w-[68px] pr-2.5 py-2.5 text-right font-bold">Form</th>
+                                        </tr>
+                                    )}
+                                    {mobileTableView === 'full' && (
+                                        <tr>
+                                            <th
+                                                onClick={() => handleSortColumn('position')}
+                                                className="w-7 pl-2 pr-0.5 py-2.5 font-bold cursor-pointer"
+                                            >
+                                                #
+                                            </th>
+                                            <th className="py-2.5 px-1 font-bold">Club</th>
+                                            <th onClick={() => handleSortColumn('played')} className="w-6 py-2.5 text-center font-bold cursor-pointer">P</th>
+                                            <th onClick={() => handleSortColumn('won')} className="w-6 py-2.5 text-center font-bold cursor-pointer">W</th>
+                                            <th onClick={() => handleSortColumn('drawn')} className="w-6 py-2.5 text-center font-bold cursor-pointer">D</th>
+                                            <th onClick={() => handleSortColumn('lost')} className="w-6 py-2.5 text-center font-bold cursor-pointer">L</th>
+                                            <th onClick={() => handleSortColumn('goal_difference')} className="w-8 py-2.5 text-center font-bold cursor-pointer">GD</th>
+                                            <th onClick={() => handleSortColumn('points')} className="w-8 pr-2 py-2.5 text-center font-bold cursor-pointer text-foreground">Pts</th>
+                                        </tr>
+                                    )}
+                                    {mobileTableView === 'form' && (
+                                        <tr>
+                                            <th
+                                                onClick={() => handleSortColumn('position')}
+                                                className="w-8 pl-2.5 pr-1 py-2.5 font-bold cursor-pointer"
+                                            >
+                                                #
+                                            </th>
+                                            <th className="py-2.5 px-1.5 font-bold">Club</th>
+                                            <th onClick={() => handleSortColumn('ppg')} className="w-11 py-2.5 text-center font-bold cursor-pointer">
+                                                PPG
+                                            </th>
+                                            <th className="w-[104px] pr-2.5 py-2.5 text-right font-bold">Last 5</th>
+                                        </tr>
+                                    )}
+                                </thead>
+                                <tbody>
+                                    {sortedRows.map((row, idx) => {
+                                        const isNextOpp =
+                                            nextOpponentInfo &&
+                                            !row.is_our_club &&
+                                            isMatchingTeamName(row.team_name, nextOpponentInfo.opponent);
+
+                                        const formattedNextDate = nextOpponentInfo?.date
+                                            ? new Date(nextOpponentInfo.date + "T12:00:00").toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                                            : "";
+
+                                        const posDiff = (row.previous_position ?? row.position) - row.position;
+                                        const formItems = Array.isArray(row.form) ? row.form.slice(-5) : [];
+                                        const rowPpg = row.played > 0 ? (row.points / row.played).toFixed(2) : "0.00";
+
+                                        let trailingWins = 0;
+                                        for (let i = formItems.length - 1; i >= 0; i--) {
+                                            if (formItems[i] === 'W') trailingWins++;
+                                            else break;
+                                        }
+                                        const isUnbeatenSeason = row.played >= 3 && row.lost === 0;
+                                        const streakLabel = isUnbeatenSeason
+                                            ? `🔥 ${row.played} Unbeaten`
+                                            : trailingWins >= 4
+                                                ? `🔥 ${trailingWins}W Streak`
+                                                : null;
+
+                                        const gdColorClass =
+                                            row.goal_difference > 0
+                                                ? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                                                : row.goal_difference < 0
+                                                    ? 'text-rose-600 dark:text-rose-400 font-semibold'
+                                                    : 'text-muted-foreground';
+
+                                        const isExpanded = expandedMobileTeam === row.team_name;
+                                        const colSpanCount = mobileTableView === 'overview' ? 6 : mobileTableView === 'full' ? 8 : 4;
+
+                                        return (
+                                            <React.Fragment key={idx}>
+                                                <tr
+                                                    onClick={() => setExpandedMobileTeam(prev => prev === row.team_name ? null : row.team_name)}
+                                                    className={`border-b border-border transition-colors cursor-pointer active:bg-surface-2/70 ${
+                                                        row.is_our_club
+                                                            ? 'bg-primary/10 border-l-4 border-l-primary'
+                                                            : isNextOpp
+                                                                ? 'bg-amber-500/5 border-l-4 border-l-amber-500/80'
+                                                                : ''
+                                                    }`}
+                                                >
+                                                    {/* Position cell */}
+                                                    <td className={`${mobileTableView === 'full' ? 'pl-2 pr-0.5' : 'pl-2.5 pr-1'} py-2.5 font-bold whitespace-nowrap`}>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="w-4 text-right">{row.position}</span>
+                                                            {mobileTableView !== 'full' && (
+                                                                posDiff > 0 ? (
+                                                                    <ArrowUp className="h-2.5 w-2.5 text-emerald-500 stroke-[3] shrink-0" />
+                                                                ) : posDiff < 0 ? (
+                                                                    <ArrowDown className="h-2.5 w-2.5 text-rose-500 stroke-[3] shrink-0" />
+                                                                ) : (
+                                                                    <span className="w-2.5 shrink-0" />
+                                                                )
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Club Name + Sub-badges */}
+                                                    <td className={`py-2.5 ${mobileTableView === 'full' ? 'px-1' : 'px-1.5'} min-w-0`}>
+                                                        <div className="flex flex-col min-w-0">
+                                                            <span className={`truncate leading-tight ${row.is_our_club ? 'font-extrabold text-primary' : 'font-semibold text-foreground'}`}>
+                                                                {row.team_name}
+                                                            </span>
+                                                            {(isNextOpp || streakLabel) && (
+                                                                <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                                                                    {isNextOpp && (
+                                                                        <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500 text-white px-1.5 py-0 text-[9px] font-extrabold uppercase tracking-tight">
+                                                                            <Zap className="h-2.5 w-2.5 fill-white text-white" />
+                                                                            Next {formattedNextDate ? `• ${formattedNextDate}` : ""} ({nextOpponentInfo?.is_home ? "H" : "A"})
+                                                                        </span>
+                                                                    )}
+                                                                    {streakLabel && (
+                                                                        <span className="inline-flex items-center rounded-full bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/35 px-1.5 py-0 text-[9px] font-bold">
+                                                                            {streakLabel}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    {mobileTableView === 'overview' && (
+                                                        <>
+                                                            <td className="py-2.5 text-center text-muted-foreground font-medium">{row.played}</td>
+                                                            <td className={`py-2.5 text-center font-mono text-[11px] ${gdColorClass}`}>
+                                                                {row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}
+                                                            </td>
+                                                            <td className="py-2.5 text-center font-extrabold text-foreground">{row.points}</td>
+                                                            <td className="pr-2.5 py-2.5 text-right whitespace-nowrap">
+                                                                {formItems.length > 0 ? (
+                                                                    <div className="inline-flex items-center justify-end gap-0.5">
+                                                                        {formItems.map((res, fIdx) => {
+                                                                            const dotColor =
+                                                                                res === 'W'
+                                                                                    ? 'bg-emerald-500 text-white'
+                                                                                    : res === 'D'
+                                                                                        ? 'bg-amber-500 text-white'
+                                                                                        : 'bg-rose-500 text-white';
+                                                                            return (
+                                                                                <span
+                                                                                    key={fIdx}
+                                                                                    className={`inline-flex items-center justify-center w-3.5 h-3.5 rounded-[3px] text-[8px] font-black ${dotColor}`}
+                                                                                >
+                                                                                    {res}
+                                                                                </span>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-muted-foreground/40">—</span>
+                                                                )}
+                                                            </td>
+                                                        </>
+                                                    )}
+
+                                                    {mobileTableView === 'full' && (
+                                                        <>
+                                                            <td className="py-2.5 text-center text-muted-foreground">{row.played}</td>
+                                                            <td className="py-2.5 text-center text-foreground">{row.won}</td>
+                                                            <td className="py-2.5 text-center text-muted-foreground">{row.drawn}</td>
+                                                            <td className="py-2.5 text-center text-muted-foreground">{row.lost}</td>
+                                                            <td className={`py-2.5 text-center font-mono text-[11px] ${gdColorClass}`}>
+                                                                {row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}
+                                                            </td>
+                                                            <td className="pr-2 py-2.5 text-center font-extrabold text-foreground">{row.points}</td>
+                                                        </>
+                                                    )}
+
+                                                    {mobileTableView === 'form' && (
+                                                        <>
+                                                            <td className="py-2.5 text-center font-mono text-[11px] font-semibold text-muted-foreground">
+                                                                {rowPpg}
+                                                            </td>
+                                                            <td className="pr-2.5 py-2.5 text-right whitespace-nowrap">
+                                                                {formItems.length > 0 ? (
+                                                                    <div className="inline-flex items-center justify-end gap-1">
+                                                                        {formItems.map((res, fIdx) => {
+                                                                            const pillStyles =
+                                                                                res === 'W'
+                                                                                    ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/45'
+                                                                                    : res === 'D'
+                                                                                        ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/45'
+                                                                                        : 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/45';
+                                                                            return (
+                                                                                <span
+                                                                                    key={fIdx}
+                                                                                    className={`inline-flex items-center justify-center w-4 h-4 rounded text-[9px] font-bold border ${pillStyles}`}
+                                                                                >
+                                                                                    {res}
+                                                                                </span>
+                                                                            );
+                                                                        })}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-muted-foreground/40">—</span>
+                                                                )}
+                                                            </td>
+                                                        </>
+                                                    )}
+                                                </tr>
+
+                                                {/* Tap-to-Expand Full Team Stats Drawer on Mobile */}
+                                                {isExpanded && (
+                                                    <tr className="bg-surface-2/60 border-b border-border">
+                                                        <td colSpan={colSpanCount} className="px-3 py-2.5">
+                                                            <div className="flex flex-col gap-2">
+                                                                <div className="grid grid-cols-5 gap-1.5 text-center">
+                                                                    <div className="bg-surface-1 rounded-lg p-1.5 border border-border">
+                                                                        <div className="text-[9px] uppercase text-muted-foreground font-bold">W - D - L</div>
+                                                                        <div className="text-xs font-extrabold text-foreground mt-0.5">
+                                                                            {row.won}-{row.drawn}-{row.lost}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="bg-surface-1 rounded-lg p-1.5 border border-border">
+                                                                        <div className="text-[9px] uppercase text-muted-foreground font-bold">GF : GA</div>
+                                                                        <div className="text-xs font-extrabold text-foreground mt-0.5">
+                                                                            {row.goals_for ?? 0}:{row.goals_against ?? 0}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="bg-surface-1 rounded-lg p-1.5 border border-border">
+                                                                        <div className="text-[9px] uppercase text-muted-foreground font-bold">GD</div>
+                                                                        <div className={`text-xs font-extrabold mt-0.5 ${gdColorClass}`}>
+                                                                            {row.goal_difference > 0 ? `+${row.goal_difference}` : row.goal_difference}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="bg-surface-1 rounded-lg p-1.5 border border-border">
+                                                                        <div className="text-[9px] uppercase text-muted-foreground font-bold">PPG</div>
+                                                                        <div className="text-xs font-extrabold text-foreground mt-0.5">
+                                                                            {rowPpg}
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="bg-surface-1 rounded-lg p-1.5 border border-brand/30">
+                                                                        <div className="text-[9px] uppercase text-brand font-bold">Points</div>
+                                                                        <div className="text-xs font-black text-foreground mt-0.5">
+                                                                            {row.points}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* ================================================================= */}
+                {/* DESKTOP STANDINGS TABLE (>= 768px) — 100% UNTOUCHED               */}
+                {/* ================================================================= */}
+                <Card className="hidden md:block border-border bg-surface-1">
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
@@ -1570,17 +2173,7 @@ export default function LeagueTablePage() {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {[...currentTable]
-                                        .sort((a, b) => {
-                                            const getVal = (r: LeagueRow) => {
-                                                if (sortField === 'ppg') return r.played > 0 ? r.points / r.played : 0;
-                                                return Number((r as any)[sortField] ?? 0);
-                                            };
-                                            const diff = getVal(a) - getVal(b);
-                                            if (diff !== 0) return sortDir === 'asc' ? diff : -diff;
-                                            return a.position - b.position;
-                                        })
-                                        .map((row, idx) => {
+                                    {sortedRows.map((row, idx) => {
                                             const isNextOpp =
                                                 nextOpponentInfo &&
                                                 !row.is_our_club &&
@@ -1722,15 +2315,15 @@ export default function LeagueTablePage() {
 
                 {/* Feature #7: 1-Click Social Media "Standings Graphic" Studio Modal */}
                 {showShareModal && (
-                    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-                        <div className="bg-surface-1 border border-border rounded-2xl max-w-2xl w-full p-5 sm:p-6 space-y-4 shadow-2xl my-auto">
+                    <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+                        <div className="bg-surface-1 border border-border rounded-2xl max-w-2xl w-full p-4 sm:p-6 space-y-3.5 sm:space-y-4 shadow-2xl my-auto">
                             <div className="flex items-center justify-between border-b border-border pb-3">
                                 <div>
-                                    <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
-                                        <Share2 className="h-5 w-5 text-brand" />
+                                    <h3 className="text-base sm:text-lg font-bold text-foreground flex items-center gap-2">
+                                        <Share2 className="h-4 w-4 sm:h-5 sm:w-5 text-brand" />
                                         <span>Share League Table Graphic</span>
                                     </h3>
-                                    <p className="text-xs text-muted-foreground">
+                                    <p className="text-[11px] sm:text-xs text-muted-foreground">
                                         Ready for Instagram Stories, WhatsApp Squad Chats, or X/Twitter.
                                     </p>
                                 </div>
@@ -1740,51 +2333,51 @@ export default function LeagueTablePage() {
                             </div>
 
                             <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex items-center gap-1.5 bg-surface-2 p-1 rounded-lg border border-border">
+                                <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-lg border border-border w-full sm:w-auto">
                                     <button
                                         onClick={() => setGraphicFormat('post')}
-                                        className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${graphicFormat === 'post' ? 'bg-brand text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                                        className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${graphicFormat === 'post' ? 'bg-brand text-white' : 'text-muted-foreground hover:text-foreground'}`}
                                     >
                                         Feed Post (4:5)
                                     </button>
                                     <button
                                         onClick={() => setGraphicFormat('story')}
-                                        className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${graphicFormat === 'story' ? 'bg-brand text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                                        className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${graphicFormat === 'story' ? 'bg-brand text-white' : 'text-muted-foreground hover:text-foreground'}`}
                                     >
-                                        Instagram / WhatsApp Story (9:16)
+                                        Story (9:16)
                                     </button>
                                 </div>
 
-                                <div className="flex items-center gap-1.5 bg-surface-2 p-1 rounded-lg border border-border">
+                                <div className="flex items-center gap-1 bg-surface-2 p-1 rounded-lg border border-border w-full sm:w-auto">
                                     <button
                                         onClick={() => setGraphicScope('full')}
-                                        className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${graphicScope === 'full' ? 'bg-brand text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                                        className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${graphicScope === 'full' ? 'bg-brand text-white' : 'text-muted-foreground hover:text-foreground'}`}
                                     >
                                         Full Division ({currentTable.length})
                                     </button>
                                     <button
                                         onClick={() => setGraphicScope('top8')}
-                                        className={`px-3 py-1 rounded-md text-xs font-semibold transition-colors ${graphicScope === 'top8' ? 'bg-brand text-white' : 'text-muted-foreground hover:text-foreground'}`}
+                                        className={`flex-1 sm:flex-initial px-2.5 py-1 rounded-md text-xs font-semibold transition-colors ${graphicScope === 'top8' ? 'bg-brand text-white' : 'text-muted-foreground hover:text-foreground'}`}
                                     >
                                         Top 8 Spotlight
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="bg-black/50 border border-border rounded-xl p-3 flex justify-center max-h-[55vh] overflow-y-auto">
+                            <div className="bg-black/50 border border-border rounded-xl p-2.5 sm:p-3 flex justify-center max-h-[48vh] sm:max-h-[55vh] overflow-y-auto">
                                 <canvas
                                     ref={shareCanvasRef}
                                     className="max-w-full h-auto rounded-lg shadow-lg"
-                                    style={{ maxHeight: "50vh" }}
+                                    style={{ maxHeight: "44vh" }}
                                 />
                             </div>
 
-                            <div className="flex items-center justify-end gap-2.5 pt-2">
-                                <Button variant="outline" onClick={handleCopyGraphic}>
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 pt-1">
+                                <Button variant="outline" onClick={handleCopyGraphic} className="w-full sm:w-auto">
                                     <Copy className="h-4 w-4 mr-1.5" />
                                     {copiedGraphic ? "Copied to Clipboard!" : "Copy for WhatsApp / Social"}
                                 </Button>
-                                <Button onClick={handleDownloadGraphic} className="bg-brand hover:bg-brand/90 text-white font-semibold">
+                                <Button onClick={handleDownloadGraphic} className="bg-brand hover:bg-brand/90 text-white font-semibold w-full sm:w-auto">
                                     <Download className="h-4 w-4 mr-1.5" />
                                     Download PNG
                                 </Button>
@@ -1799,7 +2392,7 @@ export default function LeagueTablePage() {
     // One-Step "Paste Your League Once" Setup View
     return (
         <div
-            className="h-full flex flex-col gap-6 max-w-2xl mx-auto py-12"
+            className="h-full flex flex-col gap-5 md:gap-6 max-w-2xl mx-auto py-4 md:py-12 pb-20 md:pb-12"
             onPaste={handlePaste}
         >
             <div ref={hiddenFaContainerRef} className="hidden" aria-hidden="true" />
@@ -1811,12 +2404,12 @@ export default function LeagueTablePage() {
                 onChange={handleFileChange}
             />
 
-            <div className="text-center mb-2">
-                <div className="mx-auto h-16 w-16 bg-brand/10 rounded-full flex items-center justify-center mb-4">
-                    <Trophy className="h-8 w-8 text-brand" />
+            <div className="text-center mb-1 md:mb-2">
+                <div className="mx-auto h-14 w-14 md:h-16 md:w-16 bg-brand/10 rounded-full flex items-center justify-center mb-3 md:mb-4">
+                    <Trophy className="h-7 w-7 md:h-8 md:w-8 text-brand" />
                 </div>
-                <h2 className="text-3xl font-bold text-foreground tracking-tight">Set Up Your League Once</h2>
-                <p className="text-muted-foreground mt-2 text-sm sm:text-base max-w-lg mx-auto">
+                <h2 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">Set Up Your League Once</h2>
+                <p className="text-muted-foreground mt-2 text-xs sm:text-base max-w-lg mx-auto">
                     Paste your league website link or copy-paste your league table once below. ClubFlow will automatically keep your standings and league position updated from then on.
                 </p>
                 {currentTable && currentTable.length > 0 && (
@@ -1837,7 +2430,7 @@ export default function LeagueTablePage() {
             )}
 
             <Card className="border-border bg-surface-1 shadow-sm">
-                <CardContent className="p-6 space-y-4">
+                <CardContent className="p-4 sm:p-6 space-y-4">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                         <Label htmlFor="universal-league-input" className="text-sm font-semibold flex items-center gap-1.5">
                             <Sparkles className="h-4 w-4 text-brand" />
