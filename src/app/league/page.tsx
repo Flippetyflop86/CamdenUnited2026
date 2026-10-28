@@ -1377,20 +1377,19 @@ export default function LeagueTablePage() {
                                                 {/* Feature #6: Last 5 Form Pills */}
                                                 <td className="px-4 py-3 text-center whitespace-nowrap">
                                                     {formItems.length > 0 ? (
-                                                        <div className="inline-flex items-center gap-1.5">
+                                                        <div className="inline-flex items-center gap-1">
                                                             {formItems.map((res, fIdx) => {
-                                                                const isLatest = fIdx === formItems.length - 1;
                                                                 const pillStyles =
                                                                     res === 'W'
-                                                                        ? 'bg-emerald-600 text-white border-emerald-700'
+                                                                        ? 'bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border-emerald-500/45'
                                                                         : res === 'D'
-                                                                            ? 'bg-amber-500 text-white border-amber-600'
-                                                                            : 'bg-rose-600 text-white border-rose-700';
+                                                                            ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/45'
+                                                                            : 'bg-rose-500/20 text-rose-700 dark:text-rose-300 border-rose-500/45';
                                                                 return (
                                                                     <span
                                                                         key={fIdx}
-                                                                        className={`inline-flex items-center justify-center w-6 h-6 rounded-md text-[11px] font-extrabold border shadow-xs ${pillStyles} ${isLatest ? 'ring-2 ring-offset-1 ring-foreground/25 scale-105' : ''}`}
-                                                                        title={isLatest ? `Latest match: ${res}` : res}
+                                                                        className={`inline-flex items-center justify-center w-5 h-5 rounded text-[11px] font-bold border ${pillStyles}`}
+                                                                        title={fIdx === formItems.length - 1 ? `Latest match: ${res}` : res}
                                                                     >
                                                                         {res}
                                                                     </span>
