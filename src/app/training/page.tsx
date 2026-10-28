@@ -46,6 +46,15 @@ function formatSquad(squad: string) {
     return squad;
 }
 
+function getPositionGroup(pos?: string): "GK" | "DEF" | "MID" | "FWD" | "OTHER" {
+    const p = (pos || "").toUpperCase().trim();
+    if (["GK", "GOALKEEPER"].includes(p)) return "GK";
+    if (["DEF", "CB", "LCB", "RCB", "RB", "LB", "RWB", "LWB", "DEFENDER"].includes(p)) return "DEF";
+    if (["MID", "CM", "CDM", "CAM", "RM", "LM", "MIDFIELDER"].includes(p)) return "MID";
+    if (["FWD", "ST", "CF", "RW", "LW", "FORWARD", "STRIKER", "WINGER"].includes(p)) return "FWD";
+    return "OTHER";
+}
+
 export default function TrainingPage() {
     const { settings } = useClub();
     const searchParams = useSearchParams();
@@ -87,6 +96,18 @@ export default function TrainingPage() {
 
     const [squadFilter, setSquadFilter] = useState<string>("All");
     const [timeFilter, setTimeFilter] = useState<"upcoming" | "past" | "all">("upcoming");
+    const [positionFilter, setPositionFilter] = useState<"ALL" | "GK" | "DEF" | "MID" | "FWD">("ALL");
+    const [attendanceSortBy, setAttendanceSortBy] = useState<"player" | "squad" | "attended" | "late" | "last5" | "percentage">("percentage");
+    const [attendanceSortDir, setAttendanceSortDir] = useState<"asc" | "desc">("desc");
+
+    const handleAttendanceSort = (col: "player" | "squad" | "attended" | "late" | "last5" | "percentage") => {
+        if (attendanceSortBy === col) {
+            setAttendanceSortDir(prev => (prev === "asc" ? "desc" : "asc"));
+        } else {
+            setAttendanceSortBy(col);
+            setAttendanceSortDir(col === "player" || col === "squad" ? "asc" : "desc");
+        }
+    };
 
     // WhatsApp Generated Availability Poll State
     const [activeShareSession, setActiveShareSession] = useState<TrainingSession | null>(null);
@@ -317,6 +338,7 @@ export default function TrainingPage() {
 
     const getSessionAttendanceStats = (session: TrainingSession) => {
         const regAttendedCount = session.attendance.filter(a => !a.playerId.startsWith('guest:') && (a.status === 'Present' || a.status === 'Late')).length;
+        const lateCount = session.attendance.filter(a => !a.playerId.startsWith('guest:') && a.status === 'Late').length;
         const trialistAttendedCount = session.attendance.filter(a => a.playerId.startsWith('guest:') && (a.status === 'Present' || a.status === 'Late')).length;
 
         const eligiblePlayers = players.filter(p => {
@@ -328,7 +350,7 @@ export default function TrainingPage() {
         });
         const totalEligible = eligiblePlayers.length;
         const percentage = totalEligible > 0 ? Math.round((regAttendedCount / totalEligible) * 100) : 0;
-        return { regAttendedCount, trialistAttendedCount, totalEligible, percentage };
+        return { regAttendedCount, lateCount, trialistAttendedCount, totalEligible, percentage };
     };
 
     const filteredSessions = sessions.filter(s => squadFilter === "All" || s.squad === squadFilter);
@@ -497,29 +519,102 @@ export default function TrainingPage() {
         });
     });
 
-    const playerStats = leaderboardPlayers
+    const allPlayerStats = leaderboardPlayers
         .map(player => {
             const playerIsFormer = isFormerPlayer(player);
             const depDate = player.departureDate;
-            const relevantSessions = playerIsFormer
+            const relevantSessions = (playerIsFormer
                 ? leaderboardSessions.filter(s => {
                     const hasRec = s.attendance.some(a => a.playerId === player.id && (a.status === 'Present' || a.status === 'Late'));
                     if (hasRec) return true;
                     return depDate ? s.date <= depDate : false;
                 })
-                : leaderboardSessions;
+                : leaderboardSessions
+            ).slice().sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
             const attended = relevantSessions.filter(s => {
                 const record = s.attendance.find(a => a.playerId === player.id);
                 return record?.status === 'Present' || record?.status === 'Late';
             }).length;
 
+            const late = relevantSessions.filter(s => {
+                const record = s.attendance.find(a => a.playerId === player.id);
+                return record?.status === 'Late';
+            }).length;
+
+            const last5 = relevantSessions.slice(-5).map(s => {
+                const record = s.attendance.find(a => a.playerId === player.id);
+                const status: 'Present' | 'Late' | 'Absent' =
+                    record?.status === 'Present'
+                        ? 'Present'
+                        : record?.status === 'Late'
+                        ? 'Late'
+                        : 'Absent';
+                return {
+                    id: s.id,
+                    date: s.date,
+                    topic: s.topic || 'General Preparation',
+                    status
+                };
+            });
+
+            const last5Attended = last5.filter(item => item.status === 'Present' || item.status === 'Late').length;
+
+            let streak = 0;
+            for (let i = relevantSessions.length - 1; i >= 0; i--) {
+                const rec = relevantSessions[i].attendance.find(a => a.playerId === player.id);
+                if (rec?.status === 'Present' || rec?.status === 'Late') {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+
             const total = relevantSessions.length;
             const percentage = total > 0 ? Math.round((attended / total) * 100) : 0;
+            const posGroup = getPositionGroup(player.position);
 
-            return { ...player, stats: { attended, total, percentage } };
-        })
-        .sort((a, b) => b.stats.percentage - a.stats.percentage); // Sort by %
+            return {
+                ...player,
+                posGroup,
+                stats: { attended, late, total, percentage, last5, last5Attended, streak }
+            };
+        });
+
+    const positionCounts = {
+        ALL: allPlayerStats.length,
+        GK: allPlayerStats.filter(p => p.posGroup === "GK").length,
+        DEF: allPlayerStats.filter(p => p.posGroup === "DEF").length,
+        MID: allPlayerStats.filter(p => p.posGroup === "MID").length,
+        FWD: allPlayerStats.filter(p => p.posGroup === "FWD").length,
+    };
+
+    const playerStats = allPlayerStats
+        .filter(p => positionFilter === "ALL" || p.posGroup === positionFilter)
+        .sort((a, b) => {
+            const mult = attendanceSortDir === "asc" ? 1 : -1;
+            if (attendanceSortBy === "player") {
+                return mult * (`${a.firstName} ${a.lastName}`).localeCompare(`${b.firstName} ${b.lastName}`);
+            }
+            if (attendanceSortBy === "squad") {
+                return mult * formatSquad(a.squad).localeCompare(formatSquad(b.squad));
+            }
+            if (attendanceSortBy === "attended") {
+                if (a.stats.attended !== b.stats.attended) return mult * (a.stats.attended - b.stats.attended);
+                return b.stats.percentage - a.stats.percentage;
+            }
+            if (attendanceSortBy === "late") {
+                if (a.stats.late !== b.stats.late) return mult * (a.stats.late - b.stats.late);
+                return b.stats.attended - a.stats.attended;
+            }
+            if (attendanceSortBy === "last5") {
+                if (a.stats.last5Attended !== b.stats.last5Attended) return mult * (a.stats.last5Attended - b.stats.last5Attended);
+                return b.stats.percentage - a.stats.percentage;
+            }
+            // default: percentage
+            if (a.stats.percentage !== b.stats.percentage) return mult * (a.stats.percentage - b.stats.percentage);
+            return mult * (a.stats.attended - b.stats.attended);
+        });
 
     const downloadStatsExcel = () => {
         // Calculate average attendance rate
@@ -835,33 +930,86 @@ export default function TrainingPage() {
                     {/* Historical Record */}
                     {displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]).length > 0 && (
                         <PageSection>
-                            <SectionHeader title="Historical Record" description="Past sessions and attendance records." />
-                            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 opacity-75">
+                            <SectionHeader title="Historical Record" description="Past sessions, squad turnout %, punctuality, and trialist records." />
+                            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                                 {displaySessions
                                     .filter(s => s.date < new Date().toISOString().split("T")[0])
-                                    .map((session) => (
-                                    <Card 
-                                        key={session.id} 
-                                        onClick={() => window.location.href = `/training/${session.id}`}
-                                        className="hover:shadow-sm cursor-pointer border-border bg-surface-1"
-                                    >
-                                        <CardHeader className="pb-2">
-                                            <div className="flex justify-between items-start">
-                                                <CardTitle className="text-base text-foreground">{session.topic || "General Preparation"}</CardTitle>
-                                                <span className="text-xs font-semibold text-muted-foreground">{formatSquad(session.squad)}</span>
-                                            </div>
-                                            <CardDescription className="flex items-center gap-1">
-                                                {formatDate(session.date)}
-                                            </CardDescription>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                                                <span className="h-4 w-4 rounded-full bg-status-success/20 text-status-success flex items-center justify-center font-bold text-[10px]">✓</span>
-                                                {getSessionAttendanceStats(session).regAttendedCount} Attended
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ))}
+                                    .map((session) => {
+                                        const stats = getSessionAttendanceStats(session);
+                                        const turnoutTier =
+                                            stats.percentage >= 75
+                                                ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/35"
+                                                : stats.percentage >= 50
+                                                ? "bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/35"
+                                                : "bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/35";
+                                        const barColor =
+                                            stats.percentage >= 75
+                                                ? "bg-emerald-500"
+                                                : stats.percentage >= 50
+                                                ? "bg-amber-500"
+                                                : "bg-rose-500";
+
+                                        return (
+                                            <Card 
+                                                key={session.id} 
+                                                onClick={() => window.location.href = `/training/${session.id}`}
+                                                className="hover:shadow-md transition-all cursor-pointer border-border bg-card hover:bg-surface-1/60 group"
+                                            >
+                                                <CardHeader className="pb-2.5">
+                                                    <div className="flex justify-between items-start gap-2">
+                                                        <CardTitle className="text-base font-bold text-foreground group-hover:text-brand transition-colors line-clamp-1">
+                                                            {session.topic || "General Preparation"}
+                                                        </CardTitle>
+                                                        <Badge variant="secondary" className="bg-surface-1 text-muted-foreground border-border text-[11px] shrink-0">
+                                                            {formatSquad(session.squad)}
+                                                        </Badge>
+                                                    </div>
+                                                    <CardDescription className="flex items-center gap-1.5 text-xs font-medium">
+                                                        <CalendarDays className="h-3 w-3 text-muted-foreground shrink-0" />
+                                                        <span>{formatDate(session.date)} • {formatTime12h(session.time).time}</span>
+                                                        {session.location && (
+                                                            <>
+                                                                <span>•</span>
+                                                                <span className="truncate max-w-[130px]">{session.location}</span>
+                                                            </>
+                                                        )}
+                                                    </CardDescription>
+                                                </CardHeader>
+                                                <CardContent className="space-y-2.5 pt-0">
+                                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                                        <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                                                            <span className="h-4 w-4 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 flex items-center justify-center font-bold text-[10px]">✓</span>
+                                                            <span>
+                                                                {stats.regAttendedCount}
+                                                                <span className="text-muted-foreground font-normal">/{stats.totalEligible} Attended</span>
+                                                            </span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            {stats.lateCount > 0 && (
+                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/35">
+                                                                    🕒 {stats.lateCount} Late
+                                                                </span>
+                                                            )}
+                                                            {stats.trialistAttendedCount > 0 && (
+                                                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/35">
+                                                                    +{stats.trialistAttendedCount} Trialist{stats.trialistAttendedCount > 1 ? 's' : ''}
+                                                                </span>
+                                                            )}
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold border ${turnoutTier}`}>
+                                                                {stats.percentage}% Turnout
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                    <div className="w-full bg-surface-1 border border-border rounded-full h-1.5 overflow-hidden">
+                                                        <div
+                                                            className={`h-full transition-all ${barColor}`}
+                                                            style={{ width: `${Math.min(100, stats.percentage)}%` }}
+                                                        />
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
                             </div>
                         </PageSection>
                     )}
@@ -878,33 +1026,142 @@ export default function TrainingPage() {
                 </div>
             ) : (
                 <Card className="border-border shadow-sm overflow-hidden">
-                    <CardHeader className="bg-surface-1 border-b border-border">
-                        <div className="flex items-center justify-between">
+                    <CardHeader className="bg-surface-1 border-b border-border space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
                                 <CardTitle>Training Attendance</CardTitle>
-                                <CardDescription>Tracking {displaySeasonLabel}</CardDescription>
+                                <CardDescription>Tracking {displaySeasonLabel} • Click any column header to sort</CardDescription>
                             </div>
                             <div className="flex items-center gap-4">
                                 <Button variant="outline" size="sm" onClick={downloadStatsExcel} className="border-border">
                                     <Download className="h-4 w-4 mr-2" /> Export Excel
                                 </Button>
                                 <div className="text-right">
-                                    <p className="text-sm font-medium text-muted-foreground">Total Sessions</p>
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Sessions</p>
                                     <p className="text-2xl font-bold text-foreground">{leaderboardSessions.length}</p>
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Position Filter Pills + Last 5 Legend */}
+                        <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                {([
+                                    { key: "ALL", label: "All Positions", count: positionCounts.ALL },
+                                    { key: "GK", label: "GK", count: positionCounts.GK },
+                                    { key: "DEF", label: "DEF", count: positionCounts.DEF },
+                                    { key: "MID", label: "MID", count: positionCounts.MID },
+                                    { key: "FWD", label: "FWD", count: positionCounts.FWD },
+                                ] as const).map((pos) => {
+                                    const active = positionFilter === pos.key;
+                                    return (
+                                        <button
+                                            key={pos.key}
+                                            type="button"
+                                            onClick={() => setPositionFilter(pos.key)}
+                                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold transition-all border ${
+                                                active
+                                                    ? "bg-brand text-white border-brand shadow-xs"
+                                                    : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-surface-1"
+                                            }`}
+                                        >
+                                            <span>{pos.label}</span>
+                                            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${active ? "bg-white/20 text-white" : "bg-surface-1 text-muted-foreground"}`}>
+                                                {pos.count}
+                                            </span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="flex items-center gap-3 text-[11px] font-medium text-muted-foreground">
+                                <span className="inline-flex items-center gap-1">
+                                    <span className="w-4 h-4 rounded text-[10px] font-bold inline-flex items-center justify-center bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/45">✓</span>
+                                    Present
+                                </span>
+                                <span className="inline-flex items-center gap-1">
+                                    <span className="w-4 h-4 rounded text-[10px] font-bold inline-flex items-center justify-center bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/45">L</span>
+                                    Late
+                                </span>
+                                <span className="inline-flex items-center gap-1">
+                                    <span className="w-4 h-4 rounded text-[10px] font-bold inline-flex items-center justify-center bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/45">×</span>
+                                    Absent
+                                </span>
                             </div>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm text-left">
-                                <thead className="bg-surface-1 text-muted-foreground uppercase font-semibold text-xs border-b border-border">
+                                <thead className="bg-surface-1 text-muted-foreground uppercase font-semibold text-xs border-b border-border select-none">
                                     <tr>
-                                        <th className="px-6 py-4">Player</th>
-                                        <th className="px-6 py-4">Squad</th>
-                                        <th className="px-6 py-4 text-center">Attended</th>
-                                        <th className="px-6 py-4 text-center">Attendance %</th>
-                                        <th className="px-6 py-4">Progress</th>
+                                        <th
+                                            onClick={() => handleAttendanceSort("player")}
+                                            className="px-6 py-3.5 cursor-pointer hover:text-foreground transition-colors"
+                                        >
+                                            <span className="inline-flex items-center gap-1">
+                                                Player
+                                                <span className="text-[10px] opacity-70">
+                                                    {attendanceSortBy === "player" ? (attendanceSortDir === "asc" ? "▲" : "▼") : "↕"}
+                                                </span>
+                                            </span>
+                                        </th>
+                                        <th
+                                            onClick={() => handleAttendanceSort("squad")}
+                                            className="px-4 py-3.5 cursor-pointer hover:text-foreground transition-colors hidden md:table-cell"
+                                        >
+                                            <span className="inline-flex items-center gap-1">
+                                                Squad
+                                                <span className="text-[10px] opacity-70">
+                                                    {attendanceSortBy === "squad" ? (attendanceSortDir === "asc" ? "▲" : "▼") : "↕"}
+                                                </span>
+                                            </span>
+                                        </th>
+                                        <th
+                                            onClick={() => handleAttendanceSort("attended")}
+                                            className="px-4 py-3.5 text-center cursor-pointer hover:text-foreground transition-colors"
+                                        >
+                                            <span className="inline-flex items-center justify-center gap-1">
+                                                Attended
+                                                <span className="text-[10px] opacity-70">
+                                                    {attendanceSortBy === "attended" ? (attendanceSortDir === "asc" ? "▲" : "▼") : "↕"}
+                                                </span>
+                                            </span>
+                                        </th>
+                                        <th
+                                            onClick={() => handleAttendanceSort("late")}
+                                            className="px-4 py-3.5 text-center cursor-pointer hover:text-foreground transition-colors hidden sm:table-cell"
+                                        >
+                                            <span className="inline-flex items-center justify-center gap-1">
+                                                Late
+                                                <span className="text-[10px] opacity-70">
+                                                    {attendanceSortBy === "late" ? (attendanceSortDir === "asc" ? "▲" : "▼") : "↕"}
+                                                </span>
+                                            </span>
+                                        </th>
+                                        <th
+                                            onClick={() => handleAttendanceSort("last5")}
+                                            className="px-4 py-3.5 text-center cursor-pointer hover:text-foreground transition-colors"
+                                        >
+                                            <span className="inline-flex items-center justify-center gap-1">
+                                                Last 5 Sessions
+                                                <span className="text-[10px] opacity-70">
+                                                    {attendanceSortBy === "last5" ? (attendanceSortDir === "asc" ? "▲" : "▼") : "↕"}
+                                                </span>
+                                            </span>
+                                        </th>
+                                        <th
+                                            onClick={() => handleAttendanceSort("percentage")}
+                                            className="px-4 py-3.5 text-center cursor-pointer hover:text-foreground transition-colors"
+                                        >
+                                            <span className="inline-flex items-center justify-center gap-1">
+                                                Attendance %
+                                                <span className="text-[10px] opacity-70">
+                                                    {attendanceSortBy === "percentage" ? (attendanceSortDir === "asc" ? "▲" : "▼") : "↕"}
+                                                </span>
+                                            </span>
+                                        </th>
+                                        <th className="px-6 py-3.5 hidden lg:table-cell">Progress</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-border">
@@ -913,22 +1170,74 @@ export default function TrainingPage() {
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     <Avatar className="h-8 w-8 ring-1 ring-border">
-                                                        <AvatarImage src={settings?.logo || player.imageUrl} />
+                                                        <AvatarImage src={player.imageUrl || settings?.logo || undefined} />
                                                         <AvatarFallback className="bg-surface-1 text-muted-foreground">{player.firstName[0]}{player.lastName[0]}</AvatarFallback>
                                                     </Avatar>
-                                                    <span className="font-bold text-foreground">{player.firstName} {player.lastName}</span>
+                                                    <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="font-bold text-foreground">{player.firstName} {player.lastName}</span>
+                                                        {player.position && (
+                                                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold uppercase bg-surface-1 text-muted-foreground border border-border">
+                                                                {player.position}
+                                                            </span>
+                                                        )}
+                                                        {player.stats.streak >= 5 && (
+                                                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35">
+                                                                🔥 {player.stats.streak} Streak
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-muted-foreground font-medium">{formatSquad(player.squad)}</td>
-                                            <td className="px-6 py-4 text-center">
+                                            <td className="px-4 py-4 text-muted-foreground font-medium hidden md:table-cell">{formatSquad(player.squad)}</td>
+                                            <td className="px-4 py-4 text-center">
                                                 <div className="font-bold text-foreground">{player.stats.attended}<span className="text-muted-foreground font-normal">/{player.stats.total}</span></div>
                                             </td>
-                                            <td className="px-6 py-4 text-center">
+                                            <td className="px-4 py-4 text-center hidden sm:table-cell">
+                                                {player.stats.late > 0 ? (
+                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/35">
+                                                        {player.stats.late}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground font-medium">0</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-4 text-center">
+                                                <div className="inline-flex items-center justify-center gap-1">
+                                                    {player.stats.last5.length > 0 ? (
+                                                        player.stats.last5.map((sessionItem) => {
+                                                            const pillStyle =
+                                                                sessionItem.status === "Present"
+                                                                    ? "bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/45"
+                                                                    : sessionItem.status === "Late"
+                                                                    ? "bg-amber-500/20 text-amber-700 dark:text-amber-300 border border-amber-500/45"
+                                                                    : "bg-rose-500/20 text-rose-700 dark:text-rose-300 border border-rose-500/45";
+                                                            const symbol =
+                                                                sessionItem.status === "Present"
+                                                                    ? "✓"
+                                                                    : sessionItem.status === "Late"
+                                                                    ? "L"
+                                                                    : "×";
+                                                            return (
+                                                                <span
+                                                                    key={sessionItem.id}
+                                                                    title={`${formatDate(sessionItem.date)} • ${sessionItem.topic}: ${sessionItem.status}`}
+                                                                    className={`w-5 h-5 rounded text-[11px] font-bold inline-flex items-center justify-center select-none ${pillStyle}`}
+                                                                >
+                                                                    {symbol}
+                                                                </span>
+                                                            );
+                                                        })
+                                                    ) : (
+                                                        <span className="text-xs text-muted-foreground">—</span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4 text-center">
                                                 <Badge variant="secondary" className={`${player.stats.percentage >= 80 ? 'bg-status-success/10 text-status-success' : player.stats.percentage >= 50 ? 'bg-status-warning/10 text-status-warning' : 'bg-status-error/10 text-status-error'}`}>
                                                     {player.stats.percentage}%
                                                 </Badge>
                                             </td>
-                                            <td className="px-6 py-4">
+                                            <td className="px-6 py-4 hidden lg:table-cell">
                                                 <div className="w-full bg-surface-1 border border-border rounded-full h-2 overflow-hidden">
                                                     <div
                                                         className={`h-full ${player.stats.percentage >= 80 ? 'bg-status-success' : player.stats.percentage >= 50 ? 'bg-status-warning' : 'bg-status-error'}`}
@@ -940,8 +1249,8 @@ export default function TrainingPage() {
                                     ))}
                                     {playerStats.length === 0 && (
                                         <tr>
-                                            <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground font-medium">
-                                                No training stats available for this season yet.
+                                            <td colSpan={7} className="px-6 py-12 text-center text-muted-foreground font-medium">
+                                                No training stats available for this filter yet.
                                             </td>
                                         </tr>
                                     )}
