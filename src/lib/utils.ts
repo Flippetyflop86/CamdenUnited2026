@@ -88,6 +88,42 @@ export function isFormerPlayer(player: any): boolean {
     return parsePlayerDeparture(player).isFormer;
 }
 
+export function normalizeSquadKey(squad?: string | null): string {
+    const clean = (squad || "").trim().toLowerCase().replace(/[\s-_]+/g, "");
+    if (clean === "firstteam") return "firstteam";
+    if (clean === "midweek" || clean === "midweekteam") return "midweek";
+    if (clean === "youth" || clean === "youthteam") return "youth";
+    return clean;
+}
+
+export function findMatchingActiveSquad(
+    playerSquadRaw: string | undefined | null,
+    activeSquads: string[] | undefined | null
+): string | null {
+    if (!playerSquadRaw || !activeSquads || activeSquads.length === 0) return null;
+    const playerSquadParts = playerSquadRaw
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+    for (const part of playerSquadParts) {
+        const partKey = normalizeSquadKey(part);
+        const match = activeSquads.find((active) => normalizeSquadKey(active) === partKey);
+        if (match) return match;
+    }
+    return null;
+}
+
+export function isPlayerInDeletedSquad(
+    playerSquadRaw: string | undefined | null,
+    activeSquads: string[] | undefined | null
+): boolean {
+    if (!playerSquadRaw || !playerSquadRaw.trim()) return false;
+    if (!activeSquads || activeSquads.length === 0) return false;
+    const trimmed = playerSquadRaw.trim().toLowerCase();
+    if (trimmed === "trialist" || trimmed === "all") return false;
+    return findMatchingActiveSquad(playerSquadRaw, activeSquads) === null;
+}
+
 export function stripDepartureTags(notes?: string): string {
     if (!notes) return "";
     return notes

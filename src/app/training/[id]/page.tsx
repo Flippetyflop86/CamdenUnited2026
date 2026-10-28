@@ -10,7 +10,8 @@ import { ArrowLeft, CalendarDays, MapPin, Clock, Download, Share2, Link2, Messag
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
-import { isFormerPlayer } from "@/lib/utils";
+import { isFormerPlayer, isPlayerInDeletedSquad, parsePlayerDeparture } from "@/lib/utils";
+import { useClub } from "@/context/club-context";
 
 function formatSquad(squad: string) {
     if (squad === "firstTeam") return "First Team";
@@ -37,6 +38,8 @@ function formatFriendlyDate(dateStr: string) {
 
 export default function TrainingSessionPage() {
     const routeParams = useParams();
+    const { settings } = useClub();
+    const currentSquads = settings.squads || ["First Team"];
     const [session, setSession] = useState<TrainingSession | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
     const [loading, setLoading] = useState(true);
@@ -60,28 +63,41 @@ export default function TrainingSessionPage() {
                 ]);
 
                 if (playersRes.data) {
-                    const mappedPlayers: Player[] = playersRes.data.map((p: any) => ({
-                        id: p.id,
-                        firstName: p.first_name,
-                        lastName: p.last_name,
-                        position: p.position,
-                        squadNumber: p.squad_number,
-                        age: p.age,
-                        nationality: p.nationality,
-                        squad: p.squad,
-                        medicalStatus: p.medical_status,
-                        holidayStart: p.holiday_start,
-                        holidayEnd: p.holiday_end,
-                        availability: p.availability,
-                        contractExpiry: p.contract_expiry,
-                        imageUrl: p.image_url,
-                        appearances: p.appearances,
-                        goals: p.goals,
-                        assists: p.assists,
-                        dateOfBirth: p.date_of_birth,
-                        notes: p.notes,
-                        isInTrainingSquad: p.is_in_training_squad
-                    }));
+                    const mappedPlayers: Player[] = playersRes.data.map((p: any) => {
+                        const parsedDep = parsePlayerDeparture(p);
+                        const fullNameLower = `${p.first_name || ""} ${p.last_name || ""}`.trim().toLowerCase();
+                        const isExplicitJahazi = fullNameLower === "mohammed jahazi";
+                        return {
+                            id: p.id,
+                            firstName: p.first_name,
+                            lastName: p.last_name,
+                            position: p.position,
+                            squadNumber: p.squad_number,
+                            age: p.age,
+                            nationality: p.nationality,
+                            squad: p.squad,
+                            medicalStatus: p.medical_status,
+                            holidayStart: p.holiday_start,
+                            holidayEnd: p.holiday_end,
+                            availability: p.availability,
+                            contractExpiry: p.contract_expiry,
+                            imageUrl: p.image_url,
+                            appearances: p.appearances,
+                            goals: p.goals,
+                            assists: p.assists,
+                            dateOfBirth: p.date_of_birth,
+                            notes: p.notes,
+                            isInTrainingSquad: p.is_in_training_squad,
+                            ...parsedDep,
+                            ...(isExplicitJahazi && !parsedDep.isFormer
+                                ? {
+                                      isFormer: true,
+                                      departureStatus: "Left club",
+                                      departureReason: "Left club",
+                                  }
+                                : {}),
+                        } as any;
+                    });
 
                     const mappedTrialists: Player[] = (recruitsRes.data || []).map((r: any) => {
                         const nameParts = (r.name || "").trim().split(/\s+/);
@@ -141,7 +157,7 @@ export default function TrainingSessionPage() {
                         };
                         
                         const eligible = allCombined.filter(p => {
-                            if (isFormerPlayer(p)) return false;
+                            if (isFormerPlayer(p) || isPlayerInDeletedSquad(p.squad, currentSquads)) return false;
                             if (isFirstTeamSession) {
                                 return isFirstTeam(p.squad) || p.isInTrainingSquad;
                             } else {
@@ -449,11 +465,17 @@ export default function TrainingSessionPage() {
 
     const eligiblePlayers = players
         .filter(p => {
-            // Show player if they have a recorded attendance status for this session (prevents trialists/other squads/former players on past sessions from being hidden)
+            const isFormerOrDeleted = isFormerPlayer(p) || isPlayerInDeletedSquad(p.squad, currentSquads);
+            if (isFormerOrDeleted) {
+                // Only keep a departed player on a past session card if they actually attended or were marked injured
+                return session.attendance.some(
+                    a => a.playerId === p.id && (a.status === 'Present' || a.status === 'Late' || a.status === 'Injured')
+                );
+            }
+
+            // Show active player if they have a recorded attendance status for this session
             const hasRecord = session.attendance.some(a => a.playerId === p.id);
             if (hasRecord) return true;
-
-            if (isFormerPlayer(p)) return false;
 
             const matchesSquad = isFirstTeamSession 
                 ? (isFirstTeam(p.squad) || p.isInTrainingSquad)
@@ -579,7 +601,7 @@ export default function TrainingSessionPage() {
                             const status = record?.status ?? 'Absent';
                             const isPresent = status === 'Present';
                             const isInjured = status === 'Injured';
-                            const hasPin = player.notes?.includes("[PIN:");
+                            const isFormerOrDeleted = isFormerPlayer(player) || isPlayerInDeletedSquad(player.squad, currentSquads);
 
                             // Compute percentage
                             const statRecord = attendanceStats[player.id];
@@ -628,6 +650,11 @@ export default function TrainingSessionPage() {
                                     <span className={`text-[11px] leading-tight ${isPresent ? 'text-green-100' : 'text-slate-500'}`}>
                                         {player.lastName}
                                     </span>
+                                    {isFormerOrDeleted && (
+                                        <span className="mt-0.5 px-1.5 py-0.2 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-800 border border-amber-400/50">
+                                            Left Club
+                                        </span>
+                                    )}
                                     <div className={`mt-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full
                                         ${isPresent ? 'bg-green-400 text-white' : isInjured ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
                                         {isPresent ? '✓ Here' : isInjured ? 'Injured' : 'Absent'}

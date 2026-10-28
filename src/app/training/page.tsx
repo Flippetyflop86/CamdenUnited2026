@@ -20,7 +20,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { PageSection } from "@/components/layout/page-section";
 import { SectionHeader } from "@/components/ui/section-header";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
-import { isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
+import {
+    findMatchingActiveSquad,
+    isFormerPlayer,
+    isPlayerInDeletedSquad,
+    parsePlayerDeparture,
+    serializeDepartureToNotes,
+} from "@/lib/utils";
 
 
 // I'll stick to native date formatting for zero-dep speed unless complex.
@@ -56,9 +62,10 @@ function getPositionGroup(pos?: string): "GK" | "DEF" | "MID" | "FWD" | "OTHER" 
 }
 
 export default function TrainingPage() {
-    const { settings } = useClub();
+    const { settings, isLoaded: isClubLoaded } = useClub();
     const searchParams = useSearchParams();
     const currentSquads = settings.squads || ["First Team"];
+    const healedDeletedSquadIdsRef = useRef<Set<string>>(new Set());
 
     const [sessions, setSessions] = useState<TrainingSession[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);
@@ -124,7 +131,7 @@ export default function TrainingPage() {
     const [isSavingStartDate, setIsSavingStartDate] = useState(false);
 
     // Active Squad Only toggle & Shareable Training Graphic Studio state
-    const [activeSquadOnly, setActiveSquadOnly] = useState<boolean>(true);
+    const [activeSquadOnly, setActiveSquadOnly] = useState<boolean>(false);
     const [showTrainingGraphicModal, setShowTrainingGraphicModal] = useState<boolean>(false);
     const [trainingGraphicFormat, setTrainingGraphicFormat] = useState<"post" | "story">("post");
     const [trainingGraphicScope, setTrainingGraphicScope] = useState<"top10" | "full">("top10");
@@ -176,15 +183,20 @@ export default function TrainingPage() {
     const fetchPlayers = async () => {
         const { data, error } = await supabase.from("players").select("*");
         if (!error && data) {
-            // Map simple fields needed for stats
             setPlayers(data.map((p: any) => {
-                const pSquadClean = p.squad?.toLowerCase().replace(/[\s-_]+/g, '') || '';
-                const activeSquadMatch = currentSquads.find(s => s.toLowerCase().replace(/[\s-_]+/g, '') === pSquadClean);
+                const matchedActiveSquad = findMatchingActiveSquad(p.squad, currentSquads);
+                const resolvedSquad = matchedActiveSquad || (p.squad ? formatSquad(p.squad) : (currentSquads[0] || "First Team"));
+                const fullNameLower = `${p.first_name || ""} ${p.last_name || ""}`.trim().toLowerCase();
+                const isExplicitJahazi = fullNameLower === "mohammed jahazi";
+                const parsedDep = parsePlayerDeparture(p);
+                const shouldMarkFormer = parsedDep.isFormer || isExplicitJahazi;
+
                 return {
                     id: p.id,
                     firstName: p.first_name,
                     lastName: p.last_name,
-                    squad: activeSquadMatch || currentSquads[0] || "First Team",
+                    squad: resolvedSquad,
+                    rawSquad: p.squad,
                     isInTrainingSquad: p.is_in_training_squad,
                     isInMatchdayTracker: p.is_in_matchday_tracker,
                     imageUrl: p.image_url,
@@ -192,11 +204,74 @@ export default function TrainingPage() {
                     squadNumber: p.squad_number,
                     medicalStatus: p.medical_status,
                     notes: p.notes,
-                    ...parsePlayerDeparture(p)
+                    ...parsedDep,
+                    ...(shouldMarkFormer && !parsedDep.isFormer
+                        ? {
+                              isFormer: true,
+                              departureStatus: "Left club",
+                              departureReason: "Left club",
+                          }
+                        : {}),
                 } as any;
             }));
         }
     };
+
+    // Auto-heal players whose registered squad was deleted from the club's active squads (or Mohammed Jahazi)
+    useEffect(() => {
+        if (!isClubLoaded || players.length === 0) return;
+        const activeSquadList = settings.squads && settings.squads.length > 0 ? settings.squads : ["First Team"];
+
+        const playersToHeal = players.filter((p: any) => {
+            if (healedDeletedSquadIdsRef.current.has(p.id)) return false;
+            const fullNameLower = `${p.firstName || ""} ${p.lastName || ""}`.trim().toLowerCase();
+            const isExplicitJahazi = fullNameLower === "mohammed jahazi";
+            const rawSquadStr = p.rawSquad ?? p.squad;
+            const inDeletedSquad = isPlayerInDeletedSquad(rawSquadStr, activeSquadList);
+            if (!inDeletedSquad && !isExplicitJahazi) return false;
+            const alreadyTaggedInNotes = (p.notes || "").includes("[LEFT_STATUS:");
+            return !alreadyTaggedInNotes;
+        });
+
+        if (playersToHeal.length === 0) return;
+
+        playersToHeal.forEach((p: any) => healedDeletedSquadIdsRef.current.add(p.id));
+        const todayIso = new Date().toISOString().split("T")[0];
+
+        setPlayers((prev) =>
+            prev.map((p: any) => {
+                if (!playersToHeal.some((target) => target.id === p.id)) return p;
+                const updatedNotes = serializeDepartureToNotes(p.notes, {
+                    reason: "Left club",
+                    date: p.departureDate || todayIso,
+                });
+                return {
+                    ...p,
+                    notes: updatedNotes,
+                    isInTrainingSquad: false,
+                    isFormer: true,
+                    departureStatus: "Left club",
+                    departureReason: "Left club",
+                    departureDate: p.departureDate || todayIso,
+                };
+            })
+        );
+
+        playersToHeal.forEach(async (p: any) => {
+            const updatedNotes = serializeDepartureToNotes(p.notes, {
+                reason: "Left club",
+                date: p.departureDate || todayIso,
+            });
+            await supabase
+                .from("players")
+                .update({
+                    notes: updatedNotes,
+                    availability: false,
+                    is_in_training_squad: false,
+                })
+                .eq("id", p.id);
+        });
+    }, [isClubLoaded, settings.squads, players]);
 
     // Note: Removed local storage save effect.
 
@@ -350,14 +425,18 @@ export default function TrainingPage() {
         return squad === "firstTeam" || squad === "First Team" || squad === currentSquads[0];
     };
 
+    const isPlayerFormerOrDeleted = (p: any) => {
+        return isFormerPlayer(p) || isPlayerInDeletedSquad(p?.rawSquad ?? p?.squad, currentSquads);
+    };
+
     const getSessionAttendanceStats = (session: TrainingSession) => {
         const regAttendedCount = session.attendance.filter(a => !a.playerId.startsWith('guest:') && (a.status === 'Present' || a.status === 'Late')).length;
         const lateCount = session.attendance.filter(a => !a.playerId.startsWith('guest:') && a.status === 'Late').length;
         const trialistAttendedCount = session.attendance.filter(a => a.playerId.startsWith('guest:') && (a.status === 'Present' || a.status === 'Late')).length;
 
         const eligiblePlayers = players.filter(p => {
-            const hasRecord = session.attendance.some(a => a.playerId === p.id);
-            if (isFormerPlayer(p) && !hasRecord) return false;
+            const attendedRecord = session.attendance.some(a => a.playerId === p.id && (a.status === 'Present' || a.status === 'Late'));
+            if (isPlayerFormerOrDeleted(p) && !attendedRecord) return false;
             return session.squad === "All" 
                 ? (isFirstTeamSquad(p.squad) || p.isInTrainingSquad) 
                 : (p.squad === session.squad || (session.squad === "First Team" && isFirstTeamSquad(p.squad)));
@@ -525,13 +604,13 @@ export default function TrainingPage() {
         .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     const leaderboardPlayers = (squadFilter === "All"
-        ? players.filter(p => isFirstTeamSquad(p.squad) || p.isInTrainingSquad)
-        : players.filter(p => p.squad === squadFilter || (squadFilter === "First Team" && isFirstTeamSquad(p.squad)))
+        ? players.filter(p => isFirstTeamSquad(p.squad) || p.isInTrainingSquad || isPlayerFormerOrDeleted(p))
+        : players.filter(p => p.squad === squadFilter || (squadFilter === "First Team" && isFirstTeamSquad(p.squad)) || (currentSquads.length <= 1 && isPlayerFormerOrDeleted(p)))
     ).filter(p => {
-        if (!isFormerPlayer(p)) return true;
+        if (!isPlayerFormerOrDeleted(p)) return true;
         return leaderboardSessions.some(s => {
             const record = s.attendance.find(a => a.playerId === p.id);
-            return record?.status === 'Present' || record?.status === 'Late';
+            return record?.status === 'Present' || record?.status === 'Late' || Boolean(record);
         });
     });
 
@@ -539,7 +618,7 @@ export default function TrainingPage() {
 
     const allPlayerStats = leaderboardPlayers
         .map(player => {
-            const playerIsFormer = isFormerPlayer(player);
+            const playerIsFormer = isPlayerFormerOrDeleted(player);
             const depDate = player.departureDate;
 
             // Determine when the player joined / first became part of the training register
@@ -1603,7 +1682,7 @@ export default function TrainingPage() {
                                                             </button>
                                                         )}
                                                         {player.playerIsFormer && (
-                                                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-1 text-muted-foreground border border-border">
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/35">
                                                                 Left Club
                                                             </span>
                                                         )}

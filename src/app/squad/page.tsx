@@ -7,6 +7,8 @@ import {
     DEPARTURE_REASONS,
     formatPlayerName,
     isFormerPlayer,
+    isPlayerInDeletedSquad,
+    normalizeSquadKey,
     parsePlayerDeparture,
     serializeDepartureToNotes,
     stripDepartureTags,
@@ -948,11 +950,14 @@ export default function SquadPage() {
         document.body.removeChild(link);
     };
 
-    const activeSquadPlayers = players.filter((p) => !isFormerPlayer(p));
-    const formerSquadPlayers = players.filter((p) => isFormerPlayer(p));
+    const isPlayerFormerOrDeletedSquad = (p: Player) =>
+        isFormerPlayer(p) || isPlayerInDeletedSquad(p.squad, currentSquads);
+
+    const activeSquadPlayers = players.filter((p) => !isPlayerFormerOrDeletedSquad(p));
+    const formerSquadPlayers = players.filter((p) => isPlayerFormerOrDeletedSquad(p));
 
     const filteredPlayers = players.filter((player) => {
-        const playerIsFormer = isFormerPlayer(player);
+        const playerIsFormer = isPlayerFormerOrDeletedSquad(player);
         if (squadViewMode === "active" && playerIsFormer) return false;
         if (squadViewMode === "former" && !playerIsFormer) return false;
 
@@ -964,14 +969,17 @@ export default function SquadPage() {
             player.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             player.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
             (player.departureReason || "").toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesSquad = activeTab === "All" || playerSquads.some((s: string) => {
-            const sClean = s.toLowerCase().replace(/[\s-_]+/g, '');
-            const tabClean = activeTab.toLowerCase().replace(/[\s-_]+/g, '');
-            // Handle common seed/db variants
-            if ((sClean === 'firstteam' || sClean === 'first team') && (tabClean === 'firstteam' || tabClean === 'first team')) return true;
-            if ((sClean === 'midweek' || sClean === 'midweek team') && (tabClean === 'midweek' || tabClean === 'midweek team')) return true;
-            return sClean === tabClean;
-        });
+        const matchesSquad =
+            activeTab === "All" ||
+            (squadViewMode === "former" && isPlayerInDeletedSquad(player.squad, currentSquads)) ||
+            playerSquads.some((s: string) => {
+                const sClean = s.toLowerCase().replace(/[\s-_]+/g, '');
+                const tabClean = activeTab.toLowerCase().replace(/[\s-_]+/g, '');
+                // Handle common seed/db variants
+                if ((sClean === 'firstteam' || sClean === 'first team') && (tabClean === 'firstteam' || tabClean === 'first team')) return true;
+                if ((sClean === 'midweek' || sClean === 'midweek team') && (tabClean === 'midweek' || tabClean === 'midweek team')) return true;
+                return sClean === tabClean;
+            });
         const matchesSinglePos = (posRaw: string) => {
             const p = (posRaw || "").trim().toUpperCase();
             if (!p) return false;
@@ -2826,6 +2834,44 @@ export default function SquadPage() {
                                 const cleanSquads = editingSquads.map(s => s.trim()).filter(Boolean);
                                 const finalSquads = cleanSquads.length > 0 ? cleanSquads : ["First Team"];
                                 await updateSettings({ squads: finalSquads });
+
+                                // Automatically update or mark players affected by deleted squads
+                                const todayIso = new Date().toISOString().split("T")[0];
+                                const finalKeys = new Set(finalSquads.map(s => normalizeSquadKey(s)));
+                                await Promise.all(
+                                    players.map(async (p) => {
+                                        if (!p.squad || isFormerPlayer(p)) return;
+                                        const parts = p.squad.split(",").map(s => s.trim()).filter(Boolean);
+                                        if (parts.length === 0) return;
+                                        const remainingParts = parts.filter(part => finalKeys.has(normalizeSquadKey(part)));
+                                        if (remainingParts.length === 0) {
+                                            // Player was registered only for the deleted squad -> mark as Left club
+                                            const updatedNotes = serializeDepartureToNotes(p.notes, {
+                                                reason: "Left club",
+                                                date: todayIso,
+                                            });
+                                            await supabase
+                                                .from("players")
+                                                .update({
+                                                    notes: updatedNotes,
+                                                    availability: false,
+                                                    is_in_training_squad: false,
+                                                    is_in_matchday_tracker: false,
+                                                })
+                                                .eq("id", p.id);
+                                        } else if (remainingParts.length !== parts.length) {
+                                            // Player belonged to multiple squads; keep only remaining active squads
+                                            await supabase
+                                                .from("players")
+                                                .update({
+                                                    squad: remainingParts.join(", "),
+                                                })
+                                                .eq("id", p.id);
+                                        }
+                                    })
+                                );
+                                await fetchData();
+
                                 if (!finalSquads.includes(activeTab) && activeTab !== "All") {
                                     setActiveTab(finalSquads[0] || "All");
                                 }
