@@ -68,8 +68,9 @@ export function FootballDataImportCentre({
                     body: JSON.stringify({ url: inputText, clubName: clubName || "Camden United" })
                 });
                 const data = await res.json();
-                if (data.success && data.fixtures) {
-                    const mapped = data.fixtures.map((f: any) => ({
+                const rawList = data.fixtures || data.matches;
+                if (data.success && Array.isArray(rawList) && rawList.length > 0) {
+                    const mapped = rawList.map((f: any) => ({
                         id: Math.random().toString(36).substring(2, 9),
                         date: f.date,
                         time: f.time || clubSettings?.defaultHomeKickOff || "14:00",
@@ -83,7 +84,9 @@ export function FootballDataImportCentre({
                     setPreviewData(mapped);
                     setIsPreviewOpen(true);
                 } else {
-                    alert(data.error || "Failed to fetch from URL");
+                    setActiveMode('paste');
+                    setInputText("");
+                    alert("FA Full-Time uses Cloudflare security to block automated link scrapers.\n\nWe've switched you to 'Paste Schedule Text' — simply highlight and copy the fixtures table on your FA Full-Time page and paste it directly into the box!");
                 }
             } else if (activeMode === 'csv') {
                 const lines = inputText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
