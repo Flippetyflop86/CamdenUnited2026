@@ -920,24 +920,32 @@ export default function DashboardPage() {
                             </div>
 
                             {nextMatch && (
-                                <div className="grid grid-cols-2 gap-2 pt-3 border-t border-border">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={copyMatchForWhatsApp}
-                                        className="h-8 text-xs font-semibold w-full truncate"
-                                    >
-                                        <Copy className="h-3.5 w-3.5 mr-1.5 shrink-0 text-emerald-500" />
-                                        <span className="truncate">
-                                            {copiedWhatsApp === "match" ? "Copied for WhatsApp!" : "WhatsApp Copy"}
-                                        </span>
-                                    </Button>
+                                <div className="space-y-2 pt-3 border-t border-border">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={copyMatchForWhatsApp}
+                                            className="h-8 text-xs font-semibold w-full truncate"
+                                        >
+                                            <Copy className="h-3.5 w-3.5 mr-1.5 shrink-0 text-emerald-500" />
+                                            <span className="truncate">
+                                                {copiedWhatsApp === "match" ? "Copied for WhatsApp!" : "WhatsApp Copy"}
+                                            </span>
+                                        </Button>
+                                        <Link
+                                            href="/matchday-xi"
+                                            className="h-8 px-3 rounded-md bg-brand hover:bg-brand/90 text-white text-xs font-bold inline-flex items-center justify-center gap-1 transition-colors"
+                                        >
+                                            Matchday XI <ArrowRight className="h-3.5 w-3.5" />
+                                        </Link>
+                                    </div>
                                     <Link
-                                        href="/matchday-xi"
-                                        className="h-8 px-3 rounded-md bg-brand hover:bg-brand/90 text-white text-xs font-bold inline-flex items-center justify-center gap-1 transition-colors"
+                                        href={`/opposition?team=${encodeURIComponent(nextMatch.opponent)}`}
+                                        className="h-7 w-full px-3 rounded-md bg-surface-2 hover:bg-accent border border-border text-foreground text-[11px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors"
                                     >
-                                        Matchday XI <ArrowRight className="h-3.5 w-3.5" />
+                                        📋 Opposition Scouting Report: {nextMatch.opponent}
                                     </Link>
                                 </div>
                             )}

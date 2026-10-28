@@ -215,32 +215,38 @@ export function NextMatchHero({
                     </div>
 
                     {/* Primary Mobile CTA Row */}
-                    <div className="grid grid-cols-2 gap-2 pt-0.5">
-                        <Button asChild size="sm" className="h-9 bg-brand hover:bg-brand/90 text-brand-foreground font-bold text-xs w-full">
+                    <div className="grid grid-cols-3 gap-1.5 pt-0.5">
+                        <Button asChild size="sm" className="h-9 bg-brand hover:bg-brand/90 text-brand-foreground font-bold text-xs w-full px-2">
                             <Link href={`/matchday-xi?match=${match.id}`}>
-                                <Users className="h-3.5 w-3.5 mr-1.5" />
-                                Matchday XI
+                                <Users className="h-3.5 w-3.5 mr-1 shrink-0" />
+                                <span className="truncate">Matchday XI</span>
+                            </Link>
+                        </Button>
+                        <Button asChild size="sm" variant="outline" className="h-9 bg-surface-2 hover:bg-surface-2/80 text-foreground border-border font-bold text-xs w-full px-2">
+                            <Link href={`/opposition?team=${encodeURIComponent(match.opponent)}`}>
+                                <FileText className="h-3.5 w-3.5 mr-1 text-brand shrink-0" />
+                                <span className="truncate">Scout Report</span>
                             </Link>
                         </Button>
                         {onQuickLogResult ? (
                             <Button
                                 size="sm"
                                 variant="secondary"
-                                className="h-9 bg-emerald-100/90 dark:bg-emerald-500/15 hover:bg-emerald-200/80 dark:hover:bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 border border-emerald-400/70 dark:border-emerald-500/30 font-bold text-xs w-full"
+                                className="h-9 bg-emerald-100/90 dark:bg-emerald-500/15 hover:bg-emerald-200/80 dark:hover:bg-emerald-500/25 text-emerald-800 dark:text-emerald-300 border border-emerald-400/70 dark:border-emerald-500/30 font-bold text-xs w-full px-2"
                                 onClick={() => onQuickLogResult(match)}
                             >
-                                <Trophy className="h-3.5 w-3.5 mr-1.5" />
-                                Log Result
+                                <Trophy className="h-3.5 w-3.5 mr-1 shrink-0" />
+                                <span className="truncate">Log Result</span>
                             </Button>
                         ) : (
                             <Button
                                 size="sm"
                                 variant="outline"
-                                className="h-9 text-xs font-bold w-full border-border"
+                                className="h-9 text-xs font-bold w-full border-border px-2"
                                 onClick={() => onShareMatch(match)}
                             >
-                                <Share2 className="h-3.5 w-3.5 mr-1.5" />
-                                WhatsApp Poll
+                                <Share2 className="h-3.5 w-3.5 mr-1 shrink-0" />
+                                <span className="truncate">Poll</span>
                             </Button>
                         )}
                     </div>
@@ -326,6 +332,18 @@ export function NextMatchHero({
                             <Link href={`/matchday-xi?match=${match.id}`}>
                                 <Users className="h-4 w-4 mr-1.5" />
                                 Matchday XI
+                            </Link>
+                        </Button>
+
+                        <Button
+                            asChild
+                            size="sm"
+                            variant="secondary"
+                            className="bg-surface-2 hover:bg-surface-2/80 text-foreground border border-border font-semibold"
+                        >
+                            <Link href={`/opposition?team=${encodeURIComponent(match.opponent)}`}>
+                                <FileText className="h-3.5 w-3.5 mr-1.5 text-brand" />
+                                Scouting Report
                             </Link>
                         </Button>
 
