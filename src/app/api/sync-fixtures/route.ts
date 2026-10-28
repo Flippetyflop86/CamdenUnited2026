@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
 
 function parseDateToken(raw: string): string | null {
     // 1. Long date e.g. "Saturday, 31 October 2026"
@@ -30,7 +31,17 @@ function parseDateToken(raw: string): string | null {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        let { url, clubName } = body;
+        let { url, clubName, clubId } = body;
+
+        const clientId = getClientIdentifier(request, clubId || clubName);
+        const rateLimit = checkRateLimit('sync-fixtures', clientId, 10);
+        if (!rateLimit.allowed) {
+            return NextResponse.json({
+                success: false,
+                errorType: 'RATE_LIMITED',
+                error: rateLimit.errorMessage
+            }, { status: 429 });
+        }
 
         if (!url || !clubName) {
             return NextResponse.json({ success: false, error: 'Missing url or clubName' }, { status: 400 });

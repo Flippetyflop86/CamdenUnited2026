@@ -53,8 +53,9 @@ export default function LeagueTablePage() {
     const hasAutoSyncedRef = useRef(false);
 
     const storageKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
+    const syncTimestampKey = `${storageKey}_synced_at`;
 
-    // Auto-sync live league table whenever page opens
+    // Auto-sync live league table
     const autoSyncFromUrl = async (targetUrl: string, silent = true) => {
         if (!targetUrl) return;
         if (silent) setIsAutoSyncing(true);
@@ -68,7 +69,7 @@ export default function LeagueTablePage() {
             const res = await fetch('/api/sync-league', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: targetUrl, clubName: settings.name || "Camden United" })
+                body: JSON.stringify({ url: targetUrl, clubName: settings.name || "Camden United", clubId })
             });
             const data = await res.json();
             if (data.success && Array.isArray(data.teams) && data.teams.length > 0) {
@@ -77,6 +78,7 @@ export default function LeagueTablePage() {
                 setLastSyncedAt(nowIso);
                 try {
                     localStorage.setItem(storageKey, JSON.stringify(data.teams));
+                    localStorage.setItem(syncTimestampKey, nowIso);
                 } catch (e) {}
 
                 const ourRow = data.teams.find((r: any) => r.is_our_club);
@@ -88,7 +90,12 @@ export default function LeagueTablePage() {
                 }
                 setShowImporter(false);
             } else if (!silent) {
-                if (data.errorType === 'BLOCKED') {
+                if (data.errorType === 'RATE_LIMITED') {
+                    setExtractionError({
+                        title: "Daily sync limit reached (10/day)",
+                        message: data.error || "You have reached the maximum of 10 live syncs per 24 hours."
+                    });
+                } else if (data.errorType === 'BLOCKED') {
                     setExtractionError({
                         title: "This website blocks direct automated sync",
                         message: "Use the Paste Table Text or Screenshot tab below for websites protected by Cloudflare CAPTCHA."
@@ -115,7 +122,7 @@ export default function LeagueTablePage() {
         }
     };
 
-    // Load saved league table from localStorage AND auto-sync live from leagueUrl
+    // Load saved league table from localStorage AND auto-sync live if cache is older than 6 hours
     useEffect(() => {
         const defaultMitooUrl = (settings.name || "").toLowerCase().includes("camden")
             ? "https://mitoofootball.com/LeagueTab.cfm?TblName=Matches&DivisionID=64&LeagueCode=MDX2026"
@@ -125,21 +132,33 @@ export default function LeagueTablePage() {
         if (activeUrl && !urlInput) {
             setUrlInput(activeUrl);
         }
+        let hasValidCachedTable = false;
+        let isCacheFresh = false;
         try {
             const saved = localStorage.getItem(storageKey);
+            const savedAt = localStorage.getItem(syncTimestampKey);
+            if (savedAt) {
+                setLastSyncedAt(savedAt);
+                const ageMs = Date.now() - new Date(savedAt).getTime();
+                if (ageMs < 6 * 60 * 60 * 1000) {
+                    isCacheFresh = true;
+                }
+            }
             if (saved) {
                 const parsed = JSON.parse(saved);
                 if (Array.isArray(parsed) && parsed.length > 0) {
                     setCurrentTable(parsed);
+                    hasValidCachedTable = true;
                 }
             } else if (settings.lastImportHistory?.leagueTable && Array.isArray(settings.lastImportHistory.leagueTable) && settings.lastImportHistory.leagueTable.length > 0) {
                 setCurrentTable(settings.lastImportHistory.leagueTable);
+                hasValidCachedTable = true;
             }
         } catch (e) {
             console.warn("Failed to load cached league table:", e);
         }
 
-        if (activeUrl && !hasAutoSyncedRef.current) {
+        if (activeUrl && !hasAutoSyncedRef.current && (!hasValidCachedTable || !isCacheFresh)) {
             hasAutoSyncedRef.current = true;
             autoSyncFromUrl(activeUrl, true);
         }

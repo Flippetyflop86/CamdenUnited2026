@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
+import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
 
 // Define the expected schema for validation
 const TeamRowSchema = z.object({
@@ -44,7 +45,17 @@ function isFuzzyMatch(targetName: string, ocrName: string): boolean {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { image, clubName } = body;
+        const { image, clubName, clubId } = body;
+
+        const clientId = getClientIdentifier(request, clubId || clubName);
+        const rateLimit = checkRateLimit('parse-league', clientId, 10);
+        if (!rateLimit.allowed) {
+            return NextResponse.json({
+                success: false,
+                errorType: 'RATE_LIMITED',
+                error: rateLimit.errorMessage
+            }, { status: 429 });
+        }
 
         if (!image) {
             return NextResponse.json({ success: false, error: 'No image provided.' }, { status: 400 });

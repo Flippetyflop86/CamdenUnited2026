@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
+import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
 
 function isOurClubMatch(candidate: string, clubName: string): boolean {
     const c = candidate.toLowerCase().trim();
@@ -15,7 +16,17 @@ function isOurClubMatch(candidate: string, clubName: string): boolean {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        let { url, clubName } = body;
+        let { url, clubName, clubId } = body;
+
+        const clientId = getClientIdentifier(request, clubId || clubName);
+        const rateLimit = checkRateLimit('sync-league', clientId, 10);
+        if (!rateLimit.allowed) {
+            return NextResponse.json({
+                success: false,
+                errorType: 'RATE_LIMITED',
+                error: rateLimit.errorMessage
+            }, { status: 429 });
+        }
 
         if (!url || !clubName) {
             return NextResponse.json({ success: false, error: 'Missing url or clubName' }, { status: 400 });
