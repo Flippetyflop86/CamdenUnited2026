@@ -11,7 +11,6 @@ export interface PagePermission {
 }
 
 export const ALL_PAGE_PERMISSIONS: PagePermission[] = [
-    { key: "calendar",    label: "Calendar",       href: "/calendar",    description: "Operational Football Calendar",  group: "On the Pitch" },
     { key: "squad",       label: "Squad",         href: "/squad",       description: "View and manage players",         group: "On the Pitch" },
     { key: "training",    label: "Training",       href: "/training",    description: "Training sessions and plans",     group: "On the Pitch" },
     { key: "matches",     label: "Fixtures",       href: "/matches",     description: "Fixtures and results",            group: "On the Pitch" },
@@ -36,8 +35,8 @@ export const ALL_PAGE_PERMISSIONS: PagePermission[] = [
 // Pages that are always manager-only (never shown to staff regardless of permissions)
 export const MANAGER_ONLY_PAGES: string[] = [];
 
-// Dashboard, Calendar, and Fines & Payments are always visible to logged-in managers/users.
-export const ALWAYS_VISIBLE_PAGES = ["/dashboard", "/calendar", "/player-payments"];
+// Dashboard and Fines & Payments are always visible to logged-in managers/users.
+export const ALWAYS_VISIBLE_PAGES = ["/dashboard", "/player-payments"];
 
 // These pages are pre-ticked by default when creating an invite, but can be revoked.
 export const DEFAULT_GRANTED_PERMISSIONS = ["sponsors", "finance", "budgets", "payments"];

@@ -61,7 +61,6 @@ type NavItem = {
 
 const navItems: NavItem[] = [
     { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-    { label: "Calendar", href: "/calendar", icon: CalendarDays },
     {
         label: "Squad",
         icon: Users,
