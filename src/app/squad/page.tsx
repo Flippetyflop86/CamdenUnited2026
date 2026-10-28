@@ -1312,8 +1312,512 @@ export default function SquadPage() {
     const activeParentClubCount = activeSquadPlayers.filter((p) => p.medicalStatus === "At Parent Club").length;
     const activeOnLoanCount = activeSquadPlayers.filter((p) => p.registrationType === "Loan" && !p.isParentClub).length;
 
+    const renderMobilePosBadge = (posRaw: string) => {
+        const p = (posRaw || "").trim().toUpperCase();
+        let cls = "bg-surface-2 text-foreground border-border";
+        if (p === "GK" || p.includes("GK")) {
+            cls = "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30";
+        } else if (["CB", "RB", "LB", "DEF", "RWB", "LWB", "LCB", "RCB"].includes(p) || p.includes("DEF")) {
+            cls = "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30";
+        } else if (["CM", "CDM", "CAM", "MID", "RM", "LM"].includes(p) || p.includes("MID")) {
+            cls = "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30";
+        } else if (["ST", "CF", "RW", "LW", "FWD", "ATT"].includes(p) || p.includes("FWD")) {
+            cls = "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30";
+        }
+        return (
+            <span className={`font-bold px-1.5 py-0.2 border rounded text-[9px] uppercase tracking-tight shrink-0 ${cls}`}>
+                {posRaw}
+            </span>
+        );
+    };
+
+    const renderMobilePlayerRow = (player: Player) => {
+        const dep = parsePlayerDeparture(player);
+        const isFormer = isFormerPlayer(player);
+        const loanExpiry = getLoanExpiryStatus(player.loanEndDate);
+
+        let statusSubLabel = "";
+        if (!isFormer) {
+            if (player.medicalStatus === "Injured" || player.medicalStatus === "Doubtful") {
+                statusSubLabel = [player.injuryType, player.injuryDuration].filter(Boolean).join(" • ");
+            } else if (player.medicalStatus === "Holiday" && player.holidayEnd) {
+                const parsedEnd = new Date(player.holidayEnd + "T00:00:00");
+                statusSubLabel = !isNaN(parsedEnd.getTime())
+                    ? `Back ${parsedEnd.toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+                    : `Back ${player.holidayEnd}`;
+            } else if (player.medicalStatus === "Suspended") {
+                statusSubLabel = [player.suspensionReason, player.suspensionDuration].filter(Boolean).join(" • ");
+            }
+        }
+
+        return (
+            <div
+                key={player.id}
+                onClick={() => router.push(`/squad/${player.id}`)}
+                className="flex items-center justify-between gap-2 px-3 py-2.5 bg-card active:bg-surface-2/80 transition-colors cursor-pointer"
+            >
+                {/* Left: Avatar + Name + Position/Status subline */}
+                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div className="relative shrink-0">
+                        <div className="w-10 h-10 rounded-full bg-surface-2 border border-border flex items-center justify-center text-xs font-bold text-muted-foreground overflow-hidden">
+                            {player.imageUrl &&
+                            player.imageUrl !== "/placeholder-player.png" &&
+                            !player.imageUrl.startsWith("idb:") ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                    src={player.imageUrl}
+                                    alt={formatPlayerName(player)}
+                                    className="w-full h-full object-cover"
+                                />
+                            ) : (
+                                <>
+                                    {player.firstName?.charAt(0)}
+                                    {player.lastName?.charAt(0)}
+                                </>
+                            )}
+                        </div>
+                        {player.squadNumber > 0 && (
+                            <span className="absolute -bottom-0.5 -right-0.5 min-w-[16px] h-4 px-1 rounded-full bg-foreground text-background text-[9px] font-black flex items-center justify-center leading-none border border-background">
+                                {player.squadNumber}
+                            </span>
+                        )}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-sm text-foreground truncate">
+                                {formatPlayerName(player)}
+                            </span>
+                            {(player.registrationType === "Loan" || player.registrationType === "Dual") && (
+                                <span className="text-[9px] font-bold px-1 py-0.2 bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 rounded uppercase shrink-0">
+                                    {player.registrationType === "Loan"
+                                        ? player.isParentClub
+                                            ? "Loan Out"
+                                            : "Loan In"
+                                        : "Dual"}
+                                </span>
+                            )}
+                            {(player.yellow_cards ?? 0) > 0 && (
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-muted-foreground shrink-0">
+                                    <span className="w-1.5 h-2.5 bg-yellow-400 rounded-[1px] inline-block" />
+                                    {player.yellow_cards}
+                                </span>
+                            )}
+                            {(player.red_cards ?? 0) > 0 && (
+                                <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-muted-foreground shrink-0">
+                                    <span className="w-1.5 h-2.5 bg-red-500 rounded-[1px] inline-block" />
+                                    {player.red_cards}
+                                </span>
+                            )}
+                        </div>
+
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            {renderMobilePosBadge(player.position)}
+
+                            {isFormer ? (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 font-semibold">
+                                    {dep.departureReason || dep.departureStatus}
+                                </span>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleStatusToggle(player);
+                                    }}
+                                    className={`text-[10px] font-semibold px-1.5 py-0.2 rounded border transition-colors ${getStatusBadgeStyle(
+                                        player.medicalStatus
+                                    )}`}
+                                >
+                                    {player.medicalStatus}
+                                </button>
+                            )}
+
+                            {statusSubLabel && (
+                                <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                                    {statusSubLabel}
+                                </span>
+                            )}
+
+                            {player.registrationType === "Loan" && loanExpiry.status !== "none" && (
+                                <span
+                                    className={`text-[10px] font-semibold ${
+                                        loanExpiry.status === "expired"
+                                            ? "text-red-500"
+                                            : loanExpiry.status === "expiring_soon"
+                                            ? "text-amber-500"
+                                            : "text-muted-foreground"
+                                    }`}
+                                >
+                                    • {loanExpiry.label}
+                                </span>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right: Compact Stat Columns (APP / G / A) + Quick Action */}
+                <div className="flex items-center gap-1 shrink-0">
+                    <div className="w-7 text-center">
+                        <span className="text-xs font-bold text-foreground">{player.appearances ?? 0}</span>
+                    </div>
+                    <div className="w-7 text-center">
+                        <span
+                            className={`text-xs font-bold ${
+                                (player.goals ?? 0) > 0
+                                    ? "text-emerald-600 dark:text-emerald-400"
+                                    : "text-muted-foreground/50"
+                            }`}
+                        >
+                            {player.goals ?? 0}
+                        </span>
+                    </div>
+                    <div className="w-7 text-center">
+                        <span
+                            className={`text-xs font-bold ${
+                                (player.assists ?? 0) > 0
+                                    ? "text-sky-600 dark:text-sky-400"
+                                    : "text-muted-foreground/50"
+                            }`}
+                        >
+                            {player.assists ?? 0}
+                        </span>
+                    </div>
+
+                    <div
+                        className="pl-1 flex items-center"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        {isFormer ? (
+                            <button
+                                type="button"
+                                onClick={() => handleRestorePlayer(player)}
+                                className="h-7 w-7 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 flex items-center justify-center"
+                                title="Restore Player"
+                            >
+                                <RotateCcw className="w-3.5 h-3.5" />
+                            </button>
+                        ) : (
+                            <button
+                                type="button"
+                                onClick={() => handleEdit(player)}
+                                className="h-7 w-7 rounded-lg border border-border bg-surface-1 text-muted-foreground active:text-foreground flex items-center justify-center"
+                                title="Edit Player"
+                            >
+                                <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    };
+
+    const mobilePositionGroups = [
+        {
+            label: "Goalkeepers",
+            players: tableSortedPlayers.filter((p) => ["GK"].includes(p.position)),
+        },
+        {
+            label: "Defenders",
+            players: tableSortedPlayers.filter((p) =>
+                ["DEF", "CB", "LCB", "RCB", "RB", "LB", "RWB", "LWB"].includes(p.position)
+            ),
+        },
+        {
+            label: "Midfielders",
+            players: tableSortedPlayers.filter((p) =>
+                ["MID", "CDM", "CM", "CAM", "RM", "LM"].includes(p.position)
+            ),
+        },
+        {
+            label: "Forwards",
+            players: tableSortedPlayers.filter((p) =>
+                ["FWD", "ST", "CF", "RW", "LW"].includes(p.position)
+            ),
+        },
+    ].filter((g) => g.players.length > 0);
+
     return (
         <div className="pb-16 bg-background min-h-screen">
+            {/* =====================================================================
+                MOBILE SQUAD VIEW (< 768px) — Fantasy Football Hub / FotMob Style
+               ===================================================================== */}
+            <div className="md:hidden flex flex-col">
+                {/* 1. Compact Mobile Top Header */}
+                <div className="px-4 pt-4 pb-3 bg-surface-1 border-b border-border space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                        <div>
+                            <h1 className="text-xl font-black text-foreground tracking-tight leading-none">
+                                Squad
+                            </h1>
+                            <div className="flex items-center gap-2 mt-1.5 text-[11px] font-semibold">
+                                <span className="text-status-success">
+                                    {activeSquadPlayers.filter((p) => p.medicalStatus === "Available").length} Fit
+                                </span>
+                                <span className="text-muted-foreground">•</span>
+                                <span className="text-muted-foreground">
+                                    {activeSquadPlayers.length} Active
+                                </span>
+                                {activeInjuredCount > 0 && (
+                                    <>
+                                        <span className="text-muted-foreground">•</span>
+                                        <span className="text-status-error">{activeInjuredCount} Injured</span>
+                                    </>
+                                )}
+                                {activeHolidayCount > 0 && (
+                                    <>
+                                        <span className="text-muted-foreground">•</span>
+                                        <span className="text-blue-500">{activeHolidayCount} Away</span>
+                                    </>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-1.5">
+                            <Button
+                                variant={includeFriendlies ? "secondary" : "outline"}
+                                size="sm"
+                                onClick={toggleIncludeFriendlies}
+                                className="h-8 px-2.5 text-[11px] font-semibold"
+                                title={includeFriendlies ? "Including Friendlies" : "Competitive Only"}
+                            >
+                                {includeFriendlies ? "⚽ All" : "🏆 Comp"}
+                            </Button>
+                            <Button
+                                onClick={() => setIsManageSquadsOpen(true)}
+                                variant="outline"
+                                size="icon"
+                                className="h-8 w-8"
+                                title="Manage Squads"
+                            >
+                                <Settings className="w-3.5 h-3.5" />
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="bg-brand text-brand-foreground hover:bg-brand/90 h-8 px-3 text-xs font-bold shadow-xs"
+                                onClick={() =>
+                                    setEditingPlayer({
+                                        id: "new",
+                                        firstName: "",
+                                        lastName: "",
+                                        position: "GK",
+                                        squadNumber: 0,
+                                        age: 0,
+                                        nationality: "English",
+                                        squad: currentSquads[0],
+                                        medicalStatus: "Available",
+                                        availability: true,
+                                        contractExpiry: "",
+                                        appearances: 0,
+                                        goals: 0,
+                                        assists: 0,
+                                        imageUrl: "",
+                                        isInTrainingSquad: true,
+                                        isInMatchdayTracker: false,
+                                        isContracted: false,
+                                        contractAmount: 0,
+                                        contractFrequency: "Weekly",
+                                        contractStartDate: "",
+                                        contractEndDate: "",
+                                        subsBillingModel: "Monthly",
+                                        subsCustomAmount: 0,
+                                        holidayStart: "",
+                                        holidayEnd: "",
+                                    })
+                                }
+                            >
+                                <Plus className="h-3.5 w-3.5 mr-1" /> Add
+                            </Button>
+                        </div>
+                    </div>
+
+                    {/* 2. Squad Tabs Strip */}
+                    <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 pt-0.5">
+                        <button
+                            type="button"
+                            onClick={() => setActiveTab("All")}
+                            className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+                                activeTab === "All"
+                                    ? "bg-foreground text-background shadow-xs"
+                                    : "bg-surface-2 text-muted-foreground"
+                            }`}
+                        >
+                            All Players
+                        </button>
+                        {currentSquads.map((squad) => (
+                            <button
+                                key={squad}
+                                type="button"
+                                onClick={() => setActiveTab(squad)}
+                                className={`px-3 py-1.5 rounded-full text-xs font-bold whitespace-nowrap transition-colors ${
+                                    activeTab === squad
+                                        ? "bg-foreground text-background shadow-xs"
+                                        : "bg-surface-2 text-muted-foreground"
+                                }`}
+                            >
+                                {squad}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* 3. Search + Position & Sort Pills */}
+                    <div className="space-y-2">
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                                placeholder="Search player name or #..."
+                                className="pl-8 pr-8 h-9 text-xs bg-background border-border rounded-lg"
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                            {searchTerm && (
+                                <button
+                                    type="button"
+                                    onClick={() => setSearchTerm("")}
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+                                >
+                                    <X className="w-3.5 h-3.5" />
+                                </button>
+                            )}
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
+                            {/* Position Filter Pills */}
+                            <div className="flex items-center gap-1 shrink-0">
+                                {(["All", "GK", "DEF", "MID", "FWD"] as const).map((pos) => (
+                                    <button
+                                        key={pos}
+                                        type="button"
+                                        onClick={() => setPositionFilter(pos)}
+                                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
+                                            positionFilter === pos
+                                                ? "bg-brand text-brand-foreground shadow-xs"
+                                                : "bg-background border border-border text-muted-foreground"
+                                        }`}
+                                    >
+                                        {pos}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Sort & Former Toggle Pills */}
+                            <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const order: TableSortField[] = ["position", "apps", "goals", "assists", "name"];
+                                        const nextIdx = (order.indexOf(tableSortField) + 1) % order.length;
+                                        const nextField = order[nextIdx];
+                                        setTableSortField(nextField);
+                                        setTableSortAsc(nextField === "position" || nextField === "name");
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-background border border-border text-foreground whitespace-nowrap"
+                                >
+                                    <ArrowUpDown className="w-3 h-3 text-muted-foreground" />
+                                    {tableSortField === "position"
+                                        ? "By Pos"
+                                        : tableSortField === "apps"
+                                        ? "Top Apps"
+                                        : tableSortField === "goals"
+                                        ? "Top Goals"
+                                        : tableSortField === "assists"
+                                        ? "Top Asts"
+                                        : "A–Z"}
+                                </button>
+
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setSquadViewMode((prev) => (prev === "active" ? "former" : "active"))
+                                    }
+                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold border whitespace-nowrap transition-colors ${
+                                        squadViewMode === "former"
+                                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                                            : "bg-background border-border text-muted-foreground"
+                                    }`}
+                                >
+                                    <Archive className="w-3 h-3" />
+                                    Former ({formerSquadPlayers.length})
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Loan Expiry Warning on Mobile */}
+                {squadViewMode === "active" && expiringLoans.length > 0 && (
+                    <div className="mx-3 mt-3 p-2.5 rounded-lg border border-purple-500/30 bg-purple-500/5 text-[11px] flex items-center gap-2 overflow-x-auto no-scrollbar">
+                        <span className="font-bold text-purple-600 dark:text-purple-400 shrink-0 inline-flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5" /> Loans:
+                        </span>
+                        {expiringLoans.map((lp) => {
+                            const exp = getLoanExpiryStatus(lp.loanEndDate);
+                            return (
+                                <button
+                                    key={lp.id}
+                                    type="button"
+                                    onClick={() => handleEdit(lp)}
+                                    className="px-2 py-0.5 rounded border border-purple-500/30 bg-background font-semibold whitespace-nowrap shrink-0"
+                                >
+                                    {formatPlayerName(lp)} • {exp.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                )}
+
+                {/* 4. Mobile Player List (Grouped by Position or Ranked by Stat) */}
+                <div className="px-3 pt-3 space-y-3">
+                    {tableSortedPlayers.length === 0 ? (
+                        <div className="text-center py-12 text-xs text-muted-foreground bg-card rounded-xl border border-border">
+                            {squadViewMode === "former"
+                                ? "No former players recorded yet."
+                                : "No players found matching your filters."}
+                        </div>
+                    ) : tableSortField === "position" && positionFilter === "All" ? (
+                        mobilePositionGroups.map((group) => (
+                            <div
+                                key={group.label}
+                                className="rounded-xl border border-border bg-card overflow-hidden shadow-xs"
+                            >
+                                <div className="flex items-center justify-between px-3 py-2 bg-surface-1 border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                    <span>
+                                        {group.label} ({group.players.length})
+                                    </span>
+                                    <div className="flex items-center gap-1 pr-8">
+                                        <span className="w-7 text-center">APP</span>
+                                        <span className="w-7 text-center">G</span>
+                                        <span className="w-7 text-center">A</span>
+                                    </div>
+                                </div>
+                                <div className="divide-y divide-border/60">
+                                    {group.players.map((player) => renderMobilePlayerRow(player))}
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
+                            <div className="flex items-center justify-between px-3 py-2 bg-surface-1 border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                <span>Players ({tableSortedPlayers.length})</span>
+                                <div className="flex items-center gap-1 pr-8">
+                                    <span className="w-7 text-center">APP</span>
+                                    <span className="w-7 text-center">G</span>
+                                    <span className="w-7 text-center">A</span>
+                                </div>
+                            </div>
+                            <div className="divide-y divide-border/60">
+                                {tableSortedPlayers.map((player) => renderMobilePlayerRow(player))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* =====================================================================
+                DESKTOP SQUAD VIEW (>= 768px) — Untouched
+               ===================================================================== */}
+            <div className="hidden md:block">
             <PageHeader 
                 title="Squad" 
                 description="Manage player profiles, availability, and stats."
@@ -2031,6 +2535,7 @@ export default function SquadPage() {
                     </div>
                 )}
             </PageSection>
+            </div>
 
             {editingPlayer && (
                 <div className="fixed inset-0 z-50 flex justify-end">
