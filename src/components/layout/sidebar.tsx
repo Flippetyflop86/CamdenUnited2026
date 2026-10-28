@@ -86,6 +86,7 @@ const navItems: NavItem[] = [
         ]
     },
     { label: "Recruitment", href: "/recruitment", icon: UserPlus },
+    { label: "Fines & Payments", href: "/player-payments", icon: Coins },
     {
         label: "Administration",
         icon: Settings,

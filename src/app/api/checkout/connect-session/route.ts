@@ -10,6 +10,25 @@ const getStripe = () => {
     return stripeInstance;
 };
 
+// Spond-style ClubFlow Platform Service & Processing Fee:
+// Passed on to the paying player so the club receives 100% of the fine/fee amount,
+// and ClubFlow earns the markup via Stripe Connect's application_fee_amount.
+export function calculatePlatformFeeBreakdown(baseAmountPounds: number) {
+    const base = Math.max(0, Number(baseAmountPounds) || 0);
+    // 3.9% + £0.25 service & processing fee (minimum £0.35 on any transaction)
+    const rawFee = base * 0.039 + 0.25;
+    const serviceFee = Math.round(Math.max(0.35, rawFee) * 100) / 100;
+    const totalPayable = Math.round((base + serviceFee) * 100) / 100;
+    return {
+        baseAmount: base,
+        serviceFee,
+        totalPayable,
+        baseAmountPence: Math.round(base * 100),
+        serviceFeePence: Math.round(serviceFee * 100),
+        totalPayablePence: Math.round(totalPayable * 100),
+    };
+}
+
 export async function POST(request: Request) {
     try {
         const { paymentId } = await request.json();
@@ -55,10 +74,12 @@ export async function POST(request: Request) {
         }
 
         const stripe = getStripe();
-        const amountInCents = Math.round(Number(payment.amount) * 100);
+        const feeBreakdown = calculatePlatformFeeBreakdown(Number(payment.amount));
         const origin = request.headers.get('origin') || 'https://clubflow.org.uk';
 
-        // Create Stripe Checkout Session on the connected Stripe Account
+        // Create Stripe Checkout Session on the connected Stripe Account:
+        // Line item 1: Club Fine / Fee (100% goes to the club)
+        // Line item 2: ClubFlow Service & Processing Fee (routed to ClubFlow via application_fee_amount)
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
             line_items: [
@@ -66,10 +87,21 @@ export async function POST(request: Request) {
                     price_data: {
                         currency: 'gbp',
                         product_data: {
-                            name: payment.description || 'Club Payment Request',
-                            description: `Payment requested for player: ${player.first_name} ${player.last_name}`,
+                            name: payment.description || 'Club Fine / Payment Request',
+                            description: `Player: ${player.first_name} ${player.last_name}`,
                         },
-                        unit_amount: amountInCents,
+                        unit_amount: feeBreakdown.baseAmountPence,
+                    },
+                    quantity: 1,
+                },
+                {
+                    price_data: {
+                        currency: 'gbp',
+                        product_data: {
+                            name: 'Service & Processing Fee',
+                            description: 'Instant payment processing & platform fee (Club receives 100% of fine)',
+                        },
+                        unit_amount: feeBreakdown.serviceFeePence,
                     },
                     quantity: 1,
                 },
@@ -80,10 +112,12 @@ export async function POST(request: Request) {
             metadata: {
                 payment_id: paymentId,
                 club_id: payment.club_id,
+                base_amount_pence: String(feeBreakdown.baseAmountPence),
+                service_fee_pence: String(feeBreakdown.serviceFeePence),
             },
             payment_intent_data: {
-                // Take a 1.5% application fee on transaction
-                application_fee_amount: Math.max(1, Math.round(amountInCents * 0.015)),
+                // Route the Spond-style service fee markup to ClubFlow's platform account
+                application_fee_amount: feeBreakdown.serviceFeePence,
             },
         }, {
             stripeAccount: club.stripe_connect_account_id,
@@ -95,7 +129,7 @@ export async function POST(request: Request) {
             .update({ stripe_checkout_session_id: session.id })
             .eq('id', paymentId);
 
-        return NextResponse.json({ url: session.url });
+        return NextResponse.json({ url: session.url, breakdown: feeBreakdown });
     } catch (err: any) {
         console.error('Stripe Connect Checkout Session creation failed:', err);
         return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });

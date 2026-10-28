@@ -4,10 +4,18 @@ import React, { useEffect, useState, use } from "react";
 import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ShieldCheck, Calendar, Info, Landmark, CheckCircle, AlertTriangle } from "lucide-react";
+import { ShieldCheck, Calendar, Info, Landmark, CheckCircle, AlertTriangle, Receipt } from "lucide-react";
 
 interface PaymentPageProps {
     params: Promise<{ paymentId: string }>;
+}
+
+function getPlatformFeeBreakdown(baseAmount: number) {
+    const base = Math.max(0, Number(baseAmount) || 0);
+    const rawFee = base * 0.039 + 0.25;
+    const serviceFee = Math.round(Math.max(0.35, rawFee) * 100) / 100;
+    const totalPayable = Math.round((base + serviceFee) * 100) / 100;
+    return { baseAmount: base, serviceFee, totalPayable };
 }
 
 export default function PayPage({ params }: PaymentPageProps) {
@@ -20,18 +28,22 @@ export default function PayPage({ params }: PaymentPageProps) {
     const [status, setStatus] = useState<"idle" | "success" | "cancelled">("idle");
 
     useEffect(() => {
-        // Read URL query parameters to check for Stripe redirects
         const searchParams = new URLSearchParams(window.location.search);
         const paymentResult = searchParams.get("payment");
         if (paymentResult === "success") {
             setStatus("success");
+            // Mark payment request as Paid in Supabase when returning from successful Stripe checkout
+            supabase
+                .from("player_payment_requests")
+                .update({ status: "Paid", paid_at: new Date().toISOString() })
+                .eq("id", paymentId)
+                .then(() => {});
         } else if (paymentResult === "cancelled") {
             setStatus("cancelled");
         }
 
         async function loadPaymentDetails() {
             try {
-                // Fetch payment request
                 const { data: payData, error: payErr } = await supabase
                     .from("player_payment_requests")
                     .select("*")
@@ -42,7 +54,6 @@ export default function PayPage({ params }: PaymentPageProps) {
 
                 setPayment(payData);
 
-                // Fetch player details
                 const { data: playerData } = await supabase
                     .from("players")
                     .select("first_name, last_name")
@@ -51,7 +62,6 @@ export default function PayPage({ params }: PaymentPageProps) {
                 
                 setPlayer(playerData);
 
-                // Fetch club details
                 const { data: clubData } = await supabase
                     .from("clubs")
                     .select("name, logo, primary_color")
@@ -119,6 +129,7 @@ export default function PayPage({ params }: PaymentPageProps) {
     }
 
     const primaryColor = club?.primary_color || "#10b981";
+    const breakdown = getPlatformFeeBreakdown(Number(payment.amount));
 
     if (status === "success" || payment.status === "Paid") {
         return (
@@ -127,9 +138,9 @@ export default function PayPage({ params }: PaymentPageProps) {
                     <div className="absolute top-0 left-0 right-0 h-1.5 bg-emerald-500" />
                     <CardHeader className="text-center pt-8">
                         <CheckCircle className="h-16 w-16 text-emerald-500 mx-auto mb-3 animate-bounce" />
-                        <CardTitle className="text-xl font-bold">Payment Completed</CardTitle>
+                        <CardTitle className="text-xl font-bold">Fine / Payment Settled</CardTitle>
                         <CardDescription className="text-emerald-400/80 font-medium text-xs mt-1">
-                            Thank you! Your transaction was processed successfully.
+                            Thank you! Your transaction was processed and your club record is now marked as Paid.
                         </CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4 px-6 pb-8">
@@ -143,12 +154,20 @@ export default function PayPage({ params }: PaymentPageProps) {
                                 <span className="font-semibold">{player?.first_name} {player?.last_name}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-slate-400">Description:</span>
+                                <span className="text-slate-400">Fine / Reason:</span>
                                 <span className="font-semibold text-slate-300">{payment.description}</span>
                             </div>
+                            <div className="flex justify-between border-t border-slate-800 pt-2">
+                                <span className="text-slate-400">Club Fine Amount:</span>
+                                <span className="font-semibold text-slate-200">£{breakdown.baseAmount.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-slate-400">Service &amp; Processing Fee:</span>
+                                <span className="font-medium text-slate-400">£{breakdown.serviceFee.toFixed(2)}</span>
+                            </div>
                             <div className="flex justify-between border-t border-slate-800 pt-2 text-sm">
-                                <span className="text-slate-400 font-medium">Amount Paid:</span>
-                                <span className="font-bold text-emerald-400">£{Number(payment.amount).toFixed(2)}</span>
+                                <span className="text-slate-300 font-semibold">Total Paid:</span>
+                                <span className="font-bold text-emerald-400">£{breakdown.totalPayable.toFixed(2)}</span>
                             </div>
                         </div>
                         <p className="text-[10px] text-slate-500 text-center">
@@ -171,9 +190,9 @@ export default function PayPage({ params }: PaymentPageProps) {
                     ) : (
                         <Landmark className="h-12 w-12 text-slate-400 mx-auto mb-3" />
                     )}
-                    <CardTitle className="text-xl font-bold">{club?.name || "Club Payment"}</CardTitle>
+                    <CardTitle className="text-xl font-bold">{club?.name || "Club Fine Request"}</CardTitle>
                     <CardDescription className="text-slate-400 text-xs">
-                        Secure Player Payment Request
+                        Instant Player Fine &amp; Fee Checkout
                     </CardDescription>
                 </CardHeader>
 
@@ -181,7 +200,7 @@ export default function PayPage({ params }: PaymentPageProps) {
                     {status === "cancelled" && (
                         <div className="bg-amber-500/10 border border-amber-500/30 text-amber-400 p-3 rounded-lg flex items-start gap-2 text-xs">
                             <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                            <p>Payment was cancelled. You can try submitting again below.</p>
+                            <p>Payment was cancelled. You can complete checkout below when ready.</p>
                         </div>
                     )}
 
@@ -191,16 +210,31 @@ export default function PayPage({ params }: PaymentPageProps) {
                             <span className="font-semibold text-slate-200">{player ? `${player.first_name} ${player.last_name}` : "Squad Member"}</span>
                         </div>
                         <div className="flex justify-between text-xs">
-                            <span className="text-slate-400 flex items-center gap-1"><Calendar className="h-3 w-3" /> Date Requested:</span>
-                            <span className="font-semibold text-slate-200">{new Date(payment.created_at).toLocaleDateString()}</span>
+                            <span className="text-slate-400 flex items-center gap-1"><Calendar className="h-3 w-3" /> Issued:</span>
+                            <span className="font-semibold text-slate-200">{new Date(payment.created_at).toLocaleDateString("en-GB")}</span>
                         </div>
                         <div className="flex justify-between text-xs border-t border-slate-800 pt-2">
-                            <span className="text-slate-400">Description:</span>
-                            <span className="font-semibold text-slate-300 text-right max-w-[200px] truncate">{payment.description}</span>
+                            <span className="text-slate-400">Offence / Description:</span>
+                            <span className="font-semibold text-slate-200 text-right max-w-[210px]">{payment.description}</span>
                         </div>
+
+                        <div className="border-t border-slate-800/90 pt-3 space-y-1.5 text-xs">
+                            <div className="flex justify-between text-slate-300">
+                                <span>Club Fine Amount (100% to {club?.name || "Club"}):</span>
+                                <span className="font-semibold">£{breakdown.baseAmount.toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between text-slate-400">
+                                <span className="flex items-center gap-1">
+                                    <Receipt className="h-3 w-3 text-slate-500" />
+                                    Service &amp; Processing Fee:
+                                </span>
+                                <span>£{breakdown.serviceFee.toFixed(2)}</span>
+                            </div>
+                        </div>
+
                         <div className="flex justify-between items-baseline border-t border-slate-800 pt-3">
-                            <span className="text-slate-400 text-sm font-semibold">Total Amount:</span>
-                            <span className="text-2xl font-black text-emerald-400">£{Number(payment.amount).toFixed(2)}</span>
+                            <span className="text-slate-300 text-sm font-semibold">Total Payable:</span>
+                            <span className="text-2xl font-black text-emerald-400">£{breakdown.totalPayable.toFixed(2)}</span>
                         </div>
                     </div>
 
@@ -216,13 +250,13 @@ export default function PayPage({ params }: PaymentPageProps) {
                                 Connecting to Stripe...
                             </span>
                         ) : (
-                            "Pay Securely with Stripe"
+                            `Pay £${breakdown.totalPayable.toFixed(2)} with Apple Pay / Card`
                         )}
                     </Button>
 
                     <div className="flex items-center justify-center gap-2 text-[10px] text-slate-500 border-t border-slate-900 pt-4">
                         <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                        <span>PCI-DSS Compliant Encryption. Card details are never stored.</span>
+                        <span>Powered by ClubFlow &amp; Stripe • Club receives 100% of fine</span>
                     </div>
                 </CardContent>
             </Card>

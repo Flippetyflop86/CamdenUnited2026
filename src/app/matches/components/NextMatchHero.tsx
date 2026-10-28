@@ -154,17 +154,6 @@ export function NextMatchHero({
                             Edit
                         </Button>
 
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-muted-foreground hover:text-foreground hover:bg-surface-2"
-                            onClick={() => onShareMatch(match)}
-                            title="Generate WhatsApp Availability Poll"
-                        >
-                            <Share2 className="h-4 w-4 mr-1.5" />
-                            Share
-                        </Button>
-
                         {onDeleteMatch && (
                             <Button
                                 size="sm"

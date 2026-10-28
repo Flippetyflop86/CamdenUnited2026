@@ -1160,11 +1160,6 @@ export default function MatchesPage() {
                         >
                             <Users className="h-4 w-4" />
                         </Button>
-                        {!isPast && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10" onClick={() => handleOpenShare(match)} title="Share Player Poll">
-                                <MessageCircle className="h-4 w-4" />
-                            </Button>
-                        )}
                         <Button
                             variant="ghost"
                             size="icon"

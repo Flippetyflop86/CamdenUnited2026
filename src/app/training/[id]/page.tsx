@@ -539,50 +539,6 @@ export default function TrainingSessionPage() {
                 </CardContent>
             </Card>
 
-            {/* Secure Check-in Link Card */}
-            <Card className="w-full border-slate-200 bg-slate-50 shadow-sm border-l-4 border-l-emerald-500">
-                <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-700">
-                            <Share2 className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <h3 className="font-semibold text-slate-900 text-sm">Secure Availability Link</h3>
-                            <p className="text-slate-500 text-xs">
-                                Share this link in WhatsApp. Session Code: <strong className="text-slate-950 font-bold bg-slate-200 px-1.5 py-0.5 rounded font-mono text-xs">{("CU" + (session.event_token || session.id).replace(/-/g, "").substring(0, 4)).toUpperCase()}</strong>
-                            </p>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2 w-full md:w-auto">
-                        <Button 
-                            variant="outline" 
-                            size="sm"
-                            className="bg-white border-slate-200 flex-1 md:flex-initial"
-                            onClick={() => {
-                                const link = `${window.location.origin}/respond/${session.event_token || session.id}`;
-                                navigator.clipboard.writeText(link);
-                                alert("Secure availability link copied to clipboard!");
-                            }}
-                        >
-                            <Link2 className="h-4 w-4 mr-2" /> Copy Link
-                        </Button>
-                        <Button
-                            size="sm"
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white flex-1 md:flex-initial"
-                            onClick={() => {
-                                const link = `${window.location.origin}/respond/${session.event_token || session.id}`;
-                                const dateStr = formatFriendlyDate(session.date);
-                                const code = ("CU" + (session.event_token || session.id).replace(/-/g, "").substring(0, 4)).toUpperCase();
-                                const text = `\u26BD *Camden United Training Invite*\n\ud83d\udcc5 *Date:* ${dateStr}\n\u23F0 *Time:* ${session.time}\n\ud83d\udccd *Location:* ${session.location}\n🔑 *Session Code:* ${code}\n\nPlayers, please log your training availability here:\n\ud83d\udd17 ${link}`;
-                                window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
-                            }}
-                        >
-                            <MessageCircle className="h-4 w-4 mr-2" /> Share to WhatsApp
-                        </Button>
-                    </div>
-                </CardContent>
-            </Card>
-
             {/* Attendance Register */}
             <Card className="shadow-sm">
                 <CardHeader className="flex flex-row items-center justify-between border-b bg-slate-50/50 flex-wrap gap-3">
@@ -646,16 +602,6 @@ export default function TrainingSessionPage() {
                                         }
                                     `}
                                 >
-                                    {/* Locked PIN Indicator & Reset button */}
-                                    {hasPin && (
-                                        <button
-                                            onClick={(e) => handleResetPlayerPin(player.id, e)}
-                                            title="Click to Reset Player Check-in PIN"
-                                            className="absolute top-1.5 left-1.5 rounded-full w-5 h-5 bg-slate-100 hover:bg-red-100 text-[10px] flex items-center justify-center transition-colors z-10 text-slate-500 hover:text-red-650"
-                                        >
-                                            🔒
-                                        </button>
-                                    )}
                                     {/* Injured toggle */}
                                     <button
                                         onClick={(e) => handleMarkInjured(player.id, e)}

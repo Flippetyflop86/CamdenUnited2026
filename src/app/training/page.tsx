@@ -1261,48 +1261,7 @@ export default function TrainingPage() {
                                                 <Button variant="outline" className="border-border text-foreground" onClick={() => handleEdit(trueUpcomingSessions[0])}>
                                                     <Pencil className="h-4 w-4 mr-2" /> Edit Session
                                                 </Button>
-                                                <Button variant="outline" className="border-border text-foreground" onClick={() => handleOpenShare(trueUpcomingSessions[0])}>
-                                                    <MessageCircle className="h-4 w-4 mr-2" /> Share Poll
-                                                </Button>
                                             </div>
-                                        </div>
-
-                                        {/* Right Col: Attendance Readiness */}
-                                        <div className="md:w-72 bg-surface-1 rounded-xl p-6 flex flex-col justify-center border border-border/50">
-                                            <h5 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-4">Squad Availability</h5>
-                                            
-                                            {(() => {
-                                                const { regAttendedCount, totalEligible } = getSessionAttendanceStats(trueUpcomingSessions[0]);
-                                                const responded = trueUpcomingSessions[0].attendance.filter((a: any) => !a.playerId.startsWith('guest:')).length;
-                                                const unavailable = responded - regAttendedCount;
-                                                const awaiting = totalEligible - responded;
-                                                
-                                                return (
-                                                    <div className="space-y-4">
-                                                        <div className="flex justify-between items-center">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="h-5 w-5 rounded-full bg-status-success/20 text-status-success flex items-center justify-center font-bold text-xs">✓</span>
-                                                                <span className="font-medium text-foreground">Confirmed</span>
-                                                            </div>
-                                                            <span className="text-xl font-bold text-foreground">{regAttendedCount}</span>
-                                                        </div>
-                                                        <div className="flex justify-between items-center">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="h-5 w-5 rounded-full bg-status-error/20 text-status-error flex items-center justify-center font-bold text-xs">×</span>
-                                                                <span className="font-medium text-muted-foreground">Unavailable</span>
-                                                            </div>
-                                                            <span className="text-lg font-semibold text-muted-foreground">{unavailable}</span>
-                                                        </div>
-                                                        <div className="flex justify-between items-center">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="h-5 w-5 rounded-full bg-status-warning/20 text-status-warning flex items-center justify-center font-bold text-xs">?</span>
-                                                                <span className="font-medium text-muted-foreground">Awaiting</span>
-                                                            </div>
-                                                            <span className="text-lg font-semibold text-muted-foreground">{awaiting > 0 ? awaiting : 0}</span>
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })()}
                                         </div>
                                     </div>
                                 </Card>
