@@ -1252,6 +1252,35 @@ export default function LeagueTablePage() {
 
     // Main Live Standings Table View
     if (currentTable && currentTable.length > 0 && !showImporter) {
+        const ourRow = currentTable.find(r => r.is_our_club) || currentTable[0];
+        const totalTeams = currentTable.length;
+        const fullSeasonGames = Math.max((totalTeams - 1) * 2, ourRow.played);
+        const ourPpg = ourRow.played > 0 ? ourRow.points / ourRow.played : 0;
+        const projectedPoints = Math.round(ourPpg * fullSeasonGames);
+
+        const ordinal = (n: number) => {
+            const s = ["th", "st", "nd", "rd"];
+            const v = n % 100;
+            return n + (s[(v - 20) % 10] || s[v] || s[0]);
+        };
+
+        const secondRow = currentTable[1];
+        const standingSubtext =
+            ourRow.position === 1 && secondRow
+                ? `+${ourRow.points - secondRow.points} pt${ourRow.points - secondRow.points === 1 ? "" : "s"} clear of 2nd (${secondRow.team_name})`
+                : `${currentTable[0].points - ourRow.points} pts off 1st (${currentTable[0].team_name})`;
+
+        // Compute Division Attack Rank (highest GF, tie-break GF/game) & Defence Rank (lowest GA/game)
+        const attackSorted = [...currentTable].sort((a, b) => (b.goals_for || 0) - (a.goals_for || 0));
+        const attackRank = attackSorted.findIndex(r => r.team_name === ourRow.team_name) + 1;
+        const gfPerGame = ourRow.played > 0 ? ((ourRow.goals_for || 0) / ourRow.played).toFixed(2) : "0.00";
+
+        const defenceSorted = [...currentTable]
+            .filter(r => r.played > 0)
+            .sort((a, b) => ((a.goals_against || 0) / a.played) - ((b.goals_against || 0) / b.played));
+        const defenceRank = Math.max(1, defenceSorted.findIndex(r => r.team_name === ourRow.team_name) + 1);
+        const gaPerGame = ourRow.played > 0 ? ((ourRow.goals_against || 0) / ourRow.played).toFixed(2) : "0.00";
+
         return (
             <div className="h-full flex flex-col gap-6">
                 <div ref={hiddenFaContainerRef} className="hidden" aria-hidden="true" />
@@ -1309,6 +1338,85 @@ export default function LeagueTablePage() {
                     </div>
                 </div>
 
+                {/* Club Performance Hero Strip */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+                    <Card className="border-brand/30 bg-brand/5 shadow-xs">
+                        <CardContent className="p-4">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-brand">
+                                Current Standing
+                            </p>
+                            <div className="flex items-baseline gap-2 mt-1">
+                                <span className="text-2xl font-black text-foreground">
+                                    {ordinal(ourRow.position)}
+                                </span>
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    of {totalTeams} clubs
+                                </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1 truncate" title={standingSubtext}>
+                                {standingSubtext}
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-border bg-surface-1 shadow-xs">
+                        <CardContent className="p-4">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                                Points Per Game
+                            </p>
+                            <div className="flex items-baseline gap-2 mt-1">
+                                <span className="text-2xl font-black text-foreground">
+                                    {ourPpg.toFixed(2)}
+                                </span>
+                                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">
+                                    PPG
+                                </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                On pace for <strong>{projectedPoints} pts</strong> ({fullSeasonGames} games)
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-border bg-surface-1 shadow-xs">
+                        <CardContent className="p-4">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                                League Attack Rank
+                            </p>
+                            <div className="flex items-baseline gap-2 mt-1">
+                                <span className="text-2xl font-black text-foreground">
+                                    #{attackRank}
+                                </span>
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    ({ourRow.goals_for ?? 0} GF)
+                                </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {gfPerGame} goals scored per game
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-border bg-surface-1 shadow-xs">
+                        <CardContent className="p-4">
+                            <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+                                League Defence Rank
+                            </p>
+                            <div className="flex items-baseline gap-2 mt-1">
+                                <span className="text-2xl font-black text-foreground">
+                                    #{defenceRank}
+                                </span>
+                                <span className="text-xs font-medium text-muted-foreground">
+                                    ({ourRow.goals_against ?? 0} GA)
+                                </span>
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-1">
+                                {gaPerGame} conceded/game • {ourRow.goal_difference > 0 ? `+${ourRow.goal_difference}` : ourRow.goal_difference} GD
+                            </p>
+                        </CardContent>
+                    </Card>
+                </div>
+
                 {/* Standings Table */}
                 <Card className="border-border bg-surface-1">
                     <CardContent className="p-0">
@@ -1326,6 +1434,7 @@ export default function LeagueTablePage() {
                                         <th className="px-4 py-3 font-medium text-center">GA</th>
                                         <th className="px-4 py-3 font-medium text-center">GD</th>
                                         <th className="px-4 py-3 font-medium text-center">Pts</th>
+                                        <th className="px-4 py-3 font-medium text-center" title="Points Per Game">PPG</th>
                                         <th className="px-4 py-3 font-medium text-center">Last 5</th>
                                     </tr>
                                 </thead>
@@ -1342,6 +1451,7 @@ export default function LeagueTablePage() {
 
                                         const posDiff = (row.previous_position ?? row.position) - row.position;
                                         const formItems = Array.isArray(row.form) ? row.form.slice(-5) : [];
+                                        const rowPpg = row.played > 0 ? (row.points / row.played).toFixed(2) : "0.00";
 
                                         return (
                                             <tr
@@ -1403,6 +1513,9 @@ export default function LeagueTablePage() {
                                                 </td>
                                                 <td className="px-4 py-3 text-center font-bold text-foreground whitespace-nowrap">
                                                     {row.points}
+                                                </td>
+                                                <td className="px-4 py-3 text-center font-mono text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                                                    {rowPpg}
                                                 </td>
                                                 {/* Feature #6: Last 5 Form Pills */}
                                                 <td className="px-4 py-3 text-center whitespace-nowrap">
