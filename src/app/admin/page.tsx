@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Upload, Save, Shield, Plus, Trash2, Copy, Check, UserCheck, Users2, KeyRound, Link2 } from "lucide-react";
+import { Upload, Save, Shield, Plus, Trash2, Copy, Check, UserCheck, Users2, KeyRound, Link2, Sparkles } from "lucide-react";
 import { ALL_PAGE_PERMISSIONS, PERMISSION_GROUPS, DEFAULT_GRANTED_PERMISSIONS } from "@/lib/permissions";
 import { DataExport } from "@/components/admin/data-export";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -797,15 +798,23 @@ export default function AdminPage() {
 
     return (
         <div className="space-y-6">
-            <div className="flex justify-between items-end">
+            <div className="flex flex-wrap justify-between items-end gap-3">
                 <div>
                     <h2 className="text-3xl font-bold tracking-tight text-slate-900">Admin Settings</h2>
                     <p className="text-slate-500">Manage club details, kits, and financial configurations.</p>
                 </div>
-                <Button onClick={handleSave} disabled={isSaving} className="bg-slate-900 hover:bg-slate-800 h-10 px-6">
-                    <Save className="mr-2 h-4 w-4" />
-                    {isSaving ? "Saving..." : "Save Changes"}
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Link href="/onboarding?rerun=1">
+                        <Button type="button" variant="outline" className="h-10 px-4 border-slate-300 text-slate-700 hover:bg-slate-100">
+                            <Sparkles className="mr-2 h-4 w-4 text-emerald-600" />
+                            Launch Setup Wizard
+                        </Button>
+                    </Link>
+                    <Button onClick={handleSave} disabled={isSaving} className="bg-slate-900 hover:bg-slate-800 h-10 px-6">
+                        <Save className="mr-2 h-4 w-4" />
+                        {isSaving ? "Saving..." : "Save Changes"}
+                    </Button>
+                </div>
             </div>
 
             <Tabs key={isManager ? "manager" : "admin"} defaultValue={isManager ? "identity" : "access"} className="w-full">

@@ -65,6 +65,23 @@ export default function DashboardPage() {
     const [dismissedPriorities, setDismissedPriorities] = useState<string[]>([]);
     const [standingsTable, setStandingsTable] = useState<StandingsRow[]>([]);
     const [copiedWhatsApp, setCopiedWhatsApp] = useState<"match" | "training" | null>(null);
+    const [hideSetupChecklist, setHideSetupChecklist] = useState<boolean>(false);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const key = clubId ? `clubflow_setup_checklist_dismissed_${clubId}` : "clubflow_setup_checklist_dismissed";
+        if (localStorage.getItem(key) === "true") {
+            setHideSetupChecklist(true);
+        }
+    }, [clubId]);
+
+    const handleDismissSetupChecklist = () => {
+        setHideSetupChecklist(true);
+        if (typeof window !== "undefined") {
+            const key = clubId ? `clubflow_setup_checklist_dismissed_${clubId}` : "clubflow_setup_checklist_dismissed";
+            localStorage.setItem(key, "true");
+        }
+    };
 
     // Load standings table from localStorage or Supabase settings
     useEffect(() => {
@@ -689,9 +706,104 @@ export default function DashboardPage() {
     const nextOppPos = getTeamLeaguePos(nextMatch?.opponent);
     const lastOppPos = getTeamLeaguePos(lastMatch?.opponent);
 
+    const setupChecklistSteps = [
+        {
+            id: "identity",
+            label: "Club Badge & Kits",
+            done: Boolean(settings.name && settings.name !== "My Club" && settings.logo),
+            href: "/onboarding?rerun=1",
+        },
+        {
+            id: "squad",
+            label: "Build Squad (11+ Players)",
+            done: players.length >= 11,
+            href: "/squad",
+        },
+        {
+            id: "fixtures",
+            label: "Add Season Fixtures",
+            done: matches.length > 0,
+            href: "/matches",
+        },
+        {
+            id: "league",
+            label: "Sync League Table",
+            done: standingsTable.length > 0,
+            href: "/league",
+        },
+    ];
+    const completedSetupCount = setupChecklistSteps.filter((s) => s.done).length;
+
     return (
         <div className="w-full max-w-full overflow-x-hidden min-w-0 pb-24 md:pb-12">
             <div className="max-w-7xl mx-auto flex flex-col gap-4 md:gap-6">
+
+                {/* ========================================================= */}
+                {/* POST-ONBOARDING CLUB SETUP CHECKLIST BANNER               */}
+                {/* ========================================================= */}
+                {!hideSetupChecklist && completedSetupCount < 4 && (
+                    <div className="bg-surface-1 border border-brand/30 rounded-2xl p-4 md:p-5 shadow-xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                            <div className="flex items-center gap-2.5">
+                                <div className="h-9 w-9 rounded-xl bg-brand/15 border border-brand/30 flex items-center justify-center text-brand shrink-0">
+                                    <Sparkles className="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2">
+                                        <h2 className="text-sm font-black text-foreground">
+                                            Club Setup Checklist
+                                        </h2>
+                                        <Badge className="bg-brand/15 text-brand border-brand/30 text-[10px]">
+                                            {completedSetupCount}/4 Complete
+                                        </Badge>
+                                    </div>
+                                    <p className="text-xs text-muted-foreground">
+                                        Finish setting up your club data or launch the Onboarding Studio to bulk-paste your squad, fixtures & table.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <Link href="/onboarding?rerun=1">
+                                    <Button size="sm" variant="outline" className="h-8 text-xs font-bold">
+                                        Open Onboarding Studio
+                                    </Button>
+                                </Link>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={handleDismissSetupChecklist}
+                                    className="h-8 text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                    Dismiss
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                            {setupChecklistSteps.map((step) => (
+                                <Link
+                                    key={step.id}
+                                    href={step.href}
+                                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs font-bold transition-all ${
+                                        step.done
+                                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                                            : "bg-surface-2 border-border text-foreground hover:border-brand/40"
+                                    }`}
+                                >
+                                    <span className="flex items-center gap-2 truncate">
+                                        {step.done ? (
+                                            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+                                        ) : (
+                                            <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                                        )}
+                                        <span className="truncate">{step.label}</span>
+                                    </span>
+                                    <ArrowRight className="h-3.5 w-3.5 opacity-60 shrink-0" />
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 {/* ========================================================= */}
                 {/* TOP HEADER: CLUB PULSE & HOME/AWAY SPLIT PILL             */}
