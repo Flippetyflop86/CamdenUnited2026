@@ -2396,9 +2396,9 @@ export default function MatchesPage() {
                     >
                         <span className="flex items-center gap-1.5 text-foreground">
                             <Plus className="h-3.5 w-3.5 text-brand" />
-                            Quick-Add Single Fixture
+                            Schedule / Quick-Add New Fixture
                         </span>
-                        <span className="text-[10px] font-semibold text-muted-foreground">Tap to expand</span>
+                        <span className="text-[10px] font-semibold text-muted-foreground">Tap to open</span>
                     </button>
                 ) : (
                     <form
@@ -2406,18 +2406,19 @@ export default function MatchesPage() {
                             handleQuickAddFixture(e);
                             setIsMobileQuickAddOpen(false);
                         }}
-                        className="bg-surface-1 border border-border rounded-xl p-3 shadow-sm space-y-2.5"
+                        className="bg-brand/5 border-2 border-brand/30 rounded-xl p-3 shadow-sm space-y-2.5"
                     >
                         <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-brand">
-                                Quick-Add Fixture
+                            <span className="text-[11px] font-extrabold uppercase tracking-wider text-brand flex items-center gap-1.5">
+                                <CalendarDays className="h-3.5 w-3.5" />
+                                Schedule a New Fixture
                             </span>
                             <button
                                 type="button"
                                 onClick={() => setIsMobileQuickAddOpen(false)}
                                 className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
                             >
-                                Close ✕
+                                Cancel ✕
                             </button>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
@@ -2429,14 +2430,14 @@ export default function MatchesPage() {
                                     setQuickDate(d);
                                     setQuickTime(getDefaultKickoffTime(d));
                                 }}
-                                className="h-9 text-xs bg-surface-2 border-border"
+                                className="h-9 text-xs bg-surface-1 border-border"
                                 required
                             />
                             <Input
                                 type="time"
                                 value={quickTime}
                                 onChange={(e) => setQuickTime(e.target.value)}
-                                className="h-9 text-xs bg-surface-2 border-border"
+                                className="h-9 text-xs bg-surface-1 border-border"
                             />
                             <button
                                 type="button"
@@ -2452,7 +2453,7 @@ export default function MatchesPage() {
                             <select
                                 value={quickCompetition}
                                 onChange={(e) => setQuickCompetition(e.target.value)}
-                                className="h-9 rounded-lg border border-border bg-surface-2 px-2.5 text-xs text-foreground font-semibold outline-none"
+                                className="h-9 rounded-lg border border-border bg-surface-1 px-2.5 text-xs text-foreground font-semibold outline-none"
                             >
                                 <option value="League">League</option>
                                 <option value="Middlesex Cup">Cup</option>
@@ -2461,10 +2462,10 @@ export default function MatchesPage() {
                             <Input
                                 type="text"
                                 list="known-opponents-list"
-                                placeholder="Opponent name (e.g. Hackney Wick)..."
+                                placeholder="Enter opponent to schedule new match..."
                                 value={quickOpponent}
                                 onChange={(e) => setQuickOpponent(e.target.value)}
-                                className="h-9 text-xs bg-surface-2 border-border col-span-2 font-medium"
+                                className="h-9 text-xs bg-surface-1 border-border col-span-2 font-medium"
                                 required
                             />
                         </div>
@@ -2475,81 +2476,11 @@ export default function MatchesPage() {
                             className="w-full h-9 bg-brand hover:bg-brand/90 text-brand-foreground font-bold text-xs"
                         >
                             <Plus className="h-3.5 w-3.5 mr-1" />
-                            Add Fixture to Schedule
+                            Create &amp; Add Fixture to Schedule
                         </Button>
                     </form>
                 )}
             </div>
-
-            {/* ================================================================= */}
-            {/* DESKTOP 1-LINE QUICK-ADD FIXTURE BAR (>= 768px — UNTOUCHED)       */}
-            {/* ================================================================= */}
-            <form
-                onSubmit={handleQuickAddFixture}
-                className="hidden md:flex bg-surface-1 border border-border rounded-xl p-3 shadow-sm flex-col lg:flex-row lg:items-center gap-2.5"
-            >
-                <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground shrink-0 px-1">
-                    Quick Add:
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-5 lg:flex lg:flex-1 items-center gap-2">
-                    <Input
-                        type="date"
-                        value={quickDate}
-                        onChange={(e) => {
-                            const d = e.target.value;
-                            setQuickDate(d);
-                            setQuickTime(getDefaultKickoffTime(d));
-                        }}
-                        className="h-8 text-xs bg-surface-2 border-border lg:w-36"
-                        required
-                    />
-                    <Input
-                        type="time"
-                        value={quickTime}
-                        onChange={(e) => setQuickTime(e.target.value)}
-                        className="h-8 text-xs bg-surface-2 border-border lg:w-28"
-                    />
-                    <button
-                        type="button"
-                        onClick={() => setQuickIsHome(h => !h)}
-                        className={`h-8 px-3 rounded-md text-xs font-bold border transition-colors shrink-0 ${
-                            quickIsHome
-                                ? "bg-emerald-100/90 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-400/70 dark:border-emerald-500/30 hover:bg-emerald-200/80 dark:hover:bg-emerald-500/25"
-                                : "bg-sky-100/90 dark:bg-sky-500/15 text-sky-800 dark:text-sky-300 border-sky-400/70 dark:border-sky-500/30 hover:bg-sky-200/80 dark:hover:bg-sky-500/25"
-                        }`}
-                        title="Click to toggle Home / Away"
-                    >
-                        {quickIsHome ? "HOME (H)" : "AWAY (A)"}
-                    </button>
-                    <Input
-                        type="text"
-                        list="known-opponents-list"
-                        placeholder="Opponent name (e.g. Hackney Wick)..."
-                        value={quickOpponent}
-                        onChange={(e) => setQuickOpponent(e.target.value)}
-                        className="h-8 text-xs bg-surface-2 border-border col-span-2 sm:col-span-2 lg:flex-1 font-medium"
-                        required
-                    />
-                    <select
-                        value={quickCompetition}
-                        onChange={(e) => setQuickCompetition(e.target.value)}
-                        className="h-8 rounded-md border border-border bg-surface-2 px-2.5 text-xs text-foreground outline-none lg:w-32"
-                    >
-                        <option value="League">League</option>
-                        <option value="Middlesex Cup">Cup</option>
-                        <option value="Friendly">Friendly</option>
-                    </select>
-                </div>
-                <Button
-                    type="submit"
-                    size="sm"
-                    disabled={isQuickAdding || !quickOpponent.trim()}
-                    className="h-8 bg-brand hover:bg-brand/90 text-brand-foreground font-semibold text-xs shrink-0"
-                >
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    Add Fixture
-                </Button>
-            </form>
 
             {/* ================================================================= */}
             {/* MOBILE SUB-TABS, SEARCH & SCROLLABLE FILTERS (< 768px)            */}
@@ -2595,13 +2526,23 @@ export default function MatchesPage() {
                 {/* 2-Column Search + Season Selector */}
                 <div className="grid grid-cols-[1fr_auto] gap-2">
                     <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                        <Search className="absolute left-3 top-2.5 h-4 w-4 text-brand" />
                         <Input
-                            placeholder="Search opponent..."
+                            placeholder="Search fixtures by opponent..."
                             value={opponentSearch}
                             onChange={(e) => setOpponentSearch(e.target.value)}
-                            className="pl-8 h-9 text-xs bg-surface-1 border-border rounded-xl"
+                            className="pl-9 pr-7 h-9 text-xs bg-surface-1 border-border rounded-xl font-medium"
                         />
+                        {opponentSearch && (
+                            <button
+                                type="button"
+                                onClick={() => setOpponentSearch("")}
+                                className="absolute right-2.5 top-2.5 text-xs text-muted-foreground hover:text-foreground"
+                                title="Clear search"
+                            >
+                                ✕
+                            </button>
+                        )}
                     </div>
                     <Select value={seasonFilter} onValueChange={setSeasonFilter}>
                         <SelectTrigger className="h-9 w-[125px] text-xs bg-surface-1 border-border rounded-xl font-bold">
@@ -2696,10 +2637,10 @@ export default function MatchesPage() {
             </div>
 
             {/* ================================================================= */}
-            {/* DESKTOP SUB-TABS, SEARCH & FILTERS (>= 768px — UNTOUCHED)         */}
+            {/* DESKTOP SUB-TABS, PROMINENT SEARCH & COLLAPSIBLE QUICK-ADD        */}
             {/* ================================================================= */}
             <div className="hidden md:flex flex-col gap-3 pb-3 border-b border-border">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                     {/* View Section Switcher */}
                     <div className="flex items-center gap-1 bg-surface-1 p-1 rounded-xl border border-border w-fit">
                         <button
@@ -2737,22 +2678,32 @@ export default function MatchesPage() {
                         </button>
                     </div>
 
-                    {/* Opponent Search + Season Selector */}
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="relative w-full sm:w-52">
-                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                    {/* Prominent Opponent Search + Season Selector + Quick-Add Drawer Toggle */}
+                    <div className="flex flex-wrap items-center gap-2.5 flex-1 lg:justify-end">
+                        <div className="relative flex-1 min-w-[240px] max-w-sm">
+                            <Search className="absolute left-3 top-2.5 h-4 w-4 text-brand pointer-events-none" />
                             <Input
-                                placeholder="Search opponent..."
+                                placeholder="Search fixtures &amp; results by opponent..."
                                 value={opponentSearch}
                                 onChange={(e) => setOpponentSearch(e.target.value)}
-                                className="pl-8 h-8 text-xs bg-surface-1 border-border"
+                                className="pl-9 pr-8 h-9 text-xs bg-surface-1 border-border shadow-sm font-medium focus-visible:ring-brand"
                             />
+                            {opponentSearch && (
+                                <button
+                                    type="button"
+                                    onClick={() => setOpponentSearch("")}
+                                    className="absolute right-2.5 top-2.5 text-xs text-muted-foreground hover:text-foreground font-bold"
+                                    title="Clear search"
+                                >
+                                    ✕
+                                </button>
+                            )}
                         </div>
 
                         <div className="flex items-center gap-2">
                             <span className="text-xs font-semibold text-muted-foreground hidden sm:inline-block">Season:</span>
                             <Select value={seasonFilter} onValueChange={setSeasonFilter}>
-                                <SelectTrigger className="h-8 w-[140px] text-xs bg-surface-1 border-border shadow-sm font-medium">
+                                <SelectTrigger className="h-9 w-[135px] text-xs bg-surface-1 border-border shadow-sm font-medium">
                                     <SelectValue placeholder="Select Season" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -2763,8 +2714,113 @@ export default function MatchesPage() {
                                 </SelectContent>
                             </Select>
                         </div>
+
+                        <Button
+                            type="button"
+                            variant={isMobileQuickAddOpen ? "secondary" : "outline"}
+                            size="sm"
+                            onClick={() => setIsMobileQuickAddOpen(prev => !prev)}
+                            className={`h-9 text-xs font-bold gap-1.5 ${
+                                isMobileQuickAddOpen
+                                    ? "bg-brand/15 text-brand border-brand/40"
+                                    : "border-dashed border-border hover:border-brand/50"
+                            }`}
+                        >
+                            <Plus className="h-3.5 w-3.5 text-brand" />
+                            {isMobileQuickAddOpen ? "Hide Quick-Add" : "Quick-Add Fixture"}
+                        </Button>
                     </div>
                 </div>
+
+                {/* Collapsible Desktop Quick-Add Fixture Drawer (Only visible when toggled open) */}
+                {isMobileQuickAddOpen && (
+                    <form
+                        onSubmit={(e) => {
+                            handleQuickAddFixture(e);
+                            setIsMobileQuickAddOpen(false);
+                        }}
+                        className="bg-brand/5 border-2 border-dashed border-brand/35 rounded-xl p-3 shadow-sm flex flex-col gap-2.5 animate-in fade-in slide-in-from-top-1 duration-150"
+                    >
+                        <div className="flex items-center justify-between px-0.5">
+                            <div className="flex items-center gap-2">
+                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-brand flex items-center gap-1.5">
+                                    <CalendarDays className="h-3.5 w-3.5" />
+                                    Schedule a New Fixture
+                                </span>
+                                <span className="text-[11px] text-muted-foreground">
+                                    Adds a new match to your fixture list (use the search box above to find existing games)
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsMobileQuickAddOpen(false)}
+                                className="text-xs font-semibold text-muted-foreground hover:text-foreground px-1.5 py-0.5 rounded"
+                            >
+                                Cancel ✕
+                            </button>
+                        </div>
+                        <div className="flex flex-col lg:flex-row lg:items-center gap-2">
+                            <div className="grid grid-cols-2 sm:grid-cols-5 lg:flex lg:flex-1 items-center gap-2">
+                                <Input
+                                    type="date"
+                                    value={quickDate}
+                                    onChange={(e) => {
+                                        const d = e.target.value;
+                                        setQuickDate(d);
+                                        setQuickTime(getDefaultKickoffTime(d));
+                                    }}
+                                    className="h-9 text-xs bg-surface-1 border-border lg:w-36"
+                                    required
+                                />
+                                <Input
+                                    type="time"
+                                    value={quickTime}
+                                    onChange={(e) => setQuickTime(e.target.value)}
+                                    className="h-9 text-xs bg-surface-1 border-border lg:w-28"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setQuickIsHome(h => !h)}
+                                    className={`h-9 px-3 rounded-md text-xs font-bold border transition-colors shrink-0 ${
+                                        quickIsHome
+                                            ? "bg-emerald-100/90 dark:bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border-emerald-400/70 dark:border-emerald-500/30 hover:bg-emerald-200/80 dark:hover:bg-emerald-500/25"
+                                            : "bg-sky-100/90 dark:bg-sky-500/15 text-sky-800 dark:text-sky-300 border-sky-400/70 dark:border-sky-500/30 hover:bg-sky-200/80 dark:hover:bg-sky-500/25"
+                                    }`}
+                                    title="Click to toggle Home / Away"
+                                >
+                                    {quickIsHome ? "HOME (H)" : "AWAY (A)"}
+                                </button>
+                                <Input
+                                    type="text"
+                                    list="known-opponents-list"
+                                    placeholder="Enter opponent to schedule new fixture against..."
+                                    value={quickOpponent}
+                                    onChange={(e) => setQuickOpponent(e.target.value)}
+                                    className="h-9 text-xs bg-surface-1 border-border col-span-2 sm:col-span-2 lg:flex-1 font-medium"
+                                    required
+                                />
+                                <select
+                                    value={quickCompetition}
+                                    onChange={(e) => setQuickCompetition(e.target.value)}
+                                    className="h-9 rounded-md border border-border bg-surface-1 px-2.5 text-xs text-foreground outline-none lg:w-32"
+                                >
+                                    <option value="League">League</option>
+                                    <option value="Middlesex Cup">Cup</option>
+                                    <option value="Friendly">Friendly</option>
+                                </select>
+                            </div>
+                            <Button
+                                type="submit"
+                                size="sm"
+                                disabled={isQuickAdding || !quickOpponent.trim()}
+                                className="h-9 bg-brand hover:bg-brand/90 text-brand-foreground font-bold text-xs shrink-0 px-4"
+                            >
+                                <Plus className="h-3.5 w-3.5 mr-1" />
+                                Create Fixture
+                            </Button>
+                        </div>
+                    </form>
+                )}
 
                 {/* Competition Pill Filters */}
                 <div className="flex flex-wrap items-center gap-1.5">
