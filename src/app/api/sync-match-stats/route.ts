@@ -31,7 +31,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: 'Could not fetch players from database.' }, { status: 500 });
         }
 
-        const foundStats: Record<string, { goals: number, assists: number, yellow_cards: number, red_cards: number, minutes_played: number }> = {};
+        const foundStats: Record<string, { goals: number, assists: number, yellow_cards: number, red_cards: number, minutes_played: number, participation_type: 'STARTER' | 'SUB' | 'UNUSED_SUB' }> = {};
 
         // Helper to find a player ID by name
         const matchPlayer = (text: string) => {
@@ -46,21 +46,24 @@ export async function POST(request: Request) {
             return null;
         };
 
-        // Strategy 1: FA Full-Time typical Lineup table
-        // Usually rows have Name, Goals, Yellow, Red
+        // Strategy 1: FA Full-Time / Mitoo typical Lineup table
+        // Usually rows have Name, Goals, Yellow, Red, and optionally sub Y / sub N
         $('table tr, tbody tr').each((i, row) => {
             const cells = $(row).find('td');
             if (cells.length >= 2) {
                 const cellTexts = cells.map((_, cell) => $(cell).text().trim()).get();
+                const joinedRow = cellTexts.join(' ');
                 // Attempt to match player
-                const playerId = matchPlayer(cellTexts.join(' '));
+                const playerId = matchPlayer(joinedRow);
                 if (playerId) {
+                    const isUnusedSub = /\bsub\s*n\b/i.test(joinedRow) || /\bunused\b/i.test(joinedRow);
+                    const isUsedSub = !isUnusedSub && (/\bsub\s*y\b/i.test(joinedRow) || /\bsub\b/i.test(joinedRow));
+                    const partType: 'STARTER' | 'SUB' | 'UNUSED_SUB' = isUnusedSub ? 'UNUSED_SUB' : isUsedSub ? 'SUB' : 'STARTER';
+                    const mins = partType === 'UNUSED_SUB' ? 0 : partType === 'SUB' ? 30 : 90;
+
                     if (!foundStats[playerId]) {
-                        foundStats[playerId] = { goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90 };
+                        foundStats[playerId] = { goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: mins, participation_type: partType };
                     }
-                    // Very simple heuristic: if a cell contains a number and it's near the end, it might be a goal or card.
-                    // A proper implementation would map column headers. For now we look for icon hints or just 1s.
-                    // If the row text literally contains (1) or a goal icon
                     const rowText = $(row).text();
                     const goalMatch = rowText.match(/\(?(\d+)\)?\s*Goal/i) || rowText.match(/(\d+)\s*⚽/);
                     if (goalMatch) {
@@ -81,7 +84,7 @@ export async function POST(request: Request) {
                 const playerId = matchPlayer(scorerText);
                 if (playerId) {
                     if (!foundStats[playerId]) {
-                        foundStats[playerId] = { goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90 };
+                        foundStats[playerId] = { goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90, participation_type: 'STARTER' };
                     }
                     const countMatch = scorerText.match(/\((\d+)\)/);
                     if (countMatch) {
@@ -100,7 +103,7 @@ export async function POST(request: Request) {
             for (const name of names) {
                 const playerId = matchPlayer(name);
                 if (playerId && !foundStats[playerId]) {
-                    foundStats[playerId] = { goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90 };
+                    foundStats[playerId] = { goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90, participation_type: 'STARTER' };
                 }
             }
         }

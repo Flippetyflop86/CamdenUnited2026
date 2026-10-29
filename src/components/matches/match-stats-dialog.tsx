@@ -59,6 +59,15 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
             
             for (const line of lines) {
                 const cleanLine = line.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+                const isUnusedSubLine = /\bsub\s+n\b/i.test(line) || /\bunused\b/i.test(line);
+                const isUsedSubLine = !isUnusedSubLine && (/\bsub\s+y\b/i.test(line) || /\bsub\b/i.test(line));
+                const inferredType: 'STARTER' | 'SUB' | 'UNUSED_SUB' = isUnusedSubLine
+                    ? 'UNUSED_SUB'
+                    : isUsedSubLine
+                    ? 'SUB'
+                    : 'STARTER';
+                const inferredMins = inferredType === 'UNUSED_SUB' ? 0 : inferredType === 'SUB' ? 30 : 90;
+
                 for (const p of players) {
                     const fullName = `${p.first_name.toLowerCase()} ${p.last_name.toLowerCase()}`;
                     const initialLastName = `${p.first_name[0]?.toLowerCase()} ${p.last_name.toLowerCase()}`;
@@ -66,7 +75,17 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                     if (cleanLine.includes(fullName) || cleanLine.includes(initialLastName) || cleanLine.includes(p.last_name.toLowerCase())) {
                         let stat = stats.find(s => s.player_id === p.id);
                         if (!stat) {
-                            const newStat = { match_id: matchId, player_id: p.id, goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90 };
+                            const newStat = {
+                                match_id: matchId,
+                                player_id: p.id,
+                                goals: 0,
+                                assists: 0,
+                                yellow_cards: 0,
+                                red_cards: 0,
+                                minutes_played: inferredMins,
+                                participation_type: inferredType,
+                                sub_events: [],
+                            };
                             const { data, error } = await supabase.from('match_player_stats').insert([newStat]).select().single();
                             if (data) {
                                 stats.push(data);

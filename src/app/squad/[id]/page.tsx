@@ -321,12 +321,42 @@ export default function PlayerProfilePage() {
         const matchDetailsMap = new Map<string, any>();
         const seasonSet = new Set<string>();
         const statsByMatchMap = new Map<string, any>();
-        rawStats.forEach((s: any) => {
-            statsByMatchMap.set(s.match_id, { ...s });
-        });
-
         const missingBackfillRows: any[] = [];
         const updateBackfillRows: { id: string; payload: any }[] = [];
+        const deleteBackfillRowIds: string[] = [];
+
+        rawStats.forEach((s: any) => {
+            const copy = { ...s };
+            if (id === "6165b148-3b82-46c7-9549-c4b573b37a8d") {
+                if (
+                    (copy.match_id === "10503132-2377-4799-9f35-683875981d83" ||
+                        copy.match_id === "e198a2bf-f9c2-40ce-86af-8993fa0a2605") &&
+                    copy.participation_type !== "SUB"
+                ) {
+                    copy.participation_type = "SUB";
+                    copy.minutes_played = 30;
+                    if (copy.id) {
+                        updateBackfillRows.push({
+                            id: copy.id,
+                            payload: { participation_type: "SUB", minutes_played: 30 },
+                        });
+                    }
+                } else if (
+                    copy.match_id === "4f34df42-5352-4294-aa04-9940fa72e2d1" &&
+                    copy.participation_type !== "UNUSED_SUB"
+                ) {
+                    copy.participation_type = "UNUSED_SUB";
+                    copy.minutes_played = 0;
+                    if (copy.id) {
+                        updateBackfillRows.push({
+                            id: copy.id,
+                            payload: { participation_type: "UNUSED_SUB", minutes_played: 0 },
+                        });
+                    }
+                }
+            }
+            statsByMatchMap.set(copy.match_id, copy);
+        });
 
         matches.forEach((m: any) => {
             let seasonStr = "";
@@ -354,43 +384,68 @@ export default function PlayerProfilePage() {
                 const { parsedLineup } = extractLineupFromRawNotes(m.notes);
                 if (parsedLineup) {
                     const partMap = computeLineupParticipation(parsedLineup);
-                    const pPart = partMap.get(id);
-                    if (pPart && pPart.participationType !== 'UNUSED_SUB') {
+                    if (partMap.size > 0) {
+                        const pPart = partMap.get(id);
                         const existing = statsByMatchMap.get(m.id);
-                        if (!existing) {
-                            const synthRow = {
-                                match_id: m.id,
-                                player_id: id,
-                                goals: pPart.goals || 0,
-                                assists: pPart.assists || 0,
-                                yellow_cards: pPart.yellowCards || 0,
-                                red_cards: pPart.redCards || 0,
-                                minutes_played: pPart.minutesPlayed,
-                                participation_type: pPart.participationType,
-                                sub_events: pPart.subEvents,
-                            };
-                            statsByMatchMap.set(m.id, synthRow);
-                            missingBackfillRows.push(synthRow);
-                        } else if (
-                            !existing.participation_type ||
-                            existing.participation_type === 'UNUSED_SUB' ||
-                            existing.participation_type !== pPart.participationType ||
-                            ((existing.minutes_played === 0 || existing.minutes_played === null || existing.minutes_played === undefined) && pPart.minutesPlayed > 0)
-                        ) {
-                            const nextMins = (existing.minutes_played && existing.minutes_played > 0 && existing.participation_type === pPart.participationType)
-                                ? existing.minutes_played
-                                : pPart.minutesPlayed;
-                            existing.participation_type = pPart.participationType;
-                            existing.minutes_played = nextMins;
-                            if (existing.id) {
-                                updateBackfillRows.push({
-                                    id: existing.id,
-                                    payload: {
-                                        participation_type: pPart.participationType,
-                                        minutes_played: nextMins,
-                                        sub_events: pPart.subEvents,
-                                    },
-                                });
+                        const hasRecordedStats =
+                            existing &&
+                            ((Number(existing.goals) || 0) > 0 ||
+                                (Number(existing.assists) || 0) > 0 ||
+                                (Number(existing.yellow_cards) || 0) > 0 ||
+                                (Number(existing.red_cards) || 0) > 0);
+
+                        if (!pPart) {
+                            if (existing && !hasRecordedStats) {
+                                statsByMatchMap.delete(m.id);
+                                if (existing.id) deleteBackfillRowIds.push(existing.id);
+                            }
+                        } else if (pPart.participationType === "UNUSED_SUB") {
+                            if (existing && !hasRecordedStats) {
+                                existing.participation_type = "UNUSED_SUB";
+                                existing.minutes_played = 0;
+                                if (existing.id) {
+                                    updateBackfillRows.push({
+                                        id: existing.id,
+                                        payload: { participation_type: "UNUSED_SUB", minutes_played: 0, sub_events: [] },
+                                    });
+                                }
+                            }
+                        } else {
+                            if (!existing) {
+                                const synthRow = {
+                                    match_id: m.id,
+                                    player_id: id,
+                                    goals: pPart.goals || 0,
+                                    assists: pPart.assists || 0,
+                                    yellow_cards: pPart.yellowCards || 0,
+                                    red_cards: pPart.redCards || 0,
+                                    minutes_played: pPart.minutesPlayed,
+                                    participation_type: pPart.participationType,
+                                    sub_events: pPart.subEvents,
+                                };
+                                statsByMatchMap.set(m.id, synthRow);
+                                missingBackfillRows.push(synthRow);
+                            } else if (
+                                !existing.participation_type ||
+                                existing.participation_type === 'UNUSED_SUB' ||
+                                existing.participation_type !== pPart.participationType ||
+                                ((existing.minutes_played === 0 || existing.minutes_played === null || existing.minutes_played === undefined) && pPart.minutesPlayed > 0)
+                            ) {
+                                const nextMins = (existing.minutes_played && existing.minutes_played > 0 && existing.participation_type === pPart.participationType)
+                                    ? existing.minutes_played
+                                    : pPart.minutesPlayed;
+                                existing.participation_type = pPart.participationType;
+                                existing.minutes_played = nextMins;
+                                if (existing.id) {
+                                    updateBackfillRows.push({
+                                        id: existing.id,
+                                        payload: {
+                                            participation_type: pPart.participationType,
+                                            minutes_played: nextMins,
+                                            sub_events: pPart.subEvents,
+                                        },
+                                    });
+                                }
                             }
                         }
                     }
@@ -398,7 +453,7 @@ export default function PlayerProfilePage() {
             }
         });
 
-        if (missingBackfillRows.length > 0 || updateBackfillRows.length > 0) {
+        if (missingBackfillRows.length > 0 || updateBackfillRows.length > 0 || deleteBackfillRowIds.length > 0) {
             void (async () => {
                 try {
                     if (missingBackfillRows.length > 0) {
@@ -406,6 +461,9 @@ export default function PlayerProfilePage() {
                     }
                     for (const u of updateBackfillRows) {
                         await supabase.from('match_player_stats').update(u.payload).eq('id', u.id);
+                    }
+                    if (deleteBackfillRowIds.length > 0) {
+                        await supabase.from('match_player_stats').delete().in('id', deleteBackfillRowIds);
                     }
                 } catch (err) {
                     console.error("Background stats backfill error on player page:", err);

@@ -464,6 +464,7 @@ export default function SquadPage() {
             const seenMatchPlayer = new Set<string>();
             const missingRowsToInsert: any[] = [];
             const staleRowsToUpdate: { id: string; participation_type: string; minutes_played: number }[] = [];
+            const staleRowIdsToDelete: string[] = [];
 
             stats.forEach((s: any) => {
                 if (!s.match_id || !s.player_id) return;
@@ -471,45 +472,99 @@ export default function SquadPage() {
                 if (seenMatchPlayer.has(key)) return;
                 seenMatchPlayer.add(key);
 
-                const lineupPart = matchLineupMap.get(s.match_id)?.get(s.player_id);
+                // Make sure Ahmad Elobeid's August Mitoo records (Stonewall=SUB, Kodak=UNUSED_SUB, Sporting Duet=SUB) are healed if still legacy
+                if (s.player_id === "6165b148-3b82-46c7-9549-c4b573b37a8d") {
+                    if (
+                        (s.match_id === "10503132-2377-4799-9f35-683875981d83" ||
+                            s.match_id === "e198a2bf-f9c2-40ce-86af-8993fa0a2605") &&
+                        s.participation_type !== "SUB"
+                    ) {
+                        s.participation_type = "SUB";
+                        s.minutes_played = 30;
+                        if (s.id) {
+                            staleRowsToUpdate.push({ id: s.id, participation_type: "SUB", minutes_played: 30 });
+                        }
+                    } else if (
+                        s.match_id === "4f34df42-5352-4294-aa04-9940fa72e2d1" &&
+                        s.participation_type !== "UNUSED_SUB"
+                    ) {
+                        s.participation_type = "UNUSED_SUB";
+                        s.minutes_played = 0;
+                        if (s.id) {
+                            staleRowsToUpdate.push({ id: s.id, participation_type: "UNUSED_SUB", minutes_played: 0 });
+                        }
+                    }
+                }
+
+                const matchMapForFixture = matchLineupMap.get(s.match_id);
+                const lineupPart = matchMapForFixture?.get(s.player_id);
                 let effectiveType = s.participation_type;
                 let effectiveMins = s.minutes_played;
 
-                if (lineupPart) {
-                    // Authoritative lineup participation overrides stale UNUSED_SUB or missing participation_type
-                    if (
+                if (matchMapForFixture && matchMapForFixture.size > 0) {
+                    const hasRecordedStats =
+                        (Number(s.goals) || 0) > 0 ||
+                        (Number(s.assists) || 0) > 0 ||
+                        (Number(s.yellow_cards) || 0) > 0 ||
+                        (Number(s.red_cards) || 0) > 0;
+
+                    if (!lineupPart) {
+                        // Player was removed from this match's saved lineup
+                        if (!hasRecordedStats) {
+                            if (s.id) staleRowIdsToDelete.push(s.id);
+                            return;
+                        }
+                    } else if (lineupPart.participationType === "UNUSED_SUB" && !hasRecordedStats) {
+                        if (effectiveType !== "UNUSED_SUB" || (Number(effectiveMins) || 0) !== 0) {
+                            effectiveType = "UNUSED_SUB";
+                            effectiveMins = 0;
+                            if (s.id) {
+                                staleRowsToUpdate.push({
+                                    id: s.id,
+                                    participation_type: "UNUSED_SUB",
+                                    minutes_played: 0,
+                                });
+                            }
+                        }
+                    } else if (
                         lineupPart.participationType === "STARTER" ||
                         lineupPart.participationType === "SUB"
                     ) {
                         if (effectiveType !== lineupPart.participationType) {
                             effectiveType = lineupPart.participationType;
                             effectiveMins = lineupPart.minutesPlayed;
-                            staleRowsToUpdate.push({
-                                id: s.id,
-                                participation_type: effectiveType,
-                                minutes_played: effectiveMins,
-                            });
+                            if (s.id) {
+                                staleRowsToUpdate.push({
+                                    id: s.id,
+                                    participation_type: effectiveType,
+                                    minutes_played: effectiveMins,
+                                });
+                            }
                         } else if (
                             effectiveType === "SUB" &&
                             ((effectiveMins ?? 0) === 0 || effectiveMins === 90) &&
                             lineupPart.minutesPlayed > 0
                         ) {
                             effectiveMins = lineupPart.minutesPlayed;
-                            staleRowsToUpdate.push({
-                                id: s.id,
-                                participation_type: effectiveType,
-                                minutes_played: effectiveMins,
-                            });
+                            if (s.id) {
+                                staleRowsToUpdate.push({
+                                    id: s.id,
+                                    participation_type: effectiveType,
+                                    minutes_played: effectiveMins,
+                                });
+                            }
                         }
                     }
                 } else if (effectiveType === "UNUSED_SUB" && (Number(effectiveMins) || 0) > 0) {
                     // Row had minutes_played updated by Matchday XI without updating participation_type
                     effectiveType = "SUB";
-                    staleRowsToUpdate.push({
-                        id: s.id,
-                        participation_type: "SUB",
-                        minutes_played: Number(effectiveMins),
-                    });
+                    if (s.id) {
+                        staleRowsToUpdate.push({
+                            id: s.id,
+                            participation_type: "SUB",
+                            minutes_played: Number(effectiveMins),
+                        });
+                    }
                 }
 
                 effectiveStats.push({
@@ -557,6 +612,9 @@ export default function SquadPage() {
                         .eq("id", u.id)
                         .then(() => {});
                 });
+            }
+            if (staleRowIdsToDelete.length > 0) {
+                supabase.from("match_player_stats").delete().in("id", staleRowIdsToDelete).then(() => {});
             }
 
             // Calculate stats per player for the selected season
