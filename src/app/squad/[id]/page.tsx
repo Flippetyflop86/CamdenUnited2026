@@ -1227,9 +1227,8 @@ export default function PlayerProfilePage() {
                                             ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
                                             : "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30";
                                     return (
-                                        <Link
+                                        <span
                                             key={`${fm.matchId}-${i}`}
-                                            href={`/analysis?matchId=${fm.matchId}`}
                                             title={`${letter} ${fm.scoreline || ""} vs ${fm.opponent} (${fm.isHome ? "H" : "A"})`}
                                             className={cn(
                                                 "w-6 h-6 rounded-md border text-[11px] font-extrabold flex items-center justify-center",
@@ -1237,7 +1236,7 @@ export default function PlayerProfilePage() {
                                             )}
                                         >
                                             {letter}
-                                        </Link>
+                                        </span>
                                     );
                                 })}
                             </div>
@@ -1782,17 +1781,16 @@ export default function PlayerProfilePage() {
                                                 ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
                                                 : "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30";
                                         return (
-                                            <Link
+                                            <span
                                                 key={`${fm.matchId}-${i}`}
-                                                href={`/analysis?matchId=${fm.matchId}`}
                                                 title={`${letter} ${fm.scoreline || ""} vs ${fm.opponent} (${fm.isHome ? "H" : "A"})${fm.goals ? ` • ${fm.goals}G` : ""}${fm.assists ? ` • ${fm.assists}A` : ""}`}
                                                 className={cn(
-                                                    "w-6 h-6 rounded-md border text-[11px] font-extrabold flex items-center justify-center transition-transform hover:scale-110",
+                                                    "w-6 h-6 rounded-md border text-[11px] font-extrabold flex items-center justify-center",
                                                     pillCls
                                                 )}
                                             >
                                                 {letter}
-                                            </Link>
+                                            </span>
                                         );
                                     })}
                                 </div>
@@ -2176,8 +2174,7 @@ export default function PlayerProfilePage() {
                                                 return (
                                                     <div
                                                         key={`mob-${m.matchId}-${idx}`}
-                                                        onClick={() => router.push(`/analysis?matchId=${m.matchId}`)}
-                                                        className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-2.5 active:bg-surface-2/60 transition-colors cursor-pointer"
+                                                        className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-2.5"
                                                     >
                                                         {/* Left: Result Pill + Opponent + Date/Role */}
                                                         <div className="min-w-0 flex-1 space-y-1">
@@ -2325,20 +2322,17 @@ export default function PlayerProfilePage() {
                                                     return (
                                                         <tr
                                                             key={`${m.matchId}-${idx}`}
-                                                            onClick={() => router.push(`/analysis?matchId=${m.matchId}`)}
-                                                            title={`Open match analysis vs ${m.opponent}`}
-                                                            className="group hover:bg-surface-2/60 transition-colors cursor-pointer"
+                                                            className="hover:bg-surface-2/60 transition-colors"
                                                         >
                                                             <td className="py-2.5 pr-3 font-medium text-muted-foreground whitespace-nowrap">
                                                                 {dateLabel}
                                                             </td>
                                                             <td className="py-2.5 px-3 font-bold text-foreground">
                                                                 <div className="inline-flex items-center gap-1.5">
-                                                                    <span className="group-hover:text-brand transition-colors">{m.opponent}</span>
+                                                                    <span>{m.opponent}</span>
                                                                     <span className="text-[10px] font-semibold text-muted-foreground">
                                                                         ({m.isHome ? "H" : "A"})
                                                                     </span>
-                                                                    <ExternalLink className="w-3 h-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                                                                 </div>
                                                             </td>
                                                             <td className="py-2.5 px-3 text-muted-foreground hidden sm:table-cell">
