@@ -86,6 +86,23 @@ export default function DashboardPage() {
     // Load standings table from localStorage or Supabase settings
     useEffect(() => {
         if (typeof window === "undefined") return;
+        const normalizeRows = (rows: any[]): StandingsRow[] =>
+            rows
+                .filter((r) => r && (r.team_name || r.team))
+                .map((r, idx) => ({
+                    position: Number(r.position ?? r.pos ?? idx + 1),
+                    team_name: String(r.team_name || r.team || "Club"),
+                    played: Number(r.played ?? 0),
+                    won: Number(r.won ?? 0),
+                    drawn: Number(r.drawn ?? 0),
+                    lost: Number(r.lost ?? 0),
+                    goals_for: Number(r.goals_for ?? r.gf ?? 0),
+                    goals_against: Number(r.goals_against ?? r.ga ?? 0),
+                    goal_difference: Number(r.goal_difference ?? r.gd ?? 0),
+                    points: Number(r.points ?? r.pts ?? 0),
+                    is_our_club: Boolean(r.is_our_club),
+                }));
+
         const loadStandings = () => {
             try {
                 const scopedKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
@@ -95,8 +112,11 @@ export default function DashboardPage() {
                 if (raw) {
                     const parsed = JSON.parse(raw);
                     if (Array.isArray(parsed) && parsed.length > 0) {
-                        setStandingsTable(parsed);
-                        return;
+                        const normalized = normalizeRows(parsed);
+                        if (normalized.length > 0) {
+                            setStandingsTable(normalized);
+                            return;
+                        }
                     }
                 }
                 if (
@@ -104,7 +124,10 @@ export default function DashboardPage() {
                     Array.isArray(settings.lastImportHistory.leagueTable) &&
                     settings.lastImportHistory.leagueTable.length > 0
                 ) {
-                    setStandingsTable(settings.lastImportHistory.leagueTable);
+                    const normalized = normalizeRows(settings.lastImportHistory.leagueTable);
+                    if (normalized.length > 0) {
+                        setStandingsTable(normalized);
+                    }
                 }
             } catch (e) {
                 // Ignore parse error
@@ -335,16 +358,17 @@ export default function DashboardPage() {
     const getTeamLeaguePos = (teamName?: string): number | null => {
         if (!teamName || standingsTable.length === 0) return null;
         const clean = (s: string) =>
-            s.toLowerCase()
+            (s || "")
+                .toLowerCase()
                 .replace(/\b(fc|afc|united|utd|city|town|athletic|ath|rovers|wanderers|albion|sc|1st|first|xi|reserves|res)\b/gi, "")
                 .replace(/[^a-z0-9]/g, "")
                 .trim();
         const target = clean(teamName);
         if (!target) return null;
-        const exact = standingsTable.find(r => r.team_name.toLowerCase().trim() === teamName.toLowerCase().trim());
+        const exact = standingsTable.find(r => (r.team_name || "").toLowerCase().trim() === teamName.toLowerCase().trim());
         if (exact) return exact.position;
         const fuzzy = standingsTable.find(r => {
-            const c = clean(r.team_name);
+            const c = clean(r.team_name || "");
             return c && (c === target || c.includes(target) || target.includes(c));
         });
         return fuzzy ? fuzzy.position : null;
@@ -369,7 +393,7 @@ export default function DashboardPage() {
 
     const ourStandingsRow = useMemo(() => {
         return standingsTable.find(r => r.is_our_club) ||
-            (settings.name ? standingsTable.find(r => r.team_name.toLowerCase().includes(settings.name.toLowerCase())) : undefined);
+            (settings.name ? standingsTable.find(r => (r.team_name || "").toLowerCase().includes(settings.name.toLowerCase())) : undefined);
     }, [standingsTable, settings.name]);
 
     const currentPosNumber = ourStandingsRow?.position || settings.leaguePosition || null;
@@ -379,7 +403,7 @@ export default function DashboardPage() {
     const miniTableRows = useMemo(() => {
         if (standingsTable.length === 0) return [];
         const sorted = [...standingsTable].sort((a, b) => a.position - b.position);
-        const ourIdx = sorted.findIndex(r => r.is_our_club || (settings.name && r.team_name.toLowerCase().includes(settings.name.toLowerCase())));
+        const ourIdx = sorted.findIndex(r => r.is_our_club || (settings.name && (r.team_name || "").toLowerCase().includes(settings.name.toLowerCase())));
         if (ourIdx <= 0) return sorted.slice(0, 3);
         if (ourIdx >= sorted.length - 1) return sorted.slice(Math.max(0, sorted.length - 3));
         return sorted.slice(ourIdx - 1, ourIdx + 2);

@@ -108,17 +108,19 @@ export default function LeagueTablePage() {
     const faLrCodeKey = `${storageKey}_fa_lrcode`;
     const prevPositionsKey = `${storageKey}_prev_positions`;
 
-    const isOurClubName = (teamName: string): boolean => {
+    const isOurClubName = (teamName?: string): boolean => {
+        if (!teamName) return false;
         const clubLower = (settings.name || "Camden United").toLowerCase().trim();
         const clubCore = clubLower.replace(/\bfc\b/g, "").trim();
-        const candidate = teamName.toLowerCase().trim();
+        const candidate = String(teamName).toLowerCase().trim();
         if (candidate === clubLower) return true;
         if (clubCore.length >= 4 && candidate === clubCore) return true;
         return candidate.includes(clubLower);
     };
 
-    const normalizeTeamKey = (name: string): string => {
-        return name
+    const normalizeTeamKey = (name?: string): string => {
+        if (!name) return "";
+        return String(name)
             .toLowerCase()
             .replace(/\b(fc|afc|first|1st|reserves|united|utd)\b/g, (m) => (m === 'utd' ? 'united' : m === 'fc' || m === 'afc' || m === 'first' || m === '1st' ? '' : m))
             .replace(/[^a-z0-9]/g, '')
@@ -139,7 +141,27 @@ export default function LeagueTablePage() {
     };
 
     // Feature #6 & #10: Attach Position Movement Arrows AND W/D/L Form Diffing
-    const attachPositionMovements = (newRows: LeagueRow[], existingRows?: LeagueRow[] | null): LeagueRow[] => {
+    const attachPositionMovements = (rawNewRows: any[], existingRows?: LeagueRow[] | null): LeagueRow[] => {
+        const newRows: LeagueRow[] = (rawNewRows || [])
+            .filter((r) => r && (r.team_name || r.team))
+            .map((r, idx) => {
+                const tName = String(r.team_name || r.team || "Club");
+                return {
+                    position: Number(r.position ?? r.pos ?? idx + 1),
+                    previous_position: r.previous_position,
+                    team_name: tName,
+                    played: Number(r.played ?? 0),
+                    won: Number(r.won ?? 0),
+                    drawn: Number(r.drawn ?? 0),
+                    lost: Number(r.lost ?? 0),
+                    goals_for: Number(r.goals_for ?? r.gf ?? 0),
+                    goals_against: Number(r.goals_against ?? r.ga ?? 0),
+                    goal_difference: Number(r.goal_difference ?? r.gd ?? 0),
+                    points: Number(r.points ?? r.pts ?? 0),
+                    form: Array.isArray(r.form) ? r.form : undefined,
+                    is_our_club: Boolean(r.is_our_club || isOurClubName(tName)),
+                };
+            });
         try {
             type TeamSnapshot = {
                 position: number;

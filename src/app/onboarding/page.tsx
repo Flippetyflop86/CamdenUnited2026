@@ -107,7 +107,7 @@ const ROLE_PRESETS = [
 ];
 
 const COMPETITION_PRESETS = [
-    { id: "step5_7", label: "Saturday Step 5–7", ko: "15:00", comp: "Premier Division", meetOffset: 75 },
+    { id: "step1_8", label: "Saturday Step 1–8", ko: "15:00", comp: "Premier Division", meetOffset: 75 },
     { id: "regional", label: "Saturday Regional / County", ko: "14:00", comp: "Senior Division", meetOffset: 60 },
     { id: "sunday", label: "Sunday League", ko: "10:30", comp: "Sunday Premier", meetOffset: 45 },
     { id: "midweek", label: "Midweek Floodlit / Vets", ko: "19:45", comp: "Midweek Floodlit League", meetOffset: 60 },
@@ -159,8 +159,24 @@ const FORMATIONS: Record<string, { label: string; coords: { x: number; y: number
             { x: 38, y: 48, role: "CM" },
             { x: 62, y: 48, role: "CM" },
             { x: 82, y: 44, role: "RM" },
-            { x: 36, y: 18, role: "ST" },
-            { x: 64, y: 18, role: "ST" },
+            { x: 36, y: 16, role: "ST" },
+            { x: 64, y: 16, role: "ST" },
+        ],
+    },
+    "4-1-4-1": {
+        label: "4-1-4-1 Balanced",
+        coords: [
+            { x: 50, y: 88, role: "GK" },
+            { x: 18, y: 68, role: "LB" },
+            { x: 38, y: 72, role: "CB" },
+            { x: 62, y: 72, role: "CB" },
+            { x: 82, y: 68, role: "RB" },
+            { x: 50, y: 55, role: "CDM" },
+            { x: 16, y: 36, role: "LM" },
+            { x: 38, y: 38, role: "CM" },
+            { x: 62, y: 38, role: "CM" },
+            { x: 84, y: 36, role: "RM" },
+            { x: 50, y: 15, role: "ST" },
         ],
     },
     "3-5-2": {
@@ -175,8 +191,24 @@ const FORMATIONS: Record<string, { label: string; coords: { x: number; y: number
             { x: 34, y: 42, role: "CM" },
             { x: 66, y: 42, role: "CM" },
             { x: 86, y: 46, role: "RWB" },
-            { x: 36, y: 18, role: "ST" },
-            { x: 64, y: 18, role: "ST" },
+            { x: 36, y: 16, role: "ST" },
+            { x: 64, y: 16, role: "ST" },
+        ],
+    },
+    "3-4-3": {
+        label: "3-4-3 High Press",
+        coords: [
+            { x: 50, y: 88, role: "GK" },
+            { x: 26, y: 72, role: "CB" },
+            { x: 50, y: 74, role: "CB" },
+            { x: 74, y: 72, role: "CB" },
+            { x: 15, y: 46, role: "LWB" },
+            { x: 38, y: 48, role: "CM" },
+            { x: 62, y: 48, role: "CM" },
+            { x: 85, y: 46, role: "RWB" },
+            { x: 22, y: 20, role: "LW" },
+            { x: 50, y: 15, role: "ST" },
+            { x: 78, y: 20, role: "RW" },
         ],
     },
 };
@@ -398,15 +430,19 @@ function OnboardingContent() {
     const [sponsorLogo, setSponsorLogo] = useState<string | null>(settings.sponsorLogo);
 
     // Stage 2: Matchday, Tactical & Finances
-    const [competitionPreset, setCompetitionPreset] = useState("step5_7");
+    const [competitionPreset, setCompetitionPreset] = useState("step1_8");
     const [preferredFormation, setPreferredFormation] = useState<string>("4-3-3");
-    const [useMatchdayNumbering, setUseMatchdayNumbering] = useState(settings.useMatchdayNumbering ?? true);
+    const [useMatchdayNumbering, setUseMatchdayNumbering] = useState<boolean>(
+        isRerun ? (settings.useMatchdayNumbering ?? true) : true
+    );
     const [homeGround, setHomeGround] = useState(settings.homeGround || "");
     const [trainingLocation, setTrainingLocation] = useState(settings.trainingLocation || "");
     const [defaultHomeKickOff, setDefaultHomeKickOff] = useState(settings.defaultHomeKickOff || "15:00");
     const [defaultCompetition, setDefaultCompetition] = useState(settings.defaultCompetition || "Premier Division");
     const [meetOffsetMins, setMeetOffsetMins] = useState<number>(75);
-    const [squads, setSquads] = useState<string[]>(settings.squads?.length ? settings.squads : ["First Team"]);
+    const [squads, setSquads] = useState<string[]>(
+        isRerun && settings.squads?.length ? settings.squads : ["First Team"]
+    );
     const [customSquadInput, setCustomSquadInput] = useState("");
     const [whatsappPollMessage, setWhatsappPollMessage] = useState(
         settings.whatsappPollMessage ||
@@ -479,7 +515,7 @@ function OnboardingContent() {
         }
     }, [settings.name, settings.logo]);
 
-    // Extract dominant colors from uploaded badge using HTML5 Canvas
+    // Extract optional brand color swatches from uploaded badge using HTML5 Canvas
     const extractColorsFromImage = (dataUrl: string) => {
         if (typeof window === "undefined") return;
         const img = new Image();
@@ -523,13 +559,6 @@ function OnboardingContent() {
 
                 if (topColors.length > 0) {
                     setExtractedSwatches(topColors);
-                    setPrimaryColor(topColors[0]);
-                    setHomeKitShirt(topColors[0]);
-                    setHomeKitSocks(topColors[0]);
-                    if (topColors[1]) {
-                        setAwayKitShirt(topColors[1]);
-                        setAwayKitSocks(topColors[1]);
-                    }
                 }
             } catch {
                 // Ignore canvas taint errors
@@ -665,16 +694,36 @@ function OnboardingContent() {
         if (parsedStandingsRows.length === 0 || !clubId) return;
         setIsImportingTable(true);
         try {
-            const storageKey = `clubflow_league_table_${clubId}`;
-            localStorage.setItem(storageKey, JSON.stringify(parsedStandingsRows));
-
-            // Find our club's position if present
             const ourNameLower = (clubName || settings.name || "").toLowerCase().trim();
-            const ourRow = parsedStandingsRows.find(
-                (r) =>
-                    ourNameLower &&
-                    (r.team.toLowerCase().includes(ourNameLower) || ourNameLower.includes(r.team.toLowerCase()))
-            );
+            const normalizedStandings = parsedStandingsRows.map((r) => {
+                const isOurs =
+                    Boolean(ourNameLower) &&
+                    (r.team.toLowerCase().includes(ourNameLower) || ourNameLower.includes(r.team.toLowerCase()));
+                return {
+                    position: r.pos,
+                    pos: r.pos,
+                    team_name: r.team,
+                    team: r.team,
+                    played: r.played,
+                    won: r.won,
+                    drawn: r.drawn,
+                    lost: r.lost,
+                    goals_for: r.gf,
+                    gf: r.gf,
+                    goals_against: r.ga,
+                    ga: r.ga,
+                    goal_difference: r.gd,
+                    gd: r.gd,
+                    points: r.pts,
+                    pts: r.pts,
+                    is_our_club: isOurs,
+                };
+            });
+
+            const storageKey = `clubflow_league_table_${clubId}`;
+            localStorage.setItem(storageKey, JSON.stringify(normalizedStandings));
+
+            const ourRow = normalizedStandings.find((r) => r.is_our_club);
 
             // Sync opponent clubs to league_teams
             const existingRes = await supabase.from("league_teams").select("name").eq("club_id", clubId);
@@ -692,9 +741,10 @@ function OnboardingContent() {
             }
 
             await updateSettings({
-                leaguePosition: ourRow ? ourRow.pos : settings.leaguePosition,
+                leaguePosition: ourRow ? ourRow.position : settings.leaguePosition,
                 lastImportHistory: {
                     ...settings.lastImportHistory,
+                    leagueTable: normalizedStandings,
                     table: {
                         timestamp: new Date().toISOString(),
                         summary: `Imported ${parsedStandingsRows.length} teams during onboarding`,
@@ -722,7 +772,7 @@ function OnboardingContent() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     rawText: rawFixturesPaste,
-                    clubName: clubName || settings.name || "Camden United",
+                    clubName: clubName || settings.name || "Our Club FC",
                     defaultHomeGround: homeGround || settings.homeGround || "Home Ground",
                     defaultKickOff: defaultHomeKickOff || "15:00",
                     defaultCompetition: defaultCompetition || "League",
@@ -742,18 +792,30 @@ function OnboardingContent() {
         if (parsedFixturesPreview.length === 0 || !clubId) return;
         setIsImportingFixtures(true);
         try {
-            const rows = parsedFixturesPreview.map((f: any) => ({
-                club_id: clubId,
-                opponent: f.opponent,
-                date: f.date,
-                kick_off: f.kickOff || defaultHomeKickOff || "15:00",
-                home_away: f.homeAway || "Home",
-                venue: f.venue || (f.homeAway === "Home" ? homeGround || "Home Ground" : "Away Venue"),
-                competition: f.competition || defaultCompetition || "League",
-                result: f.result || "Pending",
-                scoreline: f.scoreline || null,
-                squad: squads[0] || "First Team",
-            }));
+            const rows = parsedFixturesPreview.map((f: any) => {
+                const isHome = (f.homeAway || "Home").toLowerCase() !== "away";
+                const venueStr = f.venue || (isHome ? homeGround || "Home Ground" : "Away Venue");
+                const rawRes = (f.result || "Pending").toUpperCase();
+                const normResult =
+                    rawRes === "W" || rawRes === "WIN"
+                        ? "Win"
+                        : rawRes === "D" || rawRes === "DRAW"
+                        ? "Draw"
+                        : rawRes === "L" || rawRes === "LOSS"
+                        ? "Loss"
+                        : "Pending";
+                return {
+                    club_id: clubId,
+                    opponent: f.opponent,
+                    date: f.date,
+                    time: f.kickOff || defaultHomeKickOff || "15:00",
+                    is_home: isHome,
+                    competition: f.competition || defaultCompetition || "League",
+                    result: normResult,
+                    scoreline: f.scoreline || null,
+                    notes: `[Location: ${venueStr}]\n[Surface: 4G]`,
+                };
+            });
 
             const { error } = await supabase.from("matches").insert(rows);
             if (error) throw error;
@@ -775,22 +837,22 @@ function OnboardingContent() {
         try {
             const defaultSquad = squads[0] || "First Team";
             const samplePlayers = [
-                { first_name: "Aaron", last_name: "Ramsdale", position: "GK", squad_number: 1 },
-                { first_name: "Kyle", last_name: "Walker-Peters", position: "RB", squad_number: 2 },
-                { first_name: "Tyrick", last_name: "Mitchell", position: "LB", squad_number: 3 },
-                { first_name: "Marc", last_name: "Guehi", position: "CB", squad_number: 4 },
-                { first_name: "Ezri", last_name: "Konsa", position: "CB", squad_number: 5 },
-                { first_name: "Declan", last_name: "Rice", position: "CDM", squad_number: 6 },
-                { first_name: "Bukayo", last_name: "Saka", position: "RW", squad_number: 7 },
-                { first_name: "Conor", last_name: "Gallagher", position: "CM", squad_number: 8 },
-                { first_name: "Ollie", last_name: "Watkins", position: "ST", squad_number: 9 },
-                { first_name: "Eberechi", last_name: "Eze", position: "CAM", squad_number: 10 },
-                { first_name: "Anthony", last_name: "Gordon", position: "LW", squad_number: 11 },
-                { first_name: "Levi", last_name: "Colwill", position: "CB", squad_number: 12 },
-                { first_name: "Curtis", last_name: "Jones", position: "CM", squad_number: 14 },
-                { first_name: "Jarrod", last_name: "Bowen", position: "RW", squad_number: 17 },
-                { first_name: "Ivan", last_name: "Toney", position: "ST", squad_number: 19 },
-                { first_name: "Dean", last_name: "Henderson", position: "GK", squad_number: 22 },
+                { first_name: "Callum", last_name: "Mercer", position: "GK", squad_number: 1 },
+                { first_name: "Liam", last_name: "Sterling", position: "RB", squad_number: 2 },
+                { first_name: "Theo", last_name: "Kavanagh", position: "LB", squad_number: 3 },
+                { first_name: "Marcus", last_name: "Vance", position: "CB", squad_number: 4 },
+                { first_name: "Devon", last_name: "Richards", position: "CB", squad_number: 5 },
+                { first_name: "Harrison", last_name: "Cole", position: "CDM", squad_number: 6 },
+                { first_name: "Jayden", last_name: "Okafor", position: "RW", squad_number: 7 },
+                { first_name: "Finley", last_name: "Maddox", position: "CM", squad_number: 8 },
+                { first_name: "Nathan", last_name: "Cross", position: "ST", squad_number: 9 },
+                { first_name: "Zac", last_name: "Bellinger", position: "CAM", squad_number: 10 },
+                { first_name: "Kian", last_name: "Mensah", position: "LW", squad_number: 11 },
+                { first_name: "Rory", last_name: "Gallagher-Reid", position: "CB", squad_number: 12 },
+                { first_name: "Elliot", last_name: "Thorne", position: "CM", squad_number: 14 },
+                { first_name: "Toby", last_name: "Ashford", position: "RW", squad_number: 17 },
+                { first_name: "Dante", last_name: "Sinclair", position: "ST", squad_number: 19 },
+                { first_name: "Sam", last_name: "Hargreaves", position: "GK", squad_number: 22 },
             ].map((p) => ({
                 ...p,
                 club_id: clubId,
@@ -802,7 +864,8 @@ function OnboardingContent() {
                 is_in_matchday_tracker: true,
             }));
 
-            await supabase.from("players").insert(samplePlayers);
+            const { error: pErr } = await supabase.from("players").insert(samplePlayers);
+            if (pErr) throw pErr;
 
             const today = new Date();
             const offsetDate = (days: number) => {
@@ -811,67 +874,69 @@ function OnboardingContent() {
                 return d.toISOString().split("T")[0];
             };
 
+            const homeVenue = homeGround || "Home Ground";
             const sampleMatches = [
                 {
                     club_id: clubId,
                     opponent: "Highgate Albion FC",
                     date: offsetDate(-14),
-                    kick_off: defaultHomeKickOff,
-                    home_away: "Home",
-                    venue: homeGround || "Home Ground",
-                    competition: defaultCompetition,
-                    result: "W",
+                    time: defaultHomeKickOff || "15:00",
+                    is_home: true,
+                    competition: defaultCompetition || "League",
+                    result: "Win",
                     scoreline: "3-1",
-                    squad: defaultSquad,
+                    goalscorers: "Nathan Cross (2), Jayden Okafor",
+                    assists: "Zac Bellinger (2), Liam Sterling",
+                    notes: `[Location: ${homeVenue}]\n[Surface: 4G]\n[MOTM: Nathan Cross]`,
                 },
                 {
                     club_id: clubId,
                     opponent: "Islington Borough",
                     date: offsetDate(-7),
-                    kick_off: defaultHomeKickOff,
-                    home_away: "Away",
-                    venue: "Market Road Pitches",
-                    competition: defaultCompetition,
-                    result: "D",
+                    time: defaultHomeKickOff || "15:00",
+                    is_home: false,
+                    competition: defaultCompetition || "League",
+                    result: "Draw",
                     scoreline: "2-2",
-                    squad: defaultSquad,
+                    goalscorers: "Kian Mensah, Harrison Cole",
+                    assists: "Finley Maddox",
+                    notes: `[Location: Market Road Pitches]\n[Surface: 4G]\n[MOTM: Harrison Cole]`,
                 },
                 {
                     club_id: clubId,
                     opponent: "Hackney Wick Athletic",
                     date: offsetDate(4),
-                    kick_off: defaultHomeKickOff,
-                    home_away: "Home",
-                    venue: homeGround || "Home Ground",
-                    competition: defaultCompetition,
+                    time: defaultHomeKickOff || "15:00",
+                    is_home: true,
+                    competition: defaultCompetition || "League",
                     result: "Pending",
                     scoreline: null,
-                    squad: defaultSquad,
+                    notes: `[Location: ${homeVenue}]\n[Surface: 4G]`,
                 },
                 {
                     club_id: clubId,
                     opponent: "Finsbury Park Rovers",
                     date: offsetDate(11),
-                    kick_off: defaultHomeKickOff,
-                    home_away: "Away",
-                    venue: "Downhills Park",
-                    competition: defaultCompetition,
+                    time: defaultHomeKickOff || "15:00",
+                    is_home: false,
+                    competition: defaultCompetition || "League",
                     result: "Pending",
                     scoreline: null,
-                    squad: defaultSquad,
+                    notes: `[Location: Downhills Park]\n[Surface: Grass]`,
                 },
             ];
 
-            await supabase.from("matches").insert(sampleMatches);
+            const { error: mErr } = await supabase.from("matches").insert(sampleMatches);
+            if (mErr) throw mErr;
 
             const ourTeamName = clubName || settings.name || "Our Club FC";
-            const sampleTable: ParsedStandingsRow[] = [
-                { pos: 1, team: "Hackney Wick Athletic", played: 10, won: 8, drawn: 1, lost: 1, gf: 26, ga: 9, gd: 17, pts: 25 },
-                { pos: 2, team: ourTeamName, played: 10, won: 7, drawn: 2, lost: 1, gf: 24, ga: 11, gd: 13, pts: 23 },
-                { pos: 3, team: "Islington Borough", played: 10, won: 6, drawn: 3, lost: 1, gf: 19, ga: 10, gd: 9, pts: 21 },
-                { pos: 4, team: "Highgate Albion FC", played: 10, won: 5, drawn: 2, lost: 3, gf: 17, ga: 14, gd: 3, pts: 17 },
-                { pos: 5, team: "Finsbury Park Rovers", played: 10, won: 4, drawn: 2, lost: 4, gf: 15, ga: 16, gd: -1, pts: 14 },
-                { pos: 6, team: "Hampstead Town", played: 10, won: 2, drawn: 1, lost: 7, gf: 10, ga: 22, gd: -12, pts: 7 },
+            const sampleTable = [
+                { position: 1, pos: 1, team_name: "Hackney Wick Athletic", team: "Hackney Wick Athletic", played: 10, won: 8, drawn: 1, lost: 1, goals_for: 26, gf: 26, goals_against: 9, ga: 9, goal_difference: 17, gd: 17, points: 25, pts: 25, is_our_club: false },
+                { position: 2, pos: 2, team_name: ourTeamName, team: ourTeamName, played: 10, won: 7, drawn: 2, lost: 1, goals_for: 24, gf: 24, goals_against: 11, ga: 11, goal_difference: 13, gd: 13, points: 23, pts: 23, is_our_club: true },
+                { position: 3, pos: 3, team_name: "Islington Borough", team: "Islington Borough", played: 10, won: 6, drawn: 3, lost: 1, goals_for: 19, gf: 19, goals_against: 10, ga: 10, goal_difference: 9, gd: 9, points: 21, pts: 21, is_our_club: false },
+                { position: 4, pos: 4, team_name: "Highgate Albion FC", team: "Highgate Albion FC", played: 10, won: 5, drawn: 2, lost: 3, goals_for: 17, gf: 17, goals_against: 14, ga: 14, goal_difference: 3, gd: 3, points: 17, pts: 17, is_our_club: false },
+                { position: 5, pos: 5, team_name: "Finsbury Park Rovers", team: "Finsbury Park Rovers", played: 10, won: 4, drawn: 2, lost: 4, goals_for: 15, gf: 15, goals_against: 16, ga: 16, goal_difference: -1, gd: -1, points: 14, pts: 14, is_our_club: false },
+                { position: 6, pos: 6, team_name: "Hampstead Town", team: "Hampstead Town", played: 10, won: 2, drawn: 1, lost: 7, goals_for: 10, gf: 10, goals_against: 22, ga: 22, goal_difference: -12, gd: -12, points: 7, pts: 7, is_our_club: false },
             ];
             localStorage.setItem(`clubflow_league_table_${clubId}`, JSON.stringify(sampleTable));
 
@@ -892,7 +957,7 @@ function OnboardingContent() {
         setIsCreatingInvite(true);
         try {
             const token = crypto.randomUUID();
-            const origin = typeof window !== "undefined" ? window.location.origin : "https://camdenuniteddatahub.vercel.app";
+            const origin = typeof window !== "undefined" ? window.location.origin : "https://www.clubflow.org.uk";
             const inviteUrl = `${origin}/join?token=${token}`;
 
             const permsForRole =
@@ -904,10 +969,11 @@ function OnboardingContent() {
 
             await supabase.from("club_invitations").insert({
                 club_id: clubId,
-                email: staffEmail.trim() || `${staffName.toLowerCase().replace(/\s+/g, ".")}@club.local`,
-                role: staffAccessLevel,
+                email: (staffEmail.trim() || `${staffName.toLowerCase().replace(/\s+/g, ".")}@club.local`).toLowerCase(),
+                display_name: staffName.trim(),
+                role: staffAccessLevel === "admin" ? "manager" : "staff",
                 token,
-                permissions: permsForRole,
+                page_permissions: permsForRole,
             });
 
             await supabase.from("staff").insert({
@@ -915,8 +981,7 @@ function OnboardingContent() {
                 name: staffName.trim(),
                 email: staffEmail.trim() || null,
                 role: staffRoleTitle,
-                access_level: staffAccessLevel === "admin" ? "Full Admin" : staffAccessLevel === "coach" ? "Coach View" : "View Only",
-                permissions: permsForRole,
+                notes: `Access Level: ${staffAccessLevel === "admin" ? "Full Admin" : staffAccessLevel === "coach" ? "Coach View" : "View Only"}`,
             });
 
             setGeneratedInvites((prev) => [
@@ -949,18 +1014,19 @@ function OnboardingContent() {
     const handleCompleteOnboarding = async (destination: string = "/dashboard") => {
         setIsCompleting(true);
         try {
-            if (user) {
-                if (managerName.trim()) {
-                    await supabase.auth.updateUser({
-                        data: { name: managerName.trim() },
-                    });
+            const finalPermissions = Array.from(new Set([...selectedTabs, "admin"]));
+
+            if (user && managerName.trim()) {
+                await supabase.auth.updateUser({
+                    data: { name: managerName.trim(), full_name: managerName.trim() },
+                });
+                if (clubId) {
+                    await supabase
+                        .from("club_members")
+                        .update({ display_name: managerName.trim() })
+                        .eq("club_id", clubId)
+                        .eq("user_id", user.id);
                 }
-                await supabase
-                    .from("profiles")
-                    .update({
-                        permissions: Array.from(new Set([...selectedTabs, "admin"])),
-                    })
-                    .eq("id", user.id);
             }
 
             if (typeof window !== "undefined" && clubId) {
@@ -973,34 +1039,37 @@ function OnboardingContent() {
             const effectiveMonthlySubs = financeModel === "per_game" ? 0 : Number(monthlySubs) || 0;
             const effectiveRegFee = financeModel === "per_game" ? 0 : Number(registrationFee) || 0;
 
-            await updateSettings({
-                name: clubName.trim() || "My Football Club",
-                logo: logoPreview,
-                primaryColor,
-                secondaryColor: "#0f172a",
-                homeKitShirt,
-                homeKitShorts,
-                homeKitSocks,
-                awayKitShirt,
-                awayKitShorts,
-                awayKitSocks,
-                sponsorLogo,
-                homeGround: homeGround.trim() || "Home Ground",
-                trainingLocation: trainingLocation.trim() || "Training Centre",
-                defaultHomeKickOff: defaultHomeKickOff || "15:00",
-                defaultCompetition: defaultCompetition.trim() || "Premier Division",
-                useMatchdayNumbering,
-                squads: squads.length > 0 ? squads : ["First Team"],
-                whatsappPollMessage,
-                subsEnabled: subsEnabledVal,
-                monthlySubs: effectiveMonthlySubs,
-                registrationFee: effectiveRegFee,
-                trainingFeePerSession: subsEnabledVal ? Number(trainingFeePerSession) || 0 : 0,
-                contractsEnabled: subsEnabledVal ? contractsEnabled : false,
-                finesEnabled,
-                fineCategories,
-                isOnboarded: true,
-            });
+            await updateSettings(
+                {
+                    name: clubName.trim() || "My Football Club",
+                    logo: logoPreview,
+                    primaryColor,
+                    secondaryColor: "#0f172a",
+                    homeKitShirt,
+                    homeKitShorts,
+                    homeKitSocks,
+                    awayKitShirt,
+                    awayKitShorts,
+                    awayKitSocks,
+                    sponsorLogo,
+                    homeGround: homeGround.trim() || "Home Ground",
+                    trainingLocation: trainingLocation.trim() || "Training Centre",
+                    defaultHomeKickOff: defaultHomeKickOff || "15:00",
+                    defaultCompetition: defaultCompetition.trim() || "Premier Division",
+                    useMatchdayNumbering,
+                    squads: squads.length > 0 ? squads : ["First Team"],
+                    whatsappPollMessage,
+                    subsEnabled: subsEnabledVal,
+                    monthlySubs: effectiveMonthlySubs,
+                    registrationFee: effectiveRegFee,
+                    trainingFeePerSession: subsEnabledVal ? Number(trainingFeePerSession) || 0 : 0,
+                    contractsEnabled: subsEnabledVal ? contractsEnabled : false,
+                    finesEnabled,
+                    fineCategories,
+                    isOnboarded: true,
+                },
+                finalPermissions
+            );
 
             router.push(destination);
         } catch (err: any) {
@@ -1175,14 +1244,16 @@ function OnboardingContent() {
                             })}
                         </div>
 
-                        <button
-                            type="button"
-                            onClick={() => setShowMobilePreview((v) => !v)}
-                            className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-white/15 text-xs font-bold text-slate-200 shrink-0"
-                        >
-                            <Eye className="w-3.5 h-3.5 text-emerald-400" />
-                            {showMobilePreview ? "Hide Preview" : "Live Preview"}
-                        </button>
+                        {(stage === 1 || stage === 2) && (
+                            <button
+                                type="button"
+                                onClick={() => setShowMobilePreview((v) => !v)}
+                                className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-white/15 text-xs font-bold text-slate-200 shrink-0"
+                            >
+                                <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                                {showMobilePreview ? "Hide Preview" : "Live Preview"}
+                            </button>
+                        )}
                     </div>
                 )}
             </header>
@@ -1192,7 +1263,7 @@ function OnboardingContent() {
                 <main className="flex-1 flex items-center justify-center p-4 sm:p-8 z-10">
                     <div className="max-w-4xl w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-center bg-slate-900/70 border border-white/10 rounded-3xl p-6 sm:p-10 backdrop-blur-xl shadow-2xl">
                         <div className="lg:col-span-7 space-y-6">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs font-bold">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-xs font-bold">
                                 <Sparkles className="w-3.5 h-3.5" /> Next-Gen Football Club Operating System
                             </div>
                             <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-[1.1]">
@@ -1209,7 +1280,7 @@ function OnboardingContent() {
                             <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
                                 Whether you want to jump straight onto the tactics board in{" "}
                                 <strong className="text-white">60 seconds</strong> or import your entire{" "}
-                                <strong className="text-white">FA Full-Time fixtures, league table, squad & fines</strong> in
+                                <strong className="text-white">League Import fixtures, standings, squad & fines</strong> in
                                 one go, choose how you’d like to set up your club:
                             </p>
 
@@ -1220,21 +1291,21 @@ function OnboardingContent() {
                                         setWizardMode("full");
                                         setStage(1);
                                     }}
-                                    className="group text-left p-4 rounded-2xl border-2 border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/40 transition-all"
+                                    className="group text-left p-4 rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/15 hover:border-emerald-400 transition-all shadow-lg"
                                 >
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="p-2 rounded-xl bg-white/10 text-white">
+                                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                                        <span className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
                                             <Wrench className="w-5 h-5" />
                                         </span>
-                                        <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px]">
+                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-400 text-slate-950 font-black text-[11px] tracking-wide shadow-md shadow-emerald-500/30">
                                             Recommended (~3 mins)
-                                        </Badge>
+                                        </span>
                                     </div>
                                     <div className="font-bold text-base text-white group-hover:translate-x-0.5 transition-transform">
                                         Full Club Setup
                                     </div>
-                                    <p className="text-xs text-slate-400 mt-1">
-                                        Badge & kits, formation, matchday rules, FA Full-Time paste import & staff invite links.
+                                    <p className="text-xs text-slate-300 mt-1">
+                                        Badge & kits, formation, matchday rules, League Import & staff invite links.
                                     </p>
                                 </button>
 
@@ -1244,20 +1315,20 @@ function OnboardingContent() {
                                         setWizardMode("express");
                                         setStage(1);
                                     }}
-                                    className="group text-left p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 transition-all"
+                                    className="group text-left p-4 rounded-2xl border-2 border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/15 hover:border-amber-400 transition-all shadow-lg"
                                 >
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300">
+                                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                                        <span className="p-2 rounded-xl bg-amber-400/20 text-amber-300 border border-amber-400/30">
                                             <Zap className="w-5 h-5" />
                                         </span>
-                                        <Badge className="bg-slate-800 text-slate-300 border-white/10 text-[10px]">
+                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-[11px] tracking-wide shadow-md shadow-amber-400/30">
                                             Fast Track (~60 secs)
-                                        </Badge>
+                                        </span>
                                     </div>
                                     <div className="font-bold text-base text-white group-hover:translate-x-0.5 transition-transform">
                                         60-Second Express
                                     </div>
-                                    <p className="text-xs text-slate-400 mt-1">
+                                    <p className="text-xs text-slate-300 mt-1">
                                         Set your club name, badge & kit colors and jump straight into your workspace.
                                     </p>
                                 </button>
@@ -1272,18 +1343,18 @@ function OnboardingContent() {
                             {[
                                 {
                                     icon: Palette,
-                                    title: "Auto-Badge Color Extraction & 3 Kits",
-                                    desc: "Upload your crest to auto-detect Home, Away & GK colors.",
+                                    title: "Club Crest & Custom Kit Studio",
+                                    desc: "Upload your club badge and customize your Home, Away & Goalkeeper strips.",
                                 },
                                 {
                                     icon: ClipboardPaste,
-                                    title: "Instant Squad & FA Full-Time Paste",
-                                    desc: "Paste your WhatsApp squad list, fixtures & league table.",
+                                    title: "Instant Squad & League Import",
+                                    desc: "Paste your WhatsApp squad list, fixtures & league standings.",
                                 },
                                 {
                                     icon: Shirt,
-                                    title: "Formation & 1–11 Shirt Numbering",
-                                    desc: "Pre-configure your default Matchday XI pitch layout.",
+                                    title: "Tactical Formation & Matchday Setup",
+                                    desc: "Pre-configure your preferred formation, home ground & matchday defaults.",
                                 },
                                 {
                                     icon: Share2,
@@ -1316,20 +1387,20 @@ function OnboardingContent() {
             {stage > 0 && (
                 <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 z-10">
                     {/* Left Column: Active Stage Controls */}
-                    <div className="lg:col-span-7 space-y-6">
+                    <div className={stage <= 2 ? "lg:col-span-7 space-y-6" : "lg:col-span-12 max-w-4xl mx-auto w-full space-y-6"}>
                         {/* STAGE 1: IDENTITY, ROLE & KITS */}
                         {stage === 1 && (
                             <Card className="bg-slate-900/75 border-white/10 backdrop-blur-xl rounded-3xl overflow-hidden">
                                 <CardContent className="p-5 sm:p-7 space-y-7">
                                     <div>
-                                        <Badge className="bg-white/10 text-white border-white/15 text-[10px] mb-2">
+                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[11px] font-black tracking-wider uppercase mb-2.5 shadow-sm">
                                             STAGE 1 • CLUB IDENTITY & KIT STUDIO
-                                        </Badge>
+                                        </div>
                                         <h2 className="text-2xl font-black text-white">
                                             Club Identity, Crest & Match Kits
                                         </h2>
-                                        <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                                            Upload your club badge to automatically sample your club colors, and customize your
+                                        <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                                            Upload your club badge, choose your primary brand color, and customize your
                                             Home, Away and Goalkeeper strips.
                                         </p>
                                     </div>
@@ -1343,7 +1414,7 @@ function OnboardingContent() {
                                             <Input
                                                 value={clubName}
                                                 onChange={(e) => setClubName(e.target.value)}
-                                                placeholder="e.g. Camden United FC"
+                                                placeholder="e.g. Highgate Albion FC"
                                                 className="h-11 bg-slate-950/90 border-white/15 text-white font-semibold"
                                             />
                                         </div>
@@ -1354,13 +1425,13 @@ function OnboardingContent() {
                                             <Input
                                                 value={managerName}
                                                 onChange={(e) => setManagerName(e.target.value)}
-                                                placeholder="e.g. Leon"
+                                                placeholder="e.g. Alex"
                                                 className="h-11 bg-slate-950/90 border-white/15 text-white"
                                             />
                                         </div>
                                     </div>
 
-                                    {/* Badge Upload + Auto-Extracted Swatches */}
+                                    {/* Badge Upload + Brand Color Suggestions */}
                                     <div className="p-4 rounded-2xl bg-slate-950/70 border border-white/10 flex flex-col sm:flex-row items-center gap-4">
                                         <div
                                             onClick={() => fileInputRef.current?.click()}
@@ -1403,18 +1474,14 @@ function OnboardingContent() {
                                             {extractedSwatches.length > 0 && (
                                                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
                                                     <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
-                                                        <Sparkles className="w-3 h-3" /> Colors detected from badge:
+                                                        <Sparkles className="w-3 h-3" /> Crest accent swatches:
                                                     </span>
                                                     {extractedSwatches.map((hex, i) => (
                                                         <button
                                                             key={i}
                                                             type="button"
-                                                            onClick={() => {
-                                                                setPrimaryColor(hex);
-                                                                setHomeKitShirt(hex);
-                                                                setHomeKitSocks(hex);
-                                                            }}
-                                                            title={`Use ${hex} as Primary & Home color`}
+                                                            onClick={() => setPrimaryColor(hex)}
+                                                            title={`Set ${hex} as Club Brand Color`}
                                                             className="w-6 h-6 rounded-full border-2 border-white/40 shadow hover:scale-110 transition-transform"
                                                             style={{ backgroundColor: hex }}
                                                         />
@@ -1655,13 +1722,13 @@ function OnboardingContent() {
                             <Card className="bg-slate-900/75 border-white/10 backdrop-blur-xl rounded-3xl overflow-hidden">
                                 <CardContent className="p-5 sm:p-7 space-y-7">
                                     <div>
-                                        <Badge className="bg-white/10 text-white border-white/15 text-[10px] mb-2">
+                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[11px] font-black tracking-wider uppercase mb-2.5 shadow-sm">
                                             STAGE 2 • MATCHDAY, TACTICS & FINANCES
-                                        </Badge>
+                                        </div>
                                         <h2 className="text-2xl font-black text-white">
                                             Tactical Setup, Ground & Club Finances
                                         </h2>
-                                        <p className="text-xs sm:text-sm text-slate-400 mt-1">
+                                        <p className="text-xs sm:text-sm text-slate-300 mt-1">
                                             Set your default formation, shirt numbering mode, kick-off times and optional match
                                             subs or fine rules.
                                         </p>
@@ -1696,7 +1763,7 @@ function OnboardingContent() {
                                             <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
                                                 Preferred Tactical Formation
                                             </label>
-                                            <div className="grid grid-cols-2 gap-2">
+                                            <div className="grid grid-cols-3 gap-2">
                                                 {Object.keys(FORMATIONS).map((fKey) => (
                                                     <button
                                                         key={fKey}
@@ -1829,26 +1896,33 @@ function OnboardingContent() {
                                             <Layers className="w-3.5 h-3.5 text-purple-400" /> Active Club Squads
                                         </label>
                                         <div className="flex flex-wrap gap-2">
-                                            {["First Team", "Reserves", "Development / U23s", "U18s", "Midweek", "Vets"].map(
-                                                (sq) => {
-                                                    const active = squads.includes(sq);
-                                                    return (
-                                                        <button
-                                                            key={sq}
-                                                            type="button"
-                                                            onClick={() => toggleSquadChip(sq)}
-                                                            className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                                                                active
-                                                                    ? "bg-purple-500/20 border-purple-500/50 text-purple-200"
-                                                                    : "bg-slate-950/60 border-white/10 text-slate-400"
-                                                            }`}
-                                                        >
-                                                            {active ? "✓ " : "+ "}
-                                                            {sq}
-                                                        </button>
-                                                    );
-                                                }
-                                            )}
+                                            {[
+                                                "First Team",
+                                                "Reserves",
+                                                "Women",
+                                                "Development / U23s",
+                                                "U18s",
+                                                "Pan-Disability",
+                                                "Midweek",
+                                                "Vets",
+                                            ].map((sq) => {
+                                                const active = squads.includes(sq);
+                                                return (
+                                                    <button
+                                                        key={sq}
+                                                        type="button"
+                                                        onClick={() => toggleSquadChip(sq)}
+                                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                                                            active
+                                                                ? "bg-purple-500/20 border-purple-500/50 text-purple-200"
+                                                                : "bg-slate-950/60 border-white/10 text-slate-400"
+                                                        }`}
+                                                    >
+                                                        {active ? "✓ " : "+ "}
+                                                        {sq}
+                                                    </button>
+                                                );
+                                            })}
                                             <div className="flex items-center gap-1.5">
                                                 <Input
                                                     value={customSquadInput}
@@ -2020,29 +2094,29 @@ function OnboardingContent() {
                                 <CardContent className="p-5 sm:p-7 space-y-6">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
-                                            <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px] mb-2">
+                                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[11px] font-black tracking-wider uppercase mb-2.5 shadow-sm">
                                                 STAGE 3 • ZERO-EMPTY-STATE DATA IMPORT HUB
-                                            </Badge>
+                                            </div>
                                             <h2 className="text-2xl font-black text-white">
                                                 Populate Your Club in Seconds (Optional)
                                             </h2>
-                                            <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                                                Paste your squad list from WhatsApp or your FA Full-Time table and fixtures so your
+                                            <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                                                Paste your squad list from WhatsApp or use League Import for your table and fixtures so your
                                                 dashboard is alive from minute one.
                                             </p>
                                         </div>
 
                                         {/* Live Imported Tally */}
-                                        <div className="flex items-center gap-2">
-                                            <Badge className="bg-slate-950 border-white/10 text-slate-200 text-xs">
-                                                👥 {importedPlayersCount} Players
-                                            </Badge>
-                                            <Badge className="bg-slate-950 border-white/10 text-slate-200 text-xs">
-                                                📅 {importedFixturesCount} Fixtures
-                                            </Badge>
-                                            <Badge className="bg-slate-950 border-white/10 text-slate-200 text-xs">
-                                                🏆 {importedTeamsCount} Teams
-                                            </Badge>
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-emerald-500/40 text-white font-extrabold text-xs shadow-sm">
+                                                👥 <span className="text-emerald-400">{importedPlayersCount}</span> Players
+                                            </span>
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-sky-500/40 text-white font-extrabold text-xs shadow-sm">
+                                                📅 <span className="text-sky-400">{importedFixturesCount}</span> Fixtures
+                                            </span>
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-amber-500/40 text-white font-extrabold text-xs shadow-sm">
+                                                🏆 <span className="text-amber-400">{importedTeamsCount}</span> Teams
+                                            </span>
                                         </div>
                                     </div>
 
@@ -2050,8 +2124,8 @@ function OnboardingContent() {
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                         {[
                                             { id: "squad", label: "1. Paste Squad", icon: Users },
-                                            { id: "table", label: "2. League Table", icon: Trophy },
-                                            { id: "fixtures", label: "3. FA Fixtures", icon: Calendar },
+                                            { id: "table", label: "2. League Import (Table)", icon: Trophy },
+                                            { id: "fixtures", label: "3. League Import (Fixtures)", icon: Calendar },
                                             { id: "demo", label: "4. Sample Data", icon: Sparkles },
                                         ].map((t) => (
                                             <button
@@ -2064,8 +2138,8 @@ function OnboardingContent() {
                                                         : "bg-slate-950/60 border-white/10 text-slate-300 hover:border-white/25"
                                                 }`}
                                             >
-                                                <t.icon className="w-3.5 h-3.5" />
-                                                {t.label}
+                                                <t.icon className="w-3.5 h-3.5 shrink-0" />
+                                                <span className="truncate">{t.label}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -2077,11 +2151,11 @@ function OnboardingContent() {
                                                 <div className="text-sm font-bold text-white">
                                                     Smart Squad List Parser (WhatsApp / Notes / Excel)
                                                 </div>
-                                                <p className="text-xs text-slate-400">
-                                                    Paste one player per line. Include optional shirt numbers or positions (e.g.{" "}
-                                                    <code className="text-emerald-300">1. Jack Smith (GK)</code>,{" "}
-                                                    <code className="text-emerald-300">4. Marc Guehi - CB</code>, or just{" "}
-                                                    <code className="text-emerald-300">Bukayo Saka RW</code>).
+                                                <p className="text-xs text-slate-300 mt-0.5">
+                                                    Paste one player per line with their position (e.g.{" "}
+                                                    <code className="text-emerald-300 font-semibold">1. Callum Mercer (GK)</code>,{" "}
+                                                    <code className="text-emerald-300 font-semibold">4. Marcus Vance - CB</code>, or{" "}
+                                                    <code className="text-emerald-300 font-semibold">Jayden Okafor RW</code>).
                                                 </p>
                                             </div>
 
@@ -2089,7 +2163,7 @@ function OnboardingContent() {
                                                 value={rawSquadPaste}
                                                 onChange={(e) => setRawSquadPaste(e.target.value)}
                                                 rows={6}
-                                                placeholder={`1. Aaron Ramsdale (GK)\n2. Kyle Walker-Peters - RB\n4. Marc Guehi CB\n6. Declan Rice CDM\n7. Bukayo Saka RW\n9. Ollie Watkins ST`}
+                                                placeholder={`1. Callum Mercer (GK)\n2. Liam Sterling - RB\n4. Marcus Vance CB\n6. Harrison Cole CDM\n7. Jayden Okafor RW\n9. Nathan Cross ST`}
                                                 className="w-full rounded-xl bg-slate-900 border border-white/15 p-3 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
                                             />
 
@@ -2111,9 +2185,9 @@ function OnboardingContent() {
                                                                 <span className="font-semibold text-white">
                                                                     {p.firstName} {p.lastName !== "—" ? p.lastName : ""}
                                                                 </span>
-                                                                <Badge className="bg-emerald-500/20 text-emerald-300 border-0 text-[10px]">
+                                                                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
                                                                     {p.position}
-                                                                </Badge>
+                                                                </span>
                                                             </span>
                                                         ))}
                                                     </div>
@@ -2139,15 +2213,15 @@ function OnboardingContent() {
                                         </div>
                                     )}
 
-                                    {/* TAB 2: PASTE FA FULL-TIME LEAGUE TABLE */}
+                                    {/* TAB 2: PASTE LEAGUE TABLE */}
                                     {importTab === "table" && (
                                         <div className="space-y-4 p-4 rounded-2xl bg-slate-950/70 border border-white/10">
                                             <div>
                                                 <div className="text-sm font-bold text-white">
-                                                    Paste FA Full-Time League Standings
+                                                    League Import — Standings Table
                                                 </div>
-                                                <p className="text-xs text-slate-400">
-                                                    Copy & paste the league table rows from FA Full-Time. We’ll save your league
+                                                <p className="text-xs text-slate-300 mt-0.5">
+                                                    Copy & paste your league table rows. We’ll save your league
                                                     standings AND automatically add every opponent club to your database.
                                                 </p>
                                             </div>
@@ -2156,7 +2230,7 @@ function OnboardingContent() {
                                                 value={rawTablePaste}
                                                 onChange={(e) => setRawTablePaste(e.target.value)}
                                                 rows={6}
-                                                placeholder={`1\tCamden United FC\t10\t8\t1\t1\t26\t9\t17\t25\n2\tHighgate Albion\t10\t7\t2\t1\t22\t11\t11\t23`}
+                                                placeholder={`1\tHighgate Albion FC\t10\t8\t1\t1\t26\t9\t17\t25\n2\tHackney Wick Athletic\t10\t7\t2\t1\t22\t11\t11\t23`}
                                                 className="w-full rounded-xl bg-slate-900 border border-white/15 p-3 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
                                             />
 
@@ -2205,16 +2279,16 @@ function OnboardingContent() {
                                         </div>
                                     )}
 
-                                    {/* TAB 3: PASTE FA FULL-TIME FIXTURES */}
+                                    {/* TAB 3: PASTE LEAGUE FIXTURES */}
                                     {importTab === "fixtures" && (
                                         <div className="space-y-4 p-4 rounded-2xl bg-slate-950/70 border border-white/10">
                                             <div>
                                                 <div className="text-sm font-bold text-white">
-                                                    Paste FA Full-Time Fixtures or Results
+                                                    League Import — Fixtures or Results
                                                 </div>
-                                                <p className="text-xs text-slate-400">
-                                                    Copy & paste your upcoming fixtures or past results from FA Full-Time and click
-                                                    Preview to auto-detect Home/Away, dates, and opponents.
+                                                <p className="text-xs text-slate-300 mt-0.5">
+                                                    Copy & paste your upcoming fixtures or past results and click
+                                                    Parse to auto-detect Home/Away, dates, and opponents.
                                                 </p>
                                             </div>
 
@@ -2222,7 +2296,7 @@ function OnboardingContent() {
                                                 value={rawFixturesPaste}
                                                 onChange={(e) => setRawFixturesPaste(e.target.value)}
                                                 rows={5}
-                                                placeholder="Paste FA Full-Time fixture list text here..."
+                                                placeholder="Paste your league fixture list text here..."
                                                 className="w-full rounded-xl bg-slate-900 border border-white/15 p-3 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
                                             />
 
@@ -2269,9 +2343,9 @@ function OnboardingContent() {
                                                             className="flex items-center justify-between px-2 py-1 rounded bg-slate-950/60"
                                                         >
                                                             <span>
-                                                                <Badge className="mr-2 bg-white/10 text-white text-[10px]">
+                                                                <span className="mr-2 px-1.5 py-0.5 rounded bg-white/10 text-white font-bold text-[10px]">
                                                                     {f.homeAway}
-                                                                </Badge>
+                                                                </span>
                                                                 <strong className="text-white">vs {f.opponent}</strong>
                                                             </span>
                                                             <span className="text-slate-400">
@@ -2291,7 +2365,7 @@ function OnboardingContent() {
                                                 <Sparkles className="w-4 h-4" /> Test-Drive Mode: Seed Sample Club Data
                                             </div>
                                             <p className="text-xs text-slate-300 leading-relaxed">
-                                                Don’t have your squad list handy right now? Load a sample 16-man squad, 4 fixtures,
+                                                Don’t have your squad list handy right now? Load a sample 16-man squad (fictional players + positions), 4 fixtures,
                                                 and a 6-team league table so you can immediately explore the Matchday XI pitch
                                                 builder and stats hub.
                                             </p>
@@ -2324,40 +2398,40 @@ function OnboardingContent() {
                             <Card className="bg-slate-900/75 border-white/10 backdrop-blur-xl rounded-3xl overflow-hidden">
                                 <CardContent className="p-5 sm:p-7 space-y-7">
                                     <div>
-                                        <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 text-[10px] mb-2">
+                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[11px] font-black tracking-wider uppercase mb-2.5 shadow-sm">
                                             FINAL STAGE • STAFF ACCESS & LAUNCHPAD
-                                        </Badge>
+                                        </div>
                                         <h2 className="text-2xl font-black text-white">
                                             Invite Your Backroom Staff & Kick Off
                                         </h2>
-                                        <p className="text-xs sm:text-sm text-slate-400 mt-1">
-                                            Generate instant <code className="text-emerald-300">/join</code> invite links to share on
+                                        <p className="text-xs sm:text-sm text-slate-300 mt-1">
+                                            Generate instant <code className="text-emerald-300 font-semibold">/join</code> invite links to share on
                                             WhatsApp with your Assistant Manager, Coaches or Secretary.
                                         </p>
                                     </div>
 
                                     {/* Create Real Staff Invite Link */}
-                                    <div className="p-4 rounded-2xl bg-slate-950/75 border border-white/10 space-y-3">
-                                        <div className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/75 border border-white/10 space-y-3.5">
+                                        <div className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
                                             <UserPlus className="w-3.5 h-3.5 text-emerald-400" /> Generate Backroom Staff Invite Link
                                         </div>
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <Input
                                                 value={staffName}
                                                 onChange={(e) => setStaffName(e.target.value)}
-                                                placeholder="Staff Name (e.g. Kieran Ali)"
-                                                className="h-9 text-xs bg-slate-900 border-white/15 text-white"
+                                                placeholder="Staff Name (e.g. Jordan Cole)"
+                                                className="h-10 text-xs bg-slate-900 border-white/15 text-white"
                                             />
                                             <Input
                                                 value={staffEmail}
                                                 onChange={(e) => setStaffEmail(e.target.value)}
                                                 placeholder="Email (optional)"
-                                                className="h-9 text-xs bg-slate-900 border-white/15 text-white"
+                                                className="h-10 text-xs bg-slate-900 border-white/15 text-white"
                                             />
                                             <select
                                                 value={staffRoleTitle}
                                                 onChange={(e) => setStaffRoleTitle(e.target.value)}
-                                                className="h-9 rounded-md bg-slate-900 border border-white/15 px-2.5 text-xs text-white"
+                                                className="h-10 rounded-md bg-slate-900 border border-white/15 px-3 text-xs text-white"
                                             >
                                                 <option value="Assistant Manager">Assistant Manager</option>
                                                 <option value="First-Team Coach">First-Team Coach</option>
@@ -2365,30 +2439,32 @@ function OnboardingContent() {
                                                 <option value="Treasurer">Treasurer</option>
                                                 <option value="Opposition Analyst">Opposition Analyst</option>
                                             </select>
-                                            <div className="flex items-center gap-2">
-                                                <select
-                                                    value={staffAccessLevel}
-                                                    onChange={(e) => setStaffAccessLevel(e.target.value as any)}
-                                                    className="flex-1 h-9 rounded-md bg-slate-900 border border-white/15 px-2.5 text-xs text-white"
-                                                >
-                                                    <option value="coach">Coach Access (Pitch Tabs)</option>
-                                                    <option value="admin">Full Club Admin</option>
-                                                    <option value="viewer">Read-Only Viewer</option>
-                                                </select>
-                                                <Button
-                                                    type="button"
-                                                    disabled={isCreatingInvite || !staffName.trim()}
-                                                    onClick={handleCreateStaffInvite}
-                                                    className="h-9 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shrink-0"
-                                                >
-                                                    {isCreatingInvite ? (
-                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                    ) : (
-                                                        "+ Create Link"
-                                                    )}
-                                                </Button>
-                                            </div>
+                                            <select
+                                                value={staffAccessLevel}
+                                                onChange={(e) => setStaffAccessLevel(e.target.value as any)}
+                                                className="h-10 rounded-md bg-slate-900 border border-white/15 px-3 text-xs text-white"
+                                            >
+                                                <option value="coach">Coach Access (Pitch Tabs)</option>
+                                                <option value="admin">Full Club Admin</option>
+                                                <option value="viewer">Read-Only Viewer</option>
+                                            </select>
                                         </div>
+                                        <Button
+                                            type="button"
+                                            disabled={isCreatingInvite || !staffName.trim()}
+                                            onClick={handleCreateStaffInvite}
+                                            className="w-full h-10 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-md"
+                                        >
+                                            {isCreatingInvite ? (
+                                                <>
+                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Creating Invite Link...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <UserPlus className="w-4 h-4 mr-2" /> + Create Staff Invite Link
+                                                </>
+                                            )}
+                                        </Button>
 
                                         {generatedInvites.length > 0 && (
                                             <div className="space-y-2 pt-2">
@@ -2560,56 +2636,51 @@ function OnboardingContent() {
                         </div>
                     </div>
 
-                    {/* Right Column: Live Split-Screen Interactive Preview */}
-                    <div
-                        className={`lg:col-span-5 space-y-4 ${
-                            showMobilePreview ? "block" : "hidden lg:block"
-                        }`}
-                    >
-                        <div className="sticky top-28 bg-slate-900/80 border border-white/10 rounded-3xl p-5 backdrop-blur-xl shadow-2xl space-y-4">
-                            <div className="flex items-center justify-between">
-                                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                                    <Eye className="w-3.5 h-3.5 text-emerald-400" /> Live Matchday Preview
-                                </span>
-                                <div className="inline-flex rounded-xl bg-slate-950 p-1 border border-white/10">
-                                    {[
-                                        { id: "pitch", label: "Pitch & Kits" },
-                                        { id: "dashboard", label: "Next Match" },
-                                        { id: "whatsapp", label: "WhatsApp Poll" },
-                                    ].map((t) => (
-                                        <button
-                                            key={t.id}
-                                            type="button"
-                                            onClick={() => setPreviewTab(t.id as any)}
-                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                                                previewTab === t.id
-                                                    ? "bg-white text-slate-950"
-                                                    : "text-slate-400 hover:text-white"
-                                            }`}
-                                        >
-                                            {t.label}
-                                        </button>
-                                    ))}
+                    {/* Right Column: Live Split-Screen Interactive Preview (Only on Stages 1 & 2 where Kits/Formation/Venues are configured) */}
+                    {(stage === 1 || stage === 2) && (
+                        <div
+                            className={`lg:col-span-5 space-y-4 ${
+                                showMobilePreview ? "block" : "hidden lg:block"
+                            }`}
+                        >
+                            <div className="sticky top-28 bg-slate-900/80 border border-white/10 rounded-3xl p-5 backdrop-blur-xl shadow-2xl space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                                        <Eye className="w-3.5 h-3.5 text-emerald-400" /> Live Matchday Preview
+                                    </span>
+                                    <div className="inline-flex rounded-xl bg-slate-950 p-1 border border-white/10">
+                                        {[
+                                            { id: "pitch", label: "Pitch & Kits" },
+                                            { id: "dashboard", label: "Next Match" },
+                                            { id: "whatsapp", label: "WhatsApp Poll" },
+                                        ].map((t) => (
+                                            <button
+                                                key={t.id}
+                                                type="button"
+                                                onClick={() => setPreviewTab(t.id as any)}
+                                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                                                    previewTab === t.id
+                                                        ? "bg-white text-slate-950"
+                                                        : "text-slate-400 hover:text-white"
+                                                }`}
+                                            >
+                                                {t.label}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
 
-                            {/* PREVIEW 1: INTERACTIVE PITCH & KIT BUILDER */}
-                            {previewTab === "pitch" && (
-                                <div className="space-y-3">
-                                    <div className="relative rounded-2xl overflow-hidden border border-emerald-500/30 bg-gradient-to-b from-emerald-950 via-emerald-900/90 to-emerald-950 aspect-[4/5] p-4 shadow-inner">
-                                        {/* Pitch Markings */}
-                                        <div className="absolute inset-3 border border-white/20 rounded-xl pointer-events-none" />
-                                        <div className="absolute left-3 right-3 top-1/2 border-t border-white/20 pointer-events-none" />
-                                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full border border-white/20 pointer-events-none" />
-
-                                        {/* Header Banner inside Pitch */}
-                                        <div className="relative z-10 flex items-center justify-between bg-slate-950/80 backdrop-blur-md px-3 py-2 rounded-xl border border-white/15">
-                                            <div className="flex items-center gap-2">
+                                {/* PREVIEW 1: INTERACTIVE PITCH & KIT BUILDER */}
+                                {previewTab === "pitch" && (
+                                    <div className="space-y-3">
+                                        {/* Header Banner ABOVE Pitch so Striker is never cut off */}
+                                        <div className="flex items-center justify-between bg-slate-950/90 px-3.5 py-2.5 rounded-2xl border border-white/15">
+                                            <div className="flex items-center gap-2.5">
                                                 {logoPreview ? (
                                                     <img
                                                         src={logoPreview}
                                                         alt="Crest"
-                                                        className="w-6 h-6 object-contain"
+                                                        className="w-7 h-7 object-contain"
                                                     />
                                                 ) : (
                                                     <Shield className="w-5 h-5" style={{ color: primaryColor }} />
@@ -2618,7 +2689,7 @@ function OnboardingContent() {
                                                     <div className="text-xs font-black text-white leading-none">
                                                         {clubName || "Your Football Club"}
                                                     </div>
-                                                    <div className="text-[10px] text-emerald-300 mt-0.5">
+                                                    <div className="text-[10px] text-emerald-300 mt-0.5 font-semibold">
                                                         {activeFormation.label} •{" "}
                                                         {useMatchdayNumbering ? "1–11 Numbers" : "Squad Numbers"}
                                                     </div>
@@ -2629,173 +2700,180 @@ function OnboardingContent() {
                                                 onClick={() =>
                                                     setActiveKitPreview((k) => (k === "home" ? "away" : "home"))
                                                 }
-                                                className="px-2 py-0.5 rounded bg-white/10 text-[10px] font-bold text-white border border-white/15"
+                                                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-[10px] font-bold text-white border border-white/15 transition-colors"
                                             >
                                                 {activeKitPreview === "home" ? "Home Kit" : "Away Kit"}
                                             </button>
                                         </div>
 
-                                        {/* 11 Formation Nodes */}
-                                        {activeFormation.coords.map((node, i) => {
-                                            const isGK = node.role === "GK";
-                                            const shirtFill = isGK ? gkKitColor : activeShirt;
-                                            const num = useMatchdayNumbering ? i + 1 : [1, 2, 5, 6, 3, 4, 8, 10, 11, 9, 7][i] || i + 1;
-                                            return (
-                                                <div
-                                                    key={i}
-                                                    className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
-                                                    style={{ left: `${node.x}%`, top: `${node.y}%` }}
-                                                >
+                                        <div className="relative rounded-2xl overflow-hidden border border-emerald-500/30 bg-gradient-to-b from-emerald-950 via-emerald-900/90 to-emerald-950 aspect-[4/5] p-4 shadow-inner">
+                                            {/* Pitch Markings */}
+                                            <div className="absolute inset-3 border border-white/20 rounded-xl pointer-events-none" />
+                                            <div className="absolute left-3 right-3 top-1/2 border-t border-white/20 pointer-events-none" />
+                                            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full border border-white/20 pointer-events-none" />
+
+                                            {/* 11 Formation Nodes */}
+                                            {activeFormation.coords.map((node, i) => {
+                                                const isGK = node.role === "GK";
+                                                const shirtFill = isGK ? gkKitColor : activeShirt;
+                                                const num = useMatchdayNumbering ? i + 1 : [1, 2, 5, 6, 3, 4, 8, 10, 11, 9, 7][i] || i + 1;
+                                                return (
                                                     <div
-                                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black shadow-lg border-2 border-white/80 transition-colors"
-                                                        style={{
-                                                            backgroundColor: shirtFill,
-                                                            color:
-                                                                shirtFill.toLowerCase() === "#ffffff" ||
-                                                                shirtFill.toLowerCase() === "#eab308"
-                                                                    ? "#0f172a"
-                                                                    : "#ffffff",
-                                                        }}
+                                                        key={i}
+                                                        className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+                                                        style={{ left: `${node.x}%`, top: `${node.y}%` }}
                                                     >
-                                                        {num}
+                                                        <div
+                                                            className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black shadow-lg border-2 border-white/80 transition-colors"
+                                                            style={{
+                                                                backgroundColor: shirtFill,
+                                                                color:
+                                                                    shirtFill.toLowerCase() === "#ffffff" ||
+                                                                    shirtFill.toLowerCase() === "#eab308"
+                                                                        ? "#0f172a"
+                                                                        : "#ffffff",
+                                                            }}
+                                                        >
+                                                            {num}
+                                                        </div>
+                                                        <span className="mt-0.5 px-1.5 py-0.2 rounded bg-slate-950/85 text-[9px] font-bold text-white border border-white/10">
+                                                            {node.role}
+                                                        </span>
                                                     </div>
-                                                    <span className="mt-0.5 px-1.5 py-0.2 rounded bg-slate-950/85 text-[9px] font-bold text-white border border-white/10">
-                                                        {node.role}
-                                                    </span>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {/* Mini Kit Strip Legend */}
+                                        <div className="grid grid-cols-3 gap-2 text-center">
+                                            <div className="p-2 rounded-xl bg-slate-950/70 border border-white/10">
+                                                <div className="flex justify-center gap-1 mb-1">
+                                                    <span
+                                                        className="w-3.5 h-3.5 rounded-full border border-white/30"
+                                                        style={{ backgroundColor: activeShirt }}
+                                                    />
+                                                    <span
+                                                        className="w-3.5 h-3.5 rounded-full border border-white/30"
+                                                        style={{ backgroundColor: activeShorts }}
+                                                    />
+                                                    <span
+                                                        className="w-3.5 h-3.5 rounded-full border border-white/30"
+                                                        style={{ backgroundColor: activeSocks }}
+                                                    />
                                                 </div>
-                                            );
-                                        })}
-                                    </div>
-
-                                    {/* Mini Kit Strip Legend */}
-                                    <div className="grid grid-cols-3 gap-2 text-center">
-                                        <div className="p-2 rounded-xl bg-slate-950/70 border border-white/10">
-                                            <div className="flex justify-center gap-1 mb-1">
-                                                <span
-                                                    className="w-3.5 h-3.5 rounded-full border border-white/30"
-                                                    style={{ backgroundColor: activeShirt }}
-                                                />
-                                                <span
-                                                    className="w-3.5 h-3.5 rounded-full border border-white/30"
-                                                    style={{ backgroundColor: activeShorts }}
-                                                />
-                                                <span
-                                                    className="w-3.5 h-3.5 rounded-full border border-white/30"
-                                                    style={{ backgroundColor: activeSocks }}
-                                                />
-                                            </div>
-                                            <div className="text-[10px] font-bold text-slate-300">
-                                                {activeKitPreview === "home" ? "Home Strip" : "Away Strip"}
-                                            </div>
-                                        </div>
-                                        <div className="p-2 rounded-xl bg-slate-950/70 border border-white/10">
-                                            <div className="flex justify-center mb-1">
-                                                <span
-                                                    className="w-3.5 h-3.5 rounded-full border border-white/30"
-                                                    style={{ backgroundColor: gkKitColor }}
-                                                />
-                                            </div>
-                                            <div className="text-[10px] font-bold text-slate-300">GK Jersey</div>
-                                        </div>
-                                        <div className="p-2 rounded-xl bg-slate-950/70 border border-white/10">
-                                            <div className="text-xs font-black text-emerald-400">
-                                                {defaultHomeKickOff}
-                                            </div>
-                                            <div className="text-[10px] font-bold text-slate-300">
-                                                Meet {computedMeetTime}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* PREVIEW 2: LIVE DASHBOARD NEXT MATCH CARD */}
-                            {previewTab === "dashboard" && (
-                                <div className="space-y-3">
-                                    <div
-                                        className="p-5 rounded-2xl border border-white/15 space-y-4"
-                                        style={{
-                                            background: `linear-gradient(135deg, ${primaryColor}30 0%, rgba(9,13,22,0.95) 100%)`,
-                                        }}
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <Badge className="bg-white/10 text-white border-white/20 text-[10px]">
-                                                {defaultCompetition || "Premier Division"}
-                                            </Badge>
-                                            <span className="text-xs font-bold text-emerald-400">
-                                                KO {defaultHomeKickOff} (Meet {computedMeetTime})
-                                            </span>
-                                        </div>
-
-                                        <div className="flex items-center justify-between gap-3 py-2">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-12 h-12 rounded-2xl bg-slate-950/80 border border-white/15 flex items-center justify-center overflow-hidden">
-                                                    {logoPreview ? (
-                                                        <img
-                                                            src={logoPreview}
-                                                            alt="Crest"
-                                                            className="w-9 h-9 object-contain"
-                                                        />
-                                                    ) : (
-                                                        <Shield
-                                                            className="w-6 h-6"
-                                                            style={{ color: primaryColor }}
-                                                        />
-                                                    )}
-                                                </div>
-                                                <div>
-                                                    <div className="text-sm font-black text-white">
-                                                        {clubName || "Your Football Club"}
-                                                    </div>
-                                                    <div className="text-[11px] text-slate-400">
-                                                        {squads[0] || "First Team"} (Home)
-                                                    </div>
+                                                <div className="text-[10px] font-bold text-slate-300">
+                                                    {activeKitPreview === "home" ? "Home Strip" : "Away Strip"}
                                                 </div>
                                             </div>
-                                            <span className="text-xs font-black text-slate-500">VS</span>
-                                            <div className="text-right">
-                                                <div className="text-sm font-black text-white">Opposition FC</div>
-                                                <div className="text-[11px] text-slate-400">Saturday Fixture</div>
+                                            <div className="p-2 rounded-xl bg-slate-950/70 border border-white/10">
+                                                <div className="flex justify-center mb-1">
+                                                    <span
+                                                        className="w-3.5 h-3.5 rounded-full border border-white/30"
+                                                        style={{ backgroundColor: gkKitColor }}
+                                                    />
+                                                </div>
+                                                <div className="text-[10px] font-bold text-slate-300">GK Jersey</div>
+                                            </div>
+                                            <div className="p-2 rounded-xl bg-slate-950/70 border border-white/10">
+                                                <div className="text-xs font-black text-emerald-400">
+                                                    {defaultHomeKickOff}
+                                                </div>
+                                                <div className="text-[10px] font-bold text-slate-300">
+                                                    Meet {computedMeetTime}
+                                                </div>
                                             </div>
                                         </div>
+                                    </div>
+                                )}
 
-                                        <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-300">
-                                            <span className="flex items-center gap-1">
-                                                <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                                                {homeGround || "Home Ground"}
-                                            </span>
-                                            <span>{selectedTabs.length} Modules Enabled</span>
+                                {/* PREVIEW 2: LIVE DASHBOARD NEXT MATCH CARD */}
+                                {previewTab === "dashboard" && (
+                                    <div className="space-y-3">
+                                        <div
+                                            className="p-5 rounded-2xl border border-white/15 space-y-4"
+                                            style={{
+                                                background: `linear-gradient(135deg, ${primaryColor}30 0%, rgba(9,13,22,0.95) 100%)`,
+                                            }}
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-white border border-white/20 font-bold text-[10px]">
+                                                    {defaultCompetition || "Premier Division"}
+                                                </span>
+                                                <span className="text-xs font-bold text-emerald-400">
+                                                    KO {defaultHomeKickOff} (Meet {computedMeetTime})
+                                                </span>
+                                            </div>
+
+                                            <div className="flex items-center justify-between gap-3 py-2">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-12 h-12 rounded-2xl bg-slate-950/80 border border-white/15 flex items-center justify-center overflow-hidden">
+                                                        {logoPreview ? (
+                                                            <img
+                                                                src={logoPreview}
+                                                                alt="Crest"
+                                                                className="w-9 h-9 object-contain"
+                                                            />
+                                                        ) : (
+                                                            <Shield
+                                                                className="w-6 h-6"
+                                                                style={{ color: primaryColor }}
+                                                            />
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-sm font-black text-white">
+                                                            {clubName || "Your Football Club"}
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-400">
+                                                            {squads[0] || "First Team"} (Home)
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <span className="text-xs font-black text-slate-500">VS</span>
+                                                <div className="text-right">
+                                                    <div className="text-sm font-black text-white">Opposition FC</div>
+                                                    <div className="text-[11px] text-slate-400">Saturday Fixture</div>
+                                                </div>
+                                            </div>
+
+                                            <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-300">
+                                                <span className="flex items-center gap-1">
+                                                    <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                                                    {homeGround || "Home Ground"}
+                                                </span>
+                                                <span>{selectedTabs.length} Modules Enabled</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
 
-                            {/* PREVIEW 3: WHATSAPP POLL MESSAGE */}
-                            {previewTab === "whatsapp" && (
-                                <div className="space-y-3">
-                                    <div className="p-4 rounded-2xl bg-[#0b141a] border border-emerald-500/30 space-y-2">
-                                        <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                                            WhatsApp Group Availability Poll Preview
+                                {/* PREVIEW 3: WHATSAPP POLL MESSAGE */}
+                                {previewTab === "whatsapp" && (
+                                    <div className="space-y-3">
+                                        <div className="p-4 rounded-2xl bg-[#0b141a] border border-emerald-500/30 space-y-2">
+                                            <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                                                WhatsApp Group Availability Poll Preview
+                                            </div>
+                                            <div className="p-3 rounded-xl bg-[#005c4b] text-white text-xs whitespace-pre-line leading-relaxed shadow">
+                                                {whatsappPollMessage}
+                                                {"\n\n"}⚽ *{clubName || "Club"} vs Opposition FC*
+                                                {"\n"}🏆 {defaultCompetition || "League"}
+                                                {"\n"}📍 {homeGround || "Home Ground"}
+                                                {"\n"}🕜 Meet: {computedMeetTime} | Kick-Off: {defaultHomeKickOff}
+                                            </div>
+                                            <textarea
+                                                value={whatsappPollMessage}
+                                                onChange={(e) => setWhatsappPollMessage(e.target.value)}
+                                                rows={3}
+                                                className="w-full rounded-xl bg-slate-950 border border-white/15 p-2.5 text-xs text-white"
+                                                placeholder="Customize your WhatsApp poll header message..."
+                                            />
                                         </div>
-                                        <div className="p-3 rounded-xl bg-[#005c4b] text-white text-xs whitespace-pre-line leading-relaxed shadow">
-                                            {whatsappPollMessage}
-                                            {"\n\n"}⚽ *{clubName || "Club"} vs Opposition FC*
-                                            {"\n"}🏆 {defaultCompetition || "League"}
-                                            {"\n"}📍 {homeGround || "Home Ground"}
-                                            {"\n"}🕜 Meet: {computedMeetTime} | Kick-Off: {defaultHomeKickOff}
-                                        </div>
-                                        <textarea
-                                            value={whatsappPollMessage}
-                                            onChange={(e) => setWhatsappPollMessage(e.target.value)}
-                                            rows={3}
-                                            className="w-full rounded-xl bg-slate-950 border border-white/15 p-2.5 text-xs text-white"
-                                            placeholder="Customize your WhatsApp poll header message..."
-                                        />
                                     </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
-                    </div>
+                    )}
                 </main>
             )}
         </div>
