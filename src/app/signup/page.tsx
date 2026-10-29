@@ -22,6 +22,56 @@ export default function SignupPage() {
     const [error, setError] = useState("");
     const router = useRouter();
 
+    /**
+     * If an email still exists in Supabase `auth.users` after its club/membership row was deleted,
+     * sign in and re-provision a brand new club workspace for that account.
+     */
+    const tryReprovisionDeletedAccount = async (): Promise<boolean> => {
+        const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+        });
+
+        if (signInErr || !signInData.session) {
+            return false;
+        }
+
+        // Update user metadata with the new club name
+        await supabase.auth.updateUser({
+            data: { club_name: clubName.trim() },
+        });
+
+        // Call /api/auth/sync to check or provision the club workspace
+        const syncRes = await fetch("/api/auth/sync", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${signInData.session.access_token}`,
+            },
+            body: JSON.stringify({
+                clubName: clubName.trim(),
+                provisionIfOrphaned: true,
+            }),
+        });
+
+        if (syncRes.ok) {
+            const syncData = await syncRes.json();
+            if (syncData.membership?.club_id) {
+                // Clear any stale cached clubId and redirect to dashboard/onboarding
+                try {
+                    localStorage.setItem(
+                        "clubflow_cache_clubId",
+                        JSON.stringify(syncData.membership.club_id)
+                    );
+                } catch {}
+                window.location.href = "/dashboard";
+                return true;
+            }
+        }
+
+        return false;
+    };
+
     const handleSignup = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -42,33 +92,50 @@ export default function SignupPage() {
         try {
             // 1. Sign up the user and pass the club_name in the raw_user_meta_data
             const { data, error: signupError } = await supabase.auth.signUp({
-                email,
+                email: email.trim(),
                 password,
                 options: {
                     data: {
                         club_name: clubName.trim(),
-                    }
-                }
+                    },
+                },
             });
 
-            if (signupError) throw signupError;
+            if (signupError) {
+                if (signupError.message?.toLowerCase().includes("already registered")) {
+                    const recovered = await tryReprovisionDeletedAccount();
+                    if (recovered) return;
+                }
+                throw signupError;
+            }
 
-            // Check if the user already exists (identities array will be empty if "Prevent Email Enumeration" is on)
+            // Check if the user already exists in auth.users (identities array is empty when email already exists)
             if (data.user && data.user.identities && data.user.identities.length === 0) {
-                setError("An account with this email already exists. Please sign in.");
+                const recovered = await tryReprovisionDeletedAccount();
+                if (recovered) return;
+
+                setError(
+                    "This email still exists in Supabase Auth. If you previously deleted its club, enter your previous password for this email (or delete the user under Supabase Dashboard → Authentication → Users) to recreate the workspace."
+                );
                 setIsLoading(false);
                 return;
             }
 
-            // Note: If you have email confirmations enabled in Supabase, 
-            // data.session will be null and the user will need to check their email.
-            // If email confirmations are disabled, they are automatically logged in.
-            
             if (data.session) {
-                // Instantly logged in
+                // Ensure club membership is synced/provisioned before redirecting
+                await fetch("/api/auth/sync", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${data.session.access_token}`,
+                    },
+                    body: JSON.stringify({
+                        clubName: clubName.trim(),
+                        provisionIfOrphaned: true,
+                    }),
+                });
                 window.location.href = "/dashboard";
             } else {
-                // Awaiting email confirmation
                 alert("Success! Please check your email to confirm your account, then log in.");
                 router.push("/login");
             }
@@ -80,24 +147,30 @@ export default function SignupPage() {
     };
 
     return (
-        <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-4">
-            <div className="w-full max-w-md space-y-8">
+        <div className="min-h-screen bg-[#060911] flex flex-col items-center justify-center p-4">
+            <div className="w-full max-w-md space-y-6">
                 <div className="flex flex-col items-center justify-center text-center">
-                    <Image
-                        src="/clubflow-logo.png"
-                        alt="ClubFlow"
-                        width={240}
-                        height={160}
-                        priority
-                        className="object-contain mb-2"
-                    />
-                    <h1 className="text-3xl font-bold text-white tracking-tight">Create your Club</h1>
-                    <p className="text-slate-400 mt-2">Start managing your team with a free workspace</p>
+                    <Link href="/" className="mb-3">
+                        <div className="w-20 h-20 rounded-full overflow-hidden border border-white/15 shadow-xl bg-[#060911] flex items-center justify-center">
+                            <Image
+                                src="/clubflow-logo.png"
+                                alt="ClubFlow"
+                                width={80}
+                                height={80}
+                                priority
+                                className="w-full h-full object-cover"
+                            />
+                        </div>
+                    </Link>
+                    <h1 className="text-3xl font-black text-white tracking-tight">Create your Club</h1>
+                    <p className="text-slate-400 mt-1.5 text-sm">
+                        Start managing your team with a dedicated workspace
+                    </p>
                 </div>
 
-                <Card className="border-slate-800 bg-slate-900 shadow-xl">
+                <Card className="border-slate-800 bg-slate-900/90 shadow-2xl">
                     <CardHeader>
-                        <CardTitle className="text-white">Sign Up</CardTitle>
+                        <CardTitle className="!text-white text-xl font-bold">Sign Up</CardTitle>
                         <CardDescription className="text-slate-400">
                             Enter your details to provision a new isolated club workspace.
                         </CardDescription>
@@ -110,12 +183,12 @@ export default function SignupPage() {
                                     <AlertDescription>{error}</AlertDescription>
                                 </Alert>
                             )}
-                            
+
                             <div className="space-y-2">
                                 <Label htmlFor="clubName" className="text-slate-300">Club Name</Label>
                                 <Input
                                     id="clubName"
-                                    placeholder="e.g. AFC Richmond"
+                                    placeholder="e.g. Northbrook United FC"
                                     required
                                     value={clubName}
                                     onChange={(e) => setClubName(e.target.value)}
@@ -135,7 +208,7 @@ export default function SignupPage() {
                                     className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-red-500"
                                 />
                             </div>
-                            
+
                             <div className="space-y-2">
                                 <Label htmlFor="password" className="text-slate-300">Password</Label>
                                 <div className="relative">
@@ -179,9 +252,9 @@ export default function SignupPage() {
                             </div>
                         </CardContent>
                         <CardFooter className="flex flex-col space-y-4">
-                            <Button 
-                                type="submit" 
-                                className="w-full bg-red-600 hover:bg-red-700 text-white font-medium h-11"
+                            <Button
+                                type="submit"
+                                className="w-full bg-red-600 hover:bg-red-700 text-white font-bold h-11"
                                 disabled={isLoading}
                             >
                                 {isLoading ? (
@@ -192,7 +265,7 @@ export default function SignupPage() {
                                     </>
                                 )}
                             </Button>
-                            
+
                             <div className="text-sm text-slate-400 text-center">
                                 Already have an account?{" "}
                                 <Link href="/login" className="text-red-400 hover:text-red-300 font-medium transition-colors">
