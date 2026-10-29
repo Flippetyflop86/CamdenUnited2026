@@ -9,19 +9,28 @@ import {
     FileSpreadsheet,
     LayoutDashboard,
     Calendar,
-    CheckCircle2,
     Trophy,
     Shirt,
     Search,
-    Share2,
     Clock,
     MapPin,
     Star,
     Smartphone,
-    Monitor,
     Gavel,
     ClipboardCheck,
-    TrendingUp,
+    Menu,
+    Plus,
+    CreditCard,
+    Activity,
+    Copy,
+    Home,
+    Plane,
+    Zap,
+    AlertCircle,
+    Settings,
+    Coins,
+    Target,
+    UserPlus,
 } from "lucide-react";
 
 type ClubShowcasePreset = {
@@ -31,9 +40,8 @@ type ClubShowcasePreset = {
     rank: string;
     pageLabel: string;
     urlPath: string;
-    primary: string;
-    gk: string;
-    badgeBg: string;
+    kitPrimary: string;
+    kitGk: string;
 };
 
 const CLUB_SHOWCASES: ClubShowcasePreset[] = [
@@ -42,33 +50,30 @@ const CLUB_SHOWCASES: ClubShowcasePreset[] = [
         clubLabel: "Northbrook United",
         division: "Premier Division",
         rank: "#1st",
-        pageLabel: "Fixtures & Results",
-        urlPath: "matches",
-        primary: "#e11d48",
-        gk: "#10b981",
-        badgeBg: "rgba(225,29,72,0.14)",
+        pageLabel: "Dashboard & Form",
+        urlPath: "dashboard",
+        kitPrimary: "#e11d48",
+        kitGk: "#10b981",
     },
     {
         id: "oakwood",
         clubLabel: "Oakwood Albion",
         division: "Senior County League",
         rank: "#2nd",
-        pageLabel: "Matchday XI & Tactics",
+        pageLabel: "Matchday XI",
         urlPath: "matchday-xi",
-        primary: "#2563eb",
-        gk: "#f59e0b",
-        badgeBg: "rgba(37,99,235,0.14)",
+        kitPrimary: "#2563eb",
+        kitGk: "#f59e0b",
     },
     {
         id: "riverside",
         clubLabel: "Riverside Athletic",
         division: "Division One North",
         rank: "#3rd",
-        pageLabel: "Training & Weekly Plan",
+        pageLabel: "Training & Attendance",
         urlPath: "training",
-        primary: "#10b981",
-        gk: "#eab308",
-        badgeBg: "rgba(16,185,129,0.14)",
+        kitPrimary: "#10b981",
+        kitGk: "#eab308",
     },
     {
         id: "westbourne",
@@ -77,24 +82,22 @@ const CLUB_SHOWCASES: ClubShowcasePreset[] = [
         rank: "#4th",
         pageLabel: "Recruitment & Trialists",
         urlPath: "recruitment",
-        primary: "#f59e0b",
-        gk: "#06b6d4",
-        badgeBg: "rgba(245,158,11,0.14)",
+        kitPrimary: "#f59e0b",
+        kitGk: "#06b6d4",
     },
     {
         id: "ashford",
         clubLabel: "Ashford Park FC",
         division: "Olympian League",
         rank: "#1st",
-        pageLabel: "Opposition & League Insights",
+        pageLabel: "Opposition Reports",
         urlPath: "opposition",
-        primary: "#9f1239",
-        gk: "#22c55e",
-        badgeBg: "rgba(159,18,57,0.18)",
+        kitPrimary: "#9f1239",
+        kitGk: "#22c55e",
     },
 ];
 
-type WorkspaceTabId = "dashboard" | "league" | "matchday-xi" | "training" | "recruitment" | "squad";
+type WorkspaceTabId = "matchday-xi" | "dashboard" | "league" | "training" | "recruitment" | "squad";
 
 const WORKSPACE_TABS: {
     id: WorkspaceTabId;
@@ -104,52 +107,450 @@ const WORKSPACE_TABS: {
     desc: string;
 }[] = [
     {
-        id: "dashboard",
-        label: "Club Dashboard",
-        url: "clubflow.org.uk/dashboard",
-        headline: "Plan your week, check form & see your season leaderboards.",
-        desc: "Your league position, home and away splits, upcoming match countdown, and top goalscorers in one view.",
-    },
-    {
-        id: "league",
-        label: "League Table & Insights",
-        url: "clubflow.org.uk/league",
-        headline: "Insights that standard league tables don’t give you.",
-        desc: "Go beyond basic points—track points-per-game (PPG), recent 5-match form guides, goal trends, and how your upcoming opponents are performing.",
-    },
-    {
         id: "matchday-xi",
         label: "Matchday XI",
         url: "clubflow.org.uk/matchday-xi",
-        headline: "Build your starting XI, manage your bench & share your lineup.",
-        desc: "Lock in your formation, switch between 1–11 matchday numbers or fixed squad numbers, and export your pitch graphic.",
+        headline: "Pick your starting XI from available players, set roles & export your team sheet.",
+        desc: "Filter available players by position, see who started last match, switch between 1–11 or fixed squad numbers, and export your pitch graphic.",
+    },
+    {
+        id: "dashboard",
+        label: "Club Dashboard",
+        url: "clubflow.org.uk/dashboard",
+        headline: "Plan your week, check recent form & see your home and away splits.",
+        desc: "Your league standing, recent 5-match form pills, home/away PPG splits, manager to-do items, and next match WhatsApp copy in one place.",
+    },
+    {
+        id: "league",
+        label: "League Table & Form Guide",
+        url: "clubflow.org.uk/league",
+        headline: "Standings, Points Per Game (PPG) & Last 5 Form Guide.",
+        desc: "Track your division table alongside points-per-game (PPG) and recent 5-match form guides for every team in your league.",
     },
     {
         id: "training",
         label: "Training Attendance",
         url: "clubflow.org.uk/training",
-        headline: "Plan the week & monitor who is actually turning up to training.",
-        desc: "Log mid-week sessions, track player attendance rates over the season, and see who deserves a starting shirt on Saturday.",
+        headline: "Plan the week & monitor who is turning up to training.",
+        desc: "Schedule mid-week sessions, track player attendance percentages over the season, and see who has been training before selecting your squad.",
     },
     {
         id: "recruitment",
         label: "Recruitment",
         url: "clubflow.org.uk/recruitment",
         headline: "Track scouting targets, manage your trialist pipeline & export to Excel.",
-        desc: "Keep a database of players you’ve watched, monitor trialists in training, and download your list to Excel anytime.",
+        desc: "Keep a database of players you’ve watched, monitor trialists in training, and download your recruitment list to Excel anytime.",
     },
     {
         id: "squad",
         label: "Squad & Appearances",
         url: "clubflow.org.uk/squad",
         headline: "Starts, sub appearances, goals, loans & availability.",
-        desc: "Track starts, sub appearances, goals, cards, injuries, and loan or dual-registration players across the season.",
+        desc: "Track starts, sub appearances, goals, cards, medical status, and loan or dual-registration players across the season.",
     },
 ];
 
+/**
+ * Exact SVG Jersey & Name Pill matching src/app/matchday-xi/page.tsx
+ */
+function PitchJerseyNode({
+    x,
+    y,
+    number,
+    name,
+    kitColor = "#e11d48",
+    textColor = "#ffffff",
+    isCaptain = false,
+    badge,
+    compact = false,
+}: {
+    x: number;
+    y: number;
+    number: number | string;
+    name: string;
+    kitColor?: string;
+    textColor?: string;
+    isCaptain?: boolean;
+    badge?: string;
+    compact?: boolean;
+}) {
+    return (
+        <div
+            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none"
+            style={{ left: `${x}%`, top: `${y}%` }}
+        >
+            <div className="relative flex flex-col items-center">
+                <svg
+                    className={`${
+                        compact ? "w-7 h-7" : "w-8 h-8 sm:w-10 sm:h-10"
+                    } drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)] mb-0.5 z-10`}
+                    viewBox="0 0 100 100"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                >
+                    <path
+                        d="M 30,20 L 70,20 L 85,35 L 75,45 L 68,38 L 68,85 L 32,85 L 32,38 L 25,45 L 15,35 Z"
+                        fill={kitColor}
+                        stroke="#000"
+                        strokeWidth="3.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                    />
+                    <path d="M 40,20 Q 50,28 60,20" stroke="#000" strokeWidth="3.5" fill="none" />
+                    <text
+                        x="50"
+                        y="57"
+                        textAnchor="middle"
+                        fill={textColor}
+                        fontSize="28"
+                        fontWeight="900"
+                        dy=".3em"
+                    >
+                        {number}
+                    </text>
+                </svg>
+
+                {isCaptain && (
+                    <span className="absolute -top-1 -left-1.5 z-20 px-1 min-w-[14px] h-3.5 rounded-full text-[8px] font-black flex items-center justify-center shadow border bg-amber-400 text-black border-white">
+                        C
+                    </span>
+                )}
+
+                {badge && (
+                    <div className="absolute -bottom-1 -right-2.5 z-20 flex items-center gap-0.5 bg-slate-950/90 text-white px-1 py-0.2 rounded-full text-[7px] font-black border border-white/30 shadow whitespace-nowrap">
+                        <span>{badge}</span>
+                    </div>
+                )}
+            </div>
+
+            <div
+                className={`${
+                    compact ? "px-1.5 py-0.2 min-w-[38px]" : "px-1.5 sm:px-2 py-0.5 min-w-[44px] sm:min-w-[58px]"
+                } rounded-full shadow-md text-center bg-white/95 border border-[#eaeaea] flex items-center justify-center`}
+            >
+                <span
+                    className={`${
+                        compact ? "text-[8px]" : "text-[9px] sm:text-[10px]"
+                    } font-bold tracking-tight whitespace-nowrap truncate text-[#171717]`}
+                >
+                    {name}
+                </span>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Exact Desktop Left Sidebar matching src/components/layout/sidebar.tsx (#171717)
+ */
+function MockAppSidebar({ clubName, activePath }: { clubName: string; activePath: string }) {
+    const items = [
+        { label: "Dashboard", icon: LayoutDashboard, path: "dashboard" },
+        { label: "Players", icon: Users, path: "squad" },
+        { label: "Matchday XI", icon: Shirt, path: "matchday-xi" },
+        { label: "Training", icon: Activity, path: "training" },
+        { label: "Fixtures", icon: Calendar, path: "matches" },
+        { label: "League Table", icon: Trophy, path: "league" },
+        { label: "Opposition Reports", icon: Target, path: "opposition" },
+        { label: "Recruitment", icon: UserPlus, path: "recruitment" },
+        { label: "Fines & Payments", icon: Coins, path: "player-payments" },
+        { label: "Administration", icon: Settings, path: "admin" },
+    ];
+
+    return (
+        <div className="hidden md:flex md:col-span-3 lg:col-span-2 bg-[#171717] text-zinc-300 flex-col justify-between border-r border-[#171717] select-none">
+            <div>
+                <div className="flex h-14 items-center px-4 border-b border-white/5 gap-2.5">
+                    <div className="h-7 w-7 rounded-full bg-white/10 flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-zinc-100">{clubName.charAt(0)}</span>
+                    </div>
+                    <span className="text-xs font-bold text-zinc-100 truncate">{clubName}</span>
+                </div>
+
+                <div className="p-3 space-y-3">
+                    <div className="flex items-center gap-2 rounded border border-white/5 bg-white/5 px-2.5 py-1.5 text-[10px] text-zinc-400">
+                        <Search className="h-3 w-3 text-zinc-500 shrink-0" />
+                        <span className="truncate">Search club...</span>
+                    </div>
+
+                    <div className="space-y-0.5 text-[11px]">
+                        {items.map((item) => {
+                            const isActive = item.path === activePath;
+                            return (
+                                <div
+                                    key={item.label}
+                                    className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-colors ${
+                                        isActive
+                                            ? "bg-white/10 text-white font-bold border-l-2 border-[#e11d48]"
+                                            : "text-zinc-400 font-medium"
+                                    }`}
+                                >
+                                    <item.icon
+                                        className={`h-3.5 w-3.5 shrink-0 ${
+                                            isActive ? "text-[#e11d48]" : "text-zinc-500"
+                                        }`}
+                                    />
+                                    <span className="truncate">{item.label}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+
+            <div className="p-3 border-t border-white/5 flex items-center gap-2 text-left">
+                <div className="h-6 w-6 rounded-full bg-[#e11d48] text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                    M
+                </div>
+                <div className="min-w-0">
+                    <div className="text-[10px] font-bold text-zinc-200 truncate">First Team Manager</div>
+                    <div className="text-[9px] text-zinc-500 truncate">{clubName}</div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Exact 3-Column Matchday XI View matching src/app/matchday-xi/page.tsx
+ */
+function RealisticMatchdayXIView({
+    kitColor = "#e11d48",
+    gkColor = "#10b981",
+    numberingMode = "1-11",
+    playersOnPitch,
+}: {
+    kitColor?: string;
+    gkColor?: string;
+    numberingMode?: "1-11" | "squad";
+    playersOnPitch?: {
+        x: number;
+        y: number;
+        name: string;
+        num11: number;
+        sq: number;
+        gk?: boolean;
+        capt?: boolean;
+        badge?: string;
+    }[];
+}) {
+    const pitchPlayers = playersOnPitch || [
+        { x: 50, y: 88, name: "B. Fletcher", num11: 1, sq: 1, gk: true },
+        { x: 16, y: 68, name: "R. Brooks", num11: 3, sq: 18 },
+        { x: 38, y: 72, name: "H. Gallagher", num11: 5, sq: 4, capt: true },
+        { x: 62, y: 72, name: "S. Ward", num11: 6, sq: 5 },
+        { x: 84, y: 68, name: "D. Palmer", num11: 2, sq: 22 },
+        { x: 50, y: 53, name: "A. Cole", num11: 4, sq: 6 },
+        { x: 30, y: 40, name: "M. Barker", num11: 8, sq: 14 },
+        { x: 70, y: 40, name: "T. Vance", num11: 10, sq: 10, badge: "👟1" },
+        { x: 20, y: 20, name: "C. Maddox", num11: 11, sq: 11 },
+        { x: 50, y: 14, name: "J. Mercer", num11: 9, sq: 9, badge: "⭐ ⚽2" },
+        { x: 80, y: 20, name: "L. Sterling", num11: 7, sq: 7 },
+    ];
+
+    const availableList = [
+        { name: "J. Mercer", pos: "ST", stats: "12 Apps • 22G", tag: "Last XI", num: "#9" },
+        { name: "R. Brooks", pos: "LB", stats: "11 Apps • 1G", tag: "Last XI", num: "#18" },
+        { name: "H. Gallagher", pos: "CB", stats: "12 Apps • 2G", tag: "Last XI", num: "#4" },
+        { name: "L. Sterling", pos: "RW", stats: "11 Apps • 8G", tag: "Last XI", num: "#7" },
+        { name: "T. Vance", pos: "CAM", stats: "7 Apps • 6G", tag: "Last XI", num: "#10" },
+        { name: "K. O'Connor", pos: "GK", stats: "3 Apps", tag: "Sub Last", num: "#13" },
+        { name: "M. Richards", pos: "CB", stats: "8 Apps • 1G", tag: "Sub Last", num: "#15" },
+    ];
+
+    const benchList = [
+        { num: 12, name: "K. O'Connor", pos: "GK", mins: "" },
+        { num: 14, name: "M. Richards", pos: "CB / RB", mins: "25'" },
+        { num: 15, name: "D. Alston", pos: "CM", mins: "30'" },
+        { num: 16, name: "E. Boateng", pos: "LW / RW", mins: "15'" },
+        { num: 17, name: "S. Callaghan", pos: "ST", mins: "" },
+    ];
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 text-left text-[#171717]">
+            {/* Left Column: Available Squad Pool (Matches src/app/matchday-xi/page.tsx lines 3687-3825) */}
+            <div className="lg:col-span-3 bg-white rounded-2xl border border-[#eaeaea] shadow-xs flex flex-col overflow-hidden">
+                <div className="p-2.5 border-b border-[#eaeaea] flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-extrabold text-[#171717]">Available</span>
+                        <span className="text-[10px] font-bold text-zinc-500 bg-[#f4f4f5] px-1.5 py-0.5 rounded-md border border-[#eaeaea]">
+                            18
+                        </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-zinc-600 bg-[#f4f4f5] px-2 py-0.5 rounded-lg border border-[#eaeaea]">
+                        First Team
+                    </span>
+                </div>
+
+                {/* Position Filter Pills */}
+                <div className="px-2.5 pt-2 pb-1.5 bg-[#f4f4f5]/60 flex gap-1">
+                    {["All", "GK", "DEF", "MID", "FWD"].map((f, idx) => (
+                        <span
+                            key={f}
+                            className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                                idx === 0 ? "bg-[#171717] text-white" : "text-zinc-500"
+                            }`}
+                        >
+                            {f}
+                        </span>
+                    ))}
+                </div>
+
+                {/* Search Squad Input */}
+                <div className="px-2.5 pb-2 pt-1 border-b border-[#eaeaea] bg-[#f4f4f5]/60">
+                    <div className="flex items-center gap-1.5 px-2.5 py-1 bg-white border border-[#eaeaea] rounded-lg text-[10px] text-zinc-400">
+                        <Search className="h-3 w-3" />
+                        <span>Search squad...</span>
+                    </div>
+                </div>
+
+                {/* Compact 2-Line Player Cards */}
+                <div className="p-2 space-y-1.5">
+                    {availableList.map((p, i) => (
+                        <div
+                            key={i}
+                            className="p-2 border border-[#eaeaea] rounded-xl bg-white shadow-2xs space-y-0.5"
+                        >
+                            <div className="flex items-center justify-between gap-1">
+                                <span className="text-[11px] font-bold text-[#171717] truncate">{p.name}</span>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <span
+                                        className={`text-[8px] font-extrabold px-1.5 py-0.2 rounded border ${
+                                            p.tag === "Last XI"
+                                                ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
+                                                : "bg-blue-500/15 text-blue-600 border-blue-500/30"
+                                        }`}
+                                    >
+                                        {p.tag}
+                                    </span>
+                                    <span className="text-[8px] font-bold text-zinc-500 bg-[#f4f4f5] px-1 rounded">
+                                        {p.num}
+                                    </span>
+                                </div>
+                            </div>
+                            <div className="text-[9px] font-semibold text-zinc-500">
+                                <span className="font-bold text-[#171717]/80">{p.pos}</span> • {p.stats}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+
+            {/* Center Column: Toolbar + #2b7c3d Grass Pitch with SVG Collared Shirts */}
+            <div className="lg:col-span-6 flex flex-col">
+                <div className="flex flex-wrap items-center justify-between gap-2 pb-2">
+                    <div>
+                        <div className="text-xs font-extrabold text-[#171717]">Starting XI</div>
+                        <div className="text-[10px] text-zinc-500 font-medium">11 / 11 Selected</div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 bg-white border border-[#eaeaea] rounded-xl px-2.5 py-1 shadow-2xs text-[10px] font-bold text-[#171717]">
+                            <span
+                                className="w-3 h-3 rounded-sm border border-black/20"
+                                style={{ backgroundColor: kitColor }}
+                            />
+                            <span>Auto (Home Kit)</span>
+                            <span className="text-zinc-400 border-l border-[#eaeaea] pl-1.5">GK:</span>
+                            <span
+                                className="w-3 h-3 rounded-sm border border-black/20"
+                                style={{ backgroundColor: gkColor }}
+                            />
+                        </div>
+
+                        <div className="px-2.5 py-1 border border-[#eaeaea] rounded-xl text-[10px] font-bold bg-white text-[#171717] shadow-2xs">
+                            4-3-3 ▾
+                        </div>
+                    </div>
+                </div>
+
+                {/* Exact #2b7c3d Pitch from src/app/matchday-xi/page.tsx line 4008 */}
+                <div className="relative w-full h-[380px] sm:h-[410px] bg-[#2b7c3d] rounded-2xl shadow-lg overflow-hidden">
+                    <div className="absolute inset-2 border-2 border-white/40 pointer-events-none" />
+                    <div className="absolute left-2 right-2 top-1/2 border-t-2 border-white/40 pointer-events-none" />
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-14 h-14 border-2 border-white/40 rounded-full pointer-events-none" />
+                    <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-white/60 rounded-full pointer-events-none" />
+                    <div className="absolute left-1/2 -translate-x-1/2 top-2 w-24 h-11 border-2 border-white/40 border-t-0 pointer-events-none" />
+                    <div className="absolute left-1/2 -translate-x-1/2 bottom-2 w-24 h-11 border-2 border-white/40 border-b-0 pointer-events-none" />
+                    <div className="absolute left-1/2 -translate-x-1/2 top-2 w-12 h-5 border-2 border-white/40 border-t-0 pointer-events-none" />
+                    <div className="absolute left-1/2 -translate-x-1/2 bottom-2 w-12 h-5 border-2 border-white/40 border-b-0 pointer-events-none" />
+
+                    {pitchPlayers.map((p, idx) => (
+                        <PitchJerseyNode
+                            key={idx}
+                            x={p.x}
+                            y={p.y}
+                            number={numberingMode === "1-11" ? p.num11 : p.sq}
+                            name={p.name}
+                            kitColor={p.gk ? gkColor : kitColor}
+                            isCaptain={p.capt}
+                            badge={p.badge}
+                        />
+                    ))}
+                </div>
+            </div>
+
+            {/* Right Column: Substitutes Bench & Matchday Roles */}
+            <div className="lg:col-span-3 space-y-3">
+                <div className="bg-white rounded-2xl border border-[#eaeaea] p-3 shadow-xs space-y-2">
+                    <div className="flex items-center justify-between border-b border-[#eaeaea] pb-2">
+                        <span className="text-xs font-extrabold text-[#171717]">Substitutes Bench</span>
+                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-[#f4f4f5] text-zinc-600 border border-[#eaeaea]">
+                            5 / 5
+                        </span>
+                    </div>
+                    <div className="space-y-1.5">
+                        {benchList.map((sub) => (
+                            <div
+                                key={sub.num}
+                                className="flex items-center justify-between p-1.5 rounded-xl border border-[#eaeaea] bg-[#fcfcfd] text-[11px]"
+                            >
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="w-5 h-5 rounded-md bg-[#171717] text-white text-[10px] font-black flex items-center justify-center shrink-0">
+                                        {sub.num}
+                                    </span>
+                                    <div className="truncate">
+                                        <div className="font-bold text-[#171717] truncate">{sub.name}</div>
+                                        <div className="text-[9px] text-zinc-500">{sub.pos}</div>
+                                    </div>
+                                </div>
+                                {sub.mins ? (
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-700 font-bold text-[9px] shrink-0">
+                                        Sub {sub.mins}
+                                    </span>
+                                ) : (
+                                    <span className="text-[9px] text-zinc-400 font-semibold shrink-0">Bench</span>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="bg-white rounded-2xl border border-[#eaeaea] p-3 shadow-xs space-y-1.5 text-[11px]">
+                    <div className="text-xs font-extrabold text-[#171717] border-b border-[#eaeaea] pb-1.5">
+                        Roles & Set Pieces
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                        <span className="text-zinc-500">Captain (C)</span>
+                        <span className="font-bold text-[#171717]">H. Gallagher</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                        <span className="text-zinc-500">Penalties</span>
+                        <span className="font-bold text-[#171717]">J. Mercer</span>
+                    </div>
+                    <div className="flex justify-between py-0.5">
+                        <span className="text-zinc-500">Corners (L / R)</span>
+                        <span className="font-bold text-[#171717]">T. Vance / L. Sterling</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export default function LandingPage() {
     const [selectedClub, setSelectedClub] = useState<ClubShowcasePreset>(CLUB_SHOWCASES[0]);
-    const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceTabId>("league");
+    const [activeWorkspace, setActiveWorkspace] = useState<WorkspaceTabId>("matchday-xi");
     const [numberingMode, setNumberingMode] = useState<"1-11" | "squad">("1-11");
 
     const currentTabObj = WORKSPACE_TABS.find((t) => t.id === activeWorkspace) || WORKSPACE_TABS[0];
@@ -160,18 +561,9 @@ export default function LandingPage() {
             {/* ARCHITECTURAL PITCH-GRID & AMBIENT MESH BACKGROUND                */}
             {/* ================================================================= */}
             <div className="pointer-events-none fixed inset-0 z-0 overflow-hidden">
-                <div
-                    className="absolute -top-48 left-1/2 -translate-x-1/2 w-[980px] h-[540px] rounded-full blur-[160px] opacity-20 transition-colors duration-700"
-                    style={{ backgroundColor: selectedClub.primary }}
-                />
-                <div
-                    className="absolute top-[38%] -left-48 w-[520px] h-[520px] rounded-full blur-[170px] opacity-10 transition-colors duration-700"
-                    style={{ backgroundColor: selectedClub.gk }}
-                />
-                <div
-                    className="absolute bottom-0 right-0 w-[600px] h-[600px] rounded-full blur-[180px] opacity-15 transition-colors duration-700"
-                    style={{ backgroundColor: selectedClub.primary }}
-                />
+                <div className="absolute -top-48 left-1/2 -translate-x-1/2 w-[980px] h-[540px] rounded-full blur-[160px] opacity-20 bg-[#e11d48]" />
+                <div className="absolute top-[38%] -left-48 w-[520px] h-[520px] rounded-full blur-[170px] opacity-10 bg-emerald-500" />
+                <div className="absolute bottom-0 right-0 w-[600px] h-[600px] rounded-full blur-[180px] opacity-15 bg-[#e11d48]" />
 
                 <div
                     className="absolute inset-0 opacity-[0.16]"
@@ -197,16 +589,13 @@ export default function LandingPage() {
             </div>
 
             {/* ================================================================= */}
-            {/* CLEAN NAVBAR (JUST PREVIEW & FEATURES)                            */}
+            {/* CLEAN NAVBAR (INSIDE THE APP & FEATURES)                          */}
             {/* ================================================================= */}
-            <nav className="fixed top-0 left-0 right-0 z-50 bg-[#060911]/80 backdrop-blur-xl border-b border-white/[0.08] px-4 sm:px-8 py-3.5">
+            <nav className="fixed top-0 left-0 right-0 z-50 bg-[#060911]/85 backdrop-blur-xl border-b border-white/[0.08] px-4 sm:px-8 py-3.5">
                 <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
                     <div className="flex items-center gap-8">
                         <Link href="/" className="flex items-center gap-2.5 group">
-                            <div
-                                className="h-9 w-9 rounded-xl flex items-center justify-center font-black text-white text-sm shadow-lg transition-colors duration-500 border border-white/20"
-                                style={{ backgroundColor: selectedClub.primary }}
-                            >
+                            <div className="h-9 w-9 rounded-xl flex items-center justify-center font-black text-white text-sm shadow-lg bg-[#e11d48] border border-white/20">
                                 CF
                             </div>
                             <span className="font-black text-lg tracking-tight text-white">
@@ -233,8 +622,7 @@ export default function LandingPage() {
                         </Link>
                         <Link
                             href="/signup"
-                            className="px-4 py-2.5 rounded-xl text-white font-black shadow-lg transition-all hover:opacity-95 flex items-center gap-1.5"
-                            style={{ backgroundColor: selectedClub.primary }}
+                            className="px-4 py-2.5 rounded-xl text-white font-black shadow-lg bg-[#e11d48] hover:bg-[#be123c] transition-all flex items-center gap-1.5"
                         >
                             Start Your Club <ArrowRight className="w-3.5 h-3.5" />
                         </Link>
@@ -245,24 +633,16 @@ export default function LandingPage() {
             {/* ================================================================= */}
             {/* HERO SECTION                                                      */}
             {/* ================================================================= */}
-            <header className="relative z-10 pt-28 pb-20 md:pt-36 md:pb-24 px-4 sm:px-6">
+            <header className="relative z-10 pt-28 pb-16 md:pt-36 md:pb-20 px-4 sm:px-6">
                 <div className="max-w-6xl mx-auto text-center space-y-6 flex flex-col items-center">
                     <div className="inline-flex flex-wrap items-center justify-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.05] border border-white/10 text-xs font-bold text-slate-200 backdrop-blur-md">
-                        <span
-                            className="w-2 h-2 rounded-full animate-pulse"
-                            style={{ backgroundColor: selectedClub.primary }}
-                        />
+                        <span className="w-2 h-2 rounded-full bg-[#e11d48] animate-pulse" />
                         <span>Built for Non-League, Grassroots, Sunday League & Academy Football</span>
                     </div>
 
                     <h1 className="text-4xl sm:text-6xl lg:text-7xl font-black tracking-tight text-white max-w-4xl leading-[1.04]">
                         Plan the week. Know your opposition.{" "}
-                        <span
-                            className="bg-clip-text text-transparent transition-all duration-500"
-                            style={{
-                                backgroundImage: `linear-gradient(135deg, #ffffff 15%, ${selectedClub.primary} 100%)`,
-                            }}
-                        >
+                        <span className="bg-clip-text text-transparent bg-gradient-to-r from-white via-rose-200 to-[#e11d48]">
                             Win on Saturday.
                         </span>
                     </h1>
@@ -271,16 +651,14 @@ export default function LandingPage() {
                         Monitor <strong className="text-slate-200">training attendance</strong>, build your{" "}
                         <strong className="text-slate-200">Matchday XI</strong>, prepare{" "}
                         <strong className="text-slate-200">opposition reports</strong>, manage{" "}
-                        <strong className="text-slate-200">recruitment & trialists</strong>, and unlock{" "}
-                        <strong className="text-slate-200">deeper insights from your league table</strong> that standard
-                        tables don’t show.
+                        <strong className="text-slate-200">recruitment & trialists</strong>, and track your{" "}
+                        <strong className="text-slate-200">league table, form guide & PPG</strong> in one hub.
                     </p>
 
                     <div className="flex flex-wrap items-center justify-center gap-3.5 pt-2">
                         <Link
                             href="/signup"
-                            className="px-7 py-3.5 rounded-xl font-black text-sm text-white shadow-xl transition-all hover:scale-[1.02] flex items-center gap-2"
-                            style={{ backgroundColor: selectedClub.primary }}
+                            className="px-7 py-3.5 rounded-xl font-black text-sm text-white bg-[#e11d48] hover:bg-[#be123c] shadow-xl transition-all hover:scale-[1.02] flex items-center gap-2"
                         >
                             Create Your Club <ArrowRight className="w-4 h-4" />
                         </Link>
@@ -298,10 +676,10 @@ export default function LandingPage() {
                         </Link>
                     </div>
 
-                    {/* Club Switcher -> Each Club Displays a Different Page Snippet & Unique Club Data */}
+                    {/* Club Switcher -> Shows Different Pages in the Real ClubFlow Light UI */}
                     <div className="pt-4 space-y-2">
                         <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                            Click a club below to preview different pages of the hub:
+                            Click a club below to preview different pages inside ClubFlow:
                         </div>
                         <div className="flex flex-wrap items-center justify-center gap-2">
                             {CLUB_SHOWCASES.map((club) => {
@@ -319,13 +697,13 @@ export default function LandingPage() {
                                     >
                                         <span
                                             className="w-3 h-3 rounded-full border border-black/20 shrink-0"
-                                            style={{ backgroundColor: club.primary }}
+                                            style={{ backgroundColor: club.kitPrimary }}
                                         />
                                         <span>{club.clubLabel}</span>
                                         <span
                                             className={`text-[10px] px-1.5 py-0.5 rounded font-extrabold ${
                                                 active
-                                                    ? "bg-slate-900 text-white"
+                                                    ? "bg-[#e11d48] text-white"
                                                     : "bg-white/10 text-slate-400"
                                             }`}
                                         >
@@ -339,21 +717,21 @@ export default function LandingPage() {
                 </div>
 
                 {/* ============================================================= */}
-                {/* HERO APP WINDOW: DYNAMICALLY SHOWS A DIFFERENT PAGE PER CLUB  */}
+                {/* HERO APP WINDOW: EXACT REAL CLUBFLOW LIGHT-MODE UI + SIDEBAR  */}
                 {/* ============================================================= */}
                 <div className="max-w-6xl mx-auto mt-8">
-                    <div className="rounded-2xl sm:rounded-3xl overflow-hidden border border-white/15 shadow-[0_25px_100px_-15px_rgba(0,0,0,0.85)] bg-[#0b0f19]">
-                        {/* Browser Bar */}
-                        <div className="h-9 bg-[#0b0f19] border-b border-white/10 px-4 flex items-center justify-between">
+                    <div className="rounded-2xl sm:rounded-3xl overflow-hidden border border-white/15 shadow-[0_25px_100px_-15px_rgba(0,0,0,0.85)] bg-[#171717]">
+                        {/* Browser Top Bar */}
+                        <div className="h-9 bg-[#111111] border-b border-white/10 px-4 flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f56]" />
                                 <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
                                 <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]" />
-                                <span className="ml-2 text-[11px] text-slate-400 font-semibold hidden sm:inline">
+                                <span className="ml-2 text-[11px] text-zinc-400 font-semibold hidden sm:inline">
                                     {selectedClub.clubLabel} — {selectedClub.pageLabel}
                                 </span>
                             </div>
-                            <div className="px-3 py-0.5 rounded-md bg-white/[0.05] border border-white/10 text-[10px] text-slate-300 font-mono">
+                            <div className="px-3 py-0.5 rounded-md bg-white/[0.05] border border-white/10 text-[10px] text-zinc-300 font-mono">
                                 www.clubflow.org.uk/{selectedClub.urlPath}
                             </div>
                             <div className="flex items-center gap-1.5">
@@ -363,145 +741,139 @@ export default function LandingPage() {
                             </div>
                         </div>
 
-                        {/* App Shell */}
-                        <div className="grid grid-cols-12 min-h-[440px] bg-[#f8fafc] text-slate-900">
-                            {/* Left Sidebar */}
-                            <div className="hidden md:flex md:col-span-3 lg:col-span-2 bg-[#0b0f19] text-slate-300 p-3.5 flex-col justify-between border-r border-slate-800">
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2.5 px-2 py-1.5">
-                                        <div
-                                            className="w-7 h-7 rounded-lg flex items-center justify-center font-black text-white text-xs shrink-0"
-                                            style={{ backgroundColor: selectedClub.primary }}
-                                        >
-                                            {selectedClub.clubLabel.slice(0, 2).toUpperCase()}
-                                        </div>
-                                        <div className="truncate text-left">
-                                            <div className="text-xs font-black text-white truncate">
-                                                {selectedClub.clubLabel}
-                                            </div>
-                                            <div className="text-[10px] text-emerald-400 font-bold">
-                                                {selectedClub.rank} • {selectedClub.division}
-                                            </div>
-                                        </div>
-                                    </div>
+                        {/* Real App Shell: #171717 Left Sidebar + #FCFCFD Light Canvas */}
+                        <div className="grid grid-cols-12 min-h-[460px] bg-[#fcfcfd] text-[#171717]">
+                            <MockAppSidebar
+                                clubName={selectedClub.clubLabel}
+                                activePath={selectedClub.urlPath}
+                            />
 
-                                    <div className="space-y-1 text-xs font-semibold">
-                                        {[
-                                            { label: "Club Dashboard", icon: LayoutDashboard, path: "dashboard" },
-                                            { label: "Squad", icon: Users, path: "squad" },
-                                            { label: "Training", icon: ClipboardCheck, path: "training" },
-                                            { label: "Fixtures & Results", icon: Calendar, path: "matches" },
-                                            { label: "Matchday XI", icon: Shirt, path: "matchday-xi" },
-                                            { label: "Opposition Reports", icon: Shield, path: "opposition" },
-                                            { label: "League Table", icon: Trophy, path: "league" },
-                                            { label: "Recruitment", icon: Star, path: "recruitment" },
-                                        ].map((nav, i) => {
-                                            const isNavActive = selectedClub.urlPath === nav.path;
-                                            return (
-                                                <div
-                                                    key={i}
-                                                    className={`flex items-center justify-between px-2.5 py-2 rounded-xl transition-colors ${
-                                                        isNavActive ? "text-white font-bold shadow-sm" : "text-slate-400"
-                                                    }`}
-                                                    style={
-                                                        isNavActive ? { backgroundColor: selectedClub.primary } : undefined
-                                                    }
-                                                >
-                                                    <span className="flex items-center gap-2 truncate">
-                                                        <nav.icon className="w-3.5 h-3.5 shrink-0" />
-                                                        <span className="truncate">{nav.label}</span>
-                                                    </span>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-
-                                <div className="p-2.5 rounded-xl bg-slate-900/90 border border-white/10 text-[10px] text-slate-400 text-left space-y-0.5">
-                                    <div className="font-bold text-white">{selectedClub.clubLabel}</div>
-                                    <div>First Team Squad Active</div>
-                                </div>
-                            </div>
-
-                            {/* CLUB 1: NORTHBROOK UNITED -> FIXTURES, RESULTS & GOALSCORERS */}
+                            {/* CLUB 1: NORTHBROOK UNITED -> REAL DASHBOARD VIEW */}
                             {selectedClub.id === "northbrook" && (
-                                <div className="col-span-12 md:col-span-9 lg:col-span-10 p-4 sm:p-6 space-y-4 bg-[#f8fafc] text-left">
-                                    <div
-                                        className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs border-l-4"
-                                        style={{ borderLeftColor: selectedClub.primary }}
-                                    >
-                                        <div className="flex flex-wrap items-center justify-between gap-4">
-                                            <div className="space-y-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span
-                                                        className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider text-white"
-                                                        style={{ backgroundColor: selectedClub.primary }}
-                                                    >
-                                                        NEXT MATCH
-                                                    </span>
-                                                    <span className="text-xs font-bold uppercase text-rose-600">
-                                                        • PREMIER DIVISION
-                                                    </span>
-                                                    <span className="px-2 py-0.5 rounded border border-slate-200 text-[10px] font-bold text-slate-600">
-                                                        HOME
+                                <div className="col-span-12 md:col-span-9 lg:col-span-10 p-4 sm:p-6 space-y-4 bg-[#fcfcfd] text-left">
+                                    {/* Top Header Card matching src/app/dashboard/page.tsx lines 811-901 */}
+                                    <div className="bg-white border border-[#eaeaea] rounded-2xl p-4 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                                        <div className="flex items-center gap-3.5">
+                                            <div className="h-12 w-12 rounded-xl bg-[#e11d48]/10 border border-[#e11d48]/20 flex items-center justify-center shrink-0">
+                                                <Trophy className="h-6 w-6 text-[#e11d48]" />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <h2 className="text-lg sm:text-xl font-black text-[#171717] tracking-tight">
+                                                        Northbrook United
+                                                    </h2>
+                                                    <span className="inline-flex items-center gap-1 rounded-full bg-[#e11d48]/15 text-[#e11d48] border border-[#e11d48]/30 px-2.5 py-0.5 text-xs font-extrabold">
+                                                        <Trophy className="h-3 w-3" /> #1st in League
                                                     </span>
                                                 </div>
+                                                <div className="flex items-center gap-2 mt-1.5">
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                                        Form:
+                                                    </span>
+                                                    <div className="inline-flex items-center gap-1">
+                                                        {["W", "W", "D", "W", "W"].map((r, i) => (
+                                                            <span
+                                                                key={i}
+                                                                className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-black text-white ${
+                                                                    r === "W" ? "bg-emerald-500" : "bg-amber-500"
+                                                                }`}
+                                                            >
+                                                                {r}
+                                                            </span>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
 
-                                                <div className="flex flex-wrap items-center gap-2.5">
-                                                    <span className="text-xl sm:text-2xl font-black text-slate-900">
-                                                        Northbrook United
+                                        {/* Home Split & Away Split Pills matching src/app/dashboard/page.tsx lines 869-899 */}
+                                        <div className="grid grid-cols-2 sm:flex items-center gap-2">
+                                            <div className="flex items-center gap-2 bg-[#f4f4f5] border border-[#eaeaea] rounded-xl px-3 py-2">
+                                                <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                                                    <Home className="h-3.5 w-3.5" />
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                                        Home Split
+                                                    </div>
+                                                    <div className="text-xs font-extrabold text-[#171717]">
+                                                        6W-0D-0L <span className="text-emerald-600">(3.00 PPG)</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-2 bg-[#f4f4f5] border border-[#eaeaea] rounded-xl px-3 py-2">
+                                                <div className="h-7 w-7 rounded-lg bg-sky-500/10 text-sky-600 flex items-center justify-center shrink-0">
+                                                    <Plane className="h-3.5 w-3.5" />
+                                                </div>
+                                                <div>
+                                                    <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-500">
+                                                        Away Split
+                                                    </div>
+                                                    <div className="text-xs font-extrabold text-[#171717]">
+                                                        4W-1D-1L <span className="text-sky-600">(2.17 PPG)</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Briefing Row + Goalscorers */}
+                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+                                        {/* Next Match Card matching Dashboard Card A */}
+                                        <div className="lg:col-span-5 bg-white border border-[#eaeaea] rounded-2xl p-4 shadow-2xs flex flex-col justify-between gap-3">
+                                            <div>
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#e11d48] flex items-center gap-1.5">
+                                                        <Zap className="h-3.5 w-3.5 fill-[#e11d48] text-[#e11d48]" />
+                                                        Next Match
                                                     </span>
-                                                    <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-xs font-black">
-                                                        #1
+                                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#e11d48]/10 text-[#e11d48] border border-[#e11d48]/20">
+                                                        Premier Division
                                                     </span>
-                                                    <span className="text-sm font-bold text-slate-400">VS</span>
-                                                    <span className="text-xl sm:text-2xl font-black text-slate-600">
-                                                        Kingswood Athletic
+                                                </div>
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="text-xl font-black text-[#171717]">
+                                                        vs Kingswood Athletic
                                                     </span>
-                                                    <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-xs font-black">
+                                                    <span className="px-2 py-0.5 rounded-md text-xs font-extrabold bg-[#f4f4f5] border border-[#eaeaea] text-zinc-600">
                                                         #8
                                                     </span>
+                                                    <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-600 border border-emerald-500/30">
+                                                        Home
+                                                    </span>
                                                 </div>
-
-                                                <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500 font-medium">
-                                                    <span className="flex items-center gap-1">
-                                                        <Calendar className="w-3.5 h-3.5" /> Sat 31 Oct
+                                                <div className="flex flex-wrap items-center gap-3 text-xs text-zinc-500 font-medium mt-2">
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <Calendar className="h-3.5 w-3.5 text-[#e11d48]" /> Sat 31 Oct
                                                     </span>
-                                                    <span className="flex items-center gap-1">
-                                                        <Clock className="w-3.5 h-3.5" /> KO 15:00
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <Clock className="h-3.5 w-3.5 text-[#e11d48]" /> KO 15:00
                                                     </span>
-                                                    <span className="font-bold text-amber-600">• Meet 13:30</span>
-                                                    <span className="flex items-center gap-1">
-                                                        <MapPin className="w-3.5 h-3.5" /> Northbrook Park
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <MapPin className="h-3.5 w-3.5 text-[#e11d48]" /> Northbrook Park
                                                     </span>
                                                 </div>
                                             </div>
 
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <span
-                                                    className="px-3.5 py-2 rounded-lg text-white text-xs font-bold flex items-center gap-1.5 shadow-xs"
-                                                    style={{ backgroundColor: selectedClub.primary }}
-                                                >
-                                                    <Shirt className="w-3.5 h-3.5" /> Matchday XI
-                                                </span>
-                                                <span className="px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold">
-                                                    Opposition Report
-                                                </span>
-                                                <span className="px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
-                                                    ⚽ Log Result / Scorers
-                                                </span>
+                                            <div className="grid grid-cols-2 gap-2 pt-3 border-t border-[#eaeaea]">
+                                                <div className="h-8 rounded-lg border border-[#eaeaea] bg-white text-xs font-semibold text-[#171717] flex items-center justify-center gap-1.5">
+                                                    <Copy className="h-3.5 w-3.5 text-emerald-500" /> WhatsApp Copy
+                                                </div>
+                                                <div className="h-8 rounded-lg bg-[#e11d48] text-white text-xs font-bold flex items-center justify-center gap-1.5">
+                                                    <Shirt className="h-3.5 w-3.5" /> Matchday XI
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
 
-                                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                                        <div className="lg:col-span-7 bg-white rounded-xl border border-slate-200 p-3.5 space-y-2.5">
+                                        {/* Northbrook Results & Scorers */}
+                                        <div className="lg:col-span-7 bg-white border border-[#eaeaea] rounded-2xl p-4 shadow-2xs space-y-2.5">
                                             <div className="flex items-center justify-between">
-                                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
-                                                    Northbrook Recent Results
+                                                <span className="text-xs font-extrabold text-[#171717]">
+                                                    Recent Results & Goalscorers
                                                 </span>
-                                                <span className="text-[11px] font-bold text-emerald-600">
-                                                    Form: W • W • D • W • W
+                                                <span className="text-[11px] font-bold text-[#e11d48]">
+                                                    Top Scorer: J. Mercer (22G)
                                                 </span>
                                             </div>
                                             {[
@@ -510,29 +882,26 @@ export default function LandingPage() {
                                                     ha: "Away",
                                                     score: "4 - 0",
                                                     res: "W",
-                                                    scorers: "Mercer (2), Sterling, Vance",
-                                                    lineup: "4-3-3 Saved",
+                                                    scorers: "J. Mercer (2), L. Sterling, T. Vance",
                                                 },
                                                 {
                                                     opp: "Meadowbank Town",
                                                     ha: "Home",
                                                     score: "3 - 1",
                                                     res: "W",
-                                                    scorers: "Maddox (2), Mercer",
-                                                    lineup: "4-2-3-1 Saved",
+                                                    scorers: "C. Maddox (2), J. Mercer",
                                                 },
                                                 {
                                                     opp: "Silverdale Rovers",
                                                     ha: "Away",
                                                     score: "2 - 2",
                                                     res: "D",
-                                                    scorers: "Mercer, Cole",
-                                                    lineup: "4-3-3 Saved",
+                                                    scorers: "J. Mercer, A. Cole",
                                                 },
                                             ].map((m, idx) => (
                                                 <div
                                                     key={idx}
-                                                    className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-200/80 text-xs"
+                                                    className="flex items-center justify-between p-2.5 rounded-xl bg-[#fcfcfd] border border-[#eaeaea] text-xs"
                                                 >
                                                     <div className="flex items-center gap-2.5">
                                                         <span
@@ -543,60 +912,16 @@ export default function LandingPage() {
                                                             {m.res}
                                                         </span>
                                                         <div>
-                                                            <div className="font-bold text-slate-900">
+                                                            <div className="font-bold text-[#171717]">
                                                                 vs {m.opp}{" "}
-                                                                <span className="text-[10px] text-slate-400 font-normal">
+                                                                <span className="text-[10px] text-zinc-400 font-normal">
                                                                     ({m.ha})
                                                                 </span>
                                                             </div>
-                                                            <div className="text-[10px] text-slate-500">⚽ {m.scorers}</div>
+                                                            <div className="text-[10px] text-zinc-500">⚽ {m.scorers}</div>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="px-2 py-0.5 rounded bg-white border border-slate-200 text-[10px] font-semibold text-slate-600">
-                                                            📋 {m.lineup}
-                                                        </span>
-                                                        <span className="font-black text-slate-900 text-sm">{m.score}</span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-
-                                        <div className="lg:col-span-5 bg-white rounded-xl border border-slate-200 p-3.5 space-y-2.5">
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-500">
-                                                    Top Goalscorers & Appearances
-                                                </span>
-                                                <span className="text-[10px] font-bold text-rose-600">26/27 Season</span>
-                                            </div>
-                                            {[
-                                                { name: "J. Mercer", pos: "ST", apps: "12 (0)", goals: 22 },
-                                                { name: "L. Sterling", pos: "RW", apps: "5 (6)", goals: 8 },
-                                                { name: "T. Vance", pos: "CAM", apps: "5 (2)", goals: 6 },
-                                                { name: "C. Maddox", pos: "LW", apps: "8 (1)", goals: 5 },
-                                                { name: "R. Brooks", pos: "CM", apps: "11 (0)", goals: 1 },
-                                            ].map((p, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    className="flex items-center justify-between py-1.5 px-2 rounded-lg text-xs border-b border-slate-100 last:border-0"
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px]">
-                                                            {p.pos}
-                                                        </span>
-                                                        <span className="font-bold text-slate-900">{p.name}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-3 text-[11px]">
-                                                        <span className="text-slate-500">
-                                                            Apps: <strong className="text-slate-800">{p.apps}</strong>
-                                                        </span>
-                                                        <span
-                                                            className="px-2 py-0.5 rounded-full font-black text-white"
-                                                            style={{ backgroundColor: selectedClub.primary }}
-                                                        >
-                                                            {p.goals}G
-                                                        </span>
-                                                    </div>
+                                                    <span className="font-black text-[#171717] text-sm">{m.score}</span>
                                                 </div>
                                             ))}
                                         </div>
@@ -604,154 +929,94 @@ export default function LandingPage() {
                                 </div>
                             )}
 
-                            {/* CLUB 2: OAKWOOD ALBION -> MATCHDAY XI & TACTICS PITCH */}
+                            {/* CLUB 2: OAKWOOD ALBION -> EXACT 3-COLUMN MATCHDAY XI VIEW (NO REAL NAMES) */}
                             {selectedClub.id === "oakwood" && (
-                                <div className="col-span-12 md:col-span-9 lg:col-span-10 p-4 sm:p-6 bg-[#f8fafc] grid grid-cols-1 lg:grid-cols-12 gap-5 text-left items-center">
-                                    <div className="lg:col-span-5 space-y-3">
-                                        <span className="px-2.5 py-1 rounded-full bg-blue-50 text-blue-700 border border-blue-200 text-[11px] font-black">
-                                            Oakwood Albion • Matchday XI vs Redbridge Town
-                                        </span>
-                                        <h3 className="text-xl font-black text-slate-900">
-                                            4-2-3-1 Starting Lineup & Substitutes
-                                        </h3>
-                                        <div className="bg-white rounded-xl border border-slate-200 p-3 space-y-2 text-xs">
-                                            <div className="font-black text-slate-700 uppercase text-[10px]">
-                                                Substitutes Bench (5)
-                                            </div>
-                                            {[
-                                                "12. K. O'Connor (GK)",
-                                                "14. M. Richards (CB / RB)",
-                                                "15. D. Alston (CM)",
-                                                "16. E. Boateng (LW / RW)",
-                                                "17. S. Callaghan (ST)",
-                                            ].map((sub, i) => (
-                                                <div
-                                                    key={i}
-                                                    className="py-1.5 px-2.5 rounded bg-slate-50 border border-slate-100 font-semibold text-slate-800"
-                                                >
-                                                    {sub}
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="p-3 rounded-xl bg-white border border-slate-200 text-xs space-y-1">
-                                            <div className="font-bold text-slate-900">Oakwood Top Scorers</div>
-                                            <div className="text-slate-600">
-                                                1. H. Kane-Smith (14G) • 2. O. Bowen (9G) • 3. J. Bellingham-Hall (7G)
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="lg:col-span-7">
-                                        <div className="relative rounded-2xl overflow-hidden border border-emerald-500/30 bg-gradient-to-b from-emerald-950 via-emerald-900/90 to-emerald-950 aspect-[16/10] p-4 shadow-xl">
-                                            <div className="absolute inset-3 border border-white/20 rounded-xl pointer-events-none" />
-                                            <div className="absolute left-3 right-3 top-1/2 border-t border-white/20 pointer-events-none" />
-                                            {[
-                                                { x: 50, y: 88, name: "Pickford-Sims", num: 1, gk: true },
-                                                { x: 18, y: 68, name: "Shaw", num: 3 },
-                                                { x: 38, y: 72, name: "Tarkowski", num: 5 },
-                                                { x: 62, y: 72, name: "Branthwaite", num: 6 },
-                                                { x: 82, y: 68, name: "Trippier", num: 2 },
-                                                { x: 36, y: 52, name: "Wharton", num: 4 },
-                                                { x: 64, y: 52, name: "Mainoo", num: 8 },
-                                                { x: 20, y: 30, name: "Eze", num: 11 },
-                                                { x: 50, y: 32, name: "Bellingham-Hall", num: 10 },
-                                                { x: 80, y: 30, name: "Bowen", num: 7 },
-                                                { x: 50, y: 14, name: "Kane-Smith", num: 9 },
-                                            ].map((p, idx) => (
-                                                <div
-                                                    key={idx}
-                                                    className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
-                                                    style={{ left: `${p.x}%`, top: `${p.y}%` }}
-                                                >
-                                                    <div
-                                                        className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black text-white shadow-lg border-2 border-white"
-                                                        style={{
-                                                            backgroundColor: p.gk
-                                                                ? selectedClub.gk
-                                                                : selectedClub.primary,
-                                                        }}
-                                                    >
-                                                        {p.num}
-                                                    </div>
-                                                    <span className="mt-0.5 px-2 py-0.2 rounded bg-slate-950/90 text-[10px] font-bold text-white border border-white/15">
-                                                        {p.name}
-                                                    </span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
+                                <div className="col-span-12 md:col-span-9 lg:col-span-10 p-4 sm:p-5 bg-[#fcfcfd]">
+                                    <RealisticMatchdayXIView
+                                        kitColor={selectedClub.kitPrimary}
+                                        gkColor={selectedClub.kitGk}
+                                        numberingMode="1-11"
+                                        playersOnPitch={[
+                                            { x: 50, y: 88, name: "T. Reed", num11: 1, sq: 1, gk: true },
+                                            { x: 16, y: 68, name: "M. Collins", num11: 3, sq: 3 },
+                                            { x: 38, y: 72, name: "D. Walsh", num11: 5, sq: 5, capt: true },
+                                            { x: 62, y: 72, name: "K. Doyle", num11: 6, sq: 6 },
+                                            { x: 84, y: 68, name: "B. Turner", num11: 2, sq: 2 },
+                                            { x: 36, y: 52, name: "L. Hayes", num11: 4, sq: 4 },
+                                            { x: 64, y: 52, name: "S. Miller", num11: 8, sq: 8 },
+                                            { x: 20, y: 30, name: "C. Grant", num11: 11, sq: 11 },
+                                            { x: 50, y: 32, name: "O. Foster", num11: 10, sq: 10, badge: "👟1" },
+                                            { x: 80, y: 30, name: "N. Bennett", num11: 7, sq: 7 },
+                                            { x: 50, y: 14, name: "E. Price", num11: 9, sq: 9, badge: "⭐ ⚽2" },
+                                        ]}
+                                    />
                                 </div>
                             )}
 
                             {/* CLUB 3: RIVERSIDE ATHLETIC -> TRAINING ATTENDANCE & WEEKLY PLAN */}
                             {selectedClub.id === "riverside" && (
-                                <div className="col-span-12 md:col-span-9 lg:col-span-10 p-4 sm:p-6 bg-[#f8fafc] space-y-4 text-left">
-                                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200">
+                                <div className="col-span-12 md:col-span-9 lg:col-span-10 p-4 sm:p-6 bg-[#fcfcfd] space-y-4 text-left">
+                                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#eaeaea] shadow-2xs">
                                         <div>
-                                            <span className="text-[10px] font-black uppercase text-emerald-600">
+                                            <span className="text-[10px] font-black uppercase text-[#e11d48]">
                                                 WEEKLY PLANNING & TRAINING ATTENDANCE
                                             </span>
-                                            <h3 className="text-xl font-black text-slate-900">
+                                            <h3 className="text-lg sm:text-xl font-black text-[#171717]">
                                                 Wednesday 3G Session — Transition & Set Pieces
                                             </h3>
-                                            <p className="text-xs text-slate-500">
+                                            <p className="text-xs text-zinc-500">
                                                 📍 Riverbank 3G Pitch 2 • 20:00 – 21:30 • 21 Players Confirmed
                                             </p>
                                         </div>
-                                        <div className="flex items-center gap-3">
-                                            <div className="text-right">
-                                                <div className="text-xl font-black text-emerald-600">88%</div>
-                                                <div className="text-[10px] font-bold text-slate-400 uppercase">
-                                                    Season Attendance
-                                                </div>
+                                        <div className="text-right">
+                                            <div className="text-xl font-black text-emerald-600">88%</div>
+                                            <div className="text-[10px] font-bold text-zinc-400 uppercase">
+                                                Season Attendance
                                             </div>
                                         </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2.5">
-                                            <div className="text-xs font-black uppercase text-slate-500">
-                                                Training Attendance Leaders (Riverside Athletic)
+                                        <div className="bg-white rounded-2xl border border-[#eaeaea] p-4 space-y-2 shadow-2xs">
+                                            <div className="text-xs font-extrabold text-[#171717]">
+                                                Attendance Leaders (Riverside Athletic)
                                             </div>
                                             {[
-                                                { name: "C. Gallagher-Reid", pos: "CM", rate: "100% (14/14)", status: "In Starting XI" },
-                                                { name: "B. White-Simmonds", pos: "RB", rate: "93% (13/14)", status: "In Starting XI" },
-                                                { name: "A. Wharton-Clarke", pos: "CDM", rate: "93% (13/14)", status: "In Starting XI" },
-                                                { name: "D. Solanke-Grant", pos: "ST", rate: "86% (12/14)", status: "16 Season Goals" },
-                                            ].map((t, i) => (
+                                                { name: "J. Dawson (CM)", rate: "18 / 18 (100%)", status: "Confirmed" },
+                                                { name: "K. Clarke (ST — 16 Goals)", rate: "17 / 18 (94%)", status: "Confirmed" },
+                                                { name: "R. Patel (RB)", rate: "17 / 18 (94%)", status: "Confirmed" },
+                                                { name: "T. Hughes (CB)", rate: "16 / 18 (89%)", status: "Confirmed" },
+                                            ].map((p, i) => (
                                                 <div
                                                     key={i}
-                                                    className="flex items-center justify-between p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs"
+                                                    className="flex items-center justify-between py-1.5 border-b border-[#eaeaea] last:border-0 text-xs"
                                                 >
-                                                    <div>
-                                                        <div className="font-bold text-slate-900">{t.name}</div>
-                                                        <div className="text-[10px] text-slate-500">{t.pos} • {t.status}</div>
+                                                    <span className="font-bold text-[#171717]">{p.name}</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-zinc-500 font-semibold">{p.rate}</span>
+                                                        <span className="px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold text-[10px]">
+                                                            {p.status}
+                                                        </span>
                                                     </div>
-                                                    <span className="px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 font-black text-[11px]">
-                                                        {t.rate}
-                                                    </span>
                                                 </div>
                                             ))}
                                         </div>
 
-                                        <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2.5">
-                                            <div className="text-xs font-black uppercase text-slate-500">
+                                        <div className="bg-white rounded-2xl border border-[#eaeaea] p-4 space-y-2 shadow-2xs">
+                                            <div className="text-xs font-extrabold text-[#171717]">
                                                 Riverside Recent Results & Scorers
                                             </div>
                                             {[
-                                                { opp: "Waltham Forest XI", score: "3 - 0 W", scorers: "Solanke-Grant (2), Reid" },
-                                                { opp: "woodford Town Res", score: "2 - 1 W", scorers: "Solanke-Grant, Bowen-Lee" },
-                                                { opp: "Epping Athletic", score: "1 - 1 D", scorers: "Wharton-Clarke" },
-                                            ].map((m, i) => (
+                                                { match: "Riverside 2 - 0 Vale United", scorers: "K. Clarke, J. Dawson" },
+                                                { match: "Ashby Town 1 - 3 Riverside", scorers: "K. Clarke (2), L. Davies" },
+                                                { match: "Riverside 1 - 1 Eastbrook", scorers: "A. Morgan" },
+                                            ].map((r, i) => (
                                                 <div
                                                     key={i}
-                                                    className="p-2.5 rounded-lg bg-slate-50 border border-slate-100 text-xs flex items-center justify-between"
+                                                    className="p-2.5 rounded-xl bg-[#fcfcfd] border border-[#eaeaea] text-xs"
                                                 >
-                                                    <div>
-                                                        <div className="font-bold text-slate-900">vs {m.opp}</div>
-                                                        <div className="text-[10px] text-slate-500">⚽ {m.scorers}</div>
-                                                    </div>
-                                                    <span className="font-black text-emerald-700">{m.score}</span>
+                                                    <div className="font-bold text-[#171717]">{r.match}</div>
+                                                    <div className="text-[11px] text-zinc-500">⚽ {r.scorers}</div>
                                                 </div>
                                             ))}
                                         </div>
@@ -759,20 +1024,20 @@ export default function LandingPage() {
                                 </div>
                             )}
 
-                            {/* CLUB 4: WESTBOURNE TOWN -> RECRUITMENT & TRIALIST PIPELINE */}
+                            {/* CLUB 4: WESTBOURNE TOWN -> RECRUITMENT & TRIALISTS */}
                             {selectedClub.id === "westbourne" && (
-                                <div className="col-span-12 md:col-span-9 lg:col-span-10 p-4 sm:p-6 bg-[#f8fafc] space-y-4 text-left">
-                                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200">
+                                <div className="col-span-12 md:col-span-9 lg:col-span-10 p-4 sm:p-6 bg-[#fcfcfd] space-y-4 text-left">
+                                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#eaeaea] shadow-2xs">
                                         <div>
-                                            <span className="text-[10px] font-black uppercase text-amber-600">
-                                                WESTBOURNE TOWN • RECRUITMENT & TRIALIST PIPELINE
+                                            <span className="text-[10px] font-black uppercase text-[#e11d48]">
+                                                RECRUITMENT & TRIALIST PIPELINE
                                             </span>
-                                            <h3 className="text-xl font-black text-slate-900">
-                                                Active Scouting Targets & Trialists (14)
+                                            <h3 className="text-lg sm:text-xl font-black text-[#171717]">
+                                                Westbourne Town — Active Scouting Targets & Trialists
                                             </h3>
                                         </div>
-                                        <span className="px-3.5 py-2 rounded-xl bg-slate-900 text-white text-xs font-bold flex items-center gap-1.5">
-                                            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" /> Export to Excel (.xlsx)
+                                        <span className="px-3 py-1.5 rounded-xl bg-[#171717] text-white text-xs font-bold flex items-center gap-1.5">
+                                            <FileSpreadsheet className="w-3.5 h-3.5" /> Export to Excel
                                         </span>
                                     </div>
 
@@ -782,33 +1047,33 @@ export default function LandingPage() {
                                                 name: "Jayden Vance",
                                                 pos: "LB / LWB",
                                                 club: "Hillside Athletic U23",
-                                                stage: "Invited to Trial",
+                                                stage: "Invited to Training",
                                                 stars: 5,
-                                                note: "Quick overlapping left-back, played Step 5 last season.",
+                                                note: "Quick overlapping fullback, played Step 5 last season.",
                                             },
                                             {
                                                 name: "Marcus Osei",
                                                 pos: "CDM / CM",
                                                 club: "Brookside Wanderers",
-                                                stage: "On Trial (2 Sessions)",
+                                                stage: "On Trial",
                                                 stars: 4,
-                                                note: "Strong ball-winner, trained Wednesday night — ready to sign.",
+                                                note: "Strong ball-winner, trained Wednesday night — impressed.",
                                             },
                                             {
                                                 name: "Daniel Knight",
                                                 pos: "ST / RW",
-                                                club: "Free Agent",
-                                                stage: "Priority Target",
+                                                club: "Unattached",
+                                                stage: "Scouted",
                                                 stars: 5,
                                                 note: "18 goals in County Premier last year. Available immediately.",
                                             },
                                         ].map((t, i) => (
                                             <div
                                                 key={i}
-                                                className="p-4 rounded-xl bg-white border border-slate-200 space-y-2"
+                                                className="p-4 rounded-2xl bg-white border border-[#eaeaea] shadow-2xs space-y-2"
                                             >
                                                 <div className="flex items-center justify-between">
-                                                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-800 font-bold text-[10px]">
+                                                    <span className="px-2 py-0.5 rounded bg-[#f4f4f5] text-[#171717] font-bold text-[10px]">
                                                         {t.pos}
                                                     </span>
                                                     <span className="text-amber-500 text-xs font-black">
@@ -816,15 +1081,15 @@ export default function LandingPage() {
                                                     </span>
                                                 </div>
                                                 <div>
-                                                    <div className="font-black text-slate-900 text-sm">{t.name}</div>
-                                                    <div className="text-[11px] text-slate-500">{t.club}</div>
+                                                    <div className="font-black text-[#171717] text-sm">{t.name}</div>
+                                                    <div className="text-[11px] text-zinc-500">{t.club}</div>
                                                 </div>
-                                                <p className="text-xs text-slate-600">{t.note}</p>
+                                                <p className="text-xs text-zinc-600">{t.note}</p>
                                                 <div className="pt-1 flex items-center justify-between">
                                                     <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">
                                                         {t.stage}
                                                     </span>
-                                                    <span className="text-[11px] font-bold text-slate-900">
+                                                    <span className="text-[11px] font-bold text-[#e11d48]">
                                                         Sign to Squad →
                                                     </span>
                                                 </div>
@@ -834,53 +1099,53 @@ export default function LandingPage() {
                                 </div>
                             )}
 
-                            {/* CLUB 5: ASHFORD PARK FC -> OPPOSITION REPORTS & LEAGUE INSIGHTS */}
+                            {/* CLUB 5: ASHFORD PARK FC -> OPPOSITION REPORTS (NO REAL NAMES) */}
                             {selectedClub.id === "ashford" && (
-                                <div className="col-span-12 md:col-span-9 lg:col-span-10 p-4 sm:p-6 bg-[#f8fafc] space-y-4 text-left">
-                                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200">
+                                <div className="col-span-12 md:col-span-9 lg:col-span-10 p-4 sm:p-6 bg-[#fcfcfd] space-y-4 text-left">
+                                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#eaeaea] shadow-2xs">
                                         <div>
-                                            <span className="text-[10px] font-black uppercase text-rose-700">
-                                                OPPOSITION SCOUTING REPORT & TABLE INSIGHTS
+                                            <span className="text-[10px] font-black uppercase text-[#e11d48]">
+                                                OPPOSITION SCOUTING REPORT
                                             </span>
-                                            <h3 className="text-xl font-black text-slate-900">
+                                            <h3 className="text-lg sm:text-xl font-black text-[#171717]">
                                                 Upcoming Opponent: Silverdale Athletic (#2nd • 2.25 PPG)
                                             </h3>
-                                            <p className="text-xs text-slate-500">
-                                                Expected System: 3-5-2 Wingbacks • Danger Man: #9 L. Griffiths (15 Goals)
+                                            <p className="text-xs text-zinc-500">
+                                                Expected System: 3-5-2 Wingbacks • Key Threat: #9 L. Griffiths (15 Goals)
                                             </p>
                                         </div>
-                                        <span className="px-3 py-1.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold">
+                                        <span className="px-3 py-1.5 rounded-xl bg-rose-50 text-[#e11d48] border border-rose-200 text-xs font-bold">
                                             Head-to-Head: 2W - 1D - 0L
                                         </span>
                                     </div>
 
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
-                                            <div className="text-xs font-black uppercase text-slate-500">
+                                        <div className="bg-white rounded-2xl border border-[#eaeaea] p-4 space-y-2 shadow-2xs">
+                                            <div className="text-xs font-extrabold text-[#171717]">
                                                 Tactical Notes on Silverdale Athletic
                                             </div>
-                                            <ul className="text-xs text-slate-700 space-y-1.5 list-disc pl-4">
+                                            <ul className="text-xs text-zinc-600 space-y-1.5 list-disc pl-4">
                                                 <li>Concede 68% of their goals in the final 25 minutes of matches.</li>
                                                 <li>High wingbacks leave space in behind for our wide forwards on the counter.</li>
                                                 <li>Strong on in-swinging corners to the front post — assign zonal marker.</li>
                                             </ul>
                                         </div>
-                                        <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2">
-                                            <div className="text-xs font-black uppercase text-slate-500">
+                                        <div className="bg-white rounded-2xl border border-[#eaeaea] p-4 space-y-2 shadow-2xs">
+                                            <div className="text-xs font-extrabold text-[#171717]">
                                                 Ashford Park FC Top Goalscorers
                                             </div>
                                             <div className="space-y-1.5 text-xs">
-                                                <div className="flex justify-between py-1 border-b border-slate-100">
-                                                    <span className="font-bold text-slate-900">1. T. Abraham-Wells (ST)</span>
-                                                    <span className="font-black text-rose-700">19 Goals (11 Starts)</span>
+                                                <div className="flex justify-between py-1 border-b border-[#eaeaea]">
+                                                    <span className="font-bold text-[#171717]">1. D. Walker (ST)</span>
+                                                    <span className="font-black text-[#e11d48]">19 Goals (11 Starts)</span>
                                                 </div>
-                                                <div className="flex justify-between py-1 border-b border-slate-100">
-                                                    <span className="font-bold text-slate-900">2. K. Mitoma-Clarke (LW)</span>
-                                                    <span className="font-black text-rose-700">11 Goals (12 Starts)</span>
+                                                <div className="flex justify-between py-1 border-b border-[#eaeaea]">
+                                                    <span className="font-bold text-[#171717]">2. M. Bennett (LW)</span>
+                                                    <span className="font-black text-[#e11d48]">11 Goals (12 Starts)</span>
                                                 </div>
                                                 <div className="flex justify-between py-1">
-                                                    <span className="font-bold text-slate-900">3. R. Loftus-Hall (CM)</span>
-                                                    <span className="font-black text-rose-700">6 Goals (10 Starts)</span>
+                                                    <span className="font-bold text-[#171717]">3. J. Foster (CM)</span>
+                                                    <span className="font-black text-[#e11d48]">6 Goals (10 Starts)</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -893,14 +1158,11 @@ export default function LandingPage() {
             </header>
 
             {/* ================================================================= */}
-            {/* INSIDE THE APP: CLEAN 6-TAB PREVIEW (NO HOTSPOT PINS)             */}
+            {/* INSIDE THE APP: ALL TABS USE REAL LIGHT-MODE CLUBFLOW UI          */}
             {/* ================================================================= */}
             <section id="preview" className="relative z-10 py-20 max-w-7xl mx-auto px-4 sm:px-6 space-y-8">
                 <div className="text-center space-y-2 max-w-2xl mx-auto">
-                    <span
-                        className="text-xs font-black uppercase tracking-widest"
-                        style={{ color: selectedClub.primary }}
-                    >
+                    <span className="text-xs font-black uppercase tracking-widest text-[#e11d48]">
                         Inside the App
                     </span>
                     <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight">
@@ -919,7 +1181,7 @@ export default function LandingPage() {
                                 onClick={() => setActiveWorkspace(t.id)}
                                 className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition-all ${
                                     isActive
-                                        ? "bg-white text-slate-950 border-white shadow-lg"
+                                        ? "bg-[#e11d48] text-white border-[#e11d48] shadow-lg"
                                         : "bg-slate-900/70 text-slate-300 border-white/10 hover:border-white/25 hover:text-white"
                                 }`}
                             >
@@ -935,514 +1197,450 @@ export default function LandingPage() {
                     <p className="text-xs sm:text-sm text-slate-400">{currentTabObj.desc}</p>
                 </div>
 
-                {/* Clean Screen Frame */}
-                <div className="rounded-2xl sm:rounded-3xl overflow-hidden border border-white/15 bg-[#0c101b] shadow-2xl">
-                    <div className="h-9 bg-[#0c101b] border-b border-white/10 px-4 flex items-center justify-between">
+                {/* Real App Window Frame (#171717 Sidebar + #FCFCFD Light Canvas) */}
+                <div className="rounded-2xl sm:rounded-3xl overflow-hidden border border-white/15 bg-[#171717] shadow-2xl">
+                    <div className="h-9 bg-[#111111] border-b border-white/10 px-4 flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
                             <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f56]" />
                             <span className="h-2.5 w-2.5 rounded-full bg-[#ffbd2e]" />
                             <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]" />
                         </div>
-                        <div className="text-[11px] text-slate-400 font-mono">{currentTabObj.url}</div>
+                        <div className="text-[11px] text-zinc-400 font-mono">{currentTabObj.url}</div>
                         <div className="w-12" />
                     </div>
 
-                    {/* TAB: LEAGUE TABLE & INSIGHTS (RICH MOCK TABLE WITH FORM & PPG) */}
-                    {activeWorkspace === "league" && (
-                        <div className="p-5 sm:p-8 bg-[#f8fafc] text-slate-900 space-y-5 text-left">
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
-                                <div className="p-3.5 rounded-xl bg-white border border-slate-200">
-                                    <div className="text-[10px] font-black uppercase text-slate-400">
-                                        CURRENT POINTS PER GAME (PPG)
-                                    </div>
-                                    <div className="text-2xl font-black text-slate-900 mt-0.5">2.58 PPG</div>
-                                    <div className="text-xs text-emerald-600 font-bold">
-                                        On pace for 72 pts (Title Pace)
-                                    </div>
-                                </div>
-                                <div className="p-3.5 rounded-xl bg-white border border-slate-200">
-                                    <div className="text-[10px] font-black uppercase text-slate-400">
-                                        GOALS SCORED / CONCEDED PER GAME
-                                    </div>
-                                    <div className="text-2xl font-black text-slate-900 mt-0.5">2.83 GF • 0.91 GA</div>
-                                    <div className="text-xs text-slate-500">Best goal difference in division (+23)</div>
-                                </div>
-                                <div className="p-3.5 rounded-xl bg-white border border-slate-200">
-                                    <div className="text-[10px] font-black uppercase text-slate-400">
-                                        NEXT OPPONENT FORM (#8 KINGSWOOD)
-                                    </div>
-                                    <div className="text-2xl font-black text-amber-600 mt-0.5">1.27 PPG</div>
-                                    <div className="text-xs text-slate-500">Last 5: L - W - L - D - W</div>
-                                </div>
-                            </div>
+                    <div className="grid grid-cols-12 bg-[#fcfcfd] text-[#171717]">
+                        <MockAppSidebar
+                            clubName={selectedClub.clubLabel}
+                            activePath={activeWorkspace}
+                        />
 
-                            <div className="bg-white rounded-2xl border border-slate-200 overflow-x-auto">
-                                <table className="w-full text-left text-xs">
-                                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
-                                        <tr>
-                                            <th className="py-3 px-4">#</th>
-                                            <th className="py-3 px-4">Club</th>
-                                            <th className="py-3 px-3 text-center">P</th>
-                                            <th className="py-3 px-3 text-center">W</th>
-                                            <th className="py-3 px-3 text-center">D</th>
-                                            <th className="py-3 px-3 text-center">L</th>
-                                            <th className="py-3 px-3 text-center">GD</th>
-                                            <th className="py-3 px-3 text-center">PPG</th>
-                                            <th className="py-3 px-3 text-center">Pts</th>
-                                            <th className="py-3 px-4 text-right">Last 5 Form</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 font-medium">
-                                        {[
-                                            { pos: 1, team: selectedClub.clubLabel, p: 12, w: 10, d: 1, l: 1, gd: "+23", ppg: "2.58", pts: 31, form: ["W", "W", "W", "D", "W"], ours: true },
-                                            { pos: 2, team: "Silverdale Athletic", p: 12, w: 8, d: 3, l: 1, gd: "+14", ppg: "2.25", pts: 27, form: ["W", "D", "W", "W", "L"], ours: false },
-                                            { pos: 3, team: "Oakwood Albion", p: 12, w: 7, d: 2, l: 3, gd: "+7", ppg: "1.92", pts: 23, form: ["L", "W", "W", "D", "W"], ours: false },
-                                            { pos: 4, team: "Meadowbank Town", p: 12, w: 6, d: 3, l: 3, gd: "+5", ppg: "1.75", pts: 21, form: ["D", "W", "L", "W", "D"], ours: false },
-                                            { pos: 8, team: "Kingswood Athletic (Next Opp)", p: 11, w: 4, d: 2, l: 5, gd: "-1", ppg: "1.27", pts: 14, form: ["L", "W", "L", "D", "W"], ours: false },
-                                        ].map((r) => (
-                                            <tr
-                                                key={r.pos}
-                                                className={r.ours ? "bg-rose-50/60 font-bold" : "hover:bg-slate-50"}
-                                            >
-                                                <td className="py-3 px-4 font-black text-slate-900">{r.pos}</td>
-                                                <td className="py-3 px-4 font-black text-slate-900">{r.team}</td>
-                                                <td className="py-3 px-3 text-center">{r.p}</td>
-                                                <td className="py-3 px-3 text-center">{r.w}</td>
-                                                <td className="py-3 px-3 text-center">{r.d}</td>
-                                                <td className="py-3 px-3 text-center">{r.l}</td>
-                                                <td className="py-3 px-3 text-center font-bold text-emerald-700">{r.gd}</td>
-                                                <td className="py-3 px-3 text-center text-slate-600">{r.ppg}</td>
-                                                <td className="py-3 px-3 text-center font-black text-slate-900">{r.pts}</td>
-                                                <td className="py-3 px-4">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        {r.form.map((f, idx) => (
-                                                            <span
-                                                                key={idx}
-                                                                className={`w-5 h-5 rounded text-[10px] font-black text-white flex items-center justify-center ${
-                                                                    f === "W"
-                                                                        ? "bg-emerald-500"
-                                                                        : f === "D"
-                                                                        ? "bg-amber-500"
-                                                                        : "bg-rose-500"
-                                                                }`}
-                                                            >
-                                                                {f}
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* TAB: CLUB DASHBOARD */}
-                    {activeWorkspace === "dashboard" && (
-                        <div className="p-5 sm:p-8 bg-[#f8fafc] text-slate-900 space-y-5">
-                            <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
-                                <div className="flex items-center gap-3.5">
-                                    <div
-                                        className="w-12 h-12 rounded-2xl flex items-center justify-center font-black text-white text-lg"
-                                        style={{ backgroundColor: selectedClub.primary }}
-                                    >
-                                        {selectedClub.clubLabel.slice(0, 2).toUpperCase()}
-                                    </div>
-                                    <div className="text-left">
+                        <div className="col-span-12 md:col-span-9 lg:col-span-10 p-4 sm:p-6 bg-[#fcfcfd]">
+                            {/* TAB 1: MATCHDAY XI (EXACT 3-COLUMN REPLICA WITH SVG SHIRTS) */}
+                            {activeWorkspace === "matchday-xi" && (
+                                <div className="space-y-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-3 rounded-2xl border border-[#eaeaea] shadow-2xs">
+                                        <div className="text-left">
+                                            <div className="text-sm font-black text-[#171717]">
+                                                Matchday XI — vs Kingswood Athletic (Home)
+                                            </div>
+                                            <div className="text-[11px] text-zinc-500">
+                                                Sat 31 Oct • KO 15:00 • Meet 13:30
+                                            </div>
+                                        </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xl font-black text-slate-900">
-                                                {selectedClub.clubLabel}
-                                            </span>
-                                            <span className="px-2.5 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-xs font-black">
-                                                🏆 {selectedClub.rank} in League
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 mt-1">
-                                            <span className="text-[10px] font-bold uppercase text-slate-400">
-                                                Form:
-                                            </span>
-                                            {["W", "W", "W", "D", "W"].map((r, i) => (
-                                                <span
-                                                    key={i}
-                                                    className={`w-5 h-5 rounded text-[10px] font-black text-white flex items-center justify-center ${
-                                                        r === "W" ? "bg-emerald-500" : "bg-amber-500"
-                                                    }`}
-                                                >
-                                                    {r}
-                                                </span>
-                                            ))}
+                                            <button
+                                                type="button"
+                                                onClick={() => setNumberingMode("1-11")}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                                                    numberingMode === "1-11"
+                                                        ? "bg-[#171717] text-white border-[#171717]"
+                                                        : "bg-white text-zinc-600 border-[#eaeaea]"
+                                                }`}
+                                            >
+                                                1–11 Numbers
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setNumberingMode("squad")}
+                                                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-colors ${
+                                                    numberingMode === "squad"
+                                                        ? "bg-[#171717] text-white border-[#171717]"
+                                                        : "bg-white text-zinc-600 border-[#eaeaea]"
+                                                }`}
+                                            >
+                                                Squad Numbers
+                                            </button>
                                         </div>
                                     </div>
-                                </div>
 
-                                <div className="flex items-center gap-3">
-                                    <div className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-                                        <span className="text-slate-400 font-bold mr-2">HOME:</span>
-                                        <strong className="text-slate-800">9W - 1D - 1L</strong>
-                                    </div>
-                                    <div className="px-3.5 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-                                        <span className="text-slate-400 font-bold mr-2">AWAY:</span>
-                                        <strong className="text-slate-800">6W - 2D - 0L</strong>
-                                    </div>
+                                    <RealisticMatchdayXIView
+                                        kitColor={selectedClub.kitPrimary}
+                                        gkColor={selectedClub.kitGk}
+                                        numberingMode={numberingMode}
+                                    />
                                 </div>
-                            </div>
+                            )}
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
-                                <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2">
-                                    <div className="text-[10px] font-black uppercase text-rose-600">
-                                        TOP GOALSCORER
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <div className="text-base font-black text-slate-900">J. Mercer</div>
-                                            <div className="text-xs text-slate-500">12 Starts</div>
+                            {/* TAB 2: CLUB DASHBOARD */}
+                            {activeWorkspace === "dashboard" && (
+                                <div className="space-y-4 text-left">
+                                    <div className="flex flex-wrap items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-[#eaeaea] shadow-2xs">
+                                        <div className="flex items-center gap-3.5">
+                                            <div className="w-12 h-12 rounded-2xl bg-[#e11d48]/10 border border-[#e11d48]/20 flex items-center justify-center font-black text-[#e11d48] text-lg">
+                                                <Trophy className="w-6 h-6" />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xl font-black text-[#171717]">
+                                                        {selectedClub.clubLabel}
+                                                    </span>
+                                                    <span className="px-2.5 py-0.5 rounded-full bg-[#e11d48]/15 text-[#e11d48] border border-[#e11d48]/30 text-xs font-extrabold">
+                                                        🏆 {selectedClub.rank}
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-1.5 mt-1">
+                                                    <span className="text-[10px] font-bold uppercase text-zinc-400">
+                                                        Form:
+                                                    </span>
+                                                    {["W", "W", "W", "D", "W"].map((r, i) => (
+                                                        <span
+                                                            key={i}
+                                                            className={`w-5 h-5 rounded text-[10px] font-black text-white flex items-center justify-center ${
+                                                                r === "W" ? "bg-emerald-500" : "bg-amber-500"
+                                                            }`}
+                                                        >
+                                                            {r}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="text-2xl font-black text-rose-600">22G</div>
-                                    </div>
-                                </div>
-                                <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2">
-                                    <div className="text-[10px] font-black uppercase text-sky-600">
-                                        TRAINING ATTENDANCE
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <div className="text-base font-black text-slate-900">Wed Night 3G</div>
-                                            <div className="text-xs text-slate-500">21 Players Confirmed</div>
+
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="px-3.5 py-2 rounded-xl bg-[#f4f4f5] border border-[#eaeaea] text-xs">
+                                                <span className="text-zinc-500 font-bold mr-1.5">HOME SPLIT:</span>
+                                                <strong className="text-[#171717]">6W-0D-0L (3.00 PPG)</strong>
+                                            </div>
+                                            <div className="px-3.5 py-2 rounded-xl bg-[#f4f4f5] border border-[#eaeaea] text-xs">
+                                                <span className="text-zinc-500 font-bold mr-1.5">AWAY SPLIT:</span>
+                                                <strong className="text-[#171717]">4W-1D-1L (2.17 PPG)</strong>
+                                            </div>
                                         </div>
-                                        <div className="text-2xl font-black text-sky-600">88%</div>
                                     </div>
-                                </div>
-                                <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-2">
-                                    <div className="text-[10px] font-black uppercase text-emerald-600">
-                                        NEXT FIXTURE
-                                    </div>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <div className="text-base font-black text-slate-900">
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="p-4 rounded-2xl bg-white border border-[#eaeaea] shadow-2xs space-y-2">
+                                            <div className="text-[10px] font-black uppercase text-[#e11d48]">
+                                                NEXT MATCH
+                                            </div>
+                                            <div className="text-base font-black text-[#171717]">
                                                 vs Kingswood Athletic (#8)
                                             </div>
-                                            <div className="text-xs text-slate-500">Sat 15:00 • Meet 13:30</div>
+                                            <div className="text-xs text-zinc-500">Sat 15:00 • Meet 13:30 • Home</div>
                                         </div>
-                                        <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-700 font-black text-xs">
-                                            XI Ready
+                                        <div className="p-4 rounded-2xl bg-white border border-[#eaeaea] shadow-2xs space-y-2">
+                                            <div className="text-[10px] font-black uppercase text-emerald-600">
+                                                NEXT TRAINING
+                                            </div>
+                                            <div className="text-base font-black text-[#171717]">Wed Night 3G</div>
+                                            <div className="text-xs text-zinc-500">21 Confirmed • 88% Season Avg</div>
+                                        </div>
+                                        <div className="p-4 rounded-2xl bg-white border border-[#eaeaea] shadow-2xs space-y-2">
+                                            <div className="text-[10px] font-black uppercase text-[#e11d48]">
+                                                TOP GOALSCORER
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <div className="text-base font-black text-[#171717]">J. Mercer</div>
+                                                    <div className="text-xs text-zinc-500">12 Starts</div>
+                                                </div>
+                                                <div className="text-2xl font-black text-[#e11d48]">22G</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* TAB 3: LEAGUE TABLE, PPG & FORM GUIDE */}
+                            {activeWorkspace === "league" && (
+                                <div className="space-y-4 text-left">
+                                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#eaeaea] shadow-2xs">
+                                        <div>
+                                            <span className="text-[10px] font-black uppercase text-[#e11d48]">
+                                                PREMIER DIVISION STANDINGS
+                                            </span>
+                                            <h4 className="text-lg font-black text-[#171717]">
+                                                League Table, Points Per Game (PPG) & Last 5 Form Guide
+                                            </h4>
+                                        </div>
+                                        <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black">
+                                            2.58 PPG • #1st Place
                                         </span>
                                     </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
 
-                    {/* TAB: MATCHDAY XI */}
-                    {activeWorkspace === "matchday-xi" && (
-                        <div className="p-5 sm:p-8 bg-[#0b0f19] text-white grid grid-cols-1 lg:grid-cols-12 gap-6 items-center">
-                            <div className="lg:col-span-5 space-y-4 text-left">
-                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold">
-                                    <Shirt className="w-3.5 h-3.5" /> Matchday XI & Formations
-                                </div>
-                                <h4 className="text-2xl font-black text-white">
-                                    Set your formation, manage your bench & export your graphic
-                                </h4>
-                                <p className="text-xs sm:text-sm text-slate-400 leading-relaxed">
-                                    Switch between 1–11 matchday shirt numbers or fixed squad numbers, and export your
-                                    pitch graphic named automatically after your opposition and date.
-                                </p>
-
-                                <div className="flex items-center gap-2 pt-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => setNumberingMode("1-11")}
-                                        className={`px-3.5 py-2 rounded-xl text-xs font-bold border ${
-                                            numberingMode === "1-11"
-                                                ? "bg-white text-slate-950 border-white"
-                                                : "bg-slate-900 text-slate-400 border-white/10"
-                                        }`}
-                                    >
-                                        1–11 Matchday Numbers
-                                    </button>
-                                    <button
-                                        type="button"
-                                        onClick={() => setNumberingMode("squad")}
-                                        className={`px-3.5 py-2 rounded-xl text-xs font-bold border ${
-                                            numberingMode === "squad"
-                                                ? "bg-white text-slate-950 border-white"
-                                                : "bg-slate-900 text-slate-400 border-white/10"
-                                        }`}
-                                    >
-                                        Fixed Squad Numbers
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="lg:col-span-7">
-                                <div className="relative rounded-2xl overflow-hidden border border-emerald-500/30 bg-gradient-to-b from-emerald-950 via-emerald-900/90 to-emerald-950 aspect-[16/11] p-4 shadow-2xl">
-                                    <div className="absolute inset-3 border border-white/20 rounded-xl pointer-events-none" />
-                                    <div className="absolute left-3 right-3 top-1/2 border-t border-white/20 pointer-events-none" />
-
-                                    {[
-                                        { x: 50, y: 88, name: "Fletcher", num11: 1, sq: 1, gk: true },
-                                        { x: 18, y: 68, name: "Brooks", num11: 3, sq: 18 },
-                                        { x: 38, y: 72, name: "Gallagher", num11: 5, sq: 4 },
-                                        { x: 62, y: 72, name: "Ward", num11: 6, sq: 5 },
-                                        { x: 82, y: 68, name: "Palmer", num11: 2, sq: 22 },
-                                        { x: 50, y: 52, name: "Cole", num11: 4, sq: 6 },
-                                        { x: 32, y: 42, name: "Barker", num11: 8, sq: 14 },
-                                        { x: 68, y: 42, name: "Vance", num11: 10, sq: 10 },
-                                        { x: 22, y: 20, name: "Maddox", num11: 11, sq: 11 },
-                                        { x: 50, y: 15, name: "Mercer", num11: 9, sq: 9 },
-                                        { x: 78, y: 20, name: "Sterling", num11: 7, sq: 7 },
-                                    ].map((p, idx) => (
-                                        <div
-                                            key={idx}
-                                            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
-                                            style={{ left: `${p.x}%`, top: `${p.y}%` }}
-                                        >
-                                            <div
-                                                className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black text-white shadow-lg border-2 border-white"
-                                                style={{
-                                                    backgroundColor: p.gk
-                                                        ? selectedClub.gk
-                                                        : selectedClub.primary,
-                                                }}
-                                            >
-                                                {numberingMode === "1-11" ? p.num11 : p.sq}
-                                            </div>
-                                            <span className="mt-0.5 px-2 py-0.2 rounded bg-slate-950/90 text-[10px] font-bold text-white border border-white/15">
-                                                {p.name}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* TAB: TRAINING ATTENDANCE */}
-                    {activeWorkspace === "training" && (
-                        <div className="p-5 sm:p-8 bg-[#f8fafc] text-slate-900 space-y-4 text-left">
-                            <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200">
-                                <div>
-                                    <span className="text-[10px] font-black uppercase text-emerald-600">
-                                        WEEKLY TRAINING & ATTENDANCE TRACKER
-                                    </span>
-                                    <h4 className="text-lg font-black text-slate-900">
-                                        Wednesday Evening Session • High Press & Finishing
-                                    </h4>
-                                </div>
-                                <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black">
-                                    21 / 24 Players Present
-                                </span>
-                            </div>
-
-                            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                                <table className="w-full text-left text-xs">
-                                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
-                                        <tr>
-                                            <th className="py-3 px-4">Player</th>
-                                            <th className="py-3 px-3">Pos</th>
-                                            <th className="py-3 px-3 text-center">Sessions Attended</th>
-                                            <th className="py-3 px-3 text-center">Attendance %</th>
-                                            <th className="py-3 px-4 text-right">This Week</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 font-medium">
-                                        {[
-                                            { name: "Jack Mercer", pos: "ST", attended: "14 / 14", pct: "100%", status: "Present" },
-                                            { name: "Ryan Brooks", pos: "CM", attended: "13 / 14", pct: "93%", status: "Present" },
-                                            { name: "Harry Gallagher", pos: "CB", attended: "13 / 14", pct: "93%", status: "Present" },
-                                            { name: "Liam Sterling", pos: "RW", attended: "12 / 14", pct: "86%", status: "Present" },
-                                        ].map((row, i) => (
-                                            <tr key={i}>
-                                                <td className="py-3 px-4 font-black text-slate-900">{row.name}</td>
-                                                <td className="py-3 px-3">{row.pos}</td>
-                                                <td className="py-3 px-3 text-center">{row.attended}</td>
-                                                <td className="py-3 px-3 text-center font-bold text-emerald-700">{row.pct}</td>
-                                                <td className="py-3 px-4 text-right">
-                                                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                                                        ✓ {row.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
-
-                    {/* TAB: RECRUITMENT */}
-                    {activeWorkspace === "recruitment" && (
-                        <div className="p-5 sm:p-8 bg-[#0b0f19] text-white space-y-5">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                                <div className="space-y-1 text-left">
-                                    <div className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                                        Player Recruitment & Scouting
-                                    </div>
-                                    <div className="text-lg font-black text-white">
-                                        Trialist Pipeline, Scouting Notes & Excel Export
+                                    <div className="bg-white rounded-2xl border border-[#eaeaea] shadow-2xs overflow-x-auto">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="bg-[#f4f4f5] border-b border-[#eaeaea] text-zinc-500 uppercase text-[10px] font-black">
+                                                <tr>
+                                                    <th className="py-3 px-4">#</th>
+                                                    <th className="py-3 px-4">Club</th>
+                                                    <th className="py-3 px-3 text-center">P</th>
+                                                    <th className="py-3 px-3 text-center">W</th>
+                                                    <th className="py-3 px-3 text-center">D</th>
+                                                    <th className="py-3 px-3 text-center">L</th>
+                                                    <th className="py-3 px-3 text-center">GD</th>
+                                                    <th className="py-3 px-3 text-center">PPG</th>
+                                                    <th className="py-3 px-3 text-center">Pts</th>
+                                                    <th className="py-3 px-4 text-right">Form Guide</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[#eaeaea] font-medium">
+                                                {[
+                                                    { pos: 1, team: selectedClub.clubLabel, p: 12, w: 10, d: 1, l: 1, gd: "+23", ppg: "2.58", pts: 31, form: ["W", "W", "W", "D", "W"], ours: true },
+                                                    { pos: 2, team: "Silverdale Athletic", p: 12, w: 8, d: 3, l: 1, gd: "+14", ppg: "2.25", pts: 27, form: ["W", "D", "W", "W", "L"], ours: false },
+                                                    { pos: 3, team: "Oakwood Albion", p: 12, w: 7, d: 2, l: 3, gd: "+7", ppg: "1.92", pts: 23, form: ["L", "W", "W", "D", "W"], ours: false },
+                                                    { pos: 4, team: "Meadowbank Town", p: 12, w: 6, d: 3, l: 3, gd: "+5", ppg: "1.75", pts: 21, form: ["D", "W", "L", "W", "D"], ours: false },
+                                                    { pos: 8, team: "Kingswood Athletic (Next Opp)", p: 11, w: 4, d: 2, l: 5, gd: "-1", ppg: "1.27", pts: 14, form: ["L", "W", "L", "D", "W"], ours: false },
+                                                ].map((r) => (
+                                                    <tr
+                                                        key={r.pos}
+                                                        className={r.ours ? "bg-rose-50/70 font-bold" : "hover:bg-zinc-50"}
+                                                    >
+                                                        <td className="py-3 px-4 font-black text-[#171717]">{r.pos}</td>
+                                                        <td className="py-3 px-4 font-black text-[#171717]">{r.team}</td>
+                                                        <td className="py-3 px-3 text-center">{r.p}</td>
+                                                        <td className="py-3 px-3 text-center">{r.w}</td>
+                                                        <td className="py-3 px-3 text-center">{r.d}</td>
+                                                        <td className="py-3 px-3 text-center">{r.l}</td>
+                                                        <td className="py-3 px-3 text-center font-bold text-emerald-700">{r.gd}</td>
+                                                        <td className="py-3 px-3 text-center font-bold text-[#171717]">{r.ppg}</td>
+                                                        <td className="py-3 px-3 text-center font-black text-[#171717]">{r.pts}</td>
+                                                        <td className="py-3 px-4">
+                                                            <div className="flex items-center justify-end gap-1">
+                                                                {r.form.map((f, idx) => (
+                                                                    <span
+                                                                        key={idx}
+                                                                        className={`w-5 h-5 rounded text-[10px] font-black text-white flex items-center justify-center ${
+                                                                            f === "W"
+                                                                                ? "bg-emerald-500"
+                                                                                : f === "D"
+                                                                                ? "bg-amber-500"
+                                                                                : "bg-rose-500"
+                                                                        }`}
+                                                                    >
+                                                                        {f}
+                                                                    </span>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    <span className="px-3.5 py-2 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs flex items-center gap-1.5">
-                                        <FileSpreadsheet className="w-4 h-4" /> Export to Excel (.xlsx)
-                                    </span>
-                                </div>
-                            </div>
+                            )}
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
-                                {[
-                                    {
-                                        name: "Jayden Vance",
-                                        pos: "LB / LWB",
-                                        club: "Hillside Athletic U23",
-                                        foot: "Left",
-                                        rating: 5,
-                                        stage: "Invite to Trial",
-                                        note: "Quick overlapping fullback, played Step 5 last season.",
-                                    },
-                                    {
-                                        name: "Marcus Osei",
-                                        pos: "CDM / CM",
-                                        club: "Brookside Wanderers Res",
-                                        foot: "Right",
-                                        rating: 4,
-                                        stage: "On Trial",
-                                        note: "Strong ball-winner, trained Wednesday night — impressed.",
-                                    },
-                                    {
-                                        name: "Daniel Knight",
-                                        pos: "ST / RW",
-                                        club: "Free Agent",
-                                        foot: "Right",
-                                        rating: 5,
-                                        stage: "Priority Target",
-                                        note: "18 goals in County Premier last year. Available immediately.",
-                                    },
-                                ].map((t, i) => (
-                                    <div
-                                        key={i}
-                                        className="p-4 rounded-2xl bg-slate-900/90 border border-white/10 space-y-2.5"
-                                    >
-                                        <div className="flex items-center justify-between">
-                                            <span className="px-2 py-0.5 rounded bg-white/10 text-white font-bold text-[10px]">
-                                                {t.pos}
-                                            </span>
-                                            <span className="text-amber-400 text-xs font-black">
-                                                {"★".repeat(t.rating)}
-                                            </span>
-                                        </div>
+                            {/* TAB 4: TRAINING ATTENDANCE */}
+                            {activeWorkspace === "training" && (
+                                <div className="space-y-4 text-left">
+                                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#eaeaea] shadow-2xs">
                                         <div>
-                                            <div className="text-sm font-black text-white">{t.name}</div>
-                                            <div className="text-[11px] text-slate-400">
-                                                {t.club} • {t.foot} Foot
+                                            <span className="text-[10px] font-black uppercase text-[#e11d48]">
+                                                WEEKLY TRAINING & ATTENDANCE TRACKER
+                                            </span>
+                                            <h4 className="text-lg font-black text-[#171717]">
+                                                Wednesday Evening Session • High Press & Finishing
+                                            </h4>
+                                        </div>
+                                        <span className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-black">
+                                            21 / 24 Players Present
+                                        </span>
+                                    </div>
+
+                                    <div className="bg-white rounded-2xl border border-[#eaeaea] shadow-2xs overflow-hidden">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="bg-[#f4f4f5] border-b border-[#eaeaea] text-zinc-500 uppercase text-[10px] font-black">
+                                                <tr>
+                                                    <th className="py-3 px-4">Player</th>
+                                                    <th className="py-3 px-3">Pos</th>
+                                                    <th className="py-3 px-3 text-center">Sessions Attended</th>
+                                                    <th className="py-3 px-3 text-center">Attendance %</th>
+                                                    <th className="py-3 px-4 text-right">This Week</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[#eaeaea] font-medium">
+                                                {[
+                                                    { name: "Jack Mercer", pos: "ST", attended: "14 / 14", pct: "100%", status: "Present" },
+                                                    { name: "Ryan Brooks", pos: "LB", attended: "13 / 14", pct: "93%", status: "Present" },
+                                                    { name: "Harry Gallagher", pos: "CB", attended: "13 / 14", pct: "93%", status: "Present" },
+                                                    { name: "Liam Sterling", pos: "RW", attended: "12 / 14", pct: "86%", status: "Present" },
+                                                ].map((row, i) => (
+                                                    <tr key={i}>
+                                                        <td className="py-3 px-4 font-black text-[#171717]">{row.name}</td>
+                                                        <td className="py-3 px-3">{row.pos}</td>
+                                                        <td className="py-3 px-3 text-center">{row.attended}</td>
+                                                        <td className="py-3 px-3 text-center font-bold text-emerald-700">{row.pct}</td>
+                                                        <td className="py-3 px-4 text-right">
+                                                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                                                                ✓ {row.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* TAB 5: RECRUITMENT (LIGHT MODE REPLICA MATCHING ACTUAL SITE) */}
+                            {activeWorkspace === "recruitment" && (
+                                <div className="space-y-4 text-left">
+                                    <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-[#eaeaea] shadow-2xs">
+                                        <div>
+                                            <div className="text-[10px] font-black uppercase tracking-wider text-[#e11d48]">
+                                                PLAYER RECRUITMENT & TRIALISTS
+                                            </div>
+                                            <div className="text-lg font-black text-[#171717]">
+                                                Scouting Targets, Trialist Pipeline & Excel Export
                                             </div>
                                         </div>
-                                        <p className="text-xs text-slate-300 leading-relaxed">{t.note}</p>
-                                        <div className="pt-1 flex items-center justify-between">
-                                            <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
-                                                {t.stage}
+                                        <span className="px-3.5 py-2 rounded-xl bg-[#171717] text-white font-bold text-xs flex items-center gap-1.5">
+                                            <FileSpreadsheet className="w-4 h-4 text-emerald-400" /> Export to Excel (.xlsx)
+                                        </span>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        {[
+                                            {
+                                                name: "Jayden Vance",
+                                                pos: "LB / LWB",
+                                                club: "Hillside Athletic U23",
+                                                foot: "Left",
+                                                rating: 5,
+                                                stage: "Invited to Training",
+                                                note: "Quick overlapping fullback, played Step 5 last season.",
+                                            },
+                                            {
+                                                name: "Marcus Osei",
+                                                pos: "CDM / CM",
+                                                club: "Brookside Wanderers Res",
+                                                foot: "Right",
+                                                rating: 4,
+                                                stage: "On Trial",
+                                                note: "Strong ball-winner, trained Wednesday night — impressed.",
+                                            },
+                                            {
+                                                name: "Daniel Knight",
+                                                pos: "ST / RW",
+                                                club: "Unattached",
+                                                foot: "Right",
+                                                rating: 5,
+                                                stage: "Scouted",
+                                                note: "18 goals in County Premier last year. Available immediately.",
+                                            },
+                                        ].map((t, i) => (
+                                            <div
+                                                key={i}
+                                                className="p-4 rounded-2xl bg-white border border-[#eaeaea] shadow-2xs space-y-2.5"
+                                            >
+                                                <div className="flex items-center justify-between">
+                                                    <span className="px-2 py-0.5 rounded bg-[#f4f4f5] text-[#171717] font-bold text-[10px]">
+                                                        {t.pos}
+                                                    </span>
+                                                    <span className="text-amber-500 text-xs font-black">
+                                                        {"★".repeat(t.rating)}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm font-black text-[#171717]">{t.name}</div>
+                                                    <div className="text-[11px] text-zinc-500">
+                                                        {t.club} • {t.foot} Foot
+                                                    </div>
+                                                </div>
+                                                <p className="text-xs text-zinc-600 leading-relaxed">{t.note}</p>
+                                                <div className="pt-1 flex items-center justify-between">
+                                                    <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold">
+                                                        {t.stage}
+                                                    </span>
+                                                    <span className="text-[11px] font-bold text-[#e11d48]">
+                                                        Sign to Squad →
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* TAB 6: SQUAD & APPEARANCES */}
+                            {activeWorkspace === "squad" && (
+                                <div className="space-y-4 text-left">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-3 py-1.5 rounded-xl bg-[#171717] text-white text-xs font-bold">
+                                                Active Squad (27)
                                             </span>
-                                            <span className="text-[11px] font-bold text-sky-400">
-                                                Sign to Squad →
+                                            <span className="px-3 py-1.5 rounded-xl bg-white border border-[#eaeaea] text-zinc-600 text-xs font-bold">
+                                                Loan / Dual-Reg (3)
+                                            </span>
+                                            <span className="px-3 py-1.5 rounded-xl bg-white border border-[#eaeaea] text-zinc-600 text-xs font-bold">
+                                                Former Players (4)
                                             </span>
                                         </div>
                                     </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
 
-                    {/* TAB: SQUAD & APPEARANCES */}
-                    {activeWorkspace === "squad" && (
-                        <div className="p-5 sm:p-8 bg-[#f8fafc] text-slate-900 space-y-4">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex items-center gap-2">
-                                    <span className="px-3 py-1 rounded-lg bg-slate-900 text-white text-xs font-bold">
-                                        Active Squad (27)
-                                    </span>
-                                    <span className="px-3 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold">
-                                        Loan / Dual-Reg (3)
-                                    </span>
-                                    <span className="px-3 py-1 rounded-lg bg-white border border-slate-200 text-slate-600 text-xs font-bold">
-                                        Former Players (4)
-                                    </span>
+                                    <div className="bg-white rounded-2xl border border-[#eaeaea] shadow-2xs overflow-hidden">
+                                        <table className="w-full text-left text-xs">
+                                            <thead className="bg-[#f4f4f5] border-b border-[#eaeaea] text-zinc-500 uppercase text-[10px] font-black">
+                                                <tr>
+                                                    <th className="py-3 px-4">Player</th>
+                                                    <th className="py-3 px-3">Pos</th>
+                                                    <th className="py-3 px-3">Registration</th>
+                                                    <th className="py-3 px-3 text-center">Starts</th>
+                                                    <th className="py-3 px-3 text-center">Sub Used</th>
+                                                    <th className="py-3 px-3 text-center">Goals</th>
+                                                    <th className="py-3 px-4 text-right">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-[#eaeaea] font-medium">
+                                                {[
+                                                    { name: "Jack Mercer", pos: "ST", reg: "League Reg", starts: 12, sub: 0, goals: 22, status: "Available" },
+                                                    { name: "Ryan Brooks", pos: "LB", reg: "League Reg", starts: 11, sub: 0, goals: 1, status: "Available" },
+                                                    { name: "Liam Sterling", pos: "RW", reg: "Dual-Reg", starts: 5, sub: 6, goals: 8, status: "Available" },
+                                                    { name: "Alex Cole", pos: "CM", reg: "League Reg", starts: 4, sub: 1, goals: 1, status: "Available" },
+                                                    { name: "Sam Ward", pos: "CB", reg: "Loan (28d)", starts: 0, sub: 2, goals: 0, status: "Available" },
+                                                ].map((row, i) => (
+                                                    <tr key={i} className="hover:bg-zinc-50/80">
+                                                        <td className="py-3 px-4 font-black text-[#171717]">{row.name}</td>
+                                                        <td className="py-3 px-3">
+                                                            <span className="px-2 py-0.5 rounded bg-[#f4f4f5] text-zinc-700 font-bold text-[10px]">
+                                                                {row.pos}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 px-3 text-zinc-600">{row.reg}</td>
+                                                        <td className="py-3 px-3 text-center font-bold text-[#171717]">{row.starts}</td>
+                                                        <td className="py-3 px-3 text-center text-zinc-600">{row.sub}</td>
+                                                        <td className="py-3 px-3 text-center font-black text-[#e11d48]">{row.goals}</td>
+                                                        <td className="py-3 px-4 text-right">
+                                                            <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                                                                {row.status}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
-                            </div>
-
-                            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-                                <table className="w-full text-left text-xs">
-                                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase text-[10px] font-black">
-                                        <tr>
-                                            <th className="py-3 px-4">Player</th>
-                                            <th className="py-3 px-3">Pos</th>
-                                            <th className="py-3 px-3">Registration</th>
-                                            <th className="py-3 px-3 text-center">Starts</th>
-                                            <th className="py-3 px-3 text-center">Sub Used</th>
-                                            <th className="py-3 px-3 text-center">Goals</th>
-                                            <th className="py-3 px-4 text-right">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-100 font-medium">
-                                        {[
-                                            { name: "Jack Mercer", pos: "ST", reg: "League Reg", starts: 12, sub: 0, goals: 22, status: "Available" },
-                                            { name: "Ryan Brooks", pos: "CM", reg: "League Reg", starts: 11, sub: 0, goals: 1, status: "Available" },
-                                            { name: "Liam Sterling", pos: "RW", reg: "Dual-Reg", starts: 5, sub: 6, goals: 8, status: "Available" },
-                                            { name: "Alex Cole", pos: "CM", reg: "League Reg", starts: 4, sub: 1, goals: 1, status: "Available" },
-                                            { name: "Sam Ward", pos: "CB", reg: "Loan (28d)", starts: 0, sub: 2, goals: 0, status: "Available" },
-                                        ].map((row, i) => (
-                                            <tr key={i} className="hover:bg-slate-50/80">
-                                                <td className="py-3 px-4 font-black text-slate-900">{row.name}</td>
-                                                <td className="py-3 px-3">
-                                                    <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-700 font-bold text-[10px]">
-                                                        {row.pos}
-                                                    </span>
-                                                </td>
-                                                <td className="py-3 px-3 text-slate-600">{row.reg}</td>
-                                                <td className="py-3 px-3 text-center font-bold text-slate-900">{row.starts}</td>
-                                                <td className="py-3 px-3 text-center text-slate-600">{row.sub}</td>
-                                                <td className="py-3 px-3 text-center font-black text-rose-600">{row.goals}</td>
-                                                <td className="py-3 px-4 text-right">
-                                                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                                                        {row.status}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                            )}
                         </div>
-                    )}
+                    </div>
                 </div>
             </section>
 
             {/* ================================================================= */}
-            {/* FEATURES GRID + FULL-SIZE MOBILE VIEW                             */}
+            {/* FEATURES + REAL MOBILE SCREENSHOTS (MATCHING APPSHELL MOBILE)     */}
             {/* ================================================================= */}
-            <section
-                id="features"
-                className="relative z-10 py-20 border-t border-white/[0.08] bg-slate-950/50 px-4 sm:px-6"
-            >
-                <div className="max-w-7xl mx-auto space-y-12">
+            <section id="features" className="relative z-10 py-16 border-t border-white/[0.08]">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-12">
                     <div className="text-center space-y-2 max-w-2xl mx-auto">
-                        <span
-                            className="text-xs font-black uppercase tracking-widest"
-                            style={{ color: selectedClub.primary }}
-                        >
-                            Features
+                        <span className="text-xs font-black uppercase tracking-widest text-[#e11d48]">
+                            Built for Football Managers
                         </span>
                         <h2 className="text-3xl sm:text-4xl font-black text-white tracking-tight">
-                            Built for managers, coaches & club secretaries.
+                            Everything your club needs across the week.
                         </h2>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 text-left">
                         {[
                             {
-                                icon: TrendingUp,
-                                title: "Deeper League Table Insights",
-                                desc: "Go beyond a basic table—see points-per-game (PPG), recent form guides, home vs away splits, and how your next opponent is trending.",
+                                icon: Trophy,
+                                title: "League Table, Form Guide & PPG",
+                                desc: "Keep track of your league table alongside points-per-game (PPG), home and away splits, and a visual 5-match form guide for every team.",
                             },
                             {
                                 icon: ClipboardCheck,
@@ -1452,7 +1650,7 @@ export default function LandingPage() {
                             {
                                 icon: Shield,
                                 title: "Opposition Reports",
-                                desc: "Build scouting reports on every team in your division—record their formation, danger men, set-piece habits, and head-to-head history.",
+                                desc: "Build scouting reports on every team in your division—record their formation, key threats, set-piece habits, and head-to-head history.",
                             },
                             {
                                 icon: Star,
@@ -1462,7 +1660,7 @@ export default function LandingPage() {
                             {
                                 icon: Shirt,
                                 title: "Matchday XI & Squad Stats",
-                                desc: "Build your starting XI and bench, track starts, sub appearances, goals, and loan deals, and share your lineup graphic on matchday.",
+                                desc: "Build your starting XI and bench from available players, track starts, sub appearances, and goals, and export your team sheet graphic.",
                             },
                             {
                                 icon: Gavel,
@@ -1474,13 +1672,7 @@ export default function LandingPage() {
                                 key={i}
                                 className="p-6 rounded-3xl border bg-slate-900/80 border-white/10 space-y-2.5"
                             >
-                                <div
-                                    className="w-10 h-10 rounded-xl flex items-center justify-center"
-                                    style={{
-                                        backgroundColor: selectedClub.badgeBg,
-                                        color: selectedClub.primary,
-                                    }}
-                                >
+                                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-[#e11d48]/15 text-[#e11d48]">
                                     <card.icon className="w-5 h-5" />
                                 </div>
                                 <h3 className="text-base sm:text-lg font-black text-white">{card.title}</h3>
@@ -1489,104 +1681,262 @@ export default function LandingPage() {
                         ))}
                     </div>
 
-                    {/* Full-Scale Mobile Interface Showcase */}
+                    {/* ============================================================= */}
+                    {/* REAL MOBILE VIEW SHOWCASE (EXACT APPSHELL LIGHT MOBILE UI)    */}
+                    {/* ============================================================= */}
                     <div className="pt-8 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center bg-slate-900/60 border border-white/10 rounded-3xl p-6 sm:p-10">
-                        <div className="lg:col-span-5 space-y-4 text-left">
-                            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-xs font-bold">
+                        <div className="lg:col-span-4 space-y-4 text-left">
+                            <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#e11d48]/15 text-rose-300 border border-[#e11d48]/30 text-xs font-bold">
                                 <Smartphone className="w-3.5 h-3.5" /> Built for Mobile & Desktop
                             </span>
                             <h3 className="text-2xl sm:text-3xl font-black text-white leading-tight">
-                                Designed to be used properly on your phone.
+                                Exactly how ClubFlow looks on your phone.
                             </h3>
                             <p className="text-sm text-slate-400 leading-relaxed">
-                                Most managers live on their phone during the week and on Saturday afternoon. Every page
-                                in ClubFlow has a dedicated mobile layout—with clean player cards, bottom navigation,
-                                1-tap WhatsApp poll copying, and quick result logging.
+                                Switch between the Pitch, Bench, Squad, and Roles on Saturday afternoon, copy your
+                                matchday details to WhatsApp in one tap, or use the quick <strong className="text-white">+</strong> button
+                                to schedule matches, training, or new players on the go.
                             </p>
                         </div>
 
-                        {/* Large, Readable Dual Mobile Screens */}
-                        <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-5">
-                            {/* Phone 1: Mobile Squad & Appearances */}
-                            <div className="rounded-[28px] bg-[#0b0f19] border-2 border-slate-800 p-4 shadow-2xl space-y-3 text-left">
-                                <div className="w-16 h-1.5 bg-slate-800 rounded-full mx-auto" />
-                                <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
-                                    <div>
-                                        <div className="text-xs font-black text-white">Squad & Stats</div>
-                                        <div className="text-[10px] text-slate-400">27 Active Players</div>
+                        {/* Two Authentic Mobile Phone Screens Matching AppShell + Matchday XI + Dashboard */}
+                        <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            {/* PHONE 1: REAL MOBILE MATCHDAY XI SCREEN */}
+                            <div className="rounded-[34px] bg-[#111111] border-[6px] border-zinc-800 shadow-2xl overflow-hidden flex flex-col text-left">
+                                {/* Mobile AppShell Top Header (src/components/layout/app-shell.tsx lines 83-111) */}
+                                <div className="h-12 bg-slate-900 px-3.5 flex items-center justify-between shrink-0">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="h-7 w-7 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white">
+                                            N
+                                        </div>
+                                        <span className="text-xs font-bold text-white truncate">
+                                            Northbrook United
+                                        </span>
                                     </div>
-                                    <span
-                                        className="px-2.5 py-1 rounded-lg text-[10px] font-black text-white"
-                                        style={{ backgroundColor: selectedClub.primary }}
-                                    >
-                                        + Add Player
-                                    </span>
+                                    <div className="flex items-center gap-2 text-slate-400">
+                                        <Search className="h-4 w-4" />
+                                        <Menu className="h-5 w-5" />
+                                    </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    {[
-                                        { name: "Jack Mercer", pos: "ST", starts: 12, sub: 0, goals: 22, status: "Available" },
-                                        { name: "Liam Sterling", pos: "RW", starts: 5, sub: 6, goals: 8, status: "Dual-Reg" },
-                                        { name: "Ryan Brooks", pos: "CM", starts: 11, sub: 0, goals: 1, status: "Available" },
-                                    ].map((p, i) => (
-                                        <div
-                                            key={i}
-                                            className="p-3 rounded-xl bg-slate-900 border border-white/10 space-y-1.5"
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <span className="text-xs font-black text-white">{p.name}</span>
-                                                <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
-                                                    {p.status}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-[11px] text-slate-400">
-                                                <span>{p.pos}</span>
-                                                <span>
-                                                    Starts: <strong className="text-white">{p.starts}</strong> ({p.sub} Sub)
-                                                </span>
-                                                <span className="font-black text-rose-400">{p.goals} Goals</span>
-                                            </div>
+                                {/* Light Canvas Body (#FCFCFD) */}
+                                <div className="bg-[#fcfcfd] p-3 space-y-2.5 flex-1 relative text-[#171717]">
+                                    {/* Mobile 4-Tab Bar (Pitch | Bench | Squad | Roles) from src/app/matchday-xi/page.tsx line 3616 */}
+                                    <div className="grid grid-cols-4 gap-1 bg-white p-1 rounded-xl border border-[#eaeaea] text-[10px] font-extrabold text-center">
+                                        <div className="py-1.5 rounded-lg bg-[#e11d48] text-white shadow-2xs">
+                                            Pitch
                                         </div>
-                                    ))}
+                                        <div className="py-1.5 text-zinc-500">Bench 5</div>
+                                        <div className="py-1.5 text-zinc-500">Squad 18</div>
+                                        <div className="py-1.5 text-zinc-500">Roles 3</div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <div className="text-[11px] font-extrabold text-[#171717]">Starting XI</div>
+                                            <div className="text-[9px] text-zinc-500">11 / 11 Selected</div>
+                                        </div>
+                                        <div className="px-2 py-0.5 rounded-lg bg-white border border-[#eaeaea] text-[10px] font-bold text-[#171717]">
+                                            4-3-3 ▾
+                                        </div>
+                                    </div>
+
+                                    {/* Mobile Green Pitch (#2b7c3d) with SVG Collared Shirts */}
+                                    <div className="relative w-full h-[230px] bg-[#2b7c3d] rounded-xl shadow-md overflow-hidden">
+                                        <div className="absolute inset-1.5 border border-white/40 pointer-events-none" />
+                                        <div className="absolute left-1.5 right-1.5 top-1/2 border-t border-white/40 pointer-events-none" />
+                                        <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 border border-white/40 rounded-full pointer-events-none" />
+                                        {[
+                                            { x: 50, y: 88, name: "Fletcher", num: 1, gk: true },
+                                            { x: 16, y: 68, name: "Brooks", num: 3 },
+                                            { x: 38, y: 72, name: "Gallagher", num: 5, capt: true },
+                                            { x: 62, y: 72, name: "Ward", num: 6 },
+                                            { x: 84, y: 68, name: "Palmer", num: 2 },
+                                            { x: 50, y: 52, name: "Cole", num: 4 },
+                                            { x: 30, y: 39, name: "Barker", num: 8 },
+                                            { x: 70, y: 39, name: "Vance", num: 10 },
+                                            { x: 20, y: 18, name: "Maddox", num: 11 },
+                                            { x: 50, y: 14, name: "Mercer", num: 9 },
+                                            { x: 80, y: 18, name: "Sterling", num: 7 },
+                                        ].map((p, i) => (
+                                            <PitchJerseyNode
+                                                key={i}
+                                                x={p.x}
+                                                y={p.y}
+                                                number={p.num}
+                                                name={p.name}
+                                                kitColor={p.gk ? "#10b981" : "#e11d48"}
+                                                isCaptain={p.capt}
+                                                compact
+                                            />
+                                        ))}
+                                    </div>
+
+                                    {/* Mobile Quick Bench Strip under Pitch */}
+                                    <div className="bg-white rounded-xl border border-[#eaeaea] p-2 flex items-center justify-between text-[10px]">
+                                        <span className="font-extrabold text-[#171717]">Substitutes Bench (5/5)</span>
+                                        <span className="text-[#e11d48] font-bold">Sub Mins & Details →</span>
+                                    </div>
+
+                                    {/* Floating Universal Add FAB Button (src/components/layout/app-shell.tsx line 178) */}
+                                    <div className="absolute bottom-3 right-3 h-9 w-9 rounded-full bg-[#e11d48] text-white flex items-center justify-center shadow-lg">
+                                        <Plus className="h-4 w-4" />
+                                    </div>
+                                </div>
+
+                                {/* Mobile Bottom Navigation Bar (src/components/layout/app-shell.tsx lines 189-230) */}
+                                <div className="h-12 bg-slate-900 border-t border-slate-800 flex items-center justify-around text-[9px] font-medium shrink-0">
+                                    <div className="flex flex-col items-center gap-0.5 text-slate-400">
+                                        <LayoutDashboard className="h-4 w-4" />
+                                        <span>Dashboard</span>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-0.5 text-red-500 font-semibold">
+                                        <Users className="h-4 w-4" />
+                                        <span>Squad</span>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-0.5 text-slate-400">
+                                        <Activity className="h-4 w-4" />
+                                        <span>Fixtures</span>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-0.5 text-slate-400">
+                                        <CreditCard className="h-4 w-4" />
+                                        <span>Billing</span>
+                                    </div>
                                 </div>
                             </div>
 
-                            {/* Phone 2: Mobile Matchday & Fines */}
-                            <div className="rounded-[28px] bg-[#0b0f19] border-2 border-slate-800 p-4 shadow-2xl space-y-3 text-left">
-                                <div className="w-16 h-1.5 bg-slate-800 rounded-full mx-auto" />
-                                <div className="flex items-center justify-between border-b border-white/10 pb-2.5">
-                                    <div>
-                                        <div className="text-xs font-black text-white">Matchday & Fines</div>
-                                        <div className="text-[10px] text-slate-400">Saturday Touchline</div>
+                            {/* PHONE 2: REAL MOBILE DASHBOARD SCREEN */}
+                            <div className="rounded-[34px] bg-[#111111] border-[6px] border-zinc-800 shadow-2xl overflow-hidden flex flex-col text-left">
+                                {/* Mobile AppShell Top Header */}
+                                <div className="h-12 bg-slate-900 px-3.5 flex items-center justify-between shrink-0">
+                                    <div className="flex items-center gap-2.5">
+                                        <div className="h-7 w-7 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white">
+                                            N
+                                        </div>
+                                        <span className="text-xs font-bold text-white truncate">
+                                            Northbrook United
+                                        </span>
                                     </div>
-                                    <span className="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 text-[10px] font-bold">
-                                        KO 15:00
-                                    </span>
-                                </div>
-
-                                <div
-                                    className="p-3 rounded-xl text-white space-y-1"
-                                    style={{ backgroundColor: selectedClub.primary }}
-                                >
-                                    <div className="text-[10px] font-bold uppercase opacity-90">
-                                        Next Up • Home
-                                    </div>
-                                    <div className="text-sm font-black">
-                                        {selectedClub.clubLabel} vs Kingswood
-                                    </div>
-                                    <div className="text-[11px] opacity-90">
-                                        Meet 13:30 • 4-3-3 Lineup Saved
+                                    <div className="flex items-center gap-2 text-slate-400">
+                                        <Search className="h-4 w-4" />
+                                        <Menu className="h-5 w-5" />
                                     </div>
                                 </div>
 
-                                <div className="space-y-2">
-                                    <div className="p-2.5 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-between text-xs">
-                                        <span className="text-slate-200 font-semibold">📋 Copy WhatsApp Poll</span>
-                                        <span className="text-emerald-400 font-bold">1-Tap Copy</span>
+                                {/* Light Canvas Body (#FCFCFD) */}
+                                <div className="bg-[#fcfcfd] p-3 space-y-2.5 flex-1 relative text-[#171717]">
+                                    {/* Club Header Card (src/app/dashboard/page.tsx line 811) */}
+                                    <div className="bg-white border border-[#eaeaea] rounded-xl p-3 space-y-2.5 shadow-2xs">
+                                        <div className="flex items-center gap-2.5">
+                                            <div className="h-9 w-9 rounded-lg bg-[#e11d48]/10 border border-[#e11d48]/20 flex items-center justify-center shrink-0">
+                                                <Trophy className="h-4 w-4 text-[#e11d48]" />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-1.5">
+                                                    <span className="text-xs font-black text-[#171717]">
+                                                        Northbrook United
+                                                    </span>
+                                                    <span className="px-1.5 py-0.2 rounded-full bg-[#e11d48]/15 text-[#e11d48] text-[9px] font-extrabold">
+                                                        #1st
+                                                    </span>
+                                                </div>
+                                                <div className="flex items-center gap-1 mt-1">
+                                                    <span className="text-[8px] font-bold uppercase text-zinc-400">
+                                                        Form:
+                                                    </span>
+                                                    {["W", "W", "D", "W", "W"].map((r, i) => (
+                                                        <span
+                                                            key={i}
+                                                            className={`w-3.5 h-3.5 rounded text-[8px] font-black text-white flex items-center justify-center ${
+                                                                r === "W" ? "bg-emerald-500" : "bg-amber-500"
+                                                            }`}
+                                                        >
+                                                            {r}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-[#eaeaea] text-[9px]">
+                                            <div className="bg-[#f4f4f5] border border-[#eaeaea] rounded-lg p-1.5">
+                                                <div className="text-zinc-500 font-bold uppercase">Home Split</div>
+                                                <div className="font-extrabold text-[#171717]">
+                                                    6W-0D-0L <span className="text-emerald-600">(3.0 PPG)</span>
+                                                </div>
+                                            </div>
+                                            <div className="bg-[#f4f4f5] border border-[#eaeaea] rounded-lg p-1.5">
+                                                <div className="text-zinc-500 font-bold uppercase">Away Split</div>
+                                                <div className="font-extrabold text-[#171717]">
+                                                    4W-1D-1L <span className="text-sky-600">(2.1 PPG)</span>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div className="p-2.5 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-between text-xs">
-                                        <span className="text-slate-200 font-semibold">⚖️ Late for Meet Fine</span>
-                                        <span className="text-amber-400 font-bold">+ £5 Logged</span>
+
+                                    {/* Needs Attention Item (src/app/dashboard/page.tsx line 906) */}
+                                    <div className="bg-amber-500/5 border border-amber-500/30 rounded-xl p-2.5 flex items-center justify-between">
+                                        <div className="min-w-0">
+                                            <div className="text-[10px] font-bold text-[#171717] flex items-center gap-1">
+                                                <AlertCircle className="h-3 w-3 text-amber-500 shrink-0" />
+                                                <span>3 Unpaid Match Subs (£15)</span>
+                                            </div>
+                                            <div className="text-[9px] text-zinc-500">From Saturday vs Meadowbank</div>
+                                        </div>
+                                        <span className="px-2 py-1 rounded-md bg-white border border-[#eaeaea] text-[9px] font-bold text-[#171717]">
+                                            Open →
+                                        </span>
+                                    </div>
+
+                                    {/* Next Match Card (src/app/dashboard/page.tsx line 965) */}
+                                    <div className="bg-white border border-[#eaeaea] rounded-xl p-3 space-y-2 shadow-2xs">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-[9px] font-extrabold uppercase text-[#e11d48] flex items-center gap-1">
+                                                <Zap className="h-3 w-3 fill-[#e11d48]" /> Next Match
+                                            </span>
+                                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-700">
+                                                HOME
+                                            </span>
+                                        </div>
+                                        <div className="text-sm font-black text-[#171717]">
+                                            vs Kingswood Athletic (#8)
+                                        </div>
+                                        <div className="text-[10px] text-zinc-500">
+                                            Sat 31 Oct • KO 15:00 • Northbrook Park
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-1.5 pt-1.5 border-t border-[#eaeaea]">
+                                            <div className="py-1.5 rounded-lg border border-[#eaeaea] text-center text-[9px] font-bold text-[#171717]">
+                                                📋 WhatsApp Copy
+                                            </div>
+                                            <div className="py-1.5 rounded-lg bg-[#e11d48] text-center text-[9px] font-bold text-white">
+                                                👕 Matchday XI
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Floating Universal Add FAB Button */}
+                                    <div className="absolute bottom-3 right-3 h-9 w-9 rounded-full bg-[#e11d48] text-white flex items-center justify-center shadow-lg">
+                                        <Plus className="h-4 w-4" />
+                                    </div>
+                                </div>
+
+                                {/* Mobile Bottom Navigation Bar */}
+                                <div className="h-12 bg-slate-900 border-t border-slate-800 flex items-center justify-around text-[9px] font-medium shrink-0">
+                                    <div className="flex flex-col items-center gap-0.5 text-red-500 font-semibold">
+                                        <LayoutDashboard className="h-4 w-4" />
+                                        <span>Dashboard</span>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-0.5 text-slate-400">
+                                        <Users className="h-4 w-4" />
+                                        <span>Squad</span>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-0.5 text-slate-400">
+                                        <Activity className="h-4 w-4" />
+                                        <span>Fixtures</span>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-0.5 text-slate-400">
+                                        <CreditCard className="h-4 w-4" />
+                                        <span>Billing</span>
                                     </div>
                                 </div>
                             </div>
@@ -1599,12 +1949,7 @@ export default function LandingPage() {
             {/* FINAL CTA                                                         */}
             {/* ================================================================= */}
             <section className="relative z-10 py-20 px-4 sm:px-6">
-                <div
-                    className="max-w-4xl mx-auto rounded-3xl border border-white/15 p-8 sm:p-12 text-center space-y-6 shadow-2xl"
-                    style={{
-                        background: `linear-gradient(135deg, ${selectedClub.primary}26 0%, rgba(11,15,25,0.96) 65%)`,
-                    }}
-                >
+                <div className="max-w-4xl mx-auto rounded-3xl border border-white/15 p-8 sm:p-12 text-center space-y-6 shadow-2xl bg-gradient-to-br from-[#e11d48]/20 via-[#0b0f19] to-[#0b0f19]">
                     <h2 className="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
                         Ready to set up your club?
                     </h2>
@@ -1614,8 +1959,7 @@ export default function LandingPage() {
                     <div className="flex flex-wrap items-center justify-center gap-4 pt-2">
                         <Link
                             href="/signup"
-                            className="px-8 py-4 rounded-xl font-black text-sm text-white shadow-xl transition-all hover:scale-[1.02] flex items-center gap-2"
-                            style={{ backgroundColor: selectedClub.primary }}
+                            className="px-8 py-4 rounded-xl font-black text-sm text-white bg-[#e11d48] hover:bg-[#be123c] shadow-xl transition-all hover:scale-[1.02] flex items-center gap-2"
                         >
                             Create Your Club <ArrowRight className="w-4 h-4" />
                         </Link>
@@ -1635,10 +1979,7 @@ export default function LandingPage() {
             <footer className="relative z-10 border-t border-white/[0.08] py-10 px-6 bg-[#060911] text-xs">
                 <div className="max-w-7xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-6">
                     <div className="flex items-center gap-3">
-                        <span
-                            className="h-7 w-7 rounded-lg flex items-center justify-center font-black text-white text-xs"
-                            style={{ backgroundColor: selectedClub.primary }}
-                        >
+                        <span className="h-7 w-7 rounded-lg flex items-center justify-center font-black text-white text-xs bg-[#e11d48]">
                             CF
                         </span>
                         <span className="font-black tracking-tight text-white text-base">ClubFlow</span>
