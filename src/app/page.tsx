@@ -348,14 +348,19 @@ function RealisticMatchdayXIView({
         { x: 80, y: 20, name: "L. Sterling", num11: 7, sq: 7 },
     ];
 
+    const captainPlayer = pitchPlayers.find((p) => p.capt) || pitchPlayers[2];
+    const penaltyPlayer = pitchPlayers.find((p) => p.num11 === 9) || pitchPlayers[9];
+    const cornerLeftPlayer = pitchPlayers.find((p) => p.num11 === 10) || pitchPlayers[7];
+    const cornerRightPlayer = pitchPlayers.find((p) => p.num11 === 7) || pitchPlayers[10];
+
     const availableList = [
-        { name: "J. Mercer", pos: "ST", stats: "12 Apps • 22G", tag: "Last XI", num: "#9" },
-        { name: "R. Brooks", pos: "LB", stats: "11 Apps • 1G", tag: "Last XI", num: "#18" },
-        { name: "H. Gallagher", pos: "CB", stats: "12 Apps • 2G", tag: "Last XI", num: "#4" },
-        { name: "L. Sterling", pos: "RW", stats: "11 Apps • 8G", tag: "Last XI", num: "#7" },
-        { name: "T. Vance", pos: "CAM", stats: "7 Apps • 6G", tag: "Last XI", num: "#10" },
-        { name: "K. O'Connor", pos: "GK", stats: "3 Apps", tag: "Sub Last", num: "#13" },
-        { name: "M. Richards", pos: "CB", stats: "8 Apps • 1G", tag: "Sub Last", num: "#15" },
+        { name: "J. Harper", pos: "CB", stats: "9 Apps • 1G", tag: "Last XI", num: "#19" },
+        { name: "C. Ellis", pos: "RB", stats: "8 Apps • 0G", tag: "Sub Last", num: "#20" },
+        { name: "A. Morgan", pos: "CM", stats: "10 Apps • 2G", tag: "Sub Last", num: "#21" },
+        { name: "R. Patel", pos: "CDM", stats: "7 Apps • 0G", tag: "Available", num: "#23" },
+        { name: "L. Davies", pos: "RW", stats: "6 Apps • 3G", tag: "Sub Last", num: "#24" },
+        { name: "T. Hughes", pos: "LB", stats: "5 Apps • 0G", tag: "Available", num: "#25" },
+        { name: "B. Spencer", pos: "ST", stats: "4 Apps • 2G", tag: "Available", num: "#26" },
     ];
 
     const benchList = [
@@ -374,7 +379,7 @@ function RealisticMatchdayXIView({
                     <div className="flex items-center gap-1.5">
                         <span className="text-xs font-extrabold text-[#171717]">Available</span>
                         <span className="text-[10px] font-bold text-zinc-500 bg-[#f4f4f5] px-1.5 py-0.5 rounded-md border border-[#eaeaea]">
-                            18
+                            7
                         </span>
                     </div>
                     <span className="text-[10px] font-bold text-zinc-600 bg-[#f4f4f5] px-2 py-0.5 rounded-lg border border-[#eaeaea]">
@@ -418,7 +423,9 @@ function RealisticMatchdayXIView({
                                         className={`text-[8px] font-extrabold px-1.5 py-0.2 rounded border ${
                                             p.tag === "Last XI"
                                                 ? "bg-emerald-500/15 text-emerald-600 border-emerald-500/30"
-                                                : "bg-blue-500/15 text-blue-600 border-blue-500/30"
+                                                : p.tag === "Sub Last"
+                                                ? "bg-blue-500/15 text-blue-600 border-blue-500/30"
+                                                : "bg-zinc-100 text-zinc-600 border-zinc-200"
                                         }`}
                                     >
                                         {p.tag}
@@ -532,15 +539,17 @@ function RealisticMatchdayXIView({
                     </div>
                     <div className="flex justify-between py-0.5">
                         <span className="text-zinc-500">Captain (C)</span>
-                        <span className="font-bold text-[#171717]">H. Gallagher</span>
+                        <span className="font-bold text-[#171717]">{captainPlayer.name}</span>
                     </div>
                     <div className="flex justify-between py-0.5">
                         <span className="text-zinc-500">Penalties</span>
-                        <span className="font-bold text-[#171717]">J. Mercer</span>
+                        <span className="font-bold text-[#171717]">{penaltyPlayer.name}</span>
                     </div>
                     <div className="flex justify-between py-0.5">
                         <span className="text-zinc-500">Corners (L / R)</span>
-                        <span className="font-bold text-[#171717]">T. Vance / L. Sterling</span>
+                        <span className="font-bold text-[#171717]">
+                            {cornerLeftPlayer.name} / {cornerRightPlayer.name}
+                        </span>
                     </div>
                 </div>
             </div>
