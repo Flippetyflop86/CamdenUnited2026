@@ -23,13 +23,8 @@ import {
     Monitor,
     Zap,
     ClipboardPaste,
-    UserPlus,
     Gavel,
     Eye,
-    Layers,
-    Check,
-    Flame,
-    Compass,
 } from "lucide-react";
 
 type ClubThemePreset = {
@@ -44,9 +39,9 @@ type ClubThemePreset = {
 
 const CLUB_THEMES: ClubThemePreset[] = [
     {
-        id: "camden",
-        name: "Camden Crimson",
-        clubLabel: "Camden United",
+        id: "crimson",
+        name: "Crimson Red",
+        clubLabel: "Northbrook United",
         primary: "#e11d48",
         secondary: "#0f172a",
         gk: "#10b981",
@@ -55,7 +50,7 @@ const CLUB_THEMES: ClubThemePreset[] = [
     {
         id: "royal",
         name: "Royal Blue",
-        clubLabel: "Highgate Albion",
+        clubLabel: "Oakwood Albion",
         primary: "#2563eb",
         secondary: "#ffffff",
         gk: "#f59e0b",
@@ -64,7 +59,7 @@ const CLUB_THEMES: ClubThemePreset[] = [
     {
         id: "emerald",
         name: "Emerald Athletic",
-        clubLabel: "Hackney Wick FC",
+        clubLabel: "Riverside Athletic",
         primary: "#10b981",
         secondary: "#064e3b",
         gk: "#eab308",
@@ -73,7 +68,7 @@ const CLUB_THEMES: ClubThemePreset[] = [
     {
         id: "amber",
         name: "Gold & Obsidian",
-        clubLabel: "Islington Borough",
+        clubLabel: "Westbourne Town",
         primary: "#f59e0b",
         secondary: "#0f172a",
         gk: "#06b6d4",
@@ -82,7 +77,7 @@ const CLUB_THEMES: ClubThemePreset[] = [
     {
         id: "claret",
         name: "Claret & Sky",
-        clubLabel: "Sporting Duet XI",
+        clubLabel: "Ashford Park FC",
         primary: "#9f1239",
         secondary: "#38bdf8",
         gk: "#22c55e",
@@ -129,43 +124,43 @@ const WORKSPACE_TABS: {
                 x: 68,
                 y: 42,
                 title: "Next Match Hub & WhatsApp Copy",
-                detail: "Displays opponent rank (#8 Stonewall), automatic meet time (13:30 for 15:00 KO), and 1-tap WhatsApp poll copy.",
+                detail: "Displays opponent rank (#8 Kingswood Rovers), automatic meet time (13:30 for 15:00 KO), and 1-tap WhatsApp poll copy.",
             },
             {
                 id: "h3",
                 x: 35,
                 y: 78,
                 title: "Season Leaderboards",
-                detail: "Tracks Top Goalscorer (M. Santana — 22G), Assists, Starts, and Sub Appearances across League and Cups.",
+                detail: "Tracks Top Goalscorer (J. Mercer — 22G), Assists, Starts, and Sub Appearances across League and Cups.",
             },
         ],
     },
     {
         id: "matches",
         label: "Fixtures & Results",
-        badge: "Real Screenshot",
+        badge: "Season Hub",
         url: "clubflow.org.uk/matches",
         headline: "Clean fixture management with opponent search, weather & saved lineups.",
         desc: "Search any historical or upcoming opponent instantly, expand saved 4-3-3 lineups inline, log scorers and cards, and keep Quick-Add neatly tucked away until needed.",
         hotspots: [
             {
                 id: "m1",
-                x: 60,
-                y: 18,
+                x: 68,
+                y: 20,
                 title: "1-Click Matchday Actions",
                 detail: "Jump straight to Matchday XI, Opposition Scouting Report, or Log Result / Scorers from the Next Match banner.",
             },
             {
                 id: "m2",
-                x: 74,
-                y: 44,
+                x: 72,
+                y: 46,
                 title: "Dedicated Opponent Search",
                 detail: "Filter all 29+ season fixtures and results by opponent, competition (League, Cups, Friendlies), or season.",
             },
             {
                 id: "m3",
-                x: 49,
-                y: 88,
+                x: 50,
+                y: 86,
                 title: "Inline Saved Lineup Preview",
                 detail: "View the exact starting XI and formation used in any match without leaving the fixtures page.",
             },
@@ -191,7 +186,7 @@ const WORKSPACE_TABS: {
                 x: 82,
                 y: 25,
                 title: "Smart File Naming on Export",
-                detail: "Exports automatically as Matchsheet-vs-Stonewall-31-10-2026.pdf or .png ready for WhatsApp & social media.",
+                detail: "Exports automatically as Matchsheet-vs-Kingswood-Rovers-31-10-2026.pdf or .png ready for WhatsApp & social media.",
             },
         ],
     },
@@ -269,7 +264,6 @@ export default function LandingPage() {
     const [activeHotspotId, setActiveHotspotId] = useState<string | null>("h1");
     const [numberingMode, setNumberingMode] = useState<"1-11" | "squad">("1-11");
     const [activeRoleTab, setActiveRoleTab] = useState<"manager" | "secretary" | "coach">("manager");
-    const [pasteSimulated, setPasteSimulated] = useState<boolean>(true);
 
     const currentTabObj = WORKSPACE_TABS.find((t) => t.id === activeWorkspace) || WORKSPACE_TABS[0];
 
@@ -344,9 +338,6 @@ export default function LandingPage() {
                         <div className="hidden lg:flex items-center gap-7 text-xs font-bold uppercase tracking-wider text-slate-400">
                             <a href="#workspaces" className="hover:text-white transition-colors">
                                 Live Workspaces
-                            </a>
-                            <a href="#fulltime-sync" className="hover:text-white transition-colors">
-                                FA Full-Time Sync
                             </a>
                             <a href="#desktop-mobile" className="hover:text-white transition-colors">
                                 Desktop & Dugout
@@ -428,7 +419,7 @@ export default function LandingPage() {
                             href="#workspaces"
                             className="px-6 py-3.5 rounded-xl font-bold text-sm bg-white/[0.06] hover:bg-white/[0.1] text-white border border-white/10 transition-all"
                         >
-                            Explore Live Screenshots
+                            Explore Live Workspaces
                         </a>
                         <Link
                             href="/login"
@@ -460,7 +451,7 @@ export default function LandingPage() {
                                         className="w-3 h-3 rounded-full border border-black/20"
                                         style={{ backgroundColor: theme.primary }}
                                     />
-                                    {theme.name}
+                                    {theme.clubLabel}
                                 </button>
                             );
                         })}
@@ -471,7 +462,7 @@ export default function LandingPage() {
                 {/* HERO SHOWCASE: DESKTOP APP WINDOW + FLOATING MOBILE DUGOUT    */}
                 {/* ============================================================= */}
                 <div className="max-w-6xl mx-auto mt-12 relative">
-                    {/* Desktop Browser Window Frame (Mirrors Actual Light/Dark ClubFlow App) */}
+                    {/* Desktop Browser Window Frame */}
                     <div className="rounded-2xl sm:rounded-3xl overflow-hidden border border-white/15 shadow-[0_25px_100px_-15px_rgba(0,0,0,0.85)] bg-[#0b0f19]">
                         {/* macOS Window Chrome */}
                         <div className="h-9 bg-[#0b0f19] border-b border-white/10 px-4 flex items-center justify-between">
@@ -562,7 +553,7 @@ export default function LandingPage() {
                                 </div>
                             </div>
 
-                            {/* Main Workspace Content (Mirrors Real Camden United vs Stonewall View) */}
+                            {/* Main Workspace Content (Fictional Club & Opponents) */}
                             <div className="col-span-12 md:col-span-9 lg:col-span-10 p-4 sm:p-6 space-y-4 bg-[#f8fafc] text-left">
                                 {/* Next Match Hero Card inside App */}
                                 <div
@@ -595,7 +586,7 @@ export default function LandingPage() {
                                                 </span>
                                                 <span className="text-sm font-bold text-slate-400">VS</span>
                                                 <span className="text-xl sm:text-2xl font-black text-slate-600">
-                                                    Stonewall
+                                                    Kingswood Rovers
                                                 </span>
                                                 <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-xs font-black">
                                                     #8
@@ -676,27 +667,27 @@ export default function LandingPage() {
                                         </div>
                                         {[
                                             {
-                                                opp: "Stonewall",
+                                                opp: "Kingswood Rovers",
                                                 ha: "Away",
                                                 score: "4 - 0",
                                                 res: "W",
-                                                scorers: "Santana (2), Abazi, Zeitoun",
+                                                scorers: "Mercer (2), Sterling, Vance",
                                                 lineup: "4-3-3 Saved",
                                             },
                                             {
-                                                opp: "Kodak (Harrow)",
+                                                opp: "Meadowbank Town",
                                                 ha: "Home",
-                                                score: "1 - 2",
-                                                res: "L",
-                                                scorers: "Hassan",
+                                                score: "3 - 1",
+                                                res: "W",
+                                                scorers: "Maddox (2), Mercer",
                                                 lineup: "4-2-3-1 Saved",
                                             },
                                             {
-                                                opp: "Sporting Duet M 1st XI",
+                                                opp: "Silverdale Athletic",
                                                 ha: "Away",
                                                 score: "2 - 2",
                                                 res: "D",
-                                                scorers: "Santana, Moreno",
+                                                scorers: "Mercer, Cole",
                                                 lineup: "4-3-3 Saved",
                                             },
                                         ].map((m, idx) => (
@@ -749,11 +740,11 @@ export default function LandingPage() {
                                             <span className="text-[10px] font-bold text-rose-600">26/27 Season</span>
                                         </div>
                                         {[
-                                            { name: "M. Santana", pos: "ST", apps: "12 (0)", goals: 22 },
-                                            { name: "R. Abazi", pos: "RW", apps: "5 (6)", goals: 8 },
-                                            { name: "N. Zeitoun", pos: "CAM", apps: "5 (2)", goals: 6 },
-                                            { name: "M. Hassan", pos: "LW", apps: "8 (1)", goals: 5 },
-                                            { name: "K. Ali", pos: "CM", apps: "11 (0)", goals: 1 },
+                                            { name: "J. Mercer", pos: "ST", apps: "12 (0)", goals: 22 },
+                                            { name: "L. Sterling", pos: "RW", apps: "5 (6)", goals: 8 },
+                                            { name: "T. Vance", pos: "CAM", apps: "5 (2)", goals: 6 },
+                                            { name: "C. Maddox", pos: "LW", apps: "8 (1)", goals: 5 },
+                                            { name: "R. Brooks", pos: "CM", apps: "11 (0)", goals: 1 },
                                         ].map((p, idx) => (
                                             <div
                                                 key={idx}
@@ -803,7 +794,7 @@ export default function LandingPage() {
                                     Matchsheet Ready • 4-3-3
                                 </div>
                                 <div className="text-xs font-black">
-                                    {selectedTheme.clubLabel} vs Stonewall
+                                    {selectedTheme.clubLabel} vs Kingswood Rovers
                                 </div>
                                 <div className="text-[10px] opacity-90">
                                     11 Starters • 5 Subs • 1–11 Numbered
@@ -863,7 +854,7 @@ export default function LandingPage() {
             </section>
 
             {/* ================================================================= */}
-            {/* 6-TAB INTERACTIVE WORKSPACE TOUR + REAL SCREENSHOTS + HOTSPOTS    */}
+            {/* 6-TAB INTERACTIVE WORKSPACE TOUR + HOTSPOTS                       */}
             {/* ================================================================= */}
             <section id="workspaces" className="relative z-10 py-24 max-w-7xl mx-auto px-4 sm:px-6 space-y-10">
                 <div className="text-center space-y-3 max-w-3xl mx-auto">
@@ -1001,7 +992,7 @@ export default function LandingPage() {
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <div className="text-base font-black text-slate-900">M. Santana</div>
+                                            <div className="text-base font-black text-slate-900">J. Mercer</div>
                                             <div className="text-xs text-slate-500">12 Starts • 1.83 Goals/Game</div>
                                         </div>
                                         <div className="text-2xl font-black text-rose-600">22G</div>
@@ -1014,7 +1005,7 @@ export default function LandingPage() {
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <div className="text-base font-black text-slate-900">
-                                                G. Montgomery & W. McCreeth
+                                                D. Fletcher & H. Gallagher
                                             </div>
                                             <div className="text-xs text-slate-500">100% Starting XI</div>
                                         </div>
@@ -1027,7 +1018,9 @@ export default function LandingPage() {
                                     </div>
                                     <div className="flex items-center justify-between">
                                         <div>
-                                            <div className="text-base font-black text-slate-900">vs Stonewall (#8)</div>
+                                            <div className="text-base font-black text-slate-900">
+                                                vs Kingswood Rovers (#8)
+                                            </div>
                                             <div className="text-xs text-slate-500">Sat 15:00 • Meet 13:30</div>
                                         </div>
                                         <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-700 font-black text-xs">
@@ -1039,14 +1032,144 @@ export default function LandingPage() {
                         </div>
                     )}
 
-                    {/* WORKSPACE 2: REAL SCREENSHOT OF MATCHES & FIXTURES */}
+                    {/* WORKSPACE 2: FIXTURES & RESULTS (1:1 REPLICA WITH FICTIONAL CLUBS) */}
                     {activeWorkspace === "matches" && (
-                        <div className="bg-[#f8fafc] overflow-hidden">
-                            <img
-                                src="/matches-live-screenshot.png"
-                                alt="ClubFlow Fixtures & Results Live Screenshot"
-                                className="w-full h-auto object-cover"
-                            />
+                        <div className="p-5 sm:p-8 bg-[#f8fafc] text-slate-900 space-y-4 text-left">
+                            {/* Top Next Match Card */}
+                            <div
+                                className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs border-l-4"
+                                style={{ borderLeftColor: selectedTheme.primary }}
+                            >
+                                <div className="flex flex-wrap items-center justify-between gap-4">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black uppercase bg-rose-100 text-rose-700">
+                                                NEXT MATCH
+                                            </span>
+                                            <span className="text-xs font-bold uppercase text-rose-600">• LEAGUE</span>
+                                            <span className="px-2 py-0.5 rounded border border-slate-200 text-[10px] font-bold text-slate-600">
+                                                HOME
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-2.5">
+                                            <span className="text-2xl font-black text-slate-900">
+                                                {selectedTheme.clubLabel}
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-xs font-black">
+                                                #1
+                                            </span>
+                                            <span className="text-sm font-bold text-slate-400">VS</span>
+                                            <span className="text-2xl font-black text-slate-500">
+                                                Kingswood Rovers
+                                            </span>
+                                            <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200 text-xs font-black">
+                                                #8
+                                            </span>
+                                        </div>
+                                        <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                                            <span>📅 Sat 31 Oct</span>
+                                            <span>🕒 KO 15:00</span>
+                                            <span className="font-bold text-amber-600">• Meet 13:30</span>
+                                            <span>📍 Northbrook Park</span>
+                                            <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 font-bold text-[11px]">
+                                                Opposition Info: Pts: 14 • GD: -1
+                                            </span>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span
+                                            className="px-3.5 py-2 rounded-lg text-white text-xs font-bold"
+                                            style={{ backgroundColor: selectedTheme.primary }}
+                                        >
+                                            Matchday XI
+                                        </span>
+                                        <span className="px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold">
+                                            Scouting Report
+                                        </span>
+                                        <span className="px-3 py-2 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
+                                            Log Result / Scorers
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Filter & Opponent Search Bar */}
+                            <div className="flex flex-wrap items-center justify-between gap-2 bg-white p-3 rounded-xl border border-slate-200">
+                                <div className="flex items-center gap-2">
+                                    <span
+                                        className="px-3 py-1 rounded-full text-white text-xs font-bold"
+                                        style={{ backgroundColor: selectedTheme.primary }}
+                                    >
+                                        All (29)
+                                    </span>
+                                    <span className="px-3 py-1 rounded-full text-slate-600 text-xs font-bold">
+                                        Upcoming (10)
+                                    </span>
+                                    <span className="px-3 py-1 rounded-full text-slate-600 text-xs font-bold">
+                                        Results & Season Log (19)
+                                    </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 border border-slate-200 text-xs text-slate-500">
+                                        <Search className="w-3.5 h-3.5" /> Search fixtures & results by opponent...
+                                    </div>
+                                    <span className="px-3 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-bold">
+                                        + Quick-Add Fixture
+                                    </span>
+                                </div>
+                            </div>
+
+                            {/* Upcoming Fixture Card with Inline Lineup Pill */}
+                            <div
+                                className="bg-white rounded-2xl p-4 border border-slate-200 space-y-3 border-l-4"
+                                style={{ borderLeftColor: selectedTheme.primary }}
+                            >
+                                <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <span
+                                            className="px-2.5 py-0.5 rounded-full text-white text-[10px] font-black"
+                                            style={{ backgroundColor: selectedTheme.primary }}
+                                        >
+                                            NEXT UP
+                                        </span>
+                                        <span className="px-2.5 py-0.5 rounded-full border border-slate-200 text-slate-700 font-bold">
+                                            League
+                                        </span>
+                                        <span className="text-slate-500">
+                                            📅 Sat, 31 Oct 2026 • KO 15:00 • Meet 13:30
+                                        </span>
+                                        <span className="px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[11px]">
+                                            ☀️ Partly Cloudy (11.5°C)
+                                        </span>
+                                    </div>
+                                    <span className="px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold">
+                                        ⚽ Log Result
+                                    </span>
+                                </div>
+
+                                <div className="flex items-center justify-center gap-4 py-2 text-sm sm:text-base">
+                                    <span className="font-black text-slate-900">
+                                        {selectedTheme.clubLabel}{" "}
+                                        <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 text-xs">
+                                            #1
+                                        </span>
+                                    </span>
+                                    <span className="font-black text-slate-400">v</span>
+                                    <span className="font-bold text-slate-600">
+                                        Kingswood Rovers{" "}
+                                        <span className="px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 text-xs">
+                                            #8
+                                        </span>
+                                    </span>
+                                </div>
+
+                                <div className="pt-2 border-t border-slate-100 flex justify-center">
+                                    <span className="px-3 py-1 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 bg-slate-50">
+                                        📋 Show Saved Lineup (4-3-3)
+                                    </span>
+                                </div>
+                            </div>
                         </div>
                     )}
 
@@ -1066,7 +1189,7 @@ export default function LandingPage() {
                                     match date:
                                 </p>
                                 <div className="p-3 rounded-xl bg-slate-900 border border-white/10 font-mono text-xs text-emerald-300">
-                                    📄 Matchsheet-vs-Stonewall-31-10-2026.pdf
+                                    📄 Matchsheet-vs-Kingswood-Rovers-31-10-2026.pdf
                                 </div>
 
                                 <div className="flex items-center gap-2 pt-2">
@@ -1101,17 +1224,17 @@ export default function LandingPage() {
                                     <div className="absolute left-3 right-3 top-1/2 border-t border-white/20 pointer-events-none" />
 
                                     {[
-                                        { x: 50, y: 88, name: "Montgomery", num11: 1, sq: 1, gk: true },
-                                        { x: 18, y: 68, name: "Amblin", num11: 3, sq: 18 },
-                                        { x: 38, y: 72, name: "Clark", num11: 5, sq: 4 },
-                                        { x: 62, y: 72, name: "McCreeth", num11: 6, sq: 5 },
-                                        { x: 82, y: 68, name: "Murshid", num11: 2, sq: 22 },
-                                        { x: 50, y: 52, name: "K. Ali", num11: 4, sq: 6 },
-                                        { x: 32, y: 42, name: "Moreno", num11: 8, sq: 14 },
-                                        { x: 68, y: 42, name: "Zeitoun", num11: 10, sq: 10 },
-                                        { x: 22, y: 20, name: "Hassan", num11: 11, sq: 11 },
-                                        { x: 50, y: 15, name: "Santana", num11: 9, sq: 9 },
-                                        { x: 78, y: 20, name: "Abazi", num11: 7, sq: 7 },
+                                        { x: 50, y: 88, name: "Fletcher", num11: 1, sq: 1, gk: true },
+                                        { x: 18, y: 68, name: "Brooks", num11: 3, sq: 18 },
+                                        { x: 38, y: 72, name: "Gallagher", num11: 5, sq: 4 },
+                                        { x: 62, y: 72, name: "Ward", num11: 6, sq: 5 },
+                                        { x: 82, y: 68, name: "Palmer", num11: 2, sq: 22 },
+                                        { x: 50, y: 52, name: "Cole", num11: 4, sq: 6 },
+                                        { x: 32, y: 42, name: "Barker", num11: 8, sq: 14 },
+                                        { x: 68, y: 42, name: "Vance", num11: 10, sq: 10 },
+                                        { x: 22, y: 20, name: "Maddox", num11: 11, sq: 11 },
+                                        { x: 50, y: 15, name: "Mercer", num11: 9, sq: 9 },
+                                        { x: 78, y: 20, name: "Sterling", num11: 7, sq: 7 },
                                     ].map((p, idx) => (
                                         <div
                                             key={idx}
@@ -1173,11 +1296,11 @@ export default function LandingPage() {
                                     </thead>
                                     <tbody className="divide-y divide-slate-100 font-medium">
                                         {[
-                                            { name: "M. Santana", pos: "ST", reg: "League Reg", starts: 12, sub: 0, goals: 22, status: "Available" },
-                                            { name: "Kieran Ali", pos: "CM", reg: "League Reg", starts: 11, sub: 0, goals: 1, status: "Available" },
-                                            { name: "R. Abazi", pos: "RW", reg: "Dual-Reg", starts: 5, sub: 6, goals: 8, status: "Available" },
-                                            { name: "Sufi Yusuf Ali", pos: "CM", reg: "League Reg", starts: 4, sub: 1, goals: 1, status: "Available" },
-                                            { name: "A. Elobeid", pos: "CB", reg: "Loan (28d)", starts: 0, sub: 2, goals: 0, status: "Available" },
+                                            { name: "Jack Mercer", pos: "ST", reg: "League Reg", starts: 12, sub: 0, goals: 22, status: "Available" },
+                                            { name: "Ryan Brooks", pos: "CM", reg: "League Reg", starts: 11, sub: 0, goals: 1, status: "Available" },
+                                            { name: "Liam Sterling", pos: "RW", reg: "Dual-Reg", starts: 5, sub: 6, goals: 8, status: "Available" },
+                                            { name: "Alex Cole", pos: "CM", reg: "League Reg", starts: 4, sub: 1, goals: 1, status: "Available" },
+                                            { name: "Sam Ward", pos: "CB", reg: "Loan (28d)", starts: 0, sub: 2, goals: 0, status: "Available" },
                                         ].map((row, i) => (
                                             <tr key={i} className="hover:bg-slate-50/80">
                                                 <td className="py-3 px-4 font-black text-slate-900">{row.name}</td>
@@ -1225,9 +1348,9 @@ export default function LandingPage() {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
                                 {[
                                     {
-                                        name: " Jayden Vance",
+                                        name: "Jayden Vance",
                                         pos: "LB / LWB",
-                                        club: "Hendon U23",
+                                        club: "Hillside Athletic U23",
                                         foot: "Left",
                                         rating: 5,
                                         stage: "Invite to Trial",
@@ -1236,14 +1359,14 @@ export default function LandingPage() {
                                     {
                                         name: "Marcus Osei",
                                         pos: "CDM / CM",
-                                        club: "Wingate & Finchley Res",
+                                        club: "Brookside Wanderers Res",
                                         foot: "Right",
                                         rating: 4,
                                         stage: "On Trial",
                                         note: "Strong ball-winner, trained Wednesday night — impressed.",
                                     },
                                     {
-                                        name: "Tariq Lamptey-Smith",
+                                        name: "Daniel Knight",
                                         pos: "ST / RW",
                                         club: "Free Agent",
                                         foot: "Right",
@@ -1291,13 +1414,13 @@ export default function LandingPage() {
                             <div className="space-y-3">
                                 <div className="text-xs font-bold uppercase tracking-wider text-emerald-400">
                                     Step 1 • Copy & Paste from FA Full-Time or Mitoo
-                                </div>
+                                 </div>
                                 <div className="p-4 rounded-2xl bg-slate-950 border border-white/10 font-mono text-[11px] text-slate-300 space-y-1.5">
                                     <div className="text-slate-500">// Raw copy-paste from Mitoo / FA Full-Time:</div>
-                                    <div>1  Camden United      12  10  1  1  34  11  +23  31</div>
-                                    <div>2  Sporting Duet XI   12   8  3  1  26  12  +14  27</div>
-                                    <div>3  Highgate Albion    12   7  2  3  22  15   +7  23</div>
-                                    <div>8  Stonewall          11   4  2  5  16  17   -1  14</div>
+                                    <div>1  {selectedTheme.clubLabel.padEnd(18, " ")} 12  10  1  1  34  11  +23  31</div>
+                                    <div>2  Silverdale Athletic 12   8  3  1  26  12  +14  27</div>
+                                    <div>3  Oakwood Albion      12   7  2  3  22  15   +7  23</div>
+                                    <div>8  Kingswood Rovers    11   4  2  5  16  17   -1  14</div>
                                 </div>
                             </div>
                             <div className="space-y-3">
@@ -1482,7 +1605,7 @@ export default function LandingPage() {
                                 <Download className="w-3.5 h-3.5" /> Auto-Named Matchsheet Graphic & PDF
                             </span>
                             <h3 className="text-lg font-black text-white">
-                                Matchsheet-vs-Stonewall-31-10-2026.png
+                                Matchsheet-vs-Kingswood-Rovers-31-10-2026.png
                             </h3>
                             <p className="text-xs text-slate-400 leading-relaxed">
                                 High-resolution pitch graphic and printable PDF matchsheet complete with your club crest,
@@ -1491,11 +1614,11 @@ export default function LandingPage() {
                         </div>
                         <div className="p-3.5 rounded-2xl bg-slate-950 border border-white/10 text-xs space-y-2">
                             <div className="flex items-center justify-between text-slate-300 font-mono text-[11px]">
-                                <span>📄 Matchsheet-vs-Stonewall-31-10-2026.pdf</span>
+                                <span>📄 Matchsheet-vs-Kingswood-Rovers-31-10-2026.pdf</span>
                                 <span className="text-emerald-400 font-bold">Ready</span>
                             </div>
                             <div className="flex items-center justify-between text-slate-300 font-mono text-[11px]">
-                                <span>🖼️ Matchsheet-vs-Stonewall-31-10-2026.png</span>
+                                <span>🖼️ Matchsheet-vs-Kingswood-Rovers-31-10-2026.png</span>
                                 <span className="text-emerald-400 font-bold">Ready</span>
                             </div>
                         </div>
@@ -1538,7 +1661,7 @@ export default function LandingPage() {
                         </div>
                         <div className="p-3 rounded-2xl bg-[#005c4b] text-white text-[11px] font-sans leading-relaxed shadow-md">
                             ⚽ <strong>NEXT MATCH — {selectedTheme.clubLabel.toUpperCase()}</strong>
-                            <br />🆚 <strong>Opposition:</strong> Stonewall (#8) (HOME)
+                            <br />🆚 <strong>Opposition:</strong> Kingswood Rovers (#8) (HOME)
                             <br />📅 <strong>Date:</strong> Sat 31 Oct • KO 15:00 (Meet 13:30)
                             <br />💪 Please confirm your availability below!
                         </div>
