@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Pencil, Calendar, Users, UserMinus, RotateCcw, Check, Building2, Clock } from "lucide-react";
+import { Pencil, Calendar, Users, UserMinus, RotateCcw, Check, Building2, Clock, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { getImage } from "@/lib/db";
 
@@ -23,6 +23,7 @@ interface PlayerCardProps {
 
 export function PlayerCard({
     player,
+    onDelete,
     onMarkLeft,
     onRestore,
     onEdit,
@@ -360,6 +361,21 @@ export function PlayerCard({
                         title="Restore to Active Squad"
                     >
                         <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </Button>
+                )}
+                {isFormer && onDelete && (
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onDelete(player.id);
+                        }}
+                        className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 text-red-600 hover:text-red-700 hover:bg-red-500/10 border-red-500/30 bg-surface-1 shadow-sm"
+                        title="Permanently Remove from Database"
+                    >
+                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>
                 )}
                 {!isFormer && onMarkLeft && (

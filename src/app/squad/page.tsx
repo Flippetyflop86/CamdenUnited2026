@@ -690,6 +690,65 @@ export default function SquadPage() {
         }
     };
 
+    const handleDeletePlayerFromDb = async (player: Player) => {
+        const fullName = formatPlayerName(player);
+        const confirmed = window.confirm(
+            `Permanently delete ${fullName} from the database?\n\nThis will remove the player profile and cannot be undone.`
+        );
+        if (!confirmed) return;
+
+        try {
+            // Clean up dependent stats/records first so foreign keys never block deletion
+            await supabase.from("match_player_stats").delete().eq("player_id", player.id);
+
+            const { error } = await supabase.from("players").delete().eq("id", player.id);
+            if (error) throw error;
+
+            setPlayers((prev) => prev.filter((p) => p.id !== player.id));
+            if (editingPlayer?.id === player.id) {
+                setEditingPlayer(null);
+            }
+
+            logActivity(
+                "Deleted Former Player",
+                `Permanently removed ${player.firstName} ${player.lastName} from the database.`
+            );
+
+            await fetchData();
+        } catch (err: any) {
+            console.error("Delete player error:", err);
+            alert(`Failed to delete player from database: ${err.message}`);
+        }
+    };
+
+    const handleDeleteAllFormerPlayers = async () => {
+        if (formerSquadPlayers.length === 0) return;
+        const count = formerSquadPlayers.length;
+        const confirmed = window.confirm(
+            `Permanently delete all ${count} former player${count === 1 ? "" : "s"} currently listed from the database?\n\nThis action cannot be undone.`
+        );
+        if (!confirmed) return;
+
+        try {
+            const ids = formerSquadPlayers.map((p) => p.id);
+            await supabase.from("match_player_stats").delete().in("player_id", ids);
+
+            const { error } = await supabase.from("players").delete().in("id", ids);
+            if (error) throw error;
+
+            setPlayers((prev) => prev.filter((p) => !ids.includes(p.id)));
+            logActivity(
+                "Deleted All Former Players",
+                `Permanently removed ${count} former player(s) from the database.`
+            );
+
+            await fetchData();
+        } catch (err: any) {
+            console.error("Delete all former players error:", err);
+            alert(`Failed to delete former players: ${err.message}`);
+        }
+    };
+
     const handleStatusToggle = async (player: Player) => {
         if (isFormerPlayer(player)) return;
         const statuses: MedicalStatus[] = ["Available", "Holiday", "Injured", "Suspended", "At Parent Club"];
@@ -1485,18 +1544,28 @@ export default function SquadPage() {
                     </div>
 
                     <div
-                        className="pl-1 flex items-center"
+                        className="pl-1 flex items-center gap-1"
                         onClick={(e) => e.stopPropagation()}
                     >
                         {isFormer ? (
-                            <button
-                                type="button"
-                                onClick={() => handleRestorePlayer(player)}
-                                className="h-7 w-7 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 flex items-center justify-center"
-                                title="Restore Player"
-                            >
-                                <RotateCcw className="w-3.5 h-3.5" />
-                            </button>
+                            <>
+                                <button
+                                    type="button"
+                                    onClick={() => handleRestorePlayer(player)}
+                                    className="h-7 w-7 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-600 flex items-center justify-center"
+                                    title="Restore Player to Active Squad"
+                                >
+                                    <RotateCcw className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleDeletePlayerFromDb(player)}
+                                    className="h-7 w-7 rounded-lg border border-red-500/30 bg-red-500/10 text-red-600 flex items-center justify-center"
+                                    title="Permanently Remove from Database"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                            </>
                         ) : (
                             <button
                                 type="button"
@@ -1674,7 +1743,59 @@ export default function SquadPage() {
                         ))}
                     </div>
 
-                    {/* 3. Search + Position & Sort Pills */}
+                    {/* 3. Full-Width Active vs Former Players Toggle (Never Cut Off on Mobile) */}
+                    <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-background border border-border">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSquadViewMode("active");
+                                setSelectedPlayerIds([]);
+                            }}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
+                                squadViewMode === "active"
+                                    ? "bg-foreground text-background shadow-xs"
+                                    : "text-muted-foreground hover:text-foreground"
+                            }`}
+                        >
+                            <Users className="w-3.5 h-3.5 shrink-0" />
+                            <span>Active Squad</span>
+                            <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded-full leading-none ${
+                                    squadViewMode === "active"
+                                        ? "bg-background/20 text-background"
+                                        : "bg-surface-2 text-muted-foreground"
+                                }`}
+                            >
+                                {activeSquadPlayers.length}
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSquadViewMode("former");
+                                setSelectedPlayerIds([]);
+                            }}
+                            className={`flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg text-xs font-bold transition-all ${
+                                squadViewMode === "former"
+                                    ? "bg-amber-500 text-white shadow-xs"
+                                    : "text-muted-foreground hover:text-foreground"
+                            }`}
+                        >
+                            <Archive className="w-3.5 h-3.5 shrink-0" />
+                            <span>Former Players</span>
+                            <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded-full leading-none ${
+                                    squadViewMode === "former"
+                                        ? "bg-white/25 text-white"
+                                        : "bg-surface-2 text-muted-foreground"
+                                }`}
+                            >
+                                {formerSquadPlayers.length}
+                            </span>
+                        </button>
+                    </div>
+
+                    {/* 4. Search + Position & Sort Pills */}
                     <div className="space-y-2">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
@@ -1695,15 +1816,15 @@ export default function SquadPage() {
                             )}
                         </div>
 
-                        <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar -mx-4 px-4">
+                        <div className="flex items-center justify-between gap-1.5">
                             {/* Position Filter Pills */}
-                            <div className="flex items-center gap-1 shrink-0">
+                            <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
                                 {(["All", "GK", "DEF", "MID", "FWD"] as const).map((pos) => (
                                     <button
                                         key={pos}
                                         type="button"
                                         onClick={() => setPositionFilter(pos)}
-                                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors ${
+                                        className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-colors shrink-0 ${
                                             positionFilter === pos
                                                 ? "bg-brand text-brand-foreground shadow-xs"
                                                 : "bg-background border border-border text-muted-foreground"
@@ -1714,49 +1835,57 @@ export default function SquadPage() {
                                 ))}
                             </div>
 
-                            {/* Sort & Former Toggle Pills */}
-                            <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        const order: TableSortField[] = ["position", "apps", "goals", "assists", "name"];
-                                        const nextIdx = (order.indexOf(tableSortField) + 1) % order.length;
-                                        const nextField = order[nextIdx];
-                                        setTableSortField(nextField);
-                                        setTableSortAsc(nextField === "position" || nextField === "name");
-                                    }}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-background border border-border text-foreground whitespace-nowrap"
-                                >
-                                    <ArrowUpDown className="w-3 h-3 text-muted-foreground" />
-                                    {tableSortField === "position"
-                                        ? "By Pos"
-                                        : tableSortField === "apps"
-                                        ? "Top Apps"
-                                        : tableSortField === "goals"
-                                        ? "Top Goals"
-                                        : tableSortField === "assists"
-                                        ? "Top Asts"
-                                        : "A–Z"}
-                                </button>
-
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setSquadViewMode((prev) => (prev === "active" ? "former" : "active"))
-                                    }
-                                    className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold border whitespace-nowrap transition-colors ${
-                                        squadViewMode === "former"
-                                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                                            : "bg-background border-border text-muted-foreground"
-                                    }`}
-                                >
-                                    <Archive className="w-3 h-3" />
-                                    Former ({formerSquadPlayers.length})
-                                </button>
-                            </div>
+                            {/* Sort Pill */}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    const order: TableSortField[] = ["position", "apps", "goals", "assists", "name"];
+                                    const nextIdx = (order.indexOf(tableSortField) + 1) % order.length;
+                                    const nextField = order[nextIdx];
+                                    setTableSortField(nextField);
+                                    setTableSortAsc(nextField === "position" || nextField === "name");
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-background border border-border text-foreground whitespace-nowrap shrink-0"
+                            >
+                                <ArrowUpDown className="w-3 h-3 text-muted-foreground" />
+                                {tableSortField === "position"
+                                    ? "By Pos"
+                                    : tableSortField === "apps"
+                                    ? "Top Apps"
+                                    : tableSortField === "goals"
+                                    ? "Top Goals"
+                                    : tableSortField === "assists"
+                                    ? "Top Asts"
+                                    : "A–Z"}
+                            </button>
                         </div>
                     </div>
                 </div>
+
+                {/* Former Players Mobile Banner & Database Cleanup */}
+                {squadViewMode === "former" && (
+                    <div className="mx-3 mt-3 p-3 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-2">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                <Archive className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                                Former Players ({formerSquadPlayers.length})
+                            </span>
+                            {formerSquadPlayers.length > 0 && (
+                                <button
+                                    type="button"
+                                    onClick={handleDeleteAllFormerPlayers}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border border-red-500/30 bg-red-500/10 text-red-600 dark:text-red-400 text-[11px] font-bold active:scale-95 transition-all"
+                                >
+                                    <Trash2 className="w-3 h-3" />
+                                    Remove All from DB
+                                </button>
+                            )}
+                        </div>
+                        <p className="text-[11px] text-muted-foreground leading-snug">
+                            Tap the green arrow (<RotateCcw className="w-2.5 h-2.5 inline text-emerald-600" />) to restore a player to the active squad, or the red trash icon (<Trash2 className="w-2.5 h-2.5 inline text-red-600" />) to permanently delete them from the database.
+                        </p>
+                    </div>
+                )}
 
                 {/* Loan Expiry Warning on Mobile */}
                 {squadViewMode === "active" && expiringLoans.length > 0 && (
@@ -1780,7 +1909,7 @@ export default function SquadPage() {
                     </div>
                 )}
 
-                {/* 4. Mobile Player List (Grouped by Position or Ranked by Stat) */}
+                {/* 5. Mobile Player List (Grouped by Position or Ranked by Stat) */}
                 <div className="px-3 pt-3 space-y-3">
                     {tableSortedPlayers.length === 0 ? (
                         <div className="text-center py-12 text-xs text-muted-foreground bg-card rounded-xl border border-border">
@@ -1798,7 +1927,7 @@ export default function SquadPage() {
                                     <span>
                                         {group.label} ({group.players.length})
                                     </span>
-                                    <div className="flex items-center gap-1 pr-8">
+                                    <div className={`flex items-center gap-1 ${squadViewMode === "former" ? "pr-16" : "pr-8"}`}>
                                         <span className="w-7 text-center">APP</span>
                                         <span className="w-7 text-center">G</span>
                                         <span className="w-7 text-center">A</span>
@@ -1813,7 +1942,7 @@ export default function SquadPage() {
                         <div className="rounded-xl border border-border bg-card overflow-hidden shadow-xs">
                             <div className="flex items-center justify-between px-3 py-2 bg-surface-1 border-b border-border text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
                                 <span>Players ({tableSortedPlayers.length})</span>
-                                <div className="flex items-center gap-1 pr-8">
+                                <div className={`flex items-center gap-1 ${squadViewMode === "former" ? "pr-16" : "pr-8"}`}>
                                     <span className="w-7 text-center">APP</span>
                                     <span className="w-7 text-center">G</span>
                                     <span className="w-7 text-center">A</span>
@@ -2057,17 +2186,30 @@ export default function SquadPage() {
                                 Former &amp; Archived Players
                             </h3>
                             <p className="text-xs text-muted-foreground">
-                                These players have left the club or returned to their parent club. All historical appearances, goals, assists, and training attendance records are preserved. Click the restore button on any player card or profile to return them to the active squad.
+                                These players have left the club or returned to their parent club. Click the green restore button to return a player to the active squad, or the red trash button to permanently remove them from the database.
                             </p>
                         </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSquadViewMode("active")}
-                            className="shrink-0 text-xs"
-                        >
-                            Back to Active Squad
-                        </Button>
+                        <div className="flex items-center gap-2 shrink-0">
+                            {formerSquadPlayers.length > 0 && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleDeleteAllFormerPlayers}
+                                    className="text-xs border-red-500/30 text-red-600 hover:bg-red-500/10 hover:text-red-700"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5 mr-1.5" />
+                                    Remove All from DB ({formerSquadPlayers.length})
+                                </Button>
+                            )}
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSquadViewMode("active")}
+                                className="text-xs"
+                            >
+                                Back to Active Squad
+                            </Button>
+                        </div>
                     </div>
                 )}
 
@@ -2439,15 +2581,26 @@ export default function SquadPage() {
                                                             <Pencil className="w-3.5 h-3.5" />
                                                         </Button>
                                                         {isFormer ? (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="icon"
-                                                                onClick={() => handleRestorePlayer(player)}
-                                                                className="h-7 w-7 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
-                                                                title="Restore to Active Squad"
-                                                            >
-                                                                <RotateCcw className="w-3.5 h-3.5" />
-                                                            </Button>
+                                                            <>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="icon"
+                                                                    onClick={() => handleRestorePlayer(player)}
+                                                                    className="h-7 w-7 text-emerald-600 border-emerald-500/30 hover:bg-emerald-500/10"
+                                                                    title="Restore to Active Squad"
+                                                                >
+                                                                    <RotateCcw className="w-3.5 h-3.5" />
+                                                                </Button>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="icon"
+                                                                    onClick={() => handleDeletePlayerFromDb(player)}
+                                                                    className="h-7 w-7 text-red-600 border-red-500/30 hover:bg-red-500/10"
+                                                                    title="Permanently Remove from Database"
+                                                                >
+                                                                    <Trash2 className="w-3.5 h-3.5" />
+                                                                </Button>
+                                                            </>
                                                         ) : (
                                                             <Button
                                                                 variant="outline"
@@ -2481,6 +2634,7 @@ export default function SquadPage() {
                                             player={player}
                                             onMarkLeft={openDepartureDialog}
                                             onRestore={handleRestorePlayer}
+                                            onDelete={() => handleDeletePlayerFromDb(player)}
                                             onEdit={handleEdit}
                                             onStatusToggle={handleStatusToggle}
                                         />
@@ -2500,6 +2654,7 @@ export default function SquadPage() {
                                             player={player}
                                             onMarkLeft={openDepartureDialog}
                                             onRestore={handleRestorePlayer}
+                                            onDelete={() => handleDeletePlayerFromDb(player)}
                                             onEdit={handleEdit}
                                             onStatusToggle={handleStatusToggle}
                                         />
@@ -2519,6 +2674,7 @@ export default function SquadPage() {
                                             player={player}
                                             onMarkLeft={openDepartureDialog}
                                             onRestore={handleRestorePlayer}
+                                            onDelete={() => handleDeletePlayerFromDb(player)}
                                             onEdit={handleEdit}
                                             onStatusToggle={handleStatusToggle}
                                         />
@@ -2538,6 +2694,7 @@ export default function SquadPage() {
                                             player={player}
                                             onMarkLeft={openDepartureDialog}
                                             onRestore={handleRestorePlayer}
+                                            onDelete={() => handleDeletePlayerFromDb(player)}
                                             onEdit={handleEdit}
                                             onStatusToggle={handleStatusToggle}
                                         />
@@ -3144,19 +3301,32 @@ export default function SquadPage() {
                         <div className="p-3 sm:p-4 pb-6 sm:pb-4 border-t border-border flex justify-between items-center gap-2 shrink-0 bg-surface-2">
                             {editingPlayer.id !== "new" ? (
                                 isFormerPlayer(editingPlayer) ? (
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            const p = players.find(pl => pl.id === editingPlayer.id) || editingPlayer;
-                                            setEditingPlayer(null);
-                                            handleRestorePlayer(p);
-                                        }}
-                                        className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/10 rounded transition-colors flex items-center gap-1.5 shrink-0"
-                                    >
-                                        <RotateCcw className="w-3.5 h-3.5" />
-                                        <span className="hidden xs:inline">Restore to Squad</span>
-                                        <span className="xs:hidden">Restore</span>
-                                    </button>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const p = players.find(pl => pl.id === editingPlayer.id) || editingPlayer;
+                                                setEditingPlayer(null);
+                                                handleRestorePlayer(p);
+                                            }}
+                                            className="px-2 sm:px-3 py-1.5 text-xs font-semibold text-emerald-600 hover:bg-emerald-500/10 rounded transition-colors flex items-center gap-1 shrink-0"
+                                        >
+                                            <RotateCcw className="w-3.5 h-3.5" />
+                                            <span>Restore</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const p = players.find(pl => pl.id === editingPlayer.id) || editingPlayer;
+                                                handleDeletePlayerFromDb(p);
+                                            }}
+                                            className="px-2 sm:px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-500/10 rounded transition-colors flex items-center gap-1 shrink-0"
+                                            title="Permanently Delete from Database"
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                            <span>Delete DB</span>
+                                        </button>
+                                    </div>
                                 ) : (
                                     <button
                                         type="button"
