@@ -112,6 +112,22 @@ export default function RecruitmentPage() {
     const [compareSlotA, setCompareSlotA] = useState<string>("");
     const [compareSlotB, setCompareSlotB] = useState<string>(""); // Can be recruit ID or "squad:<id>"
 
+    // Mobile-Specific States (Pitchside Quick-Scout, Filter Drawer, Tools Bar, Speed-Dial vs Cards)
+    const [mobileViewMode, setMobileViewMode] = useState<"speed-dial" | "cards">("speed-dial");
+    const [showMobileQuickScout, setShowMobileQuickScout] = useState(false);
+    const [showMobileFilters, setShowMobileFilters] = useState(false);
+    const [showMobileExportBar, setShowMobileExportBar] = useState(false);
+    const [isSavingQuickScout, setIsSavingQuickScout] = useState(false);
+    const [mobileQuickForm, setMobileQuickForm] = useState({
+        name: "",
+        primaryPosition: "ST",
+        preferredFoot: "Right" as "Right" | "Left" | "Both",
+        currentClub: "",
+        phone: "",
+        starRating: 4,
+        notes: "",
+    });
+
     const [formData, setFormData] = useState({
         name: "",
         primaryPosition: "MID",
@@ -134,6 +150,48 @@ export default function RecruitmentPage() {
         pipelineStage: "Scouted" as RecruitPipelineStage,
         commutePracticality: "Easy / Local" as CommutePracticality,
     });
+
+    const handleMobileQuickScoutSave = async () => {
+        if (!mobileQuickForm.name.trim()) return;
+        setIsSavingQuickScout(true);
+        try {
+            const payload = serializeRecruitForDb({
+                name: mobileQuickForm.name.trim(),
+                primaryPosition: mobileQuickForm.primaryPosition,
+                secondaryPosition: "",
+                age: 22,
+                location: "London",
+                status: mobileQuickForm.currentClub.trim() ? "Attached" : "Unattached",
+                currentClub: mobileQuickForm.currentClub.trim(),
+                onTrial: false,
+                scoutedRole: mobileQuickForm.starRating === 5 ? "Star Player" : "1st Team Player",
+                preferredFoot: mobileQuickForm.preferredFoot,
+                phone: mobileQuickForm.phone.trim(),
+                starRating: mobileQuickForm.starRating,
+                pipelineStage: "Scouted",
+                commutePracticality: "Easy / Local",
+                notes: mobileQuickForm.notes.trim(),
+            });
+            const { error } = await supabase.from("recruits").insert([payload]);
+            if (error) {
+                alert("Could not save quick scout target: " + error.message);
+                return;
+            }
+            setMobileQuickForm({
+                name: "",
+                primaryPosition: "ST",
+                preferredFoot: "Right",
+                currentClub: "",
+                phone: "",
+                starRating: 4,
+                notes: "",
+            });
+            setShowMobileQuickScout(false);
+            await fetchRecruits();
+        } finally {
+            setIsSavingQuickScout(false);
+        }
+    };
 
     useEffect(() => {
         fetchRecruits();
@@ -743,322 +801,922 @@ export default function RecruitmentPage() {
     const entityB = resolveComparisonEntity(compareSlotB);
 
     return (
-        <div className="space-y-5">
+        <div className="space-y-5 pb-20 md:pb-6">
             {/* ================================================================= */}
-            {/* HEADER & EXPORT / IMPORT / COMPARE TOOLBAR (#1, #2, #21, #24)     */}
+            {/* MOBILE RECRUITMENT & PITCHSIDE BLACK BOOK (< 768px)               */}
             {/* ================================================================= */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div>
-                    <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                        Recruitment &amp; Manager&apos;s Black Book
-                    </h2>
-                    <p className="text-xs sm:text-sm text-muted-foreground">
-                        Build your long-term player black book, track recruitment pipeline stages, compare targets &amp; export to Excel
-                    </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2">
-                    {/* #1: Export to Excel (.xls) & CSV */}
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => exportRecruitsToExcelXLS(filteredRecruits, settings.name)}
-                        className="h-9 text-xs font-bold border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
-                        title="Export filtered Black Book to a styled Microsoft Excel (.xls) spreadsheet"
-                    >
-                        <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />
-                        Export Excel (.xls)
-                    </Button>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => exportRecruitsToCSV(filteredRecruits, settings.name)}
-                        className="h-9 text-xs font-bold border-border bg-surface-1 hover:bg-surface-2"
-                        title="Export filtered Black Book to CSV"
-                    >
-                        <Download className="h-3.5 w-3.5 mr-1.5 text-sky-500" />
-                        CSV
-                    </Button>
-
-                    {/* #2: Bulk Import from Excel / CSV */}
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setIsImportModalOpen(true)}
-                        className="h-9 text-xs font-bold border-border bg-surface-1 hover:bg-surface-2"
-                    >
-                        <Upload className="h-3.5 w-3.5 mr-1.5 text-indigo-500" />
-                        Import Excel/CSV
-                    </Button>
-
-                    {/* #24: Side-by-Side Comparison Trigger */}
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openComparisonModal()}
-                        className="h-9 text-xs font-bold border-border bg-surface-1 hover:bg-surface-2"
-                    >
-                        <GitCompare className="h-3.5 w-3.5 mr-1.5 text-amber-500" />
-                        Compare {compareIds.length > 0 ? `(${compareIds.length})` : "Targets"}
-                    </Button>
-
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleExportPDF}
-                        className="h-9 text-xs font-bold border-border bg-surface-1 hover:bg-surface-2"
-                    >
-                        <FileDown className="h-3.5 w-3.5 mr-1.5 text-rose-500" />
-                        PDF Report
-                    </Button>
-
-                    <Button
-                        size="sm"
-                        onClick={() => setIsDialogOpen(true)}
-                        className="h-9 text-xs font-extrabold bg-red-600 hover:bg-red-700 text-white"
-                    >
-                        <Plus className="h-4 w-4 mr-1.5" />
-                        Add Target
-                    </Button>
-                </div>
-            </div>
-
-            {/* ================================================================= */}
-            {/* #11: INTERACTIVE PIPELINE FUNNEL STRIP                            */}
-            {/* ================================================================= */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
-                <button
-                    type="button"
-                    onClick={() => setStageFilter("ALL")}
-                    className={`p-2.5 rounded-xl border text-left transition-all ${
-                        stageFilter === "ALL"
-                            ? "bg-red-600 text-white border-red-500 shadow-sm"
-                            : "bg-surface-1 border-border hover:border-red-500/40"
-                    }`}
-                >
-                    <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Total Book</div>
-                    <div className="text-lg font-black mt-0.5">{recruits.length}</div>
-                </button>
-                {PIPELINE_STAGES.map((stage) => {
-                    const isSelected = stageFilter === stage;
-                    return (
-                        <button
-                            key={stage}
-                            type="button"
-                            onClick={() => setStageFilter(isSelected ? "ALL" : stage)}
-                            className={`p-2.5 rounded-xl border text-left transition-all ${
-                                isSelected
-                                    ? "bg-red-600 text-white border-red-500 shadow-sm"
-                                    : "bg-surface-1 border-border hover:border-red-500/40"
-                            }`}
-                        >
-                            <div className="text-[10px] font-bold uppercase tracking-wider truncate opacity-80">
-                                {stage}
+            <div className="md:hidden space-y-3">
+                {/* 1. Mobile Header & Pitchside Action Bar */}
+                <div className="rounded-2xl bg-surface-1 border border-border p-3.5 space-y-3 shadow-xs">
+                    <div className="flex items-start justify-between gap-2">
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-lg font-black tracking-tight text-foreground">
+                                    Manager&apos;s Black Book
+                                </h2>
+                                <span className="px-2 py-0.5 rounded-full bg-red-600/15 text-red-400 border border-red-500/30 text-[11px] font-black">
+                                    {recruits.length}
+                                </span>
                             </div>
-                            <div className="text-lg font-black mt-0.5">{stageCounts[stage] || 0}</div>
-                        </button>
-                    );
-                })}
-            </div>
-
-            {/* ================================================================= */}
-            {/* #23 & #21: MULTI-FILTER BAR + VIEW SWITCHER (CARDS VS TABLE)      */}
-            {/* ================================================================= */}
-            <Card className="bg-surface-1 border-border">
-                <CardContent className="p-3.5 sm:p-4 space-y-3">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-                        {/* Search Input */}
-                        <div className="relative flex-1">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search by name, club, step/level, previous clubs, location, connection, phone or notes..."
-                                className="pl-9 h-9 text-xs sm:text-sm bg-surface-2 border-border"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                            />
+                            <p className="text-[11px] text-muted-foreground">
+                                Pitchside scouting, speed-dial contacts &amp; pipeline CRM
+                            </p>
                         </div>
 
-                        {/* Sort + View Mode Toggle (#21) */}
-                        <div className="flex items-center gap-2 shrink-0">
+                        <button
+                            type="button"
+                            onClick={() => setShowMobileExportBar((v) => !v)}
+                            className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-extrabold flex items-center gap-1 transition-colors shrink-0 ${
+                                showMobileExportBar
+                                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                                    : "bg-surface-2 text-foreground border-border"
+                            }`}
+                        >
+                            <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500" />
+                            Excel / Tools
+                        </button>
+                    </div>
+
+                    {/* Primary Mobile Action Buttons: Pitchside Quick-Scout + Full Add + Compare */}
+                    <div className="grid grid-cols-3 gap-2">
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => setShowMobileQuickScout((v) => !v)}
+                            className={`h-9 text-xs font-extrabold ${
+                                showMobileQuickScout
+                                    ? "bg-amber-500 hover:bg-amber-600 text-slate-950"
+                                    : "bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/40"
+                            }`}
+                        >
+                            ⚡ Quick Scout
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => setIsDialogOpen(true)}
+                            className="h-9 text-xs font-extrabold bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            <Plus className="h-3.5 w-3.5 mr-1" />
+                            Full Add
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openComparisonModal()}
+                            className="h-9 text-xs font-bold border-border bg-surface-2"
+                        >
+                            <GitCompare className="h-3.5 w-3.5 mr-1 text-amber-500" />
+                            Compare {compareIds.length > 0 ? `(${compareIds.length})` : ""}
+                        </Button>
+                    </div>
+
+                    {/* Expandable Mobile Excel / Import / PDF Toolbar */}
+                    {showMobileExportBar && (
+                        <div className="pt-2 border-t border-border grid grid-cols-2 gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => exportRecruitsToExcelXLS(filteredRecruits, settings.name)}
+                                className="h-8 text-[11px] font-bold border-emerald-500/40 text-emerald-400 bg-emerald-500/10"
+                            >
+                                <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />
+                                Export Excel (.xls)
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => exportRecruitsToCSV(filteredRecruits, settings.name)}
+                                className="h-8 text-[11px] font-bold border-border bg-surface-2"
+                            >
+                                <Download className="h-3.5 w-3.5 mr-1.5 text-sky-400" />
+                                Export CSV
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setIsImportModalOpen(true)}
+                                className="h-8 text-[11px] font-bold border-border bg-surface-2"
+                            >
+                                <Upload className="h-3.5 w-3.5 mr-1.5 text-indigo-400" />
+                                Import Excel/CSV
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleExportPDF}
+                                className="h-8 text-[11px] font-bold border-border bg-surface-2"
+                            >
+                                <FileDown className="h-3.5 w-3.5 mr-1.5 text-rose-400" />
+                                PDF Report
+                            </Button>
+                        </div>
+                    )}
+                </div>
+
+                {/* 2. ⚡ Pitchside 5-Second Quick-Scout Drawer (Mobile Exclusive) */}
+                {showMobileQuickScout && (
+                    <div className="rounded-2xl bg-surface-1 border-2 border-amber-500/50 p-3.5 space-y-2.5 shadow-lg">
+                        <div className="flex items-center justify-between">
+                            <span className="text-xs font-black uppercase tracking-wider text-amber-400">
+                                ⚡ Pitchside 5-Second Quick Scout
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setShowMobileQuickScout(false)}
+                                className="text-muted-foreground hover:text-foreground"
+                            >
+                                <X className="h-4 w-4" />
+                            </button>
+                        </div>
+                        <div className="grid grid-cols-[1fr_76px_82px] gap-1.5">
+                            <Input
+                                placeholder="Name or Shirt # (e.g. #11 Winger)"
+                                value={mobileQuickForm.name}
+                                onChange={(e) =>
+                                    setMobileQuickForm({ ...mobileQuickForm, name: e.target.value })
+                                }
+                                className="h-8 text-xs bg-surface-2"
+                            />
+                            <select
+                                value={mobileQuickForm.primaryPosition}
+                                onChange={(e) =>
+                                    setMobileQuickForm({
+                                        ...mobileQuickForm,
+                                        primaryPosition: e.target.value,
+                                    })
+                                }
+                                className="h-8 rounded-md border border-border bg-surface-2 px-1.5 text-xs font-bold"
+                            >
+                                {ALL_RECRUIT_POSITIONS.map((p) => (
+                                    <option key={p} value={p}>
+                                        {p}
+                                    </option>
+                                ))}
+                            </select>
+                            <select
+                                value={mobileQuickForm.preferredFoot}
+                                onChange={(e) =>
+                                    setMobileQuickForm({
+                                        ...mobileQuickForm,
+                                        preferredFoot: e.target.value as any,
+                                    })
+                                }
+                                className="h-8 rounded-md border border-border bg-surface-2 px-1.5 text-xs font-semibold"
+                            >
+                                <option value="Right">R Foot</option>
+                                <option value="Left">L Foot</option>
+                                <option value="Both">Both</option>
+                            </select>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5">
+                            <Input
+                                placeholder="Current Club (optional)"
+                                value={mobileQuickForm.currentClub}
+                                onChange={(e) =>
+                                    setMobileQuickForm({
+                                        ...mobileQuickForm,
+                                        currentClub: e.target.value,
+                                    })
+                                }
+                                className="h-8 text-xs bg-surface-2"
+                            />
+                            <Input
+                                placeholder="Phone / WhatsApp (optional)"
+                                value={mobileQuickForm.phone}
+                                onChange={(e) =>
+                                    setMobileQuickForm({ ...mobileQuickForm, phone: e.target.value })
+                                }
+                                className="h-8 text-xs bg-surface-2"
+                            />
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                            <Input
+                                placeholder="Quick note (e.g. Rapid in behind, spoke after game)..."
+                                value={mobileQuickForm.notes}
+                                onChange={(e) =>
+                                    setMobileQuickForm({ ...mobileQuickForm, notes: e.target.value })
+                                }
+                                className="h-8 text-xs bg-surface-2 flex-1"
+                            />
+                            <Button
+                                type="button"
+                                size="sm"
+                                disabled={!mobileQuickForm.name.trim() || isSavingQuickScout}
+                                onClick={handleMobileQuickScoutSave}
+                                className="h-8 px-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs shrink-0"
+                            >
+                                {isSavingQuickScout ? "Saving..." : "Save"}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* 3. Horizontal Swipeable Pipeline Funnel Strip (Mobile) */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
+                    <button
+                        type="button"
+                        onClick={() => setStageFilter("ALL")}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-extrabold whitespace-nowrap border transition-colors shrink-0 ${
+                            stageFilter === "ALL"
+                                ? "bg-red-600 text-white border-red-500 shadow-xs"
+                                : "bg-surface-1 text-foreground border-border"
+                        }`}
+                    >
+                        All ({recruits.length})
+                    </button>
+                    {PIPELINE_STAGES.map((stage) => {
+                        const isSelected = stageFilter === stage;
+                        return (
+                            <button
+                                key={stage}
+                                type="button"
+                                onClick={() => setStageFilter(isSelected ? "ALL" : stage)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border transition-colors shrink-0 ${
+                                    isSelected
+                                        ? "bg-red-600 text-white border-red-500 shadow-xs"
+                                        : "bg-surface-1 text-muted-foreground border-border"
+                                }`}
+                            >
+                                {stage} ({stageCounts[stage] || 0})
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* 4. Mobile 5-Segment Position Selector Bar */}
+                <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-surface-1 border border-border">
+                    {(
+                        [
+                            { id: "ALL", label: "All" },
+                            { id: "GK", label: "GK" },
+                            { id: "DEF", label: "DEF" },
+                            { id: "MID", label: "MID" },
+                            { id: "FWD", label: "FWD" },
+                        ] as const
+                    ).map((posTab) => (
+                        <button
+                            key={posTab.id}
+                            type="button"
+                            onClick={() => setPositionFilter(posTab.id)}
+                            className={`py-1.5 rounded-lg text-xs font-extrabold transition-colors ${
+                                positionFilter === posTab.id
+                                    ? "bg-red-600 text-white shadow-xs"
+                                    : "text-muted-foreground hover:text-foreground"
+                            }`}
+                        >
+                            {posTab.label}
+                        </button>
+                    ))}
+                </div>
+
+                {/* 5. Mobile Search + Filter Drawer Toggle + Speed-Dial / Cards Switcher */}
+                <div className="space-y-2">
+                    <div className="flex items-center gap-1.5">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input
+                                placeholder="Search player, club, step, foot..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-8 h-9 text-xs bg-surface-1 border-border"
+                            />
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => setShowMobileFilters((v) => !v)}
+                            className={`h-9 px-2.5 rounded-xl border text-xs font-bold flex items-center gap-1 shrink-0 ${
+                                showMobileFilters || activeFilterCount > 0
+                                    ? "bg-red-600/15 text-red-400 border-red-500/40"
+                                    : "bg-surface-1 text-foreground border-border"
+                            }`}
+                        >
+                            <Filter className="h-3.5 w-3.5" />
+                            <span>Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}</span>
+                        </button>
+                        <div className="inline-flex rounded-xl border border-border bg-surface-1 p-0.5 shrink-0">
+                            <button
+                                type="button"
+                                onClick={() => setMobileViewMode("speed-dial")}
+                                className={`px-2 py-1.5 rounded-lg text-[11px] font-bold ${
+                                    mobileViewMode === "speed-dial"
+                                        ? "bg-red-600 text-white"
+                                        : "text-muted-foreground"
+                                }`}
+                                title="Compact Speed-Dial List"
+                            >
+                                List
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setMobileViewMode("cards")}
+                                className={`px-2 py-1.5 rounded-lg text-[11px] font-bold ${
+                                    mobileViewMode === "cards"
+                                        ? "bg-red-600 text-white"
+                                        : "text-muted-foreground"
+                                }`}
+                                title="Full Scouting Cards"
+                            >
+                                Cards
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Collapsible Mobile Filter Drawer */}
+                    {showMobileFilters && (
+                        <div className="p-3 rounded-2xl bg-surface-1 border border-border grid grid-cols-2 gap-2">
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold"
+                            >
+                                <option value="ALL">Free Agent &amp; Attached</option>
+                                <option value="Unattached">Free Agents Only</option>
+                                <option value="Attached">Attached Only</option>
+                            </select>
+                            <select
+                                value={footFilter}
+                                onChange={(e) => setFootFilter(e.target.value)}
+                                className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold"
+                            >
+                                <option value="ALL">Any Foot</option>
+                                <option value="Left">Left Foot</option>
+                                <option value="Right">Right Foot</option>
+                                <option value="Both">Both Feet</option>
+                            </select>
+                            <select
+                                value={minRatingFilter}
+                                onChange={(e) => setMinRatingFilter(Number(e.target.value))}
+                                className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold"
+                            >
+                                <option value={0}>Any ★ Rating</option>
+                                <option value={5}>5★ Only</option>
+                                <option value={4}>4★ &amp; Up</option>
+                                <option value={3}>3★ &amp; Up</option>
+                            </select>
+                            <select
+                                value={commuteFilter}
+                                onChange={(e) => setCommuteFilter(e.target.value)}
+                                className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold"
+                            >
+                                <option value="ALL">Any Commute</option>
+                                {COMMUTE_OPTIONS.map((c) => (
+                                    <option key={c} value={c}>
+                                        {c}
+                                    </option>
+                                ))}
+                            </select>
                             <select
                                 value={sortBy}
                                 onChange={(e) => setSortBy(e.target.value as any)}
-                                className="h-9 rounded-lg border border-border bg-surface-2 px-2.5 text-xs font-bold text-foreground"
-                                title="Sort targets by"
+                                className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold"
                             >
-                                <option value="rating">Sort: Highest ★ Rating</option>
-                                <option value="recent">Sort: Recently Updated</option>
-                                <option value="name">Sort: Name (A–Z)</option>
-                                <option value="age">Sort: Youngest First</option>
+                                <option value="rating">Sort: Highest ★</option>
+                                <option value="recent">Sort: Recent</option>
+                                <option value="name">Sort: A–Z</option>
+                                <option value="age">Sort: Youngest</option>
                             </select>
-
-                            <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5">
+                            <div className="flex items-center gap-1.5">
                                 <button
                                     type="button"
-                                    onClick={() => setViewMode("cards")}
-                                    className={`px-2.5 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                                        viewMode === "cards"
-                                            ? "bg-red-600 text-white shadow-xs"
-                                            : "text-muted-foreground hover:text-foreground"
+                                    onClick={() => setOnlyTrialists((v) => !v)}
+                                    className={`flex-1 h-8 rounded-lg border text-xs font-bold ${
+                                        onlyTrialists
+                                            ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                                            : "bg-surface-2 text-muted-foreground border-border"
                                     }`}
                                 >
-                                    <LayoutGrid className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">Cards</span>
+                                    {onlyTrialists ? "✓ On Trial" : "Trialists"}
                                 </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setViewMode("table")}
-                                    className={`px-2.5 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                                        viewMode === "table"
-                                            ? "bg-red-600 text-white shadow-xs"
-                                            : "text-muted-foreground hover:text-foreground"
-                                    }`}
-                                >
-                                    <TableIcon className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">Spreadsheet</span>
-                                </button>
+                                {activeFilterCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={resetAllFilters}
+                                        className="h-8 px-2.5 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-400 text-xs font-bold"
+                                    >
+                                        Reset
+                                    </button>
+                                )}
                             </div>
                         </div>
-                    </div>
+                    )}
+                </div>
 
-                    {/* Multi-Filter Selects Row */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-                        <select
-                            value={positionFilter}
-                            onChange={(e) => setPositionFilter(e.target.value)}
-                            className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground"
-                        >
-                            <option value="ALL">All Positions</option>
-                            <option value="GK">Goalkeepers (GK)</option>
-                            <option value="DEF">Defenders (DEF)</option>
-                            <option value="MID">Midfielders (MID)</option>
-                            <option value="FWD">Forwards (FWD)</option>
-                            {ALL_RECRUIT_POSITIONS.map((pos) => (
-                                <option key={pos} value={pos}>
-                                    Exact: {pos}
-                                </option>
-                            ))}
-                        </select>
-
-                        <select
-                            value={stageFilter}
-                            onChange={(e) => setStageFilter(e.target.value)}
-                            className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground"
-                        >
-                            <option value="ALL">All Pipeline Stages</option>
-                            {PIPELINE_STAGES.map((s) => (
-                                <option key={s} value={s}>
-                                    {s}
-                                </option>
-                            ))}
-                        </select>
-
-                        <select
-                            value={statusFilter}
-                            onChange={(e) => setStatusFilter(e.target.value)}
-                            className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground"
-                        >
-                            <option value="ALL">Free Agent &amp; Attached</option>
-                            <option value="Unattached">Free Agents Only</option>
-                            <option value="Attached">Attached Only</option>
-                        </select>
-
-                        <select
-                            value={footFilter}
-                            onChange={(e) => setFootFilter(e.target.value)}
-                            className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground"
-                        >
-                            <option value="ALL">Any Preferred Foot</option>
-                            <option value="Left">Left Footed</option>
-                            <option value="Right">Right Footed</option>
-                            <option value="Both">Both Feet</option>
-                        </select>
-
-                        <select
-                            value={minRatingFilter}
-                            onChange={(e) => setMinRatingFilter(Number(e.target.value))}
-                            className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground"
-                        >
-                            <option value={0}>Any ★ Rating</option>
-                            <option value={5}>★★★★★ (5★ Only)</option>
-                            <option value={4}>★★★★☆ (4★ &amp; Up)</option>
-                            <option value={3}>★★★☆☆ (3★ &amp; Up)</option>
-                        </select>
-
-                        <select
-                            value={commuteFilter}
-                            onChange={(e) => setCommuteFilter(e.target.value)}
-                            className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground"
-                        >
-                            <option value="ALL">Any Commute</option>
-                            {COMMUTE_OPTIONS.map((c) => (
-                                <option key={c} value={c}>
-                                    {c}
-                                </option>
-                            ))}
-                        </select>
-
-                        <div className="flex items-center gap-1.5">
-                            <button
-                                type="button"
-                                onClick={() => setOnlyTrialists((v) => !v)}
-                                className={`flex-1 h-8 px-2 rounded-lg border text-xs font-bold transition-colors truncate ${
-                                    onlyTrialists
-                                        ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
-                                        : "bg-surface-2 text-muted-foreground border-border hover:text-foreground"
-                                }`}
-                            >
-                                {onlyTrialists ? "✓ On Trial" : "Trialists"}
-                            </button>
-                            {activeFilterCount > 0 && (
-                                <button
-                                    type="button"
-                                    onClick={resetAllFilters}
-                                    className="h-8 px-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20"
-                                    title="Clear all active filters"
-                                >
-                                    <X className="h-3.5 w-3.5" />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
-                        <span>
-                            Showing <strong className="text-foreground">{filteredRecruits.length}</strong> of{" "}
-                            <strong className="text-foreground">{recruits.length}</strong> Black Book targets
-                        </span>
-                        {compareIds.length > 0 && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-amber-400 font-bold">
-                                    {compareIds.length} selected for comparison
-                                </span>
-                                <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => openComparisonModal()}
-                                    className="h-6 px-2 text-[10px] font-bold"
-                                >
-                                    Open Comparison
-                                </Button>
-                                <button
-                                    type="button"
-                                    onClick={() => setCompareIds([])}
-                                    className="text-[10px] text-muted-foreground hover:text-foreground underline"
-                                >
-                                    Clear
-                                </button>
+                {/* 6. Mobile Speed-Dial List View (Tailored for one-handed phone browsing) */}
+                {mobileViewMode === "speed-dial" && (
+                    <div className="space-y-2">
+                        {filteredRecruits.length === 0 ? (
+                            <div className="rounded-2xl bg-surface-1 border border-border p-8 text-center text-xs text-muted-foreground">
+                                No recruitment targets match your filters.
                             </div>
+                        ) : (
+                            filteredRecruits.map((recruit) => {
+                                const waUrl = formatWhatsAppUrl(
+                                    recruit.phone || "",
+                                    recruit.name,
+                                    settings.name
+                                );
+                                const isCompared = compareIds.includes(recruit.id);
+
+                                return (
+                                    <div
+                                        key={recruit.id}
+                                        className={`rounded-2xl bg-slate-950 border-2 ${getPositionBorder(
+                                            recruit.primaryPosition
+                                        )} p-3 space-y-2.5 shadow-sm`}
+                                    >
+                                        {/* Top Row: Name, Pos, Foot, Rating, and Quick Stage Dropdown */}
+                                        <div className="flex items-start justify-between gap-2">
+                                            <div
+                                                onClick={() => setEnlargedRecruit(recruit)}
+                                                className="min-w-0 flex-1 cursor-pointer"
+                                            >
+                                                <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <span className="px-1.5 py-0.5 rounded bg-red-600/20 text-red-400 border border-red-500/30 text-[10px] font-black">
+                                                        {recruit.primaryPosition}
+                                                        {recruit.secondaryPosition
+                                                            ? `/${recruit.secondaryPosition}`
+                                                            : ""}
+                                                    </span>
+                                                    <span className="text-sm font-extrabold text-white truncate">
+                                                        {recruit.name}
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-400 font-semibold">
+                                                        {recruit.age ? `${recruit.age}yo` : ""} •{" "}
+                                                        {recruit.preferredFoot || "R"} Foot
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex items-center gap-2 mt-1 flex-wrap text-[11px]">
+                                                    <span className="text-amber-400 font-bold tracking-tight">
+                                                        {"★".repeat(recruit.starRating || 3)}
+                                                    </span>
+                                                    <span className="text-slate-300 font-semibold">
+                                                        {recruit.status === "Unattached" ? (
+                                                            <span className="text-emerald-400">Free Agent</span>
+                                                        ) : (
+                                                            recruit.currentClub || "Attached"
+                                                        )}
+                                                    </span>
+                                                    {recruit.highestLevel && (
+                                                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+                                                            {recruit.highestLevel}
+                                                        </span>
+                                                    )}
+                                                    <span
+                                                        className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${getCommuteBadgeStyle(
+                                                            recruit.commutePracticality
+                                                        )}`}
+                                                    >
+                                                        {recruit.commutePracticality || "Easy / Local"}
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Stage Selector Pill */}
+                                            <select
+                                                value={
+                                                    recruit.pipelineStage ||
+                                                    (recruit.onTrial ? "On Trial" : "Scouted")
+                                                }
+                                                onChange={(e) =>
+                                                    handleQuickUpdateRecruit(recruit, {
+                                                        pipelineStage: e.target.value as RecruitPipelineStage,
+                                                    })
+                                                }
+                                                className={`rounded-lg px-2 py-1 text-[10px] font-extrabold border bg-slate-900 shrink-0 ${getPipelineBadgeStyle(
+                                                    recruit.pipelineStage
+                                                )}`}
+                                            >
+                                                {PIPELINE_STAGES.map((st) => (
+                                                    <option key={st} value={st} className="bg-slate-900 text-white">
+                                                        {st}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* Notes / Connection 1-line preview */}
+                                        {(recruit.clubConnection || recruit.notes) && (
+                                            <div
+                                                onClick={() => setEnlargedRecruit(recruit)}
+                                                className="text-[11px] text-slate-400 bg-slate-900/70 rounded-lg px-2.5 py-1.5 border border-slate-800 line-clamp-2 cursor-pointer"
+                                            >
+                                                {recruit.clubConnection && (
+                                                    <span className="text-red-400 font-semibold mr-1.5">
+                                                        🔗 {recruit.clubConnection}:
+                                                    </span>
+                                                )}
+                                                {recruit.notes}
+                                            </div>
+                                        )}
+
+                                        {/* Bottom Thumb Action Bar: WhatsApp, Call, Compare, Edit, Dossier, Sign */}
+                                        <div className="flex items-center justify-between gap-1.5 pt-0.5">
+                                            <div className="flex items-center gap-1.5">
+                                                {waUrl && (
+                                                    <a
+                                                        href={waUrl}
+                                                        target="_blank"
+                                                        rel="noreferrer"
+                                                        className="h-7 px-2.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold flex items-center gap-1"
+                                                    >
+                                                        <MessageCircle className="h-3 w-3" />
+                                                        WhatsApp
+                                                    </a>
+                                                )}
+                                                {recruit.phone && (
+                                                    <a
+                                                        href={`tel:${recruit.phone}`}
+                                                        className="h-7 px-2 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30 text-[10px] font-bold flex items-center gap-1"
+                                                    >
+                                                        <Phone className="h-3 w-3" />
+                                                    </a>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleCompareRecruit(recruit.id)}
+                                                    className={`h-7 px-2 rounded-lg border text-[10px] font-bold flex items-center gap-1 ${
+                                                        isCompared
+                                                            ? "bg-amber-500 text-slate-950 border-amber-400"
+                                                            : "bg-slate-900 text-slate-300 border-slate-800"
+                                                    }`}
+                                                >
+                                                    <GitCompare className="h-3 w-3" />
+                                                    {isCompared ? "✓" : "Cmp"}
+                                                </button>
+                                            </div>
+
+                                            <div className="flex items-center gap-1">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleEdit(recruit)}
+                                                    className="h-7 px-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-[10px] font-bold"
+                                                >
+                                                    Edit
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEnlargedRecruit(recruit)}
+                                                    className="h-7 px-2.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-[10px] font-bold"
+                                                >
+                                                    Dossier
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleSignPlayer(recruit)}
+                                                    className="h-7 px-2.5 rounded-lg bg-red-600 text-white text-[10px] font-extrabold"
+                                                >
+                                                    Sign
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })
                         )}
                     </div>
-                </CardContent>
-            </Card>
+                )}
+
+                {/* 7. Floating Mobile Comparison Bar when targets are selected */}
+                {compareIds.length > 0 && (
+                    <div className="fixed bottom-16 left-3 right-3 z-40 rounded-2xl bg-slate-950/95 backdrop-blur-md border border-amber-500/50 p-2.5 shadow-2xl flex items-center justify-between gap-2">
+                        <span className="text-xs font-extrabold text-amber-400 pl-1">
+                            {compareIds.length} {compareIds.length === 1 ? "Target" : "Targets"} Selected
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setCompareIds([])}
+                                className="h-8 px-2.5 text-xs text-slate-400"
+                            >
+                                Clear
+                            </Button>
+                            <Button
+                                size="sm"
+                                onClick={() => openComparisonModal()}
+                                className="h-8 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black"
+                            >
+                                <GitCompare className="h-3.5 w-3.5 mr-1" />
+                                Compare Side-by-Side
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
 
             {/* ================================================================= */}
-            {/* #21 VIEW MODE A: COMPACT SPREADSHEET TABLE VIEW                   */}
+            {/* DESKTOP HEADER, PIPELINE STRIP & MULTI-FILTER BAR (>= 768px)      */}
+            {/* ================================================================= */}
+            <div className="hidden md:block space-y-5">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                    <div>
+                        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                            Recruitment &amp; Manager&apos;s Black Book
+                        </h2>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                            Build your long-term player black book, track recruitment pipeline stages, compare targets &amp; export to Excel
+                        </p>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        {/* #1: Export to Excel (.xls) & CSV */}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => exportRecruitsToExcelXLS(filteredRecruits, settings.name)}
+                            className="h-9 text-xs font-bold border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
+                            title="Export filtered Black Book to a styled Microsoft Excel (.xls) spreadsheet"
+                        >
+                            <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />
+                            Export Excel (.xls)
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => exportRecruitsToCSV(filteredRecruits, settings.name)}
+                            className="h-9 text-xs font-bold border-border bg-surface-1 hover:bg-surface-2"
+                            title="Export filtered Black Book to CSV"
+                        >
+                            <Download className="h-3.5 w-3.5 mr-1.5 text-sky-500" />
+                            CSV
+                        </Button>
+
+                        {/* #2: Bulk Import from Excel / CSV */}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsImportModalOpen(true)}
+                            className="h-9 text-xs font-bold border-border bg-surface-1 hover:bg-surface-2"
+                        >
+                            <Upload className="h-3.5 w-3.5 mr-1.5 text-indigo-500" />
+                            Import Excel/CSV
+                        </Button>
+
+                        {/* #24: Side-by-Side Comparison Trigger */}
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openComparisonModal()}
+                            className="h-9 text-xs font-bold border-border bg-surface-1 hover:bg-surface-2"
+                        >
+                            <GitCompare className="h-3.5 w-3.5 mr-1.5 text-amber-500" />
+                            Compare {compareIds.length > 0 ? `(${compareIds.length})` : "Targets"}
+                        </Button>
+
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleExportPDF}
+                            className="h-9 text-xs font-bold border-border bg-surface-1 hover:bg-surface-2"
+                        >
+                            <FileDown className="h-3.5 w-3.5 mr-1.5 text-rose-500" />
+                            PDF Report
+                        </Button>
+
+                        <Button
+                            size="sm"
+                            onClick={() => setIsDialogOpen(true)}
+                            className="h-9 text-xs font-extrabold bg-red-600 hover:bg-red-700 text-white"
+                        >
+                            <Plus className="h-4 w-4 mr-1.5" />
+                            Add Target
+                        </Button>
+                    </div>
+                </div>
+
+                {/* #11: INTERACTIVE PIPELINE FUNNEL STRIP (Desktop) */}
+                <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setStageFilter("ALL")}
+                        className={`p-2.5 rounded-xl border text-left transition-all ${
+                            stageFilter === "ALL"
+                                ? "bg-red-600 text-white border-red-500 shadow-sm"
+                                : "bg-surface-1 border-border hover:border-red-500/40"
+                        }`}
+                    >
+                        <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Total Book</div>
+                        <div className="text-lg font-black mt-0.5">{recruits.length}</div>
+                    </button>
+                    {PIPELINE_STAGES.map((stage) => {
+                        const isSelected = stageFilter === stage;
+                        return (
+                            <button
+                                key={stage}
+                                type="button"
+                                onClick={() => setStageFilter(isSelected ? "ALL" : stage)}
+                                className={`p-2.5 rounded-xl border text-left transition-all ${
+                                    isSelected
+                                        ? "bg-red-600 text-white border-red-500 shadow-sm"
+                                        : "bg-surface-1 border-border hover:border-red-500/40"
+                                }`}
+                            >
+                                <div className="text-[10px] font-bold uppercase tracking-wider truncate opacity-80">
+                                    {stage}
+                                </div>
+                                <div className="text-lg font-black mt-0.5">{stageCounts[stage] || 0}</div>
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {/* #23 & #21: MULTI-FILTER BAR + VIEW SWITCHER (Desktop) */}
+                <Card className="bg-surface-1 border-border">
+                    <CardContent className="p-4 space-y-3">
+                        <div className="flex items-center justify-between gap-2.5">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    placeholder="Search by name, club, step/level, previous clubs, location, connection, phone or notes..."
+                                    className="pl-9 h-9 text-sm bg-surface-2 border-border"
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                                <select
+                                    value={sortBy}
+                                    onChange={(e) => setSortBy(e.target.value as any)}
+                                    className="h-9 rounded-lg border border-border bg-surface-2 px-2.5 text-xs font-bold text-foreground"
+                                    title="Sort targets by"
+                                >
+                                    <option value="rating">Sort: Highest ★ Rating</option>
+                                    <option value="recent">Sort: Recently Updated</option>
+                                    <option value="name">Sort: Name (A–Z)</option>
+                                    <option value="age">Sort: Youngest First</option>
+                                </select>
+
+                                <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5">
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewMode("cards")}
+                                        className={`px-2.5 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors ${
+                                            viewMode === "cards"
+                                                ? "bg-red-600 text-white shadow-xs"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        <LayoutGrid className="h-3.5 w-3.5" />
+                                        <span>Cards</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewMode("table")}
+                                        className={`px-2.5 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors ${
+                                            viewMode === "table"
+                                                ? "bg-red-600 text-white shadow-xs"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        <TableIcon className="h-3.5 w-3.5" />
+                                        <span>Spreadsheet</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-7 gap-2">
+                            <select
+                                value={positionFilter}
+                                onChange={(e) => setPositionFilter(e.target.value)}
+                                className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground"
+                            >
+                                <option value="ALL">All Positions</option>
+                                <option value="GK">Goalkeepers (GK)</option>
+                                <option value="DEF">Defenders (DEF)</option>
+                                <option value="MID">Midfielders (MID)</option>
+                                <option value="FWD">Forwards (FWD)</option>
+                                {ALL_RECRUIT_POSITIONS.map((pos) => (
+                                    <option key={pos} value={pos}>
+                                        Exact: {pos}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <select
+                                value={stageFilter}
+                                onChange={(e) => setStageFilter(e.target.value)}
+                                className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground"
+                            >
+                                <option value="ALL">All Pipeline Stages</option>
+                                {PIPELINE_STAGES.map((s) => (
+                                    <option key={s} value={s}>
+                                        {s}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <select
+                                value={statusFilter}
+                                onChange={(e) => setStatusFilter(e.target.value)}
+                                className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground"
+                            >
+                                <option value="ALL">Free Agent &amp; Attached</option>
+                                <option value="Unattached">Free Agents Only</option>
+                                <option value="Attached">Attached Only</option>
+                            </select>
+
+                            <select
+                                value={footFilter}
+                                onChange={(e) => setFootFilter(e.target.value)}
+                                className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground"
+                            >
+                                <option value="ALL">Any Preferred Foot</option>
+                                <option value="Left">Left Footed</option>
+                                <option value="Right">Right Footed</option>
+                                <option value="Both">Both Feet</option>
+                            </select>
+
+                            <select
+                                value={minRatingFilter}
+                                onChange={(e) => setMinRatingFilter(Number(e.target.value))}
+                                className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground"
+                            >
+                                <option value={0}>Any ★ Rating</option>
+                                <option value={5}>★★★★★ (5★ Only)</option>
+                                <option value={4}>★★★★☆ (4★ &amp; Up)</option>
+                                <option value={3}>★★★☆☆ (3★ &amp; Up)</option>
+                            </select>
+
+                            <select
+                                value={commuteFilter}
+                                onChange={(e) => setCommuteFilter(e.target.value)}
+                                className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold text-foreground"
+                            >
+                                <option value="ALL">Any Commute</option>
+                                {COMMUTE_OPTIONS.map((c) => (
+                                    <option key={c} value={c}>
+                                        {c}
+                                    </option>
+                                ))}
+                            </select>
+
+                            <div className="flex items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    onClick={() => setOnlyTrialists((v) => !v)}
+                                    className={`flex-1 h-8 px-2 rounded-lg border text-xs font-bold transition-colors truncate ${
+                                        onlyTrialists
+                                            ? "bg-amber-500/20 text-amber-400 border-amber-500/40"
+                                            : "bg-surface-2 text-muted-foreground border-border hover:text-foreground"
+                                    }`}
+                                >
+                                    {onlyTrialists ? "✓ On Trial" : "Trialists"}
+                                </button>
+                                {activeFilterCount > 0 && (
+                                    <button
+                                        type="button"
+                                        onClick={resetAllFilters}
+                                        className="h-8 px-2 rounded-lg border border-rose-500/30 bg-rose-500/10 text-rose-400 text-xs font-bold hover:bg-rose-500/20"
+                                        title="Clear all active filters"
+                                    >
+                                        <X className="h-3.5 w-3.5" />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
+                            <span>
+                                Showing <strong className="text-foreground">{filteredRecruits.length}</strong> of{" "}
+                                <strong className="text-foreground">{recruits.length}</strong> Black Book targets
+                            </span>
+                            {compareIds.length > 0 && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-amber-400 font-bold">
+                                        {compareIds.length} selected for comparison
+                                    </span>
+                                    <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={() => openComparisonModal()}
+                                        className="h-6 px-2 text-[10px] font-bold"
+                                    >
+                                        Open Comparison
+                                    </Button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setCompareIds([])}
+                                        className="text-[10px] text-muted-foreground hover:text-foreground underline"
+                                    >
+                                        Clear
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* ================================================================= */}
+            {/* #21 VIEW MODE A: COMPACT SPREADSHEET TABLE VIEW (Desktop Only)    */}
             {/* ================================================================= */}
             {viewMode === "table" ? (
-                <Card className="bg-surface-1 border-border overflow-hidden">
+                <Card className="hidden md:block bg-surface-1 border-border overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
                             <thead>
@@ -1284,7 +1942,7 @@ export default function RecruitmentPage() {
                 /* ================================================================= */
                 /* #21 VIEW MODE B: POSITION GROUP CARDS VIEW                        */
                 /* ================================================================= */
-                <Card className="bg-surface-1 border-border">
+                <Card className={`${mobileViewMode === "cards" ? "block" : "hidden md:block"} bg-surface-1 border-border`}>
                     <CardContent className="p-0">
                         <div className="divide-y divide-border">
                             {sections.map((section) => {
