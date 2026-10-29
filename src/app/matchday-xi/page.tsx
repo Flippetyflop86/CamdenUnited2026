@@ -2000,6 +2000,31 @@ export default function MatchdayXIPage() {
         return calculateMeetTime(nextMatch.time, -offsetMins);
     };
 
+    const getMatchSheetFileBaseName = (): string => {
+        if (nextMatch) {
+            const cleanOpponent = (nextMatch.opponent || "Opposition")
+                .trim()
+                .replace(/[\\/:*?"<>|]+/g, "")
+                .replace(/\s+/g, "-");
+            let formattedDate = (nextMatch.date || "").trim();
+            const d = new Date(nextMatch.date);
+            if (!isNaN(d.getTime())) {
+                const dd = String(d.getDate()).padStart(2, "0");
+                const mm = String(d.getMonth() + 1).padStart(2, "0");
+                const yyyy = d.getFullYear();
+                formattedDate = `${dd}-${mm}-${yyyy}`;
+            }
+            return formattedDate
+                ? `Matchsheet-vs-${cleanOpponent}-${formattedDate}`
+                : `Matchsheet-vs-${cleanOpponent}`;
+        }
+        const today = new Date();
+        const dd = String(today.getDate()).padStart(2, "0");
+        const mm = String(today.getMonth() + 1).padStart(2, "0");
+        const yyyy = today.getFullYear();
+        return `Matchsheet-${dd}-${mm}-${yyyy}`;
+    };
+
     const handleDownloadPitchGraphic = () => {
         if (!lineup) return;
         try {
@@ -2227,10 +2252,7 @@ export default function MatchdayXIPage() {
             }
 
             const link = document.createElement("a");
-            const slug = nextMatch
-                ? `vs-${nextMatch.opponent.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`
-                : "starting-xi";
-            link.download = `${settings.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${slug}.png`;
+            link.download = `${getMatchSheetFileBaseName()}.png`;
             link.href = canvas.toDataURL("image/png");
             link.click();
             showToast("Pitch Graphic PNG downloaded!");
@@ -2246,6 +2268,7 @@ export default function MatchdayXIPage() {
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;
 
+        const exportFileBaseName = getMatchSheetFileBaseName();
         const formation = FORMATIONS[lineup.formation];
         const kitColor = getEffectiveOutfieldKitColor();
         const gkColor = getEffectiveGkKitColor();
@@ -2271,7 +2294,7 @@ export default function MatchdayXIPage() {
             <!DOCTYPE html>
             <html>
             <head>
-                <title>${settings.name} - Matchday Team Sheet</title>
+                <title>${exportFileBaseName}</title>
                 <style>
                     * { box-sizing: border-box; }
                     body {
