@@ -205,6 +205,17 @@ export interface SquadDepth {
     updated_at?: string;
 }
 
+export type RecruitPipelineStage =
+    | 'Scouted'
+    | 'Contacted'
+    | 'Invited to Training'
+    | 'On Trial'
+    | 'Approach In (7-Day)'
+    | 'Keep Warm'
+    | 'Signed';
+
+export type CommutePracticality = 'Easy / Local' | 'Moderate' | 'Long Commute';
+
 export interface Recruit {
     id: string;
     name: string;
@@ -218,6 +229,15 @@ export interface Recruit {
     scoutedRole: 'Star Player' | '1st Team Player' | 'Rotation Player' | 'Back-up' | 'Prospect';
     notes: string;
     clubConnection?: string;
+    preferredFoot?: 'Right' | 'Left' | 'Both';
+    phone?: string;
+    email?: string;
+    instagram?: string;
+    highestLevel?: string;
+    previousClubs?: string;
+    starRating?: number; // 1 to 5
+    pipelineStage?: RecruitPipelineStage;
+    commutePracticality?: CommutePracticality;
     createdAt: string;
     updatedAt: string;
 }

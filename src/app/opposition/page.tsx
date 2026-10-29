@@ -35,7 +35,8 @@ import {
     Search,
     Eye,
     EyeOff,
-    ClipboardCheck
+    ClipboardCheck,
+    UserPlus
 } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
@@ -43,6 +44,7 @@ import { supabase } from "@/lib/supabase";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
+import { serializeRecruitForDb, normalizeRecruitPosition } from "@/lib/recruitment-utils";
 
 interface DangerManItem {
     id: string;
@@ -592,6 +594,53 @@ export default function OppositionReportsPage() {
         setEditedReport({
             ...editedReport,
             dangerMenList: (editedReport.dangerMenList || []).filter((item) => item.id !== id)
+        });
+    };
+
+    const [sentDangerManIds, setSentDangerManIds] = useState<Set<string>>(new Set());
+
+    const handleSendDangerManToBlackBook = async (dm: DangerManItem, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        const teamName = (activeReport.name || "Opposition").trim();
+        const rawPos = (dm.position || "ST").trim();
+        const parts = rawPos.split(/[\/,\s]+/).filter(Boolean);
+        const primaryPos = normalizeRecruitPosition(parts[0] || "ST");
+        const secondaryPos = parts.slice(1).join("/").toUpperCase();
+        const displayName = dm.name?.trim()
+            ? dm.name.trim()
+            : `${teamName} #${(dm.number || "?").replace(/^#/, "")} (${primaryPos})`;
+        const footVal: "Right" | "Left" | "Both" =
+            dm.foot === "Left" ? "Left" : dm.foot === "Both" ? "Both" : "Right";
+
+        const payload = serializeRecruitForDb({
+            name: displayName,
+            primaryPosition: primaryPos,
+            secondaryPosition: secondaryPos,
+            age: 22,
+            location: "London",
+            status: "Attached",
+            currentClub: teamName,
+            onTrial: false,
+            scoutedRole: "1st Team Player",
+            preferredFoot: footVal,
+            starRating: 4,
+            pipelineStage: "Scouted",
+            commutePracticality: "Easy / Local",
+            clubConnection: `Scouted vs ${teamName}${dm.number ? ` (#${dm.number.replace(/^#/, "")})` : ""}`,
+            notes: dm.notes
+                ? `Opposition Danger Man vs ${teamName}${dm.number ? ` (Shirt #${dm.number.replace(/^#/, "")})` : ""}: ${dm.notes}`
+                : `Standout player scouted from ${teamName} dossier.`,
+        });
+
+        const { error } = await supabase.from("recruits").insert([payload]);
+        if (error) {
+            alert("Could not send player to Recruitment Black Book: " + error.message);
+            return;
+        }
+        setSentDangerManIds((prev) => {
+            const next = new Set(prev);
+            next.add(dm.id);
+            return next;
         });
     };
 
@@ -1547,9 +1596,25 @@ export default function OppositionReportsPage() {
                                                                 {dm.name || "Key Threat"}
                                                             </span>
                                                         </div>
-                                                        <span className="text-[10px] font-bold text-muted-foreground">
-                                                            {dm.foot} foot
-                                                        </span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="text-[10px] font-bold text-muted-foreground">
+                                                                {dm.foot} foot
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => handleSendDangerManToBlackBook(dm, e)}
+                                                                disabled={sentDangerManIds.has(dm.id)}
+                                                                className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-colors flex items-center gap-1 ${
+                                                                    sentDangerManIds.has(dm.id)
+                                                                        ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                                                                        : "bg-surface-1 hover:bg-brand/10 text-brand border-brand/30"
+                                                                }`}
+                                                                title="Add this opposition player to your Recruitment Black Book"
+                                                            >
+                                                                <UserPlus className="h-2.5 w-2.5" />
+                                                                {sentDangerManIds.has(dm.id) ? "In Black Book ✓" : "+ Black Book"}
+                                                            </button>
+                                                        </div>
                                                     </div>
                                                     {dm.notes && (
                                                         <p className="text-xs text-muted-foreground leading-relaxed">
@@ -2687,6 +2752,20 @@ export default function OppositionReportsPage() {
                                                             {dm.notes || "Key threat"}
                                                         </p>
                                                     </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => handleSendDangerManToBlackBook(dm, e)}
+                                                        disabled={sentDangerManIds.has(dm.id)}
+                                                        className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-colors flex items-center gap-1 shrink-0 ${
+                                                            sentDangerManIds.has(dm.id)
+                                                                ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                                                                : "bg-surface-1 hover:bg-brand/10 text-brand border-brand/30"
+                                                        }`}
+                                                        title="Send this opposition standout to your Recruitment Black Book"
+                                                    >
+                                                        <UserPlus className="h-3 w-3" />
+                                                        {sentDangerManIds.has(dm.id) ? "In Black Book ✓" : "+ Black Book"}
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>
