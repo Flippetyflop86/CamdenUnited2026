@@ -812,14 +812,14 @@ export default function RecruitmentPage() {
                         <div>
                             <div className="flex items-center gap-2">
                                 <h2 className="text-lg font-black tracking-tight text-foreground">
-                                    Manager&apos;s Black Book
+                                    Player Recruitment
                                 </h2>
                                 <span className="px-2 py-0.5 rounded-full bg-red-600/15 text-red-400 border border-red-500/30 text-[11px] font-black">
                                     {recruits.length}
                                 </span>
                             </div>
                             <p className="text-[11px] text-muted-foreground">
-                                Pitchside scouting, speed-dial contacts &amp; pipeline CRM
+                                Pitchside scouting, trialists &amp; recruitment targets
                             </p>
                         </div>
 
@@ -1414,10 +1414,10 @@ export default function RecruitmentPage() {
                 <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                     <div>
                         <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
-                            Recruitment &amp; Manager&apos;s Black Book
+                            Player Recruitment
                         </h2>
                         <p className="text-xs sm:text-sm text-muted-foreground">
-                            Build your long-term player black book, track recruitment pipeline stages, compare targets &amp; export to Excel
+                            Track scouting targets, manage trialists, compare players &amp; export to Excel
                         </p>
                     </div>
 
@@ -1428,7 +1428,7 @@ export default function RecruitmentPage() {
                             size="sm"
                             onClick={() => exportRecruitsToExcelXLS(filteredRecruits, settings.name)}
                             className="h-9 text-xs font-bold border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10"
-                            title="Export filtered Black Book to a styled Microsoft Excel (.xls) spreadsheet"
+                            title="Export filtered recruitment list to a styled Microsoft Excel (.xls) spreadsheet"
                         >
                             <FileSpreadsheet className="h-3.5 w-3.5 mr-1.5" />
                             Export Excel (.xls)
@@ -1438,7 +1438,7 @@ export default function RecruitmentPage() {
                             size="sm"
                             onClick={() => exportRecruitsToCSV(filteredRecruits, settings.name)}
                             className="h-9 text-xs font-bold border-border bg-surface-1 hover:bg-surface-2"
-                            title="Export filtered Black Book to CSV"
+                            title="Export filtered recruitment list to CSV"
                         >
                             <Download className="h-3.5 w-3.5 mr-1.5 text-sky-500" />
                             CSV
@@ -1498,7 +1498,7 @@ export default function RecruitmentPage() {
                                 : "bg-surface-1 border-border hover:border-red-500/40"
                         }`}
                     >
-                        <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Total Book</div>
+                        <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Total Targets</div>
                         <div className="text-lg font-black mt-0.5">{recruits.length}</div>
                     </button>
                     {PIPELINE_STAGES.map((stage) => {
@@ -1683,7 +1683,7 @@ export default function RecruitmentPage() {
                         <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
                             <span>
                                 Showing <strong className="text-foreground">{filteredRecruits.length}</strong> of{" "}
-                                <strong className="text-foreground">{recruits.length}</strong> Black Book targets
+                                <strong className="text-foreground">{recruits.length}</strong> recruitment targets
                             </span>
                             {compareIds.length > 0 && (
                                 <div className="flex items-center gap-2">

@@ -63,10 +63,10 @@ const SHOWCASE_TABS: {
         label: "Club Dashboard",
         shortLabel: "Dashboard",
         url: "app.clubflow.org.uk/dashboard",
-        badge: "Weekly Command Centre",
+        badge: "Club Command Centre",
         headline: "Your entire week at a glance — form, home/away splits, next fixture, training & leaderboards.",
         description:
-            "Open ClubFlow on Monday morning and immediately see what needs attention, who is attending Thursday training, how your last match went, and who leads the squad in goals, assists, MOTM awards, and training commitment.",
+            "Log in whenever suits you and immediately see what needs attention, who is attending training, how your last match went, and who leads the squad in goals, assists, MOTM awards, and training commitment.",
     },
     {
         id: "matchday-xi",
@@ -96,14 +96,14 @@ const SHOWCASE_TABS: {
         badge: "Season Schedule",
         headline: "Every league and cup fixture, result, goalscorer, assist, and saved lineup in one timeline.",
         description:
-            "Log match results in seconds, record goals, assists, cards, and Man of the Match awards, and jump straight into the saved Matchday XI or opposition dossier for any fixture.",
+            "Log match results in seconds, record goals, assists, cards, and Man of the Match awards, and jump straight into the saved Matchday XI or opposition report for any fixture.",
     },
     {
         id: "recruitment",
-        label: "Recruitment & Trialists",
+        label: "Player Recruitment",
         shortLabel: "Recruitment",
         url: "app.clubflow.org.uk/recruitment",
-        badge: "Scouting Pipeline",
+        badge: "Player Recruitment",
         headline: "Track players you’ve watched, manage trialists in training, and convert signings to your squad.",
         description:
             "Move targets through Scouted, Contacted, Invited to Training, On Trial, and Signed stages. Keep scouting notes, star ratings, and positions organised and exportable to Excel or PDF.",
@@ -114,7 +114,7 @@ const SHOWCASE_TABS: {
         shortLabel: "Opposition",
         url: "app.clubflow.org.uk/opposition",
         badge: "Match Preparation",
-        headline: "Build structured scouting dossiers on every team in your division and flag their danger men.",
+        headline: "Build structured opposition reports on every team in your division and flag their danger men.",
         description:
             "Document how your next opponents build up in possession, defend out of possession, and set up on corners — and send standout opposition players straight to your recruitment shortlist.",
     },
@@ -123,7 +123,7 @@ const SHOWCASE_TABS: {
 const FAQ_ITEMS = [
     {
         q: "Who is ClubFlow built for?",
-        a: "ClubFlow is designed specifically for grassroots, Sunday League, Saturday amateur, and semi-professional (Step 5–7 & county league) football managers, coaches, and club secretaries who want a proper operational setup without enterprise complexity.",
+        a: "ClubFlow is designed specifically for Grassroots, Semi-Pro, and Academies — built for football managers, coaches, and club secretaries who want a proper operational setup without enterprise complexity.",
     },
     {
         q: "Does ClubFlow work on mobile as well as laptop and desktop?",
@@ -143,7 +143,7 @@ const FAQ_ITEMS = [
     },
     {
         q: "Is our club data private to our staff?",
-        a: "Yes. Your squad availability, tactical lineups, opposition scouting dossiers, recruitment targets, and financial ledgers are strictly private to your authenticated club workspace.",
+        a: "Yes. Your squad availability, tactical lineups, opposition scouting reports, recruitment targets, and financial ledgers are strictly private to your authenticated club workspace.",
     },
 ];
 
@@ -475,7 +475,7 @@ function FullDashboardPreview({
                         onClick={() => onNavigate("opposition")}
                         className="text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-2.5 py-1 rounded-lg hover:bg-indigo-100/70 transition-colors cursor-pointer"
                     >
-                        Kingswood Rovers scouting dossier updated →
+                        Kingswood Rovers opposition report updated →
                     </button>
                     <span className="text-[11px] font-semibold bg-neutral-100 text-neutral-700 px-2.5 py-1 rounded-lg">
                         2 outstanding match subs (£10)
@@ -1717,7 +1717,7 @@ function FullRecruitmentPreview() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                     <h3 className="text-lg font-black text-neutral-900">
-                        Recruitment & Trialist Pipeline
+                        Player Recruitment
                     </h3>
                     <p className="text-xs text-neutral-500">
                         Track opposition standouts, manage trialists in training, and convert signings to your squad.
@@ -1815,7 +1815,7 @@ function FullOppositionPreview() {
                 <div>
                     <div className="flex items-center gap-2">
                         <h3 className="text-lg font-black text-neutral-900">
-                            Opposition Scouting Dossier
+                            Opposition Scouting Report
                         </h3>
                         <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-50 text-amber-800 border border-amber-200">
                             vs Kingswood Rovers (Sat 14 Nov)
@@ -1830,7 +1830,7 @@ function FullOppositionPreview() {
                         Preferred Shape: 4-2-3-1
                     </span>
                     <span className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-xs font-bold flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5" /> Export PDF Dossier
+                        <FileText className="w-3.5 h-3.5" /> Export PDF Report
                     </span>
                 </div>
             </div>
@@ -2069,11 +2069,11 @@ export default function LandingPage() {
             <header className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#060911]/85 backdrop-blur-xl">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 sm:h-20 flex items-center justify-between">
                     <Link href="/" className="flex items-center gap-3 group">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-neutral-800 to-neutral-950 p-1.5 border border-white/10 shadow-lg flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-full overflow-hidden border border-white/15 shadow-lg flex items-center justify-center bg-[#060911]">
                             <img
-                                src="/logo.png"
+                                src="/clubflow-logo.png"
                                 alt="ClubFlow Logo"
-                                className="w-full h-full object-contain"
+                                className="w-full h-full object-cover"
                             />
                         </div>
                         <div className="flex flex-col">
@@ -2189,7 +2189,7 @@ export default function LandingPage() {
                     <div className="text-center max-w-4xl mx-auto">
                         <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-xs font-semibold text-neutral-300 mb-6">
                             <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                            <span>Built for Grassroots & Semi-Pro Football Clubs</span>
+                            <span>Built for Grassroots, Semi-Pro & Academy Football Clubs</span>
                         </div>
 
                         <h1 className="text-4xl sm:text-6xl lg:text-[64px] font-black tracking-tight leading-[1.06] text-white">
@@ -2330,7 +2330,7 @@ export default function LandingPage() {
                                 Built Around the Football Week
                             </div>
                             <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-                                Run your club with clarity from Monday night to Saturday kick-off.
+                                Run your club with clarity all week through to matchday.
                             </h2>
                             <p className="mt-3 text-base text-neutral-400">
                                 Designed for managers and coaches who want everything in one structured system instead of scattered spreadsheets, notes apps, and group chats.
@@ -2351,7 +2351,7 @@ export default function LandingPage() {
                                     </p>
                                 </div>
                                 <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-bold text-neutral-300">
-                                    <span>Matchday XI • Opposition Dossiers</span>
+                                    <span>Matchday XI • Opposition Report</span>
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -2405,7 +2405,7 @@ export default function LandingPage() {
                                         3. Keep everything organised
                                     </h3>
                                     <p className="mt-2.5 text-sm text-neutral-400 leading-relaxed">
-                                        Manage your recruitment pipeline, trialists, league table form guide, match subs, and club fines in one clean workspace that works on both laptop and phone.
+                                        Manage your recruitment, trialists, league table form guide, match subs, and club fines in one clean workspace that works on both laptop and phone.
                                     </p>
                                 </div>
                                 <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-bold text-neutral-300">
@@ -2820,8 +2820,8 @@ export default function LandingPage() {
                                 },
                                 {
                                     icon: Target,
-                                    title: "Recruitment & Trialist Pipeline",
-                                    desc: "Manage scouting targets across 5 pipeline stages, rate trialists in training, and export your shortlist to Excel or PDF.",
+                                    title: "Player Recruitment",
+                                    desc: "Manage scouting targets across 5 stages, rate trialists in training, and export your shortlist to Excel or PDF.",
                                 },
                                 {
                                     icon: Coins,
@@ -2940,9 +2940,13 @@ export default function LandingPage() {
             <footer className="border-t border-white/[0.08] py-10 px-4 sm:px-6 lg:px-8 bg-[#05070e]">
                 <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">
                     <div className="flex items-center gap-2.5">
-                        <img src="/logo.png" alt="ClubFlow" className="w-5 h-5 object-contain" />
+                        <img
+                            src="/clubflow-logo.png"
+                            alt="ClubFlow"
+                            className="w-6 h-6 rounded-full object-cover"
+                        />
                         <span className="font-bold text-neutral-300">ClubFlow</span>
-                        <span>• Grassroots & Semi-Pro Football Operations Platform</span>
+                        <span>• Grassroots, Semi-Pro & Academy Football Operations</span>
                     </div>
                     <div className="flex items-center gap-6">
                         <a href="#preview" className="hover:text-neutral-300">
