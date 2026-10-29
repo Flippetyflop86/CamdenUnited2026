@@ -58,7 +58,7 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
             let goalsAdded = 0;
             
             for (const line of lines) {
-                const cleanLine = line.toLowerCase().replace(/[^a-z0-9\s]/g, ' ');
+                const cleanLine = line.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim();
                 const isUnusedSubLine = /\bsub\s+n\b/i.test(line) || /\bunused\b/i.test(line);
                 const isUsedSubLine = !isUnusedSubLine && (/\bsub\s+y\b/i.test(line) || /\bsub\b/i.test(line));
                 const inferredType: 'STARTER' | 'SUB' | 'UNUSED_SUB' = isUnusedSubLine
@@ -68,55 +68,91 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
                     : 'STARTER';
                 const inferredMins = inferredType === 'UNUSED_SUB' ? 0 : inferredType === 'SUB' ? 30 : 90;
 
-                for (const p of players) {
-                    const fullName = `${p.first_name.toLowerCase()} ${p.last_name.toLowerCase()}`;
-                    const initialLastName = `${p.first_name[0]?.toLowerCase()} ${p.last_name.toLowerCase()}`;
-                    
-                    if (cleanLine.includes(fullName) || cleanLine.includes(initialLastName) || cleanLine.includes(p.last_name.toLowerCase())) {
-                        let stat = stats.find(s => s.player_id === p.id);
-                        if (!stat) {
-                            const newStat = {
-                                match_id: matchId,
-                                player_id: p.id,
-                                goals: 0,
-                                assists: 0,
-                                yellow_cards: 0,
-                                red_cards: 0,
-                                minutes_played: inferredMins,
-                                participation_type: inferredType,
-                                sub_events: [],
-                            };
-                            const { data, error } = await supabase.from('match_player_stats').insert([newStat]).select().single();
-                            if (data) {
-                                stats.push(data);
-                                setStats([...stats]);
-                                stat = data;
-                            }
-                        }
-                        
-                        if (stat) {
-                            const goalEmojis = (line.match(/⚽/g) || []).length;
-                            let additionalGoals = goalEmojis;
+                const findMatchingPlayer = (rowText: string) => {
+                    const padded = ` ${rowText} `;
+                    // 1. Full name or FirstInitial + LastName or LastName + FirstInitial
+                    for (const p of players) {
+                        const first = (p.first_name || '').toLowerCase().trim();
+                        const last = (p.last_name || '').toLowerCase().trim();
+                        if (!first || !last) continue;
+                        const fInit = first[0];
+                        const lastTokens = last.split(/\s+/);
+                        const baseSurname = lastTokens[lastTokens.length - 1];
 
-                            const lineLower = line.toLowerCase();
-                            if (lineLower.includes('goal')) {
-                                const countMatch = line.match(/\((\d+)\)/) || line.match(/goals?\s*(\d+)/i) || line.match(/(\d+)\s*goals?/i);
-                                if (countMatch) {
-                                    additionalGoals = parseInt(countMatch[1]);
-                                } else if (additionalGoals === 0) {
-                                    additionalGoals = 1;
-                                }
-                            }
-
-                            if (additionalGoals > 0) {
-                                await supabase.from('match_player_stats').update({ goals: additionalGoals }).eq('id', stat.id);
-                                goalsAdded += additionalGoals;
-                            }
+                        const patterns = [
+                            ` ${first} ${last} `,
+                            ` ${fInit} ${last} `,
+                            ` ${last} ${fInit} `,
+                            ` ${fInit} ${baseSurname} `,
+                            ` ${baseSurname} ${fInit} `,
+                        ];
+                        if (patterns.some(pat => padded.includes(pat))) {
+                            return p;
                         }
-                        
-                        matchedCount++;
-                        break;
                     }
+                    // 2. Unique surname fallback (only when only 1 player has that surname)
+                    for (const p of players) {
+                        const last = (p.last_name || '').toLowerCase().trim();
+                        if (!last) continue;
+                        const baseSurname = last.split(/\s+/).pop()!;
+                        if (padded.includes(` ${last} `) || padded.includes(` ${baseSurname} `)) {
+                            const sameSurnameCount = players.filter(other => {
+                                const oLast = (other.last_name || '').toLowerCase().trim();
+                                return oLast === last || oLast.split(/\s+/).pop() === baseSurname;
+                            }).length;
+                            if (sameSurnameCount === 1) {
+                                return p;
+                            }
+                        }
+                    }
+                    return null;
+                };
+
+                const matchedPlayer = findMatchingPlayer(cleanLine);
+                if (matchedPlayer) {
+                    const p = matchedPlayer;
+                    let stat = stats.find(s => s.player_id === p.id);
+                    if (!stat) {
+                        const newStat = {
+                            match_id: matchId,
+                            player_id: p.id,
+                            goals: 0,
+                            assists: 0,
+                            yellow_cards: 0,
+                            red_cards: 0,
+                            minutes_played: inferredMins,
+                            participation_type: inferredType,
+                            sub_events: [],
+                        };
+                        const { data } = await supabase.from('match_player_stats').insert([newStat]).select().single();
+                        if (data) {
+                            stats.push(data);
+                            setStats([...stats]);
+                            stat = data;
+                        }
+                    }
+                    
+                    if (stat) {
+                        const goalEmojis = (line.match(/⚽/g) || []).length;
+                        let additionalGoals = goalEmojis;
+
+                        const lineLower = line.toLowerCase();
+                        if (lineLower.includes('goal')) {
+                            const countMatch = line.match(/\((\d+)\)/) || line.match(/goals?\s*(\d+)/i) || line.match(/(\d+)\s*goals?/i);
+                            if (countMatch) {
+                                additionalGoals = parseInt(countMatch[1]);
+                            } else if (additionalGoals === 0) {
+                                additionalGoals = 1;
+                            }
+                        }
+
+                        if (additionalGoals > 0) {
+                            await supabase.from('match_player_stats').update({ goals: additionalGoals }).eq('id', stat.id);
+                            goalsAdded += additionalGoals;
+                        }
+                    }
+                    
+                    matchedCount++;
                 }
             }
             alert(`Successfully imported statistics!\n\nAdded/matched ${matchedCount} players.\nGoals logged: ${goalsAdded}.`);
@@ -240,7 +276,7 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
         const newStats = [];
         for (const sId of lineupStarters) {
             if (!stats.find(s => s.player_id === sId)) {
-                newStats.push({ match_id: matchId, player_id: sId, goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90 });
+                newStats.push({ match_id: matchId, player_id: sId, goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90, participation_type: 'STARTER' as const });
             }
         }
         if (newStats.length > 0) {

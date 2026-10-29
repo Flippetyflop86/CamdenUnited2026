@@ -33,14 +33,40 @@ export async function POST(request: Request) {
 
         const foundStats: Record<string, { goals: number, assists: number, yellow_cards: number, red_cards: number, minutes_played: number, participation_type: 'STARTER' | 'SUB' | 'UNUSED_SUB' }> = {};
 
-        // Helper to find a player ID by name
+        // Helper to find a player ID by name (supports "FirstName LastName", "F LastName", "LastName F", and unique surname)
         const matchPlayer = (text: string) => {
-            const cleanText = text.toLowerCase().replace(/[^a-z -]/g, '');
+            const cleanText = text.toLowerCase().replace(/[^a-z -]/g, ' ').replace(/\s+/g, ' ').trim();
+            const padded = ` ${cleanText} `;
             for (const p of players) {
-                const fullName = `${p.first_name.toLowerCase()} ${p.last_name.toLowerCase()}`;
-                const initialLastName = `${p.first_name[0]?.toLowerCase()} ${p.last_name.toLowerCase()}`;
-                if (cleanText.includes(fullName) || cleanText.includes(initialLastName) || cleanText === p.last_name.toLowerCase()) {
+                const first = (p.first_name || '').toLowerCase().trim();
+                const last = (p.last_name || '').toLowerCase().trim();
+                if (!first || !last) continue;
+                const fInit = first[0];
+                const baseSurname = last.split(/\s+/).pop()!;
+
+                const patterns = [
+                    ` ${first} ${last} `,
+                    ` ${fInit} ${last} `,
+                    ` ${last} ${fInit} `,
+                    ` ${fInit} ${baseSurname} `,
+                    ` ${baseSurname} ${fInit} `,
+                ];
+                if (patterns.some(pat => padded.includes(pat))) {
                     return p.id;
+                }
+            }
+            for (const p of players) {
+                const last = (p.last_name || '').toLowerCase().trim();
+                if (!last) continue;
+                const baseSurname = last.split(/\s+/).pop()!;
+                if (padded.includes(` ${last} `) || padded.includes(` ${baseSurname} `)) {
+                    const sameSurnameCount = players.filter(other => {
+                        const oLast = (other.last_name || '').toLowerCase().trim();
+                        return oLast === last || oLast.split(/\s+/).pop() === baseSurname;
+                    }).length;
+                    if (sameSurnameCount === 1) {
+                        return p.id;
+                    }
                 }
             }
             return null;

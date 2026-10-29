@@ -1166,30 +1166,53 @@ export default function MatchdayXIPage() {
             [playerId]: nextEventsForPlayer
         }));
 
+        const starterIdSet = new Set<string>(
+            Object.values(lineup.starters || {}).filter((id): id is string => Boolean(id))
+        );
+        const isStarter = starterIdSet.has(playerId);
+        const hasAnyEvent =
+            nextEventsForPlayer.goals > 0 ||
+            nextEventsForPlayer.assists > 0 ||
+            nextEventsForPlayer.yellowCards > 0 ||
+            nextEventsForPlayer.redCards > 0;
+
+        const nextUsedSubstitutes = new Set<string>(lineup.usedSubstitutes || []);
+        if (!isStarter && hasAnyEvent) {
+            nextUsedSubstitutes.add(playerId);
+        }
+
         const updated: MatchdayXI = {
             ...lineup,
+            usedSubstitutes: Array.from(nextUsedSubstitutes),
             matchEvents: nextMatchEvents,
             updatedAt: new Date().toISOString()
         };
         setLineup(updated);
         await saveLineup(updated);
 
-        // Also sync directly to match_player_stats in Supabase if it's a real squad player (#10)
-        if (selectedMatchId && !playerId.startsWith("trialist-")) {
+        // Also sync directly to match_player_stats in Supabase if it's a real squad player and match is completed (#10)
+        const currentMatch = matches.find(m => m.id === selectedMatchId);
+        if (selectedMatchId && !playerId.startsWith("trialist-") && currentMatch && currentMatch.result !== "Pending") {
             try {
                 const { data: existingRows } = await supabase
                     .from('match_player_stats')
-                    .select('id')
+                    .select('id, minutes_played')
                     .eq('match_id', selectedMatchId)
                     .eq('player_id', playerId)
                     .limit(1);
 
-                const payload = {
+                const payload: Record<string, any> = {
                     goals: nextEventsForPlayer.goals,
                     assists: nextEventsForPlayer.assists,
                     yellow_cards: nextEventsForPlayer.yellowCards,
                     red_cards: nextEventsForPlayer.redCards
                 };
+                if (!isStarter && hasAnyEvent) {
+                    payload.participation_type = 'SUB';
+                    if (!existingRows?.[0]?.minutes_played || Number(existingRows[0].minutes_played) === 0) {
+                        payload.minutes_played = 30;
+                    }
+                }
 
                 if (existingRows && existingRows.length > 0) {
                     await supabase
@@ -1202,7 +1225,8 @@ export default function MatchdayXIPage() {
                         .insert([{
                             match_id: selectedMatchId,
                             player_id: playerId,
-                            minutes_played: 90,
+                            minutes_played: isStarter ? 90 : 30,
+                            participation_type: isStarter ? 'STARTER' : 'SUB',
                             ...payload
                         }]);
                 }
@@ -1211,7 +1235,7 @@ export default function MatchdayXIPage() {
             } catch (err) {
                 console.warn("Error syncing match event stat:", err);
             }
-        } else if (selectedMatchId) {
+        } else if (selectedMatchId && currentMatch && currentMatch.result !== "Pending") {
             await syncMatchGoalsAndAssistsEverywhere(selectedMatchId);
         }
     };

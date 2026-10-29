@@ -66,17 +66,30 @@ export function matchTokenToPlayer(tokenName: string, players: SimplePlayerRef[]
         return lastMatches[0];
     }
 
-    // 3. Initial + partial last name match
-    const dotParts = clean.split(/[\.\s]+/);
-    if (dotParts.length >= 2 && dotParts[0].length === 1) {
-        const initial = dotParts[0];
-        const restLast = dotParts.slice(1).join(" ");
-        const initMatches = players.filter(p => {
-            const first = (p.first_name ?? p.firstName ?? "").trim().toLowerCase();
-            const last = (p.last_name ?? p.lastName ?? "").trim().toLowerCase();
-            return first.startsWith(initial) && last === restLast;
-        });
-        if (initMatches.length >= 1) return initMatches[0];
+    // 3. Initial + partial last name match ("k.ali", "k ali") OR "lastname initial" ("ali k", "feka e")
+    const dotParts = clean.split(/[\.\s]+/).filter(Boolean);
+    if (dotParts.length >= 2) {
+        if (dotParts[0].length === 1) {
+            const initial = dotParts[0];
+            const restLast = dotParts.slice(1).join(" ");
+            const initMatches = players.filter(p => {
+                const first = (p.first_name ?? p.firstName ?? "").trim().toLowerCase();
+                const last = (p.last_name ?? p.lastName ?? "").trim().toLowerCase();
+                return first.startsWith(initial) && (last === restLast || last.endsWith(` ${restLast}`));
+            });
+            if (initMatches.length >= 1) return initMatches[0];
+        }
+        const lastToken = dotParts[dotParts.length - 1];
+        if (lastToken.length === 1) {
+            const initial = lastToken;
+            const restLast = dotParts.slice(0, -1).join(" ");
+            const initMatches = players.filter(p => {
+                const first = (p.first_name ?? p.firstName ?? "").trim().toLowerCase();
+                const last = (p.last_name ?? p.lastName ?? "").trim().toLowerCase();
+                return first.startsWith(initial) && (last === restLast || last.endsWith(` ${restLast}`));
+            });
+            if (initMatches.length >= 1) return initMatches[0];
+        }
     }
 
     return undefined;
@@ -574,6 +587,21 @@ export function computeLineupParticipation(parsedLineup: any): Map<string, Lineu
         }
     });
 
+    // Also treat any bench player who recorded a goal, assist, yellow card, or red card in matchEvents as a used substitute
+    const matchEvents = parsedLineup.matchEvents || {};
+    Object.entries(matchEvents).forEach(([pid, ev]: [string, any]) => {
+        if (!isRealPlayerId(pid) || starterSet.has(pid)) return;
+        const hasEvent =
+            (Number(ev?.goals) || 0) > 0 ||
+            (Number(ev?.assists) || 0) > 0 ||
+            (Number(ev?.yellowCards) || 0) > 0 ||
+            (Number(ev?.redCards) || 0) > 0;
+        if (hasEvent) {
+            usedSubSet.add(pid);
+            benchSubSet.add(pid);
+        }
+    });
+
     // Calculate minutes played using a chronological substitution timeline
     const minutesMap = new Map<string, number>();
     const onPitchSince = new Map<string, number>();
@@ -635,8 +663,6 @@ export function computeLineupParticipation(parsedLineup: any): Map<string, Lineu
             }
         }
     });
-
-    const matchEvents = parsedLineup.matchEvents || {};
 
     starterSet.forEach((id) => {
         const ev = matchEvents[id] || {};

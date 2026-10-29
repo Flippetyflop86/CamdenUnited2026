@@ -44,6 +44,7 @@ export function QuickResultScorersModal({
         subs: new Set(),
         starterOrder: []
     });
+    const [usedSubs, setUsedSubs] = useState<Set<string>>(new Set());
     const [search, setSearch] = useState("");
     const [filterTab, setFilterTab] = useState<"active" | "all">("active");
     const [isLoading, setIsLoading] = useState(false);
@@ -79,6 +80,7 @@ export function QuickResultScorersModal({
         // Extract lineup starters & subs from freshMatch.notes or m.rawNotes or m.lineup
         const starterSet = new Set<string>();
         const subSet = new Set<string>();
+        const initialUsedSubs = new Set<string>();
         const starterOrder: string[] = [];
 
         const rawNotesStr = freshMatch?.notes || (m as any).rawNotes || m.notes || "";
@@ -102,7 +104,16 @@ export function QuickResultScorersModal({
                 if (id && typeof id === "string" && !id.startsWith("trialist-")) subSet.add(id);
             });
             (parsedLineup.usedSubstitutes || []).forEach((id: any) => {
-                if (id && typeof id === "string" && !id.startsWith("trialist-") && !starterSet.has(id)) subSet.add(id);
+                if (id && typeof id === "string" && !id.startsWith("trialist-") && !starterSet.has(id)) {
+                    subSet.add(id);
+                    initialUsedSubs.add(id);
+                }
+            });
+            (parsedLineup.substitutions || []).forEach((sub: any) => {
+                if (sub?.subId && typeof sub.subId === "string" && !sub.subId.startsWith("trialist-") && !starterSet.has(sub.subId)) {
+                    subSet.add(sub.subId);
+                    initialUsedSubs.add(sub.subId);
+                }
             });
         }
         setLineupIds({ starters: starterSet, subs: subSet, starterOrder });
@@ -141,7 +152,14 @@ export function QuickResultScorersModal({
             if (row.player_id && (Number(row.assists) || 0) > 0) {
                 aMap[row.player_id] = Number(row.assists);
             }
+            if (row.player_id && subSet.has(row.player_id)) {
+                const pt = String(row.participation_type || "").toUpperCase();
+                if (pt === "SUB" || (Number(row.goals) || 0) > 0 || (Number(row.assists) || 0) > 0) {
+                    initialUsedSubs.add(row.player_id);
+                }
+            }
         });
+        setUsedSubs(initialUsedSubs);
 
         // Check for manual/unmatched tokens (e.g. "Own Goal")
         const parsedGoalTokens = parseStatTextString(goalscorersText, pList);
@@ -191,6 +209,13 @@ export function QuickResultScorersModal({
     }, [playerAssists, extraManualAssists]);
 
     const adjustPlayerStat = (playerId: string, type: "goals" | "assists", delta: number) => {
+        if (delta > 0 && lineupIds.subs.has(playerId) && !lineupIds.starters.has(playerId)) {
+            setUsedSubs(prev => {
+                const next = new Set(prev);
+                next.add(playerId);
+                return next;
+            });
+        }
         if (type === "goals") {
             setPlayerGoals(prev => {
                 const nextVal = Math.max(0, (prev[playerId] || 0) + delta);
@@ -208,6 +233,15 @@ export function QuickResultScorersModal({
                 return copy;
             });
         }
+    };
+
+    const toggleSubUsed = (playerId: string) => {
+        setUsedSubs(prev => {
+            const next = new Set(prev);
+            if (next.has(playerId)) next.delete(playerId);
+            else next.add(playerId);
+            return next;
+        });
     };
 
     const matchdaySquadCount = useMemo(() => {
@@ -254,6 +288,33 @@ export function QuickResultScorersModal({
             const aTrim = awayGoals.trim();
             const newScoreline = (hTrim !== "" && aTrim !== "") ? `${hTrim} - ${aTrim}` : "";
 
+            // Update usedSubstitutes inside [Lineup: {...}] if a lineup exists in matches.notes
+            const { data: freshMatchRow } = await supabase
+                .from("matches")
+                .select("notes")
+                .eq("id", match.id)
+                .single();
+
+            if (freshMatchRow?.notes) {
+                const extracted = extractLineupFromRawNotes(freshMatchRow.notes);
+                if (extracted.parsedLineup) {
+                    const updatedUsedSubs = new Set<string>(Array.from(usedSubs));
+                    lineupIds.subs.forEach(pid => {
+                        if ((playerGoals[pid] || 0) > 0 || (playerAssists[pid] || 0) > 0) {
+                            updatedUsedSubs.add(pid);
+                        }
+                    });
+                    const updatedLineup = {
+                        ...extracted.parsedLineup,
+                        usedSubstitutes: Array.from(updatedUsedSubs)
+                    };
+                    const newNotes = extracted.cleanNotes
+                        ? `${extracted.cleanNotes}\n\n[Lineup: ${JSON.stringify(updatedLineup)}]`
+                        : `[Lineup: ${JSON.stringify(updatedLineup)}]`;
+                    await supabase.from("matches").update({ notes: newNotes }).eq("id", match.id);
+                }
+            }
+
             // Fetch existing match_player_stats for this match
             const { data: existingRows } = await supabase
                 .from("match_player_stats")
@@ -264,7 +325,8 @@ export function QuickResultScorersModal({
             const allPlayerIdsToTouch = new Set<string>([
                 ...rows.map((r: any) => r.player_id),
                 ...Object.keys(playerGoals),
-                ...Object.keys(playerAssists)
+                ...Object.keys(playerAssists),
+                ...Array.from(lineupIds.subs)
             ]);
 
             for (const pid of allPlayerIdsToTouch) {
@@ -272,14 +334,20 @@ export function QuickResultScorersModal({
                 const g = playerGoals[pid] || 0;
                 const a = playerAssists[pid] || 0;
                 const existing = rows.find((r: any) => r.player_id === pid);
+                const isSub = lineupIds.subs.has(pid) && !lineupIds.starters.has(pid);
+                const isSubUsed = isSub && (usedSubs.has(pid) || g > 0 || a > 0);
 
                 if (existing) {
+                    const updatePayload: Record<string, any> = { goals: g, assists: a };
+                    if (isSub) {
+                        updatePayload.participation_type = isSubUsed ? "SUB" : "UNUSED_SUB";
+                        updatePayload.minutes_played = isSubUsed ? (Number(existing.minutes_played) > 0 ? Number(existing.minutes_played) : 30) : 0;
+                    }
                     await supabase
                         .from("match_player_stats")
-                        .update({ goals: g, assists: a })
+                        .update(updatePayload)
                         .eq("id", existing.id);
-                } else if (g > 0 || a > 0) {
-                    const isSub = lineupIds.subs.has(pid) && !lineupIds.starters.has(pid);
+                } else if (g > 0 || a > 0 || isSubUsed) {
                     await supabase
                         .from("match_player_stats")
                         .insert([{
@@ -487,6 +555,7 @@ export function QuickResultScorersModal({
                                     const a = playerAssists[p.id] || 0;
                                     const isStarter = lineupIds.starters.has(p.id);
                                     const isSub = lineupIds.subs.has(p.id);
+                                    const isSubUsed = isSub && !isStarter && (usedSubs.has(p.id) || g > 0 || a > 0);
 
                                     return (
                                         <div
@@ -506,9 +575,18 @@ export function QuickResultScorersModal({
                                                     </span>
                                                 )}
                                                 {!isStarter && isSub && (
-                                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-sky-100/90 dark:bg-sky-500/15 text-sky-800 dark:text-sky-300 border border-sky-400/70 dark:border-sky-500/30 shrink-0">
-                                                        SUB
-                                                    </span>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => toggleSubUsed(p.id)}
+                                                        title="Click to toggle whether this substitute came onto the pitch"
+                                                        className={`text-[9px] font-bold px-1.5 py-0.5 rounded border transition-colors shrink-0 ${
+                                                            isSubUsed
+                                                                ? "bg-sky-500 text-white border-sky-600 shadow-xs"
+                                                                : "bg-surface-1 text-muted-foreground border-border hover:border-sky-400/60 hover:text-sky-600 dark:hover:text-sky-400"
+                                                        }`}
+                                                    >
+                                                        {isSubUsed ? "SUB: USED ✓" : "SUB: UNUSED"}
+                                                    </button>
                                                 )}
                                             </div>
 
