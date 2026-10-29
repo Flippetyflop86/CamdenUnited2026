@@ -240,15 +240,75 @@ export async function syncMatchGoalsAndAssistsEverywhere(
         }
     });
 
-    // Also check if lineup in matches.notes has trialist goals/assists or needs its matchEvents updated
+    // Also check if lineup in matches.notes has trialist goals/assists, needs its matchEvents updated,
+    // or has starters / used substitutes that haven't been synced into match_player_stats yet
     const normalizedNotesInfo = normalizeMatchNotesString(matchRow?.notes || "");
     let updatedNotes = normalizedNotesInfo.normalized;
+    const effectiveScoreline = options?.overrideScoreline !== undefined
+        ? options.overrideScoreline.trim()
+        : (matchRow?.scoreline || "");
+    const effectiveOutcome = options?.overrideScoreline !== undefined
+        ? computeMatchOutcome(effectiveScoreline, Boolean(matchRow?.is_home ?? true))
+        : (matchRow?.result || "Pending");
+    const isCompletedMatch = effectiveOutcome !== "Pending" || Boolean(effectiveScoreline && effectiveScoreline.includes("-"));
+
     if (updatedNotes.includes("[Lineup: ")) {
         const extracted = extractLineupFromRawNotes(updatedNotes);
         if (extracted.parsedLineup) {
             try {
                 const parsedLineup = extracted.parsedLineup;
                 const nextMatchEvents: Record<string, any> = { ...(parsedLineup.matchEvents || {}) };
+
+                // If the match is completed, ensure all starters and used substitutes from the lineup
+                // exist in match_player_stats with accurate participation_type ('STARTER' | 'SUB') and minutes_played
+                if (isCompletedMatch) {
+                    const participationMap = computeLineupParticipation(parsedLineup);
+                    for (const [pid, part] of participationMap.entries()) {
+                        if (part.participationType === "UNUSED_SUB") continue;
+                        const existingStat = currentStats.find((r: any) => r.player_id === pid);
+                        const ev = nextMatchEvents[pid];
+                        if (!existingStat) {
+                            const newRowPayload = {
+                                match_id: matchId,
+                                player_id: pid,
+                                goals: Number(ev?.goals) || 0,
+                                assists: Number(ev?.assists) || 0,
+                                yellow_cards: Number(ev?.yellowCards) || 0,
+                                red_cards: Number(ev?.redCards) || 0,
+                                minutes_played: part.minutesPlayed,
+                                participation_type: part.participationType,
+                                sub_events: part.subEvents,
+                            };
+                            const { data: inserted } = await supabase
+                                .from("match_player_stats")
+                                .insert([newRowPayload])
+                                .select()
+                                .single();
+                            if (inserted) {
+                                currentStats.push(inserted);
+                                if (inserted.goals > 0) goalCounts[pid] = Number(inserted.goals);
+                                if (inserted.assists > 0) assistCounts[pid] = Number(inserted.assists);
+                            }
+                        } else if (
+                            existingStat.participation_type !== part.participationType ||
+                            (part.participationType === "SUB" && (existingStat.minutes_played ?? 0) === 0 && part.minutesPlayed > 0)
+                        ) {
+                            const nextMins =
+                                part.participationType === "SUB" && (existingStat.minutes_played === 0 || existingStat.minutes_played === 90)
+                                    ? part.minutesPlayed
+                                    : (existingStat.minutes_played ?? part.minutesPlayed);
+                            await supabase
+                                .from("match_player_stats")
+                                .update({
+                                    participation_type: part.participationType,
+                                    minutes_played: nextMins,
+                                })
+                                .eq("id", existingStat.id);
+                            existingStat.participation_type = part.participationType;
+                            existingStat.minutes_played = nextMins;
+                        }
+                    }
+                }
 
                 // Sync real player stats into lineup.matchEvents
                 currentStats.forEach((row: any) => {
@@ -458,3 +518,166 @@ export async function ensureStatsHydratedFromMatchText(
 
     return changed;
 }
+
+export interface LineupPlayerParticipation {
+    participationType: "STARTER" | "SUB" | "UNUSED_SUB";
+    minutesPlayed: number;
+    subEvents: { type: "on" | "off"; minute: number }[];
+    goals: number;
+    assists: number;
+    yellowCards: number;
+    redCards: number;
+}
+
+/**
+ * Computes accurate player participation (`STARTER`, `SUB`, `UNUSED_SUB`) and `minutesPlayed`
+ * from a parsed `[Lineup: {...}]` JSON object (`starters`, `substitutes`, `usedSubstitutes`, `substitutions`, `matchEvents`).
+ */
+export function computeLineupParticipation(parsedLineup: any): Map<string, LineupPlayerParticipation> {
+    const result = new Map<string, LineupPlayerParticipation>();
+    if (!parsedLineup || typeof parsedLineup !== "object") return result;
+
+    const isRealPlayerId = (id: any): id is string =>
+        Boolean(id && typeof id === "string" && !id.startsWith("trialist-"));
+
+    const starterSet = new Set<string>();
+    const usedSubSet = new Set<string>();
+    const benchSubSet = new Set<string>();
+
+    if (parsedLineup.starters && typeof parsedLineup.starters === "object") {
+        Object.values(parsedLineup.starters).forEach((id: any) => {
+            if (isRealPlayerId(id)) starterSet.add(id);
+        });
+    }
+
+    if (Array.isArray(parsedLineup.substitutes)) {
+        parsedLineup.substitutes.forEach((id: any) => {
+            if (isRealPlayerId(id) && !starterSet.has(id)) benchSubSet.add(id);
+        });
+    }
+
+    if (Array.isArray(parsedLineup.usedSubstitutes)) {
+        parsedLineup.usedSubstitutes.forEach((id: any) => {
+            if (isRealPlayerId(id) && !starterSet.has(id)) {
+                usedSubSet.add(id);
+                benchSubSet.add(id);
+            }
+        });
+    }
+
+    // Also treat any player with a substitution record (`subId`) as a used substitute
+    const rawSubs: any[] = Array.isArray(parsedLineup.substitutions) ? parsedLineup.substitutions : [];
+    rawSubs.forEach((sub: any) => {
+        if (isRealPlayerId(sub?.subId) && !starterSet.has(sub.subId)) {
+            usedSubSet.add(sub.subId);
+            benchSubSet.add(sub.subId);
+        }
+    });
+
+    // Calculate minutes played using a chronological substitution timeline
+    const minutesMap = new Map<string, number>();
+    const onPitchSince = new Map<string, number>();
+    const subEventsMap = new Map<string, { type: "on" | "off"; minute: number }[]>();
+
+    starterSet.forEach((id) => {
+        onPitchSince.set(id, 0);
+        minutesMap.set(id, 0);
+        subEventsMap.set(id, []);
+    });
+
+    usedSubSet.forEach((id) => {
+        minutesMap.set(id, 0);
+        subEventsMap.set(id, []);
+    });
+
+    const sortedSubs = [...rawSubs]
+        .filter((sub) => sub && sub.subId)
+        .sort((a, b) => (Number(a.minute) || 60) - (Number(b.minute) || 60));
+
+    sortedSubs.forEach((sub) => {
+        const subMin = Number(sub.minute) || 60;
+
+        if (isRealPlayerId(sub.replacedId) && onPitchSince.has(sub.replacedId)) {
+            const startedAt = onPitchSince.get(sub.replacedId)!;
+            const played = Math.max(0, subMin - startedAt);
+            minutesMap.set(sub.replacedId, (minutesMap.get(sub.replacedId) || 0) + played);
+            onPitchSince.delete(sub.replacedId);
+            const evs = subEventsMap.get(sub.replacedId) || [];
+            evs.push({ type: "off", minute: subMin });
+            subEventsMap.set(sub.replacedId, evs);
+        }
+
+        if (isRealPlayerId(sub.subId)) {
+            if (!minutesMap.has(sub.subId)) minutesMap.set(sub.subId, 0);
+            onPitchSince.set(sub.subId, subMin);
+            const evs = subEventsMap.get(sub.subId) || [];
+            evs.push({ type: "on", minute: subMin });
+            subEventsMap.set(sub.subId, evs);
+        }
+    });
+
+    onPitchSince.forEach((startedAt, id) => {
+        const played = startedAt > 0 ? Math.max(1, 90 - startedAt) : Math.max(0, 90 - startedAt);
+        minutesMap.set(id, (minutesMap.get(id) || 0) + played);
+    });
+
+    sortedSubs.forEach((sub) => {
+        if (isRealPlayerId(sub.subId) && typeof sub.customMinutesPlayed === "number") {
+            minutesMap.set(sub.subId, Math.max(1, sub.customMinutesPlayed));
+        }
+    });
+
+    usedSubSet.forEach((id) => {
+        if ((minutesMap.get(id) || 0) === 0) {
+            const hasSubRecord = sortedSubs.some((s) => s.subId === id);
+            if (!hasSubRecord) {
+                minutesMap.set(id, 30);
+            }
+        }
+    });
+
+    const matchEvents = parsedLineup.matchEvents || {};
+
+    starterSet.forEach((id) => {
+        const ev = matchEvents[id] || {};
+        result.set(id, {
+            participationType: "STARTER",
+            minutesPlayed: minutesMap.get(id) ?? 90,
+            subEvents: subEventsMap.get(id) || [],
+            goals: Number(ev.goals) || 0,
+            assists: Number(ev.assists) || 0,
+            yellowCards: Number(ev.yellowCards) || 0,
+            redCards: Number(ev.redCards) || 0,
+        });
+    });
+
+    usedSubSet.forEach((id) => {
+        const ev = matchEvents[id] || {};
+        result.set(id, {
+            participationType: "SUB",
+            minutesPlayed: minutesMap.get(id) ?? 30,
+            subEvents: subEventsMap.get(id) || [],
+            goals: Number(ev.goals) || 0,
+            assists: Number(ev.assists) || 0,
+            yellowCards: Number(ev.yellowCards) || 0,
+            redCards: Number(ev.redCards) || 0,
+        });
+    });
+
+    benchSubSet.forEach((id) => {
+        if (starterSet.has(id) || usedSubSet.has(id)) return;
+        const ev = matchEvents[id] || {};
+        result.set(id, {
+            participationType: "UNUSED_SUB",
+            minutesPlayed: 0,
+            subEvents: [],
+            goals: Number(ev.goals) || 0,
+            assists: Number(ev.assists) || 0,
+            yellowCards: Number(ev.yellowCards) || 0,
+            redCards: Number(ev.redCards) || 0,
+        });
+    });
+
+    return result;
+}
+

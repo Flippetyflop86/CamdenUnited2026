@@ -41,7 +41,7 @@ import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
 import { calculateMeetTime, resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
-import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, computeMatchOutcome, extractLineupFromRawNotes } from "@/lib/match-stats-sync";
+import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, computeMatchOutcome, extractLineupFromRawNotes, computeLineupParticipation } from "@/lib/match-stats-sync";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 
@@ -607,97 +607,13 @@ export default function MatchdayXIPage() {
     }, [selectedMatchId, matches, activeSquadTab]);
 
     const syncLineupAppearancesToDatabase = async (matchId: string, newLineup: MatchdayXI & { usedSubstitutes?: string[] }) => {
-        const playerIds = new Set<string>();
-        const isRealPlayerId = (id: any): id is string => Boolean(id && typeof id === "string" && !id.startsWith("trialist-"));
-
-        if (newLineup.starters) {
-            Object.values(newLineup.starters).forEach((id: any) => {
-                if (isRealPlayerId(id)) playerIds.add(id);
-            });
-        }
-
-        if (newLineup.usedSubstitutes && Array.isArray(newLineup.usedSubstitutes)) {
-            newLineup.usedSubstitutes.forEach((id: any) => {
-                if (isRealPlayerId(id)) playerIds.add(id);
-            });
-        } else if (newLineup.substitutes && Array.isArray(newLineup.substitutes)) {
-            newLineup.substitutes.forEach((id: any) => {
-                if (isRealPlayerId(id)) playerIds.add(id);
-            });
-        }
-
-        // Calculate minutes played using a timeline
-        const minutesMap = new Map<string, number>();
-        const onPitchSince = new Map<string, number>();
-
-        // Initialize starters
-        if (newLineup.starters) {
-            Object.values(newLineup.starters).forEach((id: any) => {
-                if (isRealPlayerId(id)) {
-                    onPitchSince.set(id, 0);
-                    minutesMap.set(id, 0);
-                }
-            });
-        }
-
-        // Initialize playing subs
-        if (newLineup.usedSubstitutes && Array.isArray(newLineup.usedSubstitutes)) {
-            newLineup.usedSubstitutes.forEach((id: any) => {
-                if (isRealPlayerId(id)) {
-                    minutesMap.set(id, 0);
-                }
-            });
-        }
-
-        // Sort substitutions chronologically by minute
-        const sortedSubs = [...(newLineup.substitutions || [])]
-            .filter(sub => sub.subId)
-            .sort((a, b) => (Number(a.minute) || 60) - (Number(b.minute) || 60));
-
-        sortedSubs.forEach(sub => {
-            const subMin = Number(sub.minute) || 60;
-            
-            // 1. Take the replaced player off the pitch
-            if (sub.replacedId && onPitchSince.has(sub.replacedId)) {
-                const startedAt = onPitchSince.get(sub.replacedId)!;
-                const played = Math.max(0, subMin - startedAt);
-                minutesMap.set(sub.replacedId, (minutesMap.get(sub.replacedId) || 0) + played);
-                onPitchSince.delete(sub.replacedId);
-            }
-            
-            // 2. Put the sub onto the pitch
-            if (isRealPlayerId(sub.subId)) {
-                if (!minutesMap.has(sub.subId)) {
-                    minutesMap.set(sub.subId, 0);
-                }
-                onPitchSince.set(sub.subId, subMin);
+        const participationMap = computeLineupParticipation(newLineup);
+        const activePlayerIds = new Set<string>();
+        participationMap.forEach((p, pid) => {
+            if (p.participationType !== 'UNUSED_SUB') {
+                activePlayerIds.add(pid);
             }
         });
-
-        // End of match (90th minute) - add remaining time for everyone still on pitch
-        onPitchSince.forEach((startedAt, id) => {
-            const played = startedAt > 0 ? Math.max(1, 90 - startedAt) : Math.max(0, 90 - startedAt);
-            minutesMap.set(id, (minutesMap.get(id) || 0) + played);
-        });
-
-        // Apply any custom played-minutes override (e.g. stoppage time adjustments)
-        sortedSubs.forEach(sub => {
-            if (isRealPlayerId(sub.subId) && typeof sub.customMinutesPlayed === "number") {
-                minutesMap.set(sub.subId, Math.max(1, sub.customMinutesPlayed));
-            }
-        });
-
-        // Ensure any used sub that wasn't logged in substitutions gets a fallback of 30 mins
-        if (newLineup.usedSubstitutes && Array.isArray(newLineup.usedSubstitutes)) {
-            newLineup.usedSubstitutes.forEach((id: any) => {
-                if (isRealPlayerId(id) && minutesMap.get(id) === 0) {
-                    const hasSubRecord = newLineup.substitutions?.some(s => s.subId === id);
-                    if (!hasSubRecord) {
-                        minutesMap.set(id, 30);
-                    }
-                }
-            });
-        }
 
         // Fetch current stats for the match
         const { data: existingStats, error: fetchErr } = await supabase
@@ -713,9 +629,9 @@ export default function MatchdayXIPage() {
         const existingMap = new Map<string, any>();
         existingStats?.forEach(s => existingMap.set(s.player_id, s));
 
-        // 1. Ensure rows exist for everyone in the lineup with calculated minutes & any logged match events (#10)
-        for (const playerId of playerIds) {
-            const mins = minutesMap.get(playerId) ?? 90;
+        // 1. Ensure rows exist for everyone who played (starters + used substitutes) with accurate participation_type, minutes & events
+        for (const playerId of activePlayerIds) {
+            const pPart = participationMap.get(playerId)!;
             const existing = existingMap.get(playerId);
             const ev = newLineup.matchEvents?.[playerId];
             if (!existing) {
@@ -726,13 +642,19 @@ export default function MatchdayXIPage() {
                         player_id: playerId,
                         goals: ev?.goals ?? 0,
                         assists: ev?.assists ?? 0,
-                        minutes_played: mins,
+                        minutes_played: pPart.minutesPlayed,
+                        participation_type: pPart.participationType,
+                        sub_events: pPart.subEvents,
                         yellow_cards: ev?.yellowCards ?? 0,
                         red_cards: ev?.redCards ?? 0
                     }]);
                 if (insertErr) console.error("Error inserting stats row:", insertErr);
             } else {
-                const updatePayload: any = { minutes_played: mins };
+                const updatePayload: any = {
+                    minutes_played: pPart.minutesPlayed,
+                    participation_type: pPart.participationType,
+                    sub_events: pPart.subEvents,
+                };
                 if (ev) {
                     if (typeof ev.goals === "number") updatePayload.goals = ev.goals;
                     if (typeof ev.assists === "number") updatePayload.assists = ev.assists;
@@ -747,16 +669,24 @@ export default function MatchdayXIPage() {
             }
         }
 
-        // 2. Remove rows for players NOT in the lineup anymore (who have no other stats)
+        // 2. Remove or mark UNUSED_SUB for rows of players no longer playing in the lineup
         for (const existing of existingStats || []) {
-            if (!playerIds.has(existing.player_id)) {
+            if (!activePlayerIds.has(existing.player_id)) {
                 const hasStats = (existing.goals || 0) > 0 || (existing.assists || 0) > 0 || (existing.yellow_cards || 0) > 0 || (existing.red_cards || 0) > 0;
+                const unusedPart = participationMap.get(existing.player_id);
                 if (!hasStats) {
-                    const { error: deleteErr } = await supabase
-                        .from('match_player_stats')
-                        .delete()
-                        .eq('id', existing.id);
-                    if (deleteErr) console.error("Error deleting stats row:", deleteErr);
+                    if (unusedPart && unusedPart.participationType === 'UNUSED_SUB') {
+                        await supabase
+                            .from('match_player_stats')
+                            .update({ participation_type: 'UNUSED_SUB', minutes_played: 0, sub_events: [] })
+                            .eq('id', existing.id);
+                    } else {
+                        const { error: deleteErr } = await supabase
+                            .from('match_player_stats')
+                            .delete()
+                            .eq('id', existing.id);
+                        if (deleteErr) console.error("Error deleting stats row:", deleteErr);
+                    }
                 }
             }
         }

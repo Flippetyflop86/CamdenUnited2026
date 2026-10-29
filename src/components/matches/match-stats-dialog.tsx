@@ -9,7 +9,7 @@ import { BarChart3, Plus, Minus, Search, Trash2, Filter, RefreshCw, Link as Link
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
 import { isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
-import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText } from "@/lib/match-stats-sync";
+import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, extractLineupFromRawNotes, computeLineupParticipation } from "@/lib/match-stats-sync";
 
 interface MatchPlayerStat {
     id: string;
@@ -138,54 +138,73 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
         if (matchData?.notes) {
             const rawNotes = matchData.notes;
             if (rawNotes.includes("[Lineup: ")) {
-                const startIdx = rawNotes.indexOf("[Lineup: ");
-                const endIdx = rawNotes.indexOf("}]", startIdx);
-                if (endIdx !== -1) {
-                    try {
-                        const parsed = JSON.parse(rawNotes.substring(startIdx + "[Lineup: ".length, endIdx + 1));
-                        if (parsed) {
-                            const startersList: string[] = [];
-                            if (parsed.starters) {
-                                Object.values(parsed.starters).forEach((id: any) => {
-                                    if (id) startersList.push(id);
-                                });
-                            }
-                            setLineupStarters(startersList);
-                            
-                            const subsList: string[] = [];
-                            if (parsed.substitutes && Array.isArray(parsed.substitutes)) {
-                                parsed.substitutes.forEach((id: any) => {
-                                    if (id) subsList.push(id);
-                                });
-                            }
-                            setLineupSubs(subsList);
-                            
-                            // Sprint 13: Auto-initialize Match Stats from Lineup
-                            const missingStats: any[] = [];
-                            for (const sId of startersList) {
-                                if (!currentStats.find(s => s.player_id === sId)) {
-                                    missingStats.push({ match_id: matchId, player_id: sId, goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 90, participation_type: 'STARTER', sub_events: [] });
-                                }
-                            }
-                            for (const subId of subsList) {
-                                if (!currentStats.find(s => s.player_id === subId)) {
-                                    missingStats.push({ match_id: matchId, player_id: subId, goals: 0, assists: 0, yellow_cards: 0, red_cards: 0, minutes_played: 0, participation_type: 'UNUSED_SUB', sub_events: [] });
-                                }
-                            }
-                            
-                            if (missingStats.length > 0) {
-                                const { data: insertedStats } = await supabase.from('match_player_stats').insert(missingStats).select();
-                                if (insertedStats) {
-                                    currentStats = [...currentStats, ...insertedStats];
-                                    await syncMatchesTable(matchId);
-                                }
-                            }
-                            
-                            setRightPanelTab('lineup');
-                        }
-                    } catch(e) {
-                        console.error("Error parsing lineup in stats dialog", e);
+                const { parsedLineup: parsed } = extractLineupFromRawNotes(rawNotes);
+                if (parsed) {
+                    const startersList: string[] = [];
+                    if (parsed.starters) {
+                        Object.values(parsed.starters).forEach((id: any) => {
+                            if (id) startersList.push(id);
+                        });
                     }
+                    setLineupStarters(startersList);
+
+                    const subsList: string[] = [];
+                    if (parsed.substitutes && Array.isArray(parsed.substitutes)) {
+                        parsed.substitutes.forEach((id: any) => {
+                            if (id) subsList.push(id);
+                        });
+                    }
+                    setLineupSubs(subsList);
+
+                    const participationMap = computeLineupParticipation(parsed);
+                    const missingStats: any[] = [];
+                    let updatedExisting = false;
+
+                    for (const [pId, pPart] of participationMap.entries()) {
+                        const existing = currentStats.find(s => s.player_id === pId);
+                        if (!existing) {
+                            missingStats.push({
+                                match_id: matchId,
+                                player_id: pId,
+                                goals: pPart.goals || 0,
+                                assists: pPart.assists || 0,
+                                yellow_cards: pPart.yellowCards || 0,
+                                red_cards: pPart.redCards || 0,
+                                minutes_played: pPart.minutesPlayed,
+                                participation_type: pPart.participationType,
+                                sub_events: pPart.subEvents,
+                            });
+                        } else if (
+                            pPart.participationType !== 'UNUSED_SUB' &&
+                            (!existing.participation_type || existing.participation_type === 'UNUSED_SUB')
+                        ) {
+                            const nextMins = existing.minutes_played && existing.minutes_played > 0 ? existing.minutes_played : pPart.minutesPlayed;
+                            await supabase
+                                .from('match_player_stats')
+                                .update({
+                                    participation_type: pPart.participationType,
+                                    minutes_played: nextMins,
+                                    sub_events: pPart.subEvents,
+                                })
+                                .eq('id', existing.id);
+                            existing.participation_type = pPart.participationType;
+                            existing.minutes_played = nextMins;
+                            existing.sub_events = pPart.subEvents;
+                            updatedExisting = true;
+                        }
+                    }
+
+                    if (missingStats.length > 0) {
+                        const { data: insertedStats } = await supabase.from('match_player_stats').insert(missingStats).select();
+                        if (insertedStats) {
+                            currentStats = [...currentStats, ...insertedStats];
+                            await syncMatchesTable(matchId);
+                        }
+                    } else if (updatedExisting) {
+                        await syncMatchesTable(matchId);
+                    }
+
+                    setRightPanelTab('lineup');
                 }
             } else {
                 setRightPanelTab('all');

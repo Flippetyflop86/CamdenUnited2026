@@ -42,6 +42,7 @@ import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
 import { Input } from "@/components/ui/input";
 import { logActivity } from "@/lib/activity";
+import { extractLineupFromRawNotes, computeLineupParticipation } from "@/lib/match-stats-sync";
 
 const POSITION_ORDER: Record<string, number> = {
     GK: 1,
@@ -156,7 +157,7 @@ export default function PlayerProfilePage() {
         
         const [playerRes, matchesRes, statsRes, sessionsRes, allPlayersRes] = await Promise.all([
             supabase.from('players').select('*, email, mobile_number, status, trusted_devices').eq('id', id).single(),
-            supabase.from('matches').select('id, date, opponent, is_home, competition, scoreline, result'),
+            supabase.from('matches').select('id, date, opponent, is_home, competition, scoreline, result, notes'),
             supabase.from('match_player_stats').select('*').eq('player_id', id),
             supabase.from('training_sessions').select('id, date, topic, attendance').order('date', { ascending: false }).limit(25),
             supabase.from('players').select('id, first_name, last_name, nickname, use_nickname, position, squad_number, notes, club_status, departure_reason')
@@ -312,13 +313,21 @@ export default function PlayerProfilePage() {
 
         // Calculate dynamic stats & match log
         const matches = matchesRes.data || [];
-        const stats = statsRes.data || [];
+        const rawStats = statsRes.data || [];
 
         const matchSeasons = new Map<string, string>();
         const matchCompetitions = new Map<string, string>();
         const matchResultsMap = new Map<string, string>();
         const matchDetailsMap = new Map<string, any>();
         const seasonSet = new Set<string>();
+        const statsByMatchMap = new Map<string, any>();
+        rawStats.forEach((s: any) => {
+            statsByMatchMap.set(s.match_id, { ...s });
+        });
+
+        const missingBackfillRows: any[] = [];
+        const updateBackfillRows: { id: string; payload: any }[] = [];
+
         matches.forEach((m: any) => {
             let seasonStr = "";
             if (!m.date) {
@@ -339,7 +348,72 @@ export default function PlayerProfilePage() {
             matchResultsMap.set(m.id, m.result || "Pending");
             matchDetailsMap.set(m.id, m);
             seasonSet.add(seasonStr);
+
+            const isCompleted = m.result === "Win" || m.result === "Draw" || m.result === "Loss";
+            if (isCompleted && m.notes && m.notes.includes("[Lineup: ")) {
+                const { parsedLineup } = extractLineupFromRawNotes(m.notes);
+                if (parsedLineup) {
+                    const partMap = computeLineupParticipation(parsedLineup);
+                    const pPart = partMap.get(id);
+                    if (pPart && pPart.participationType !== 'UNUSED_SUB') {
+                        const existing = statsByMatchMap.get(m.id);
+                        if (!existing) {
+                            const synthRow = {
+                                match_id: m.id,
+                                player_id: id,
+                                goals: pPart.goals || 0,
+                                assists: pPart.assists || 0,
+                                yellow_cards: pPart.yellowCards || 0,
+                                red_cards: pPart.redCards || 0,
+                                minutes_played: pPart.minutesPlayed,
+                                participation_type: pPart.participationType,
+                                sub_events: pPart.subEvents,
+                            };
+                            statsByMatchMap.set(m.id, synthRow);
+                            missingBackfillRows.push(synthRow);
+                        } else if (
+                            !existing.participation_type ||
+                            existing.participation_type === 'UNUSED_SUB' ||
+                            existing.participation_type !== pPart.participationType ||
+                            ((existing.minutes_played === 0 || existing.minutes_played === null || existing.minutes_played === undefined) && pPart.minutesPlayed > 0)
+                        ) {
+                            const nextMins = (existing.minutes_played && existing.minutes_played > 0 && existing.participation_type === pPart.participationType)
+                                ? existing.minutes_played
+                                : pPart.minutesPlayed;
+                            existing.participation_type = pPart.participationType;
+                            existing.minutes_played = nextMins;
+                            if (existing.id) {
+                                updateBackfillRows.push({
+                                    id: existing.id,
+                                    payload: {
+                                        participation_type: pPart.participationType,
+                                        minutes_played: nextMins,
+                                        sub_events: pPart.subEvents,
+                                    },
+                                });
+                            }
+                        }
+                    }
+                }
+            }
         });
+
+        if (missingBackfillRows.length > 0 || updateBackfillRows.length > 0) {
+            void (async () => {
+                try {
+                    if (missingBackfillRows.length > 0) {
+                        await supabase.from('match_player_stats').insert(missingBackfillRows);
+                    }
+                    for (const u of updateBackfillRows) {
+                        await supabase.from('match_player_stats').update(u.payload).eq('id', u.id);
+                    }
+                } catch (err) {
+                    console.error("Background stats backfill error on player page:", err);
+                }
+            })();
+        }
+
+        const stats = Array.from(statsByMatchMap.values());
         seasonSet.add(getCurrentSeasonStr());
         setAvailableSeasons(Array.from(seasonSet).sort().reverse());
 

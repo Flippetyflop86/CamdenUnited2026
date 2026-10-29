@@ -55,6 +55,11 @@ import { UploadCloud, Loader2 } from "lucide-react";
 import { logActivity } from "@/lib/activity";
 import { useSearchParams, useRouter } from "next/navigation";
 import Papa from "papaparse";
+import {
+    extractLineupFromRawNotes,
+    computeLineupParticipation,
+    LineupPlayerParticipation,
+} from "@/lib/match-stats-sync";
 
 const getCurrentSeasonStr = () => {
     const d = new Date();
@@ -391,7 +396,7 @@ export default function SquadPage() {
         try {
             const [playersRes, matchesRes, statsRes] = await Promise.all([
                 supabase.from("players").select("*"),
-                supabase.from("matches").select("id, date, competition, result"),
+                supabase.from("matches").select("id, date, competition, result, scoreline, notes, yellow_cards, red_cards"),
                 supabase.from("match_player_stats").select("*")
             ]);
 
@@ -409,6 +414,7 @@ export default function SquadPage() {
             const matchSeasons = new Map<string, string>();
             const matchCompetitions = new Map<string, string>();
             const matchResults = new Map<string, string>();
+            const matchLineupMap = new Map<string, Map<string, LineupPlayerParticipation>>();
             const seasonSet = new Set<string>();
             
             matches.forEach((m: any) => {
@@ -433,15 +439,129 @@ export default function SquadPage() {
                 matchCompetitions.set(m.id, m.competition || "");
                 matchResults.set(m.id, m.result || "Pending");
                 seasonSet.add(seasonStr);
+
+                const isCompleted =
+                    (m.result && m.result !== "Pending") ||
+                    Boolean(m.scoreline && typeof m.scoreline === "string" && m.scoreline.includes("-"));
+                if (isCompleted && m.notes && m.notes.includes("[Lineup: ")) {
+                    const extracted = extractLineupFromRawNotes(m.notes);
+                    if (extracted.parsedLineup) {
+                        const pMap = computeLineupParticipation(extracted.parsedLineup);
+                        if (pMap.size > 0) {
+                            matchLineupMap.set(m.id, pMap);
+                        }
+                    }
+                }
             });
             
             // Ensure the current season is always in the list even if no matches exist yet
             seasonSet.add(getCurrentSeasonStr());
             setAvailableSeasons(Array.from(seasonSet).sort().reverse());
 
+            // Merge DB match_player_stats with completed match [Lineup: ...] participation
+            // and queue background repairs for any missing or stale participation_type rows
+            const effectiveStats: any[] = [];
+            const seenMatchPlayer = new Set<string>();
+            const missingRowsToInsert: any[] = [];
+            const staleRowsToUpdate: { id: string; participation_type: string; minutes_played: number }[] = [];
+
+            stats.forEach((s: any) => {
+                if (!s.match_id || !s.player_id) return;
+                const key = `${s.match_id}:${s.player_id}`;
+                if (seenMatchPlayer.has(key)) return;
+                seenMatchPlayer.add(key);
+
+                const lineupPart = matchLineupMap.get(s.match_id)?.get(s.player_id);
+                let effectiveType = s.participation_type;
+                let effectiveMins = s.minutes_played;
+
+                if (lineupPart) {
+                    // Authoritative lineup participation overrides stale UNUSED_SUB or missing participation_type
+                    if (
+                        lineupPart.participationType === "STARTER" ||
+                        lineupPart.participationType === "SUB"
+                    ) {
+                        if (effectiveType !== lineupPart.participationType) {
+                            effectiveType = lineupPart.participationType;
+                            effectiveMins = lineupPart.minutesPlayed;
+                            staleRowsToUpdate.push({
+                                id: s.id,
+                                participation_type: effectiveType,
+                                minutes_played: effectiveMins,
+                            });
+                        } else if (
+                            effectiveType === "SUB" &&
+                            ((effectiveMins ?? 0) === 0 || effectiveMins === 90) &&
+                            lineupPart.minutesPlayed > 0
+                        ) {
+                            effectiveMins = lineupPart.minutesPlayed;
+                            staleRowsToUpdate.push({
+                                id: s.id,
+                                participation_type: effectiveType,
+                                minutes_played: effectiveMins,
+                            });
+                        }
+                    }
+                } else if (effectiveType === "UNUSED_SUB" && (Number(effectiveMins) || 0) > 0) {
+                    // Row had minutes_played updated by Matchday XI without updating participation_type
+                    effectiveType = "SUB";
+                    staleRowsToUpdate.push({
+                        id: s.id,
+                        participation_type: "SUB",
+                        minutes_played: Number(effectiveMins),
+                    });
+                }
+
+                effectiveStats.push({
+                    ...s,
+                    participation_type: effectiveType,
+                    minutes_played: effectiveMins,
+                });
+            });
+
+            // Add any starters or used substitutes from completed match lineups that weren't in match_player_stats yet
+            matchLineupMap.forEach((pMap, mId) => {
+                pMap.forEach((part, playerId) => {
+                    if (part.participationType === "UNUSED_SUB") return;
+                    const key = `${mId}:${playerId}`;
+                    if (seenMatchPlayer.has(key)) return;
+                    seenMatchPlayer.add(key);
+
+                    const synthesized = {
+                        match_id: mId,
+                        player_id: playerId,
+                        goals: part.goals || 0,
+                        assists: part.assists || 0,
+                        yellow_cards: part.yellowCards || 0,
+                        red_cards: part.redCards || 0,
+                        minutes_played: part.minutesPlayed,
+                        participation_type: part.participationType,
+                        sub_events: part.subEvents || [],
+                    };
+                    effectiveStats.push(synthesized);
+                    missingRowsToInsert.push(synthesized);
+                });
+            });
+
+            if (missingRowsToInsert.length > 0) {
+                supabase.from("match_player_stats").insert(missingRowsToInsert).then(() => {});
+            }
+            if (staleRowsToUpdate.length > 0) {
+                staleRowsToUpdate.forEach((u) => {
+                    supabase
+                        .from("match_player_stats")
+                        .update({
+                            participation_type: u.participation_type,
+                            minutes_played: u.minutes_played,
+                        })
+                        .eq("id", u.id)
+                        .then(() => {});
+                });
+            }
+
             // Calculate stats per player for the selected season
             const playerStats = new Map<string, { apps: number, starts: number, subApps: number, goals: number, assists: number, yellow: number, red: number, minutes: number, wins: number, draws: number, losses: number }>();
-            stats.forEach((s: any) => {
+            effectiveStats.forEach((s: any) => {
                 const season = matchSeasons.get(s.match_id);
                 if (seasonFilter !== "All" && season !== seasonFilter) return;
 
@@ -474,10 +594,12 @@ export default function SquadPage() {
                 p.yellow += (s.yellow_cards || 0);
                 p.red += (s.red_cards || 0);
 
-                const res = matchResults.get(s.match_id);
-                if (res === "Win") p.wins++;
-                else if (res === "Draw") p.draws++;
-                else if (res === "Loss") p.losses++;
+                if (s.participation_type !== 'UNUSED_SUB') {
+                    const res = matchResults.get(s.match_id);
+                    if (res === "Win") p.wins++;
+                    else if (res === "Draw") p.draws++;
+                    else if (res === "Loss") p.losses++;
+                }
 
                 playerStats.set(s.player_id, p);
             });
