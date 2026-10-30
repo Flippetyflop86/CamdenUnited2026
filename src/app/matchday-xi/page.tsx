@@ -131,6 +131,7 @@ export default function MatchdayXIPage() {
     const [meetInputValue, setMeetInputValue] = useState<string>("13:00");
     const [draggedPlayer, setDraggedPlayer] = useState<string | null>(null);
     const [draggedSource, setDraggedSource] = useState<{type: 'squad' | 'pitch' | 'sub', index?: number} | null>(null);
+    const [dragOverSlot, setDragOverSlot] = useState<{type: 'pitch' | 'sub' | 'squad', index?: number} | null>(null);
     const [squadFilter, setSquadFilter] = useState<"All" | "GK" | "DEF" | "MID" | "FWD">("All");
     const [panelSearchQuery, setPanelSearchQuery] = useState<string>("");
     const currentSquads = settings.squads || ["First Team"];
@@ -2111,12 +2112,69 @@ export default function MatchdayXIPage() {
         showToast("Cleared bench", "info");
     };
 
-    // --- Drag and Drop Logic ---
-    const handleDragStart = (e: React.DragEvent, playerId: string, source: {type: 'squad' | 'pitch' | 'sub', index?: number}) => {
+    // --- Drag and Drop Logic (Custom Compact Jersey + Name Pill Drag Ghost) ---
+    const handleDragStart = (
+        e: React.DragEvent,
+        playerId: string,
+        source: { type: 'squad' | 'pitch' | 'sub'; index?: number },
+        badgeNumber?: number
+    ) => {
         setDraggedPlayer(playerId);
         setDraggedSource(source);
         e.dataTransfer.setData('text/plain', playerId);
         e.dataTransfer.effectAllowed = 'move';
+
+        if (typeof document !== 'undefined') {
+            const player = resolvePlayerOrTrialist(playerId);
+            const nameText = player ? getMatchdayDisplayName(player) : "Player";
+            const posText = player ? (isTrialistId(playerId) ? "GUEST" : (player.position || "")) : "";
+            const isGk = posText.toUpperCase() === "GK" || (source.type === "pitch" && source.index === 0);
+            const shirtColor = isGk ? getEffectiveGkKitColor() : getEffectiveOutfieldKitColor();
+            const textColor = getContrastTextColor(shirtColor);
+            const numText = badgeNumber ?? (player?.squadNumber && player.squadNumber > 0 ? player.squadNumber : "");
+
+            const ghost = document.createElement("div");
+            ghost.style.position = "fixed";
+            ghost.style.top = "-1000px";
+            ghost.style.left = "-1000px";
+            ghost.style.zIndex = "99999";
+            ghost.style.pointerEvents = "none";
+            ghost.style.display = "inline-flex";
+            ghost.style.alignItems = "center";
+            ghost.style.gap = "8px";
+            ghost.style.padding = "5px 12px 5px 8px";
+            ghost.style.borderRadius = "9999px";
+            ghost.style.background = "rgba(15, 23, 42, 0.96)";
+            ghost.style.border = "1.5px solid rgba(255, 255, 255, 0.25)";
+            ghost.style.boxShadow = "0 10px 25px -5px rgba(0, 0, 0, 0.55)";
+            ghost.style.fontFamily = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+            ghost.style.whiteSpace = "nowrap";
+
+            ghost.innerHTML = `
+                <svg width="26" height="26" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;filter:drop-shadow(0 1px 2px rgba(0,0,0,0.5));">
+                    <path d="M 30,20 L 70,20 L 85,35 L 75,45 L 68,38 L 68,85 L 32,85 L 32,38 L 25,45 L 15,35 Z" fill="${shirtColor}" stroke="#ffffff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M 40,20 Q 50,28 60,20" stroke="#ffffff" stroke-width="4" fill="none" />
+                    ${numText ? `<text x="50" y="57" text-anchor="middle" fill="${textColor}" font-size="30" font-weight="900" dy=".3em">${numText}</text>` : ""}
+                </svg>
+                <span style="color:#ffffff;font-size:12px;font-weight:800;letter-spacing:-0.01em;">${nameText}</span>
+                ${posText ? `<span style="color:#34d399;background:rgba(16,185,129,0.18);border:1px solid rgba(16,185,129,0.35);padding:1px 6px;border-radius:9999px;font-size:10px;font-weight:800;text-transform:uppercase;">${posText}</span>` : ""}
+            `;
+
+            document.body.appendChild(ghost);
+            const rect = ghost.getBoundingClientRect();
+            e.dataTransfer.setDragImage(ghost, Math.round(rect.width / 2), Math.round(rect.height / 2));
+            requestAnimationFrame(() => {
+                setTimeout(() => {
+                    if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
+                }, 0);
+            });
+        }
+    };
+
+    const handleDragEnd = () => {
+        setDraggedPlayer(null);
+        setDraggedSource(null);
+        setDragOverSlot(null);
     };
 
     const handleDragOver = (e: React.DragEvent) => {
@@ -2126,6 +2184,7 @@ export default function MatchdayXIPage() {
 
     const handleDropOnPitch = (e: React.DragEvent, targetIndex: number) => {
         e.preventDefault();
+        setDragOverSlot(null);
         if (!draggedPlayer || !lineup) return;
 
         let newStarters = { ...lineup.starters };
@@ -2160,6 +2219,7 @@ export default function MatchdayXIPage() {
 
     const handleDropOnSub = (e: React.DragEvent, targetIndex: number) => {
         e.preventDefault();
+        setDragOverSlot(null);
         if (!draggedPlayer || !lineup) return;
 
         let newStarters = { ...lineup.starters };
@@ -2185,6 +2245,7 @@ export default function MatchdayXIPage() {
 
     const handleDropOnSquad = (e: React.DragEvent) => {
         e.preventDefault();
+        setDragOverSlot(null);
         if (!draggedPlayer || !lineup) return;
 
         let newStarters = { ...lineup.starters };
@@ -4173,8 +4234,13 @@ export default function MatchdayXIPage() {
                                         key={player.id}
                                         draggable
                                         onDragStart={(e) => handleDragStart(e, player.id, {type: 'squad'})}
+                                        onDragEnd={handleDragEnd}
                                         onClick={() => handleQuickAssignFromSquad(player)}
-                                        className="group flex items-center p-2 border border-border rounded-xl cursor-pointer lg:cursor-grab active:cursor-grabbing hover:border-foreground/30 bg-surface-1 transition-all shadow-sm relative overflow-hidden"
+                                        className={`group flex items-center p-2 border rounded-xl cursor-pointer lg:cursor-grab active:cursor-grabbing hover:border-foreground/30 bg-surface-1 transition-all shadow-sm relative overflow-hidden ${
+                                            draggedPlayer === player.id
+                                                ? "opacity-40 scale-[0.98] border-dashed border-primary/60"
+                                                : "border-border"
+                                        }`}
                                     >
                                         <GripVertical className="hidden lg:block h-3.5 w-0 opacity-0 group-hover:w-3.5 group-hover:opacity-100 group-hover:mr-1.5 text-primary transition-all shrink-0 overflow-hidden" />
                                         <div className="flex flex-col min-w-0 flex-1">
@@ -4267,9 +4333,14 @@ export default function MatchdayXIPage() {
                                                     key={player.id}
                                                     draggable
                                                     onDragStart={(e) => handleDragStart(e, player.id, { type: 'squad' })}
+                                                    onDragEnd={handleDragEnd}
                                                     onClick={() => handleQuickAssignFromSquad(player)}
                                                     title="Tap or drag onto pitch/bench to override availability"
-                                                    className="flex items-center justify-between gap-2 p-2 rounded-lg border border-border/70 bg-surface-1/80 opacity-85 hover:opacity-100 cursor-pointer lg:cursor-grab active:cursor-grabbing transition-all"
+                                                    className={`flex items-center justify-between gap-2 p-2 rounded-lg border bg-surface-1/80 cursor-pointer lg:cursor-grab active:cursor-grabbing transition-all ${
+                                                        draggedPlayer === player.id
+                                                            ? "opacity-40 scale-[0.98] border-dashed border-primary/60"
+                                                            : "border-border/70 opacity-85 hover:opacity-100"
+                                                    }`}
                                                 >
                                                     <div className="min-w-0">
                                                         <div className="text-xs font-bold text-foreground truncate">{displayName}</div>
@@ -4542,6 +4613,9 @@ export default function MatchdayXIPage() {
                                     return (yiq >= 140) ? "#000000" : "#ffffff";
                                 })();
 
+                                const isPitchSlotDragOver = dragOverSlot?.type === "pitch" && dragOverSlot.index === idx;
+                                const isPitchSlotBeingDragged = Boolean(playerId && draggedPlayer === playerId && draggedSource?.type === "pitch" && draggedSource.index === idx);
+
                                 return (
                                 <div
                                     key={idx}
@@ -4550,15 +4624,28 @@ export default function MatchdayXIPage() {
                                         left: `${pos.x}%`,
                                         top: `${pos.y}%`,
                                     }}
-                                    onDragOver={handleDragOver}
+                                    onDragOver={(e) => {
+                                        handleDragOver(e);
+                                        if (dragOverSlot?.type !== "pitch" || dragOverSlot.index !== idx) {
+                                            setDragOverSlot({ type: "pitch", index: idx });
+                                        }
+                                    }}
+                                    onDragLeave={() => {
+                                        if (dragOverSlot?.type === "pitch" && dragOverSlot.index === idx) {
+                                            setDragOverSlot(null);
+                                        }
+                                    }}
                                     onDrop={(e) => handleDropOnPitch(e, idx)}
                                 >
-                                    <div className="flex flex-col items-center group relative cursor-pointer"
+                                    <div className={`flex flex-col items-center group relative cursor-pointer transition-all duration-150 ${
+                                        isPitchSlotDragOver ? "scale-110 z-30" : ""
+                                    } ${isPitchSlotBeingDragged ? "opacity-40 scale-95" : ""}`}
                                             draggable={!!playerId && !isEditingThisNumber && editingNamePlayerId !== playerId}
-                                            onDragStart={(e) => playerId && handleDragStart(e, playerId, {type: 'pitch', index: idx})}
+                                            onDragStart={(e) => playerId && handleDragStart(e, playerId, {type: 'pitch', index: idx}, displayedNumber)}
+                                            onDragEnd={handleDragEnd}
                                             onClick={() => { setModalTab("swap"); setActiveSlot({ type: 'pitch', index: idx, label: pos.label }); }}
                                     >
-                                        <div className="relative">
+                                        <div className={`relative rounded-full transition-all ${isPitchSlotDragOver ? "ring-4 ring-emerald-400/90 bg-emerald-400/20 shadow-[0_0_20px_rgba(52,211,153,0.7)]" : ""}`}>
                                             {/* Jersey SVG Icon colored dynamically based on kit selector & GK slot (#4 Larger for 5v5/7v7) */}
                                             <svg 
                                                 className={`${activeFormat === "5v5" || activeFormat === "7v7" ? "w-10 h-10 sm:w-12 sm:h-12" : "w-9 h-9 sm:w-11 sm:h-11"} drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)] mb-0.5 z-10 transition-transform group-hover:scale-105`}
@@ -4929,67 +5016,92 @@ export default function MatchdayXIPage() {
                             const subEvents = subId ? getPlayerMatchEventStats(subId) : undefined;
                             const isSubMotm = Boolean(subId && lineup.motmPlayerId === subId);
 
+                            const isSubSlotDragOver = dragOverSlot?.type === "sub" && dragOverSlot.index === idx;
+                            const isSubBeingDragged = Boolean(subId && draggedPlayer === subId && draggedSource?.type === "sub" && draggedSource.index === idx);
+
                             return (
                                 <div key={idx} className="space-y-1.5">
                                     <div 
                                         className="flex flex-col gap-1 w-full"
-                                        onDragOver={handleDragOver}
+                                        onDragOver={(e) => {
+                                            handleDragOver(e);
+                                            if (dragOverSlot?.type !== "sub" || dragOverSlot.index !== idx) {
+                                                setDragOverSlot({ type: "sub", index: idx });
+                                            }
+                                        }}
+                                        onDragLeave={() => {
+                                            if (dragOverSlot?.type === "sub" && dragOverSlot.index === idx) {
+                                                setDragOverSlot(null);
+                                            }
+                                        }}
                                         onDrop={(e) => handleDropOnSub(e, idx)}
                                     >
                                         <div className="flex items-center gap-1.5 w-full">
-                                            {isEditingSubNumber ? (
-                                                <input
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                    autoFocus
-                                                    maxLength={2}
-                                                    value={editingNumberValue}
-                                                    onFocus={(e) => e.currentTarget.select()}
-                                                    onChange={(e) => setEditingNumberValue(e.target.value.replace(/[^0-9]/g, ""))}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === "Enter") {
-                                                            handleCustomNumberChange(subSlotKey, editingNumberValue, defaultSubNumber);
-                                                            setEditingNumberSlot(null);
-                                                        } else if (e.key === "Escape") {
-                                                            setEditingNumberSlot(null);
-                                                        }
-                                                    }}
-                                                    onBlur={() => {
-                                                        handleCustomNumberChange(subSlotKey, editingNumberValue, defaultSubNumber);
-                                                        setEditingNumberSlot(null);
-                                                    }}
-                                                    className="w-7 h-6 rounded-md bg-surface-2 border border-primary text-[10px] font-black text-center text-foreground outline-none ring-1 ring-primary shrink-0 p-0"
-                                                />
-                                            ) : (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setEditingNumberSlot(subSlotKey);
-                                                        setEditingNumberValue(String(displayedSubNumber));
-                                                    }}
-                                                    title={`Shirt #${displayedSubNumber} — Click to change number manually (Default: ${defaultSubNumber})`}
-                                                    className="w-7 h-6 rounded-md bg-surface-2 hover:bg-surface-3 border border-border text-[10px] font-extrabold text-center text-foreground transition-colors shrink-0"
-                                                >
-                                                    {displayedSubNumber}
-                                                </button>
-                                            )}
-                                            
                                             <div 
-                                                draggable={!!subId && editingNamePlayerId !== subId}
-                                                onDragStart={(e) => subId && handleDragStart(e, subId, {type: 'sub', index: idx})}
+                                                draggable={!!subId && editingNamePlayerId !== subId && !isEditingSubNumber}
+                                                onDragStart={(e) => subId && handleDragStart(e, subId, { type: 'sub', index: idx }, displayedSubNumber)}
+                                                onDragEnd={handleDragEnd}
                                                 onClick={() => {
-                                                    if (editingNamePlayerId === subId) return;
+                                                    if (editingNamePlayerId === subId || isEditingSubNumber) return;
                                                     setModalTab("swap");
                                                     setActiveSlot({ type: 'sub', index: idx, label: `Bench Slot ${idx + 1}` });
                                                 }}
-                                                className={`flex-1 min-w-0 flex flex-col justify-center px-2.5 py-2 border rounded-xl shadow-sm transition-all cursor-pointer ${subId ? 'bg-surface-1 hover:border-primary/50 border-border group gap-1' : 'bg-surface-2 border-dashed border-border text-muted-foreground hover:bg-surface-3'}`}
+                                                className={`flex-1 min-w-0 flex items-center gap-2 px-2.5 py-2 border rounded-xl transition-all cursor-pointer lg:cursor-grab active:cursor-grabbing ${
+                                                    isSubSlotDragOver
+                                                        ? "ring-2 ring-emerald-400 border-emerald-400 bg-emerald-500/10 scale-[1.01]"
+                                                        : isSubBeingDragged
+                                                        ? "opacity-40 scale-[0.98] border-dashed border-primary/60 bg-surface-1"
+                                                        : subId
+                                                        ? "bg-surface-1 hover:border-primary/50 border-border shadow-sm group"
+                                                        : "bg-surface-2/60 border-dashed border-border text-muted-foreground hover:bg-surface-3"
+                                                }`}
                                             >
+                                                {/* Integrated Shirt Number Badge inside the Bench Row */}
+                                                {isEditingSubNumber ? (
+                                                    <input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        autoFocus
+                                                        maxLength={2}
+                                                        value={editingNumberValue}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        onFocus={(e) => e.currentTarget.select()}
+                                                        onChange={(e) => setEditingNumberValue(e.target.value.replace(/[^0-9]/g, ""))}
+                                                        onKeyDown={(e) => {
+                                                            e.stopPropagation();
+                                                            if (e.key === "Enter") {
+                                                                handleCustomNumberChange(subSlotKey, editingNumberValue, defaultSubNumber);
+                                                                setEditingNumberSlot(null);
+                                                            } else if (e.key === "Escape") {
+                                                                setEditingNumberSlot(null);
+                                                            }
+                                                        }}
+                                                        onBlur={() => {
+                                                            handleCustomNumberChange(subSlotKey, editingNumberValue, defaultSubNumber);
+                                                            setEditingNumberSlot(null);
+                                                        }}
+                                                        className="w-6 h-6 rounded-lg bg-surface-2 border border-primary text-[10px] font-black text-center text-foreground outline-none ring-1 ring-primary shrink-0 p-0"
+                                                    />
+                                                ) : (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditingNumberSlot(subSlotKey);
+                                                            setEditingNumberValue(String(displayedSubNumber));
+                                                        }}
+                                                        title={`Shirt #${displayedSubNumber} — Click to change number manually (Default: ${defaultSubNumber})`}
+                                                        className="w-6 h-6 rounded-lg bg-surface-2 hover:bg-surface-3 border border-border text-[10px] font-extrabold text-center text-foreground transition-colors shrink-0 flex items-center justify-center"
+                                                    >
+                                                        {displayedSubNumber}
+                                                    </button>
+                                                )}
+
                                                 {subId ? (
-                                                    <>
-                                                        {/* Line 1: Full Player Name across the entire card width (#5 GripVertical hidden until hover) */}
+                                                    <div className="flex flex-col min-w-0 flex-1 gap-0.5">
+                                                        {/* Top Row: Player Name + Hover Edit/Remove */}
                                                         <div className="flex items-center justify-between gap-1 min-w-0 w-full">
                                                             <div className="flex items-center min-w-0 flex-1">
-                                                                <GripVertical className="hidden lg:block h-3.5 w-0 opacity-0 group-hover:w-3.5 group-hover:opacity-100 group-hover:mr-1.5 text-primary transition-all shrink-0 overflow-hidden" />
                                                                 {editingNamePlayerId === subId ? (
                                                                     <input
                                                                         type="text"
@@ -5015,13 +5127,13 @@ export default function MatchdayXIPage() {
                                                                         className="w-full bg-surface-2 text-foreground text-xs font-semibold rounded px-1.5 py-0.5 outline-none ring-1 ring-primary"
                                                                     />
                                                                 ) : (
-                                                                    <span className="font-bold text-xs text-foreground leading-tight break-words" title={displayName}>
+                                                                    <span className="font-bold text-xs text-foreground leading-tight truncate" title={displayName}>
                                                                         {displayName}
                                                                     </span>
                                                                 )}
                                                             </div>
                                                             {editingNamePlayerId !== subId && (
-                                                                <div className="flex items-center gap-1 shrink-0">
+                                                                <div className="flex items-center gap-0.5 shrink-0">
                                                                     <button
                                                                         type="button"
                                                                         onClick={(e) => {
@@ -5049,7 +5161,7 @@ export default function MatchdayXIPage() {
                                                             )}
                                                         </div>
 
-                                                        {/* Line 2: Position Badge + Events + Unused/Played Toggle */}
+                                                        {/* Bottom Row: Position + Event Badges + Unused/Played Toggle */}
                                                         <div className="flex items-center justify-between gap-1 w-full">
                                                             <div className="flex items-center gap-1 min-w-0">
                                                                 <span className="text-[10px] uppercase text-muted-foreground font-extrabold">
@@ -5089,9 +5201,9 @@ export default function MatchdayXIPage() {
                                                                 {isSubPlayed ? `✓ ${subMinutes}'` : "Unused"}
                                                             </button>
                                                         </div>
-                                                    </>
+                                                    </div>
                                                 ) : (
-                                                    <span className="text-[10px] font-medium text-center w-full block">Tap or drag player here</span>
+                                                    <span className="text-[10px] font-medium text-muted-foreground flex-1">Tap or drag player here</span>
                                                 )}
                                             </div>
 
