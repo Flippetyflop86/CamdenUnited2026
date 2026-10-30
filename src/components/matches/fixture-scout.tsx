@@ -53,12 +53,11 @@ export function FixtureScout({ onImport }: FixtureScoutProps) {
 
             // 3. Identify Opponent
             // Remove date and score from line to guess team names
-            // This is "dumb" parsing: assumes "Camden United" is in the line
-            const isHome = line.toLowerCase().indexOf("camden united") < line.toLowerCase().indexOf("v") ||
-                (scoreMatch && line.toLowerCase().indexOf("camden united") < scoreMatch.index!);
+            const isHome = line.toLowerCase().indexOf("clubflow") < line.toLowerCase().indexOf("v") ||
+                (scoreMatch && line.toLowerCase().indexOf("clubflow") < scoreMatch.index!);
 
             // Clean up text to find opponent
-            let cleanLine = line.replace(scoreRegex, "").replace(dateRegex, "").replace(/camden united/gi, "").replace(/v/gi, "").replace(/-/g, "").trim();
+            let cleanLine = line.replace(scoreRegex, "").replace(dateRegex, "").replace(/clubflow united/gi, "").replace(/clubflow/gi, "").replace(/v/gi, "").replace(/-/g, "").trim();
             const opponent = cleanLine.substring(0, 30).trim() || "Unknown Opponent";
 
             // Determine Result
@@ -117,7 +116,7 @@ export function FixtureScout({ onImport }: FixtureScoutProps) {
                 {step === "input" ? (
                     <div className="space-y-4 py-4">
                         <Textarea
-                            placeholder="Paste text here... e.g. '12/10 Camden United 3-1 Wood Lane'"
+                            placeholder="Paste text here... e.g. '12/10 ClubFlow United 3-1 Wood Lane'"
                             className="min-h-[200px] font-mono text-sm"
                             value={rawText}
                             onChange={(e) => setRawText(e.target.value)}

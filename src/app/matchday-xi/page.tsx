@@ -514,7 +514,7 @@ export default function MatchdayXIPage() {
             setMatches(mapped);
             
             const urlMatchId = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("match") : null;
-            const storedMatchId = typeof window !== "undefined" ? sessionStorage.getItem("camden_matchday_xi_match_id") : null;
+            const storedMatchId = typeof window !== "undefined" ? sessionStorage.getItem("clubflow_matchday_xi_match_id") : null;
             const requestedMatch = urlMatchId
                 ? mapped.find((m: any) => m.id === urlMatchId)
                 : (storedMatchId ? mapped.find((m: any) => m.id === storedMatchId) : null);
@@ -528,14 +528,14 @@ export default function MatchdayXIPage() {
                 selectedMatchIdRef.current = requestedMatch.id;
                 setSelectedMatchId(requestedMatch.id);
                 setNextMatch(requestedMatch);
-                if (typeof window !== "undefined") sessionStorage.setItem("camden_matchday_xi_match_id", requestedMatch.id);
+                if (typeof window !== "undefined") sessionStorage.setItem("clubflow_matchday_xi_match_id", requestedMatch.id);
             } else if (existingSelected) {
                 setNextMatch(existingSelected);
             } else if (upcoming) {
                 selectedMatchIdRef.current = upcoming.id;
                 setSelectedMatchId(upcoming.id);
                 setNextMatch(upcoming);
-                if (typeof window !== "undefined") sessionStorage.setItem("camden_matchday_xi_match_id", upcoming.id);
+                if (typeof window !== "undefined") sessionStorage.setItem("clubflow_matchday_xi_match_id", upcoming.id);
             }
         } else {
             fetchLineupOnly(true);
@@ -547,7 +547,7 @@ export default function MatchdayXIPage() {
         if (!selectedMatchId || matches.length === 0) return;
 
         if (typeof window !== "undefined") {
-            sessionStorage.setItem("camden_matchday_xi_match_id", selectedMatchId);
+            sessionStorage.setItem("clubflow_matchday_xi_match_id", selectedMatchId);
         }
 
         const currentMatch = matches.find(m => m.id === selectedMatchId);
@@ -3136,7 +3136,7 @@ export default function MatchdayXIPage() {
             : new Date().toLocaleDateString('en-GB');
 
         const meetTime = getFormattedMeetTime();
-        const sessionCode = nextMatch ? ("CU" + (nextMatch.event_token || nextMatch.id).replace(/-/g, "").substring(0, 4)).toUpperCase() : "TBD";
+        const sessionCode = nextMatch ? ("CF" + (nextMatch.event_token || nextMatch.id).replace(/-/g, "").substring(0, 4)).toUpperCase() : "TBD";
 
         const formattedMsg = msgTemplate
             .replace(/{opponent}/g, nextMatch ? nextMatch.opponent : "TBD")
@@ -3481,7 +3481,7 @@ export default function MatchdayXIPage() {
                                     selectedMatchIdRef.current = nextId;
                                     setSelectedMatchId(nextId);
                                     if (typeof window !== "undefined") {
-                                        sessionStorage.setItem("camden_matchday_xi_match_id", nextId);
+                                        sessionStorage.setItem("clubflow_matchday_xi_match_id", nextId);
                                     }
                                 }}
                                 className="h-8 flex-1 min-w-0 bg-surface-2 hover:bg-surface-3 border border-border text-foreground text-xs rounded-xl px-2.5 transition-colors focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-bold truncate"
@@ -3944,7 +3944,7 @@ export default function MatchdayXIPage() {
                                     selectedMatchIdRef.current = nextId;
                                     setSelectedMatchId(nextId);
                                     if (typeof window !== "undefined") {
-                                        sessionStorage.setItem("camden_matchday_xi_match_id", nextId);
+                                        sessionStorage.setItem("clubflow_matchday_xi_match_id", nextId);
                                     }
                                 }}
                                 className="h-8 bg-surface-2 hover:bg-surface-3 border border-border text-foreground text-xs rounded-xl px-2.5 transition-colors focus:outline-none focus:ring-1 focus:ring-primary cursor-pointer font-bold max-w-full sm:max-w-[260px] truncate"

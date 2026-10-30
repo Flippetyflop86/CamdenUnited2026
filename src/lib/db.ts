@@ -1,4 +1,4 @@
-export const DB_NAME = "CamdenUnitedDB";
+export const DB_NAME = "ClubFlowDB";
 export const STORE_NAME = "images";
 const DB_VERSION = 1;
 

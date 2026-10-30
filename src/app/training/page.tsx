@@ -549,8 +549,10 @@ export default function TrainingPage() {
             parts.push(additionalNotes.trim());
         }
 
-        const checkinLink = `${window.location.origin}/respond/${activeShareSession.event_token || activeShareSession.id}`;
-        parts.push(`Please confirm your availability here:\n${checkinLink}`);
+        const tokenOrId = activeShareSession.event_token || activeShareSession.id;
+        const checkinLink = `${window.location.origin}/respond/${tokenOrId}`;
+        const sessionCode = ("CF" + tokenOrId.replace(/-/g, "").substring(0, 4)).toUpperCase();
+        parts.push(`Please confirm your availability here:\n${checkinLink}\n🔑 Session Code: *${sessionCode}*`);
 
         return parts.join("\n\n");
     };

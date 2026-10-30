@@ -21,7 +21,7 @@ function getAdminClient() {
 // Generate a deterministic 6-character session code based on ID
 function getSessionCode(id: string): string {
     const cleanId = id.replace(/-/g, "");
-    return ("CU" + cleanId.substring(0, 4)).toUpperCase();
+    return ("CF" + cleanId.substring(0, 4)).toUpperCase();
 }
 
 // Position order helper
@@ -274,6 +274,9 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: "Incorrect session code. Please verify the code in the WhatsApp invite." }, { status: 401 });
         }
 
+        // Sanitize optional note so brackets cannot corrupt the [AVAILABILITY: [...]] tag
+        const safeNote = String(notes || "").replace(/\[/g, "(").replace(/\]/g, ")").trim();
+
         // 3. Update attendance
         if (eventType === "match") {
             const { data: match, error: fetchMatchErr } = await supabaseAdmin
@@ -289,7 +292,7 @@ export async function POST(request: Request) {
 
             const currentNotes = match.notes || "";
             let currentList: any[] = [];
-            const matchRaw = currentNotes.match(/\[AVAILABILITY:\s*(.*?)\s*\]/);
+            const matchRaw = currentNotes.match(/\[AVAILABILITY:\s*(\[[\s\S]*?\])\s*\]/);
             if (matchRaw && matchRaw[1]) {
                 try {
                     currentList = JSON.parse(matchRaw[1]);
@@ -302,12 +305,12 @@ export async function POST(request: Request) {
             const playerIndex = updatedList.findIndex(a => a.playerId === playerId);
 
             if (playerIndex >= 0) {
-                updatedList[playerIndex] = { playerId, status, notes: notes || "" };
+                updatedList[playerIndex] = { playerId, status, notes: safeNote };
             } else {
-                updatedList.push({ playerId, status, notes: notes || "" });
+                updatedList.push({ playerId, status, notes: safeNote });
             }
 
-            const cleanBaseNotes = currentNotes.replace(/\[AVAILABILITY:.*?\]\n?/, "").trim();
+            const cleanBaseNotes = currentNotes.replace(/\[AVAILABILITY:\s*\[[\s\S]*?\]\s*\]\n?/g, "").trim();
             const finalNotes = `${cleanBaseNotes}\n[AVAILABILITY: ${JSON.stringify(updatedList)} ]`.trim();
 
             const { error: updateMatchErr } = await supabaseAdmin
@@ -342,13 +345,13 @@ export async function POST(request: Request) {
                 updatedAttendance[playerIndex] = { 
                     ...updatedAttendance[playerIndex], 
                     status: mappedStatus,
-                    notes: notes || "RSVP"
+                    notes: safeNote || "RSVP"
                 };
             } else {
                 updatedAttendance.push({ 
                     playerId, 
                     status: mappedStatus, 
-                    notes: notes || "RSVP" 
+                    notes: safeNote || "RSVP" 
                 });
             }
 

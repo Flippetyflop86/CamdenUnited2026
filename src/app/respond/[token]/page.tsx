@@ -79,6 +79,9 @@ export default function SessionCodeResponderPage() {
  
         if (isVerifiedForSession()) {
             setEnteredCode(getSavedCode());
+        } else if (token) {
+            const autoCode = ("CF" + String(token).replace(/-/g, "").substring(0, 4)).toUpperCase();
+            setEnteredCode(autoCode);
         } else {
             setEnteredCode("");
         }
@@ -270,8 +273,51 @@ export default function SessionCodeResponderPage() {
                     <CardHeader className="pb-4">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div>
-                                <CardTitle className="text-lg text-slate-900 font-black">Squad List</CardTitle>
-                                <CardDescription className="text-slate-500 font-medium">
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <CardTitle className="text-lg text-slate-900 font-black">Squad List</CardTitle>
+                                    {(() => {
+                                        let avail = 0;
+                                        let maybe = 0;
+                                        if (eventType === "match") {
+                                            const currentNotes = event?.notes || "";
+                                            const matchRaw = currentNotes.match(/\[AVAILABILITY:\s*([\s\S]*?)\s*\]/);
+                                            if (matchRaw && matchRaw[1]) {
+                                                try {
+                                                    const list = JSON.parse(matchRaw[1]);
+                                                    players.forEach((p) => {
+                                                        const rec = list.find((a: any) => a.playerId === p.id);
+                                                        if (rec?.status === "Available") avail++;
+                                                        else if (rec?.status === "Maybe") maybe++;
+                                                    });
+                                                } catch {}
+                                            }
+                                        } else {
+                                            const attendance = event?.attendance || [];
+                                            players.forEach((p) => {
+                                                const rec = attendance.find((a: any) => a.playerId === p.id);
+                                                if (rec?.status === "Present") avail++;
+                                                else if (rec?.status === "Late") maybe++;
+                                            });
+                                        }
+                                        const unavail = Math.max(0, players.length - avail - maybe);
+                                        return (
+                                            <div className="flex items-center gap-1.5 text-[10px] font-bold">
+                                                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 border border-emerald-300">
+                                                    {avail} Available
+                                                </span>
+                                                {maybe > 0 && (
+                                                    <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 border border-amber-300">
+                                                        {maybe} Maybe
+                                                    </span>
+                                                )}
+                                                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
+                                                    {unavail} Pending / No
+                                                </span>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                                <CardDescription className="text-slate-500 font-medium mt-1">
                                     Search for your name and select it to RSVP.
                                 </CardDescription>
                             </div>

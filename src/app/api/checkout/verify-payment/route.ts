@@ -93,10 +93,26 @@ export async function POST(request: Request) {
 
         if (session.payment_status === 'paid') {
             const paidAt = new Date().toISOString();
-            await supabase
+            const { data: updatedPayment } = await supabase
                 .from('player_payment_requests')
                 .update({ status: 'Paid', paid_at: paidAt })
-                .eq('id', paymentId);
+                .eq('id', paymentId)
+                .neq('status', 'Paid')
+                .select()
+                .maybeSingle();
+
+            if (updatedPayment) {
+                await supabase
+                    .from('finance_transactions')
+                    .insert([{
+                        club_id: updatedPayment.club_id,
+                        date: paidAt.split('T')[0],
+                        description: `${updatedPayment.description} (Paid via Stripe)`,
+                        amount: Number(updatedPayment.amount),
+                        type: 'Income',
+                        category: 'Player Fees',
+                    }]);
+            }
 
             return NextResponse.json({ status: 'Paid', paid_at: paidAt });
         }

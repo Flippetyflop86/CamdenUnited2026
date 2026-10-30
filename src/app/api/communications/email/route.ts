@@ -18,7 +18,7 @@ function getAdminClient() {
 
 function getSessionCode(id: string): string {
     const cleanId = id.replace(/-/g, "");
-    return ("CU" + cleanId.substring(0, 4)).toUpperCase();
+    return ("CF" + cleanId.substring(0, 4)).toUpperCase();
 }
 
 export async function POST(request: Request) {

@@ -25,12 +25,18 @@ export async function POST(request: Request) {
         }
 
         let event: Stripe.Event;
-        try {
-            event = getStripe().webhooks.constructEvent(rawBody, sig, getWebhookSecret());
-        } catch (webhookErr: any) {
-            console.warn(`Stripe Webhook Signature Verification Failed: ${webhookErr.message}`);
-            // Fallback for debugging in dev if no signature verification secret is set
+        const secret = getWebhookSecret();
+        if (secret) {
+            try {
+                event = getStripe().webhooks.constructEvent(rawBody, sig, secret);
+            } catch (webhookErr: any) {
+                console.error(`Stripe Webhook Signature Verification Failed: ${webhookErr.message}`);
+                return NextResponse.json({ error: `Webhook Error: ${webhookErr.message}` }, { status: 400 });
+            }
+        } else if (process.env.NODE_ENV !== 'production') {
             event = JSON.parse(rawBody);
+        } else {
+            return NextResponse.json({ error: 'Webhook secret not configured' }, { status: 500 });
         }
 
         // Handle relevant Connect webhook events
@@ -39,13 +45,14 @@ export async function POST(request: Request) {
             const paymentId = session.metadata?.payment_id;
 
             if (paymentId) {
-                // Update payment status in database
+                // Atomically transition from non-Paid to Paid so retries never double-insert into finance_transactions
                 const { data: payment, error: updateErr } = await supabase
                     .from('player_payment_requests')
                     .update({ status: 'Paid', paid_at: new Date().toISOString() })
                     .eq('id', paymentId)
+                    .neq('status', 'Paid')
                     .select()
-                    .single();
+                    .maybeSingle();
 
                 if (updateErr) {
                     console.error("Failed to update player payment record:", updateErr);

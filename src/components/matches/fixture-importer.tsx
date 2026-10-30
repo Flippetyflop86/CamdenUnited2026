@@ -102,10 +102,10 @@ export function FixtureImporter({ onImport }: FixtureImporterProps) {
                 // Removes numeric chars and time patterns to leave potential team names
                 let cleanLine = line.replace(/\d{1,2}[:.]\d{2}/, '').replace(/\d+\s*[-]\s*\d+/, '');
 
-                if (cleanLine.toLowerCase().includes('camden united')) {
+                if (cleanLine.toLowerCase().includes('clubflow')) {
                     // Extract the other part
                     const parts = cleanLine.split(/ v | vs /i);
-                    const opponent = parts.find(p => !p.toLowerCase().includes('camden'));
+                    const opponent = parts.find(p => !p.toLowerCase().includes('clubflow'));
                     if (opponent) newMatch.opponent = opponent.trim();
                 } else {
                     newMatch.opponent = cleanLine.trim();

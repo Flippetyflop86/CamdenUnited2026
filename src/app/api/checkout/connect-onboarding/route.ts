@@ -14,35 +14,39 @@ export async function POST(request: Request) {
     const supabase = getServerSupabase();
     try {
         const token = request.headers.get('Authorization')?.split(' ')[1];
+        if (!token) {
+            return NextResponse.json({ error: 'Unauthorized: Missing authentication token' }, { status: 401 });
+        }
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        if (authError || !user) {
+            return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
+        }
+
         const body = await request.json().catch(() => ({}));
         let clubId = body.clubId as string | undefined;
-        let userEmail = (body.treasurerEmail as string | undefined)?.trim();
+        let userEmail = (body.treasurerEmail as string | undefined)?.trim() || user.email;
         const treasurerFirstName = (body.treasurerFirstName as string | undefined)?.trim();
         const treasurerLastName = (body.treasurerLastName as string | undefined)?.trim();
         const accountHolderType = (body.accountHolderType as 'individual' | 'company' | 'non_profit' | undefined) || 'individual';
         const resetExisting = Boolean(body.resetAccount);
 
-        if (token) {
-            const { data: { user } } = await supabase.auth.getUser(token);
-            if (user) {
-                userEmail = userEmail || user.email;
-                if (!clubId) {
-                    const { data: member } = await supabase
-                        .from('club_members')
-                        .select('club_id, email')
-                        .eq('user_id', user.id)
-                        .single();
-                    if (member) {
-                        clubId = member.club_id;
-                        userEmail = userEmail || member.email || undefined;
-                    }
-                }
-            }
+        const { data: member } = await supabase
+            .from('club_members')
+            .select('club_id, email, role')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        if (!member) {
+            return NextResponse.json({ error: 'Forbidden: Club membership not found' }, { status: 403 });
         }
 
-        if (!clubId) {
-            return NextResponse.json({ error: 'Missing clubId parameter' }, { status: 400 });
+        if (clubId && clubId !== member.club_id) {
+            return NextResponse.json({ error: 'Forbidden: You do not have permission for this club' }, { status: 403 });
         }
+
+        clubId = member.club_id;
+        userEmail = userEmail || member.email || undefined;
 
         // Fetch club settings to check for existing Stripe Connect ID
         const { data: club, error: clubError } = await supabase
