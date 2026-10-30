@@ -980,6 +980,10 @@ export default function OppositionReportsPage() {
     const formationPositions = FORMATIONS[activeReport.formation] || FORMATIONS["4-2-3-1"] || [];
     const activeOppFormat: MatchFormat = getFormatFromFormation(activeReport.formation);
     const activeOppRomanLabel = FORMAT_ROMAN_LABEL[activeOppFormat] || "XI";
+    const enabledFormats: MatchFormat[] =
+        Array.isArray(settings.enabledMatchFormats) && settings.enabledMatchFormats.length > 0
+            ? (settings.enabledMatchFormats as MatchFormat[])
+            : ["11v11"];
 
     const handleOppFormatChange = (fmt: MatchFormat) => {
         const defaultForm = DEFAULT_FORMATION_BY_FORMAT[fmt] || "4-2-3-1";
@@ -1304,15 +1308,17 @@ export default function OppositionReportsPage() {
                                         }
                                         className="w-full h-9 px-2.5 rounded-lg border border-border bg-surface-2 text-xs font-bold text-foreground"
                                     >
-                                        {(["11v11", "9v9", "7v7", "5v5"] as const).map((fmt) => (
-                                            <optgroup key={fmt} label={`${fmt} Formations`}>
-                                                {FORMATIONS_BY_FORMAT[fmt].map((name) => (
-                                                    <option key={name} value={name}>
-                                                        {name} ({fmt})
-                                                    </option>
-                                                ))}
-                                            </optgroup>
-                                        ))}
+                                        {(["11v11", "9v9", "7v7", "5v5"] as const)
+                                            .filter((fmt) => enabledFormats.includes(fmt) || fmt === activeOppFormat)
+                                            .map((fmt) => (
+                                                <optgroup key={fmt} label={`${fmt} Formations`}>
+                                                    {FORMATIONS_BY_FORMAT[fmt].map((name) => (
+                                                        <option key={name} value={name}>
+                                                            {enabledFormats.length > 1 ? `${name} (${fmt})` : name}
+                                                        </option>
+                                                    ))}
+                                                </optgroup>
+                                            ))}
                                     </select>
                                 </div>
                                 <div className="flex items-end gap-1.5">
@@ -1894,22 +1900,24 @@ export default function OppositionReportsPage() {
                                 </p>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <div className="inline-flex items-center p-0.5 rounded-lg bg-surface-2 border border-border">
-                                    {(["5v5", "7v7", "9v9", "11v11"] as const).map((fmt) => (
-                                        <button
-                                            key={fmt}
-                                            type="button"
-                                            onClick={() => handleOppFormatChange(fmt)}
-                                            className={`px-1.5 py-0.5 rounded text-[9px] font-black transition-all ${
-                                                activeOppFormat === fmt
-                                                    ? "bg-brand text-brand-foreground"
-                                                    : "text-muted-foreground hover:text-foreground"
-                                            }`}
-                                        >
-                                            {fmt}
-                                        </button>
-                                    ))}
-                                </div>
+                                {enabledFormats.length > 1 && (
+                                    <div className="inline-flex items-center p-0.5 rounded-lg bg-surface-2 border border-border">
+                                        {enabledFormats.map((fmt) => (
+                                            <button
+                                                key={fmt}
+                                                type="button"
+                                                onClick={() => handleOppFormatChange(fmt)}
+                                                className={`px-1.5 py-0.5 rounded text-[9px] font-black transition-all ${
+                                                    activeOppFormat === fmt
+                                                        ? "bg-brand text-brand-foreground"
+                                                        : "text-muted-foreground hover:text-foreground"
+                                                }`}
+                                            >
+                                                {fmt}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                                 {mobileTab === "all" && (
                                     <button
                                         type="button"
@@ -2456,15 +2464,17 @@ export default function OppositionReportsPage() {
                                                     }
                                                     className="w-full h-10 px-3 rounded-md border border-border bg-surface-2 text-xs font-bold text-foreground outline-none"
                                                 >
-                                                    {(["11v11", "9v9", "7v7", "5v5"] as const).map((fmt) => (
-                                                        <optgroup key={fmt} label={`${fmt} Formations`}>
-                                                            {FORMATIONS_BY_FORMAT[fmt].map((name) => (
-                                                                <option key={name} value={name}>
-                                                                    {name} ({fmt})
-                                                                </option>
-                                                            ))}
-                                                        </optgroup>
-                                                    ))}
+                                                    {(["11v11", "9v9", "7v7", "5v5"] as const)
+                                                        .filter((fmt) => enabledFormats.includes(fmt) || fmt === activeOppFormat)
+                                                        .map((fmt) => (
+                                                            <optgroup key={fmt} label={`${fmt} Formations`}>
+                                                                {FORMATIONS_BY_FORMAT[fmt].map((name) => (
+                                                                    <option key={name} value={name}>
+                                                                        {enabledFormats.length > 1 ? `${name} (${fmt})` : name}
+                                                                    </option>
+                                                                ))}
+                                                            </optgroup>
+                                                        ))}
                                                 </select>
                                             </div>
                                         </div>
@@ -3215,22 +3225,24 @@ export default function OppositionReportsPage() {
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-2 shrink-0">
-                                <div className="inline-flex items-center p-0.5 rounded-xl bg-surface-2 border border-border">
-                                    {(["5v5", "7v7", "9v9", "11v11"] as const).map((fmt) => (
-                                        <button
-                                            key={fmt}
-                                            type="button"
-                                            onClick={() => handleOppFormatChange(fmt)}
-                                            className={`px-2 py-1 rounded-lg text-[10px] font-black transition-all ${
-                                                activeOppFormat === fmt
-                                                    ? "bg-brand text-brand-foreground shadow-xs"
-                                                    : "text-muted-foreground hover:text-foreground"
-                                            }`}
-                                        >
-                                            {fmt}
-                                        </button>
-                                    ))}
-                                </div>
+                                {enabledFormats.length > 1 && (
+                                    <div className="inline-flex items-center p-0.5 rounded-xl bg-surface-2 border border-border">
+                                        {enabledFormats.map((fmt) => (
+                                            <button
+                                                key={fmt}
+                                                type="button"
+                                                onClick={() => handleOppFormatChange(fmt)}
+                                                className={`px-2 py-1 rounded-lg text-[10px] font-black transition-all ${
+                                                    activeOppFormat === fmt
+                                                        ? "bg-brand text-brand-foreground shadow-xs"
+                                                        : "text-muted-foreground hover:text-foreground"
+                                                }`}
+                                            >
+                                                {fmt}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
                                 <Button
                                     type="button"
                                     variant="outline"

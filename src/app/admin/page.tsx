@@ -91,6 +91,23 @@ export default function AdminPage() {
         if (cached !== null) return cached === "true";
         return settings.useMatchdayNumbering || false;
     });
+    const [enabledMatchFormats, setEnabledMatchFormats] = useState<("5v5" | "7v7" | "9v9" | "11v11")[]>(() => {
+        const cached = getCached("enabledMatchFormats");
+        if (cached) {
+            try { return JSON.parse(cached); } catch {}
+        }
+        return settings.enabledMatchFormats?.length ? settings.enabledMatchFormats : ["11v11"];
+    });
+    const [equalPlayTimeEnabled, setEqualPlayTimeEnabled] = useState<boolean>(() => {
+        const cached = getCached("equalPlayTimeEnabled");
+        if (cached !== null) return cached === "true";
+        return settings.equalPlayTimeEnabled || false;
+    });
+    const [defaultMatchDuration, setDefaultMatchDuration] = useState<string>(() => {
+        const cached = getCached("defaultMatchDuration");
+        if (cached) return cached;
+        return String(settings.defaultMatchDuration || 90);
+    });
 
     const [isMigrating, setIsMigrating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -258,6 +275,19 @@ export default function AdminPage() {
             const cachedUseMatchdayNumbering = getCached("useMatchdayNumbering");
             setUseMatchdayNumbering(cachedUseMatchdayNumbering !== null ? cachedUseMatchdayNumbering === "true" : (settings.useMatchdayNumbering || false));
 
+            const cachedEnabledFormats = getCached("enabledMatchFormats");
+            if (cachedEnabledFormats) {
+                try { setEnabledMatchFormats(JSON.parse(cachedEnabledFormats)); } catch {}
+            } else if (settings.enabledMatchFormats?.length) {
+                setEnabledMatchFormats(settings.enabledMatchFormats);
+            }
+
+            const cachedEqualTime = getCached("equalPlayTimeEnabled");
+            setEqualPlayTimeEnabled(cachedEqualTime !== null ? cachedEqualTime === "true" : (settings.equalPlayTimeEnabled || false));
+
+            const cachedMatchDuration = getCached("defaultMatchDuration");
+            setDefaultMatchDuration(cachedMatchDuration ?? String(settings.defaultMatchDuration || 90));
+
             const cachedTraining = getCached("trainingTemplate");
             const cachedMatch = getCached("matchTemplate");
             
@@ -314,7 +344,10 @@ export default function AdminPage() {
             trainingTemplate,
             matchTemplate,
             measurementUnit,
-            useMatchdayNumbering: String(useMatchdayNumbering)
+            useMatchdayNumbering: String(useMatchdayNumbering),
+            enabledMatchFormats: JSON.stringify(enabledMatchFormats),
+            equalPlayTimeEnabled: String(equalPlayTimeEnabled),
+            defaultMatchDuration
         };
 
         Object.entries(cache).forEach(([key, val]) => {
@@ -324,7 +357,8 @@ export default function AdminPage() {
         name, squads, homeGround, foundingYear, twitterUrl, instagramUrl, primaryColor,
         homeKitShirt, homeKitShorts, homeKitSocks, awayKitShirt, awayKitShorts, awayKitSocks,
         leagueUrl, leaguePosition, monthlySubs, subsEnabled, contractsEnabled, finesEnabled,
-        fineCategories, notificationsEnabled, notificationEmail, managerName, trainingTemplate, matchTemplate, measurementUnit, useMatchdayNumbering
+        fineCategories, notificationsEnabled, notificationEmail, managerName, trainingTemplate, matchTemplate, measurementUnit, useMatchdayNumbering,
+        enabledMatchFormats, equalPlayTimeEnabled, defaultMatchDuration
     ]);
 
     const fetchTeamAccess = async () => {
@@ -682,6 +716,9 @@ export default function AdminPage() {
                 sponsorLogo: finalSponsor,
                 measurementUnit,
                 useMatchdayNumbering,
+                enabledMatchFormats: enabledMatchFormats.length > 0 ? enabledMatchFormats : ["11v11"],
+                equalPlayTimeEnabled,
+                defaultMatchDuration: Math.max(10, Math.min(120, parseInt(defaultMatchDuration, 10) || 90)),
                 whatsappPollMessage: JSON.stringify({
                     training: trainingTemplate,
                     match: matchTemplate
@@ -695,7 +732,8 @@ export default function AdminPage() {
                 "name", "squads", "homeGround", "foundingYear", "twitterUrl", "instagramUrl", "primaryColor",
                 "homeKitShirt", "homeKitShorts", "homeKitSocks", "awayKitShirt", "awayKitShorts", "awayKitSocks",
                 "leagueUrl", "leaguePosition", "monthlySubs", "subsEnabled", "contractsEnabled", "finesEnabled",
-                "fineCategories", "notificationsEnabled", "notificationEmail", "managerName", "trainingTemplate", "matchTemplate", "measurementUnit", "useMatchdayNumbering"
+                "fineCategories", "notificationsEnabled", "notificationEmail", "managerName", "trainingTemplate", "matchTemplate", "measurementUnit", "useMatchdayNumbering",
+                "enabledMatchFormats", "equalPlayTimeEnabled", "defaultMatchDuration"
             ];
             ADMIN_CACHE_KEYS.forEach(key => sessionStorage.removeItem(`clubflow_admin_${key}`));
         } catch (error) {
@@ -896,6 +934,79 @@ export default function AdminPage() {
                                 />
                             </div>
 
+                            <div className="border rounded-md p-4 bg-slate-50 border-slate-200 space-y-4">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-base font-semibold">Match Formats &amp; Total Match Length</Label>
+                                        <p className="text-sm text-slate-500">
+                                            11v11 is the default format. Enable additional formats (9v9, 7v7, 5v5) if your club runs youth or small-sided squads.
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Label htmlFor="defaultMatchDurationIdentity" className="text-xs font-semibold text-slate-600 whitespace-nowrap">
+                                            Default Match Length (mins):
+                                        </Label>
+                                        <Input
+                                            id="defaultMatchDurationIdentity"
+                                            type="number"
+                                            min={10}
+                                            max={120}
+                                            value={defaultMatchDuration}
+                                            onChange={(e) => setDefaultMatchDuration(e.target.value)}
+                                            className="w-20 h-9 text-center font-bold bg-white"
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                    {([
+                                        { id: "11v11", label: "11v11 (Default)" },
+                                        { id: "9v9", label: "9v9 (U11–U12)" },
+                                        { id: "7v7", label: "7v7 (U9–U10)" },
+                                        { id: "5v5", label: "5v5 (U7–U8)" },
+                                    ] as const).map((fmt) => {
+                                        const active = enabledMatchFormats.includes(fmt.id);
+                                        return (
+                                            <button
+                                                key={fmt.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    if (fmt.id === "11v11") return;
+                                                    setEnabledMatchFormats((prev) =>
+                                                        prev.includes(fmt.id)
+                                                            ? prev.filter((f) => f !== fmt.id)
+                                                            : [...prev, fmt.id]
+                                                    );
+                                                }}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                                                    active
+                                                        ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                                                        : "bg-white text-slate-600 border-slate-300 hover:bg-slate-100"
+                                                }`}
+                                            >
+                                                {active ? "✓ " : "+ "}
+                                                {fmt.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                {enabledMatchFormats.some((f) => f !== "11v11") && (
+                                    <div className="flex items-center justify-between pt-3 border-t border-slate-200">
+                                        <div className="space-y-0.5 pr-4">
+                                            <Label className="text-sm font-semibold">Youth Equal Play-Time Target (5v5 / 7v7 / 9v9 Only)</Label>
+                                            <p className="text-xs text-slate-500">
+                                                Show equal play-time targets and rolling sub helper on small-sided youth formats. Never shown on 11v11.
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={equalPlayTimeEnabled}
+                                            onCheckedChange={setEqualPlayTimeEnabled}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
                             <div className="space-y-2">
                                 <Label>Club Logo</Label>
                                 <div className="flex items-center gap-4">
@@ -999,6 +1110,93 @@ export default function AdminPage() {
                             >
                                 <Plus className="w-4 h-4 mr-2" /> Add Squad
                             </Button>
+
+                            <div className="pt-4 mt-4 border-t border-slate-200 space-y-4">
+                                <div className="space-y-1">
+                                    <h4 className="font-semibold text-slate-800 text-sm">Additional Match Formats &amp; Game-Time Options</h4>
+                                    <p className="text-xs text-slate-500">
+                                        11v11 is enabled by default. Choose any additional youth/academy match formats used across your squads.
+                                    </p>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                    {([
+                                        { id: "11v11", label: "11v11 (Default)" },
+                                        { id: "9v9", label: "9v9 (U11–U12)" },
+                                        { id: "7v7", label: "7v7 (U9–U10)" },
+                                        { id: "5v5", label: "5v5 (U7–U8)" },
+                                    ] as const).map((fmt) => {
+                                        const active = enabledMatchFormats.includes(fmt.id);
+                                        return (
+                                            <button
+                                                key={fmt.id}
+                                                type="button"
+                                                onClick={() => {
+                                                    if (fmt.id === "11v11") return;
+                                                    setEnabledMatchFormats((prev) =>
+                                                        prev.includes(fmt.id)
+                                                            ? prev.filter((f) => f !== fmt.id)
+                                                            : [...prev, fmt.id]
+                                                    );
+                                                }}
+                                                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                                                    active
+                                                        ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                                                        : "bg-white text-slate-600 border-slate-300 hover:bg-slate-100"
+                                                }`}
+                                            >
+                                                {active ? "✓ " : "+ "}
+                                                {fmt.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-xs font-semibold text-slate-700">Default Total Match Length (Minutes)</Label>
+                                        <p className="text-[11px] text-slate-500">Can also be adjusted per fixture on the Matchday XI page.</p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        {[40, 50, 60, 70, 80, 90].map((m) => (
+                                            <button
+                                                key={m}
+                                                type="button"
+                                                onClick={() => setDefaultMatchDuration(String(m))}
+                                                className={`px-2 py-1 rounded text-xs font-bold border ${
+                                                    Number(defaultMatchDuration) === m
+                                                        ? "bg-slate-900 text-white border-slate-900"
+                                                        : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                                                }`}
+                                            >
+                                                {m}m
+                                            </button>
+                                        ))}
+                                        <Input
+                                            type="number"
+                                            min={10}
+                                            max={120}
+                                            value={defaultMatchDuration}
+                                            onChange={(e) => setDefaultMatchDuration(e.target.value)}
+                                            className="w-16 h-8 text-xs font-bold text-center"
+                                        />
+                                    </div>
+                                </div>
+
+                                {enabledMatchFormats.some((f) => f !== "11v11") && (
+                                    <div className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200">
+                                        <div className="space-y-0.5 pr-4">
+                                            <Label className="text-xs font-semibold text-slate-800">Youth Equal Play-Time Target (5v5 / 7v7 / 9v9 Only)</Label>
+                                            <p className="text-[11px] text-slate-500">
+                                                Toggle equal play-time targets on or off for youth formats (never shown in 11v11).
+                                            </p>
+                                        </div>
+                                        <Switch
+                                            checked={equalPlayTimeEnabled}
+                                            onCheckedChange={setEqualPlayTimeEnabled}
+                                        />
+                                    </div>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
                 </TabsContent>

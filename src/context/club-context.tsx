@@ -47,6 +47,9 @@ interface ClubSettings {
     timezone?: string;
     lastImportHistory?: any;
     useMatchdayNumbering: boolean;
+    enabledMatchFormats: ("5v5" | "7v7" | "9v9" | "11v11")[];
+    equalPlayTimeEnabled: boolean;
+    defaultMatchDuration: number;
 }
 
 interface ClubContextType {
@@ -102,7 +105,10 @@ const defaultSettings: ClubSettings = {
     defaultCompetition: "League",
     timezone: "Europe/London",
     lastImportHistory: null,
-    useMatchdayNumbering: false
+    useMatchdayNumbering: false,
+    enabledMatchFormats: ["11v11"],
+    equalPlayTimeEnabled: false,
+    defaultMatchDuration: 90
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -217,6 +223,46 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                 }
 
                 if (data) {
+                    let parsedEnabledFormats: ("5v5" | "7v7" | "9v9" | "11v11")[] = ["11v11"];
+                    let parsedEqualPlayTime = false;
+                    let parsedDefaultDuration = 90;
+
+                    if (typeof window !== "undefined") {
+                        try {
+                            const cachedStr = localStorage.getItem("clubflow_cache_clubSettings");
+                            if (cachedStr) {
+                                const cachedObj = JSON.parse(cachedStr);
+                                if (Array.isArray(cachedObj.enabledMatchFormats) && cachedObj.enabledMatchFormats.length > 0) {
+                                    parsedEnabledFormats = cachedObj.enabledMatchFormats;
+                                }
+                                if (typeof cachedObj.equalPlayTimeEnabled === "boolean") {
+                                    parsedEqualPlayTime = cachedObj.equalPlayTimeEnabled;
+                                }
+                                if (typeof cachedObj.defaultMatchDuration === "number" && cachedObj.defaultMatchDuration > 0) {
+                                    parsedDefaultDuration = cachedObj.defaultMatchDuration;
+                                }
+                            }
+                        } catch {}
+                    }
+
+                    if (data.whatsapp_poll_message) {
+                        try {
+                            const pollParsed = JSON.parse(data.whatsapp_poll_message);
+                            if (pollParsed && pollParsed._matchdayConfig) {
+                                const cfg = pollParsed._matchdayConfig;
+                                if (Array.isArray(cfg.enabledMatchFormats) && cfg.enabledMatchFormats.length > 0) {
+                                    parsedEnabledFormats = cfg.enabledMatchFormats;
+                                }
+                                if (typeof cfg.equalPlayTimeEnabled === "boolean") {
+                                    parsedEqualPlayTime = cfg.equalPlayTimeEnabled;
+                                }
+                                if (typeof cfg.defaultMatchDuration === "number" && cfg.defaultMatchDuration > 0) {
+                                    parsedDefaultDuration = cfg.defaultMatchDuration;
+                                }
+                            }
+                        } catch {}
+                    }
+
                     const loadedSettings: ClubSettings = {
                         name: data.name || "My Club",
                         logo: data.logo || null,
@@ -260,7 +306,10 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         defaultCompetition: data.default_competition || "League",
                         timezone: data.timezone || "Europe/London",
                         lastImportHistory: data.last_import_history || null,
-                        useMatchdayNumbering: data.use_matchday_numbering || false
+                        useMatchdayNumbering: data.use_matchday_numbering || false,
+                        enabledMatchFormats: parsedEnabledFormats,
+                        equalPlayTimeEnabled: parsedEqualPlayTime,
+                        defaultMatchDuration: parsedDefaultDuration
                     };
                     setSettings(loadedSettings);
                     if (typeof window !== 'undefined') {
@@ -288,6 +337,32 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             finalSecondaryColor = generateSecondaryColor(newSettings.primaryColor);
         }
 
+        const nextEnabledFormats = newSettings.enabledMatchFormats ?? settings.enabledMatchFormats ?? ["11v11"];
+        const nextEqualPlayTime = newSettings.equalPlayTimeEnabled ?? settings.equalPlayTimeEnabled ?? false;
+        const nextDefaultDuration = newSettings.defaultMatchDuration ?? settings.defaultMatchDuration ?? 90;
+
+        // Embed _matchdayConfig into whatsapp_poll_message JSON so it persists on the clubs row without schema issues
+        const rawPollMsg = newSettings.whatsappPollMessage ?? settings.whatsappPollMessage;
+        let finalPollMsgObj: Record<string, any> = {};
+        if (rawPollMsg) {
+            try {
+                const parsed = JSON.parse(rawPollMsg);
+                if (parsed && typeof parsed === "object") {
+                    finalPollMsgObj = { ...parsed };
+                } else {
+                    finalPollMsgObj = { match: String(rawPollMsg) };
+                }
+            } catch {
+                finalPollMsgObj = { match: String(rawPollMsg) };
+            }
+        }
+        finalPollMsgObj._matchdayConfig = {
+            enabledMatchFormats: nextEnabledFormats.includes("11v11") ? nextEnabledFormats : ["11v11", ...nextEnabledFormats],
+            equalPlayTimeEnabled: nextEqualPlayTime,
+            defaultMatchDuration: nextDefaultDuration
+        };
+        const serializedPollMessage = JSON.stringify(finalPollMsgObj);
+
         // Update DB first (only include columns that exist on the `clubs` table)
         const updates: any = {
             name: newSettings.name ?? settings.name,
@@ -310,7 +385,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             founding_year: newSettings.foundingYear ?? settings.foundingYear,
             twitter_url: newSettings.twitterUrl ?? settings.twitterUrl,
             instagram_url: newSettings.instagramUrl ?? settings.instagramUrl,
-            whatsapp_poll_message: newSettings.whatsappPollMessage ?? settings.whatsappPollMessage,
+            whatsapp_poll_message: serializedPollMessage,
             fine_categories: newSettings.fineCategories ?? settings.fineCategories,
             notifications_enabled: newSettings.notificationsEnabled ?? settings.notificationsEnabled,
             notification_email: newSettings.notificationEmail ?? settings.notificationEmail,

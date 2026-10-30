@@ -173,6 +173,7 @@ export interface MatchdayXI {
     formation: string;
     matchFormat?: MatchFormat;
     matchDurationMinutes?: number;
+    equalPlayTimeEnabled?: boolean;
     activePeriod?: "full" | "Full" | "Q1" | "Q2" | "Q3" | "Q4" | "H1" | "H2";
     periodStarters?: Record<string, Record<string, string>>;
     parentFriendlyExport?: boolean;

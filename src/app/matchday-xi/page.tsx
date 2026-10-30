@@ -112,7 +112,7 @@ function upsertNotesMetadata(cleanNotes: string, meetTime?: string, venueNotes?:
 }
 
 export default function MatchdayXIPage() {
-    const { settings, isLoaded: isClubLoaded } = useClub();
+    const { settings, updateSettings, isLoaded: isClubLoaded } = useClub();
     const { isLoading: isAuthLoading, clubId } = useAuth();
     const [lineup, setLineup] = useState<MatchdayXI | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
@@ -546,7 +546,14 @@ export default function MatchdayXIPage() {
         const notesMeetTime = (resolvedKo !== "14:00" && (rawNotesMeet === "13:00" || rawNotesMeet === "12:45")) ? "" : rawNotesMeet;
         const notesLocation = extractLocationFromNotes(currentMatch.notes);
         const defaultOffset = currentMatch.isHome ? 60 : 75;
-        const squadDefaultFormat: MatchFormat = inferFormatFromSquadName(activeSquadTab) || "11v11";
+        const enabledFormats: MatchFormat[] = settings.enabledMatchFormats?.length
+            ? settings.enabledMatchFormats
+            : ["11v11"];
+        const inferredSquadFormat = inferFormatFromSquadName(activeSquadTab) || "11v11";
+        const squadDefaultFormat: MatchFormat = enabledFormats.includes(inferredSquadFormat)
+            ? inferredSquadFormat
+            : "11v11";
+        const defaultClubDuration = settings.defaultMatchDuration || 90;
 
         const parsed = parseLineupFromNotes(currentMatch.notes);
         if (parsed) {
@@ -563,13 +570,14 @@ export default function MatchdayXIPage() {
                 ? parsed.venueNotes.trim()
                 : notesLocation;
 
-            // If a squad tab has a specific youth format and the fixture has no starters yet, auto-adopt the squad's format
+            // Default to 11v11 unless the parsed or squad format is enabled in club settings
             const rawParsedFormation = parsed.formation && FORMATIONS[parsed.formation]
                 ? parsed.formation
                 : DEFAULT_FORMATION_BY_FORMAT[squadDefaultFormat];
-            const parsedFormat: MatchFormat = parsed.matchFormat
+            const candidateFormat: MatchFormat = parsed.matchFormat
                 ? parsed.matchFormat
                 : (!hasStarters && squadDefaultFormat !== "11v11" ? squadDefaultFormat : getFormatFromFormation(rawParsedFormation));
+            const parsedFormat: MatchFormat = enabledFormats.includes(candidateFormat) ? candidateFormat : "11v11";
             const effectiveFormation = FORMATIONS_BY_FORMAT[parsedFormat].includes(rawParsedFormation)
                 ? rawParsedFormation
                 : DEFAULT_FORMATION_BY_FORMAT[parsedFormat];
@@ -579,7 +587,8 @@ export default function MatchdayXIPage() {
                 id: `match-lineup-${currentMatch.id}`,
                 matchFormat: parsedFormat,
                 formation: effectiveFormation,
-                matchDurationMinutes: parsed.matchDurationMinutes || FORMAT_DEFAULT_DURATION[parsedFormat],
+                matchDurationMinutes: parsed.matchDurationMinutes || (parsedFormat === "11v11" ? defaultClubDuration : FORMAT_DEFAULT_DURATION[parsedFormat]),
+                equalPlayTimeEnabled: typeof parsed.equalPlayTimeEnabled === "boolean" ? parsed.equalPlayTimeEnabled : Boolean(settings.equalPlayTimeEnabled),
                 activePeriod: parsed.activePeriod || "full",
                 periodStarters: parsed.periodStarters || {},
                 parentFriendlyExport: typeof parsed.parentFriendlyExport === "boolean" ? parsed.parentFriendlyExport : (parsedFormat !== "11v11"),
@@ -620,7 +629,8 @@ export default function MatchdayXIPage() {
             id: `match-lineup-${selectedMatchId}`,
             matchFormat: squadDefaultFormat,
             formation: DEFAULT_FORMATION_BY_FORMAT[squadDefaultFormat],
-            matchDurationMinutes: FORMAT_DEFAULT_DURATION[squadDefaultFormat],
+            matchDurationMinutes: squadDefaultFormat === "11v11" ? defaultClubDuration : FORMAT_DEFAULT_DURATION[squadDefaultFormat],
+            equalPlayTimeEnabled: Boolean(settings.equalPlayTimeEnabled),
             activePeriod: "full",
             periodStarters: {},
             parentFriendlyExport: squadDefaultFormat !== "11v11",
@@ -651,7 +661,7 @@ export default function MatchdayXIPage() {
         });
         setSaveStatus("draft");
         loadedLineupKeyRef.current = currentKey;
-    }, [selectedMatchId, matches, activeSquadTab]);
+    }, [selectedMatchId, matches, activeSquadTab, settings.enabledMatchFormats, settings.defaultMatchDuration, settings.equalPlayTimeEnabled]);
 
     const syncLineupAppearancesToDatabase = async (matchId: string, newLineup: MatchdayXI & { usedSubstitutes?: string[] }) => {
         const participationMap = computeLineupParticipation(newLineup);
@@ -1400,16 +1410,36 @@ export default function MatchdayXIPage() {
         handleFormationChange(nextFormation, newFormat);
     };
 
-    const handleMatchDurationChange = (minutes: number) => {
+    const handleMatchDurationChange = (minutes: number, silent = false) => {
         if (!lineup) return;
+        const clamped = Math.max(10, Math.min(120, minutes || 90));
         const updated: MatchdayXI = {
             ...lineup,
-            matchDurationMinutes: minutes,
+            matchDurationMinutes: clamped,
             updatedAt: new Date().toISOString(),
         };
         setLineup(updated);
         saveLineup(updated);
-        showToast(`Match duration set to ${minutes} mins`);
+        if (!silent) {
+            showToast(`Match duration set to ${clamped} mins`);
+        }
+    };
+
+    const handleToggleEqualPlayTime = () => {
+        if (!lineup) return;
+        const currentVal = typeof lineup.equalPlayTimeEnabled === "boolean"
+            ? lineup.equalPlayTimeEnabled
+            : Boolean(settings.equalPlayTimeEnabled);
+        const nextVal = !currentVal;
+        const updated: MatchdayXI = {
+            ...lineup,
+            equalPlayTimeEnabled: nextVal,
+            updatedAt: new Date().toISOString(),
+        };
+        setLineup(updated);
+        saveLineup(updated);
+        updateSettings({ equalPlayTimeEnabled: nextVal }).catch(() => {});
+        showToast(nextVal ? "Equal play-time target enabled" : "Equal play-time target hidden", "info");
     };
 
     const handlePeriodChange = (nextPeriod: "full" | "Q1" | "Q2" | "Q3" | "Q4") => {
@@ -3047,12 +3077,21 @@ export default function MatchdayXIPage() {
 
     if (!lineup) return <div>Loading...</div>;
 
-    const activeFormat: MatchFormat = lineup.matchFormat || getFormatFromFormation(lineup.formation);
+    const clubEnabledFormats: MatchFormat[] = (["5v5", "7v7", "9v9", "11v11"] as const).filter(fmt =>
+        (settings.enabledMatchFormats?.length ? settings.enabledMatchFormats : ["11v11"]).includes(fmt)
+    );
+    const rawActiveFormat: MatchFormat = lineup.matchFormat || getFormatFromFormation(lineup.formation);
+    const activeFormat: MatchFormat = clubEnabledFormats.includes(rawActiveFormat) ? rawActiveFormat : "11v11";
     const activeRomanLabel = FORMAT_ROMAN_LABEL[activeFormat];
     const formation = FORMATIONS[lineup.formation] || FORMATIONS[DEFAULT_FORMATION_BY_FORMAT[activeFormat]];
     const targetStarterCount = formation.length || FORMAT_PLAYER_COUNT[activeFormat];
     const benchStartNumber = targetStarterCount + 1;
-    const effectiveMatchDuration = lineup.matchDurationMinutes || FORMAT_DEFAULT_DURATION[activeFormat];
+    const effectiveMatchDuration = lineup.matchDurationMinutes || (activeFormat === "11v11" ? (settings.defaultMatchDuration || 90) : FORMAT_DEFAULT_DURATION[activeFormat]);
+    const isEqualPlayTimeActive = activeFormat !== "11v11" && (
+        typeof lineup.equalPlayTimeEnabled === "boolean"
+            ? lineup.equalPlayTimeEnabled
+            : Boolean(settings.equalPlayTimeEnabled)
+    );
     const defaultSubMinute = Math.round((effectiveMatchDuration * 2) / 3);
     const defaultSubPlayedMins = Math.max(10, effectiveMatchDuration - defaultSubMinute);
 
@@ -4259,29 +4298,31 @@ export default function MatchdayXIPage() {
                                 </span>
                             </div>
 
-                            {/* #1 4-Way Match Format Pill Switcher (5v5 | 7v7 | 9v9 | 11v11) */}
-                            <div
-                                className="inline-flex items-center p-0.5 rounded-xl bg-surface-1 border border-border shadow-sm"
-                                title="Switch Matchday Format (5v5, 7v7, 9v9, or 11v11)"
-                            >
-                                {(["5v5", "7v7", "9v9", "11v11"] as const).map(fmt => {
-                                    const isActive = activeFormat === fmt;
-                                    return (
-                                        <button
-                                            key={fmt}
-                                            type="button"
-                                            onClick={() => handleFormatChange(fmt)}
-                                            className={`px-2 py-1 rounded-lg text-[10px] sm:text-[11px] font-black transition-all ${
-                                                isActive
-                                                    ? "bg-primary text-primary-foreground shadow-sm"
-                                                    : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
-                                            }`}
-                                        >
-                                            {fmt}
-                                        </button>
-                                    );
-                                })}
-                            </div>
+                            {/* #1 Match Format Pill Switcher — only shown when additional formats (5v5/7v7/9v9) are enabled in Onboarding or Admin Settings */}
+                            {clubEnabledFormats.length > 1 && (
+                                <div
+                                    className="inline-flex items-center p-0.5 rounded-xl bg-surface-1 border border-border shadow-sm"
+                                    title="Switch Matchday Format"
+                                >
+                                    {clubEnabledFormats.map(fmt => {
+                                        const isActive = activeFormat === fmt;
+                                        return (
+                                            <button
+                                                key={fmt}
+                                                type="button"
+                                                onClick={() => handleFormatChange(fmt)}
+                                                className={`px-2 py-1 rounded-lg text-[10px] sm:text-[11px] font-black transition-all ${
+                                                    isActive
+                                                        ? "bg-primary text-primary-foreground shadow-sm"
+                                                        : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                                                }`}
+                                            >
+                                                {fmt}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
 
                             {/* Mobile Quick Squad Switcher right on Pitch Toolbar */}
                             {currentSquads.length > 1 && (
@@ -4369,19 +4410,37 @@ export default function MatchdayXIPage() {
                                 </button>
                             )}
 
-                            {/* #9 Format-Specific Match Duration Selector */}
-                            <select
-                                value={effectiveMatchDuration}
-                                onChange={(e) => handleMatchDurationChange(parseInt(e.target.value, 10) || 90)}
-                                title="Match Duration (used for automatic sub & appearance minutes)"
-                                className="px-2.5 py-1.5 border border-border rounded-xl text-xs font-bold focus:ring-2 focus:ring-primary focus:outline-none bg-surface-1 text-foreground shadow-sm hover:border-foreground/30 transition-colors cursor-pointer"
+                            {/* #9 Configurable Total Match Time Length (mins) */}
+                            <div
+                                className="inline-flex items-center gap-1 px-2.5 py-1 border border-border rounded-xl bg-surface-1 text-foreground shadow-sm"
+                                title="Configure total match length in minutes (used for automatic sub & appearance minutes)"
                             >
-                                {[40, 50, 60, 70, 80, 90].map(mins => (
-                                    <option key={mins} value={mins} className="bg-surface-1 text-foreground">
-                                        {mins} mins
-                                    </option>
-                                ))}
-                            </select>
+                                <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
+                                <input
+                                    type="number"
+                                    min={10}
+                                    max={120}
+                                    list="match-duration-presets"
+                                    value={effectiveMatchDuration}
+                                    onChange={(e) => {
+                                        const val = parseInt(e.target.value, 10);
+                                        if (!isNaN(val) && val > 0) {
+                                            handleMatchDurationChange(val, true);
+                                        }
+                                    }}
+                                    onBlur={(e) => {
+                                        const val = parseInt(e.target.value, 10) || 90;
+                                        handleMatchDurationChange(val, false);
+                                    }}
+                                    className="w-10 bg-transparent text-xs font-bold text-foreground text-center focus:outline-none"
+                                />
+                                <span className="text-[10px] font-bold text-muted-foreground">mins</span>
+                                <datalist id="match-duration-presets">
+                                    {[40, 50, 60, 70, 80, 90].map(mins => (
+                                        <option key={mins} value={mins} />
+                                    ))}
+                                </datalist>
+                            </div>
 
                             {/* #1 Formation Dropdown filtered to activeFormat */}
                             <select
@@ -4391,7 +4450,7 @@ export default function MatchdayXIPage() {
                             >
                                 {(FORMATIONS_BY_FORMAT[activeFormat] || FORMATION_NAMES).map(name => (
                                     <option key={name} value={name} className="bg-surface-1 text-foreground">
-                                        {name} ({activeFormat})
+                                        {clubEnabledFormats.length > 1 ? `${name} (${activeFormat})` : name}
                                     </option>
                                 ))}
                             </select>
@@ -4818,6 +4877,20 @@ export default function MatchdayXIPage() {
                             <span className="cf-metadata mt-0.5">{selectedSubsCount} / {lineup.substitutes.length} Selected</span>
                         </div>
                         <div className="flex items-center gap-1 shrink-0">
+                            {activeFormat !== "11v11" && (
+                                <button
+                                    type="button"
+                                    onClick={handleToggleEqualPlayTime}
+                                    title="Toggle Youth Equal Play-Time Target ON or OFF"
+                                    className={`font-bold text-[10px] flex items-center px-2 py-1 rounded-full border transition-colors ${
+                                        isEqualPlayTimeActive
+                                            ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                                            : "bg-surface-2 text-muted-foreground border-border hover:text-foreground"
+                                    }`}
+                                >
+                                    Equal Time: {isEqualPlayTimeActive ? "ON" : "OFF"}
+                                </button>
+                            )}
                             <button
                                 type="button"
                                 onClick={handleAutoFillBench}
@@ -4847,8 +4920,8 @@ export default function MatchdayXIPage() {
                         </div>
                     </div>
 
-                    {/* #8 Rolling Substitutions & Equal Game-Time Helper Banner */}
-                    {selectedSubsCount > 0 && (
+                    {/* #8 Rolling Substitutions & Equal Game-Time Helper Banner — NEVER shown in 11v11, and only shown when toggled ON in youth formats */}
+                    {activeFormat !== "11v11" && isEqualPlayTimeActive && selectedSubsCount > 0 && (
                         <div className="px-3 py-2 border-b border-border/60 bg-surface-2/60 flex items-center justify-between gap-2 shrink-0">
                             <div className="flex flex-col min-w-0">
                                 <span className="text-[10px] font-extrabold text-foreground truncate">

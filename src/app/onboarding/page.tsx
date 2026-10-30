@@ -443,6 +443,15 @@ function OnboardingContent() {
     const [squads, setSquads] = useState<string[]>(
         isRerun && settings.squads?.length ? settings.squads : ["First Team"]
     );
+    const [enabledMatchFormats, setEnabledMatchFormats] = useState<("5v5" | "7v7" | "9v9" | "11v11")[]>(
+        isRerun && settings.enabledMatchFormats?.length ? settings.enabledMatchFormats : ["11v11"]
+    );
+    const [equalPlayTimeEnabled, setEqualPlayTimeEnabled] = useState<boolean>(
+        isRerun ? (settings.equalPlayTimeEnabled ?? false) : false
+    );
+    const [defaultMatchDuration, setDefaultMatchDuration] = useState<number>(
+        isRerun ? (settings.defaultMatchDuration ?? 90) : 90
+    );
     const [customSquadInput, setCustomSquadInput] = useState("");
     const [whatsappPollMessage, setWhatsappPollMessage] = useState(
         settings.whatsappPollMessage ||
@@ -1092,6 +1101,9 @@ function OnboardingContent() {
                     defaultHomeKickOff: defaultHomeKickOff || "15:00",
                     defaultCompetition: defaultCompetition.trim() || "Premier Division",
                     useMatchdayNumbering,
+                    enabledMatchFormats: enabledMatchFormats.length > 0 ? enabledMatchFormats : ["11v11"],
+                    equalPlayTimeEnabled,
+                    defaultMatchDuration: Number(defaultMatchDuration) || 90,
                     squads: squads.length > 0 ? squads : ["First Team"],
                     whatsappPollMessage,
                     subsEnabled: subsEnabledVal,
@@ -1976,6 +1988,89 @@ function OnboardingContent() {
                                                 </Button>
                                             </div>
                                         </div>
+                                    </div>
+
+                                    {/* Match Formats (11v11 Default + Optional Youth/Small-Sided Formats) & Total Match Duration */}
+                                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-white/10 space-y-3.5">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div>
+                                                <div className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+                                                    <Sliders className="w-3.5 h-3.5 text-emerald-400" /> Match Formats &amp; Total Match Length
+                                                </div>
+                                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                                    11v11 is enabled by default. Select additional small-sided formats if your club runs youth/academy teams.
+                                                </p>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <span className="text-[11px] font-bold text-slate-300">Match Length:</span>
+                                                <Input
+                                                    type="number"
+                                                    min={10}
+                                                    max={120}
+                                                    value={defaultMatchDuration}
+                                                    onChange={(e) => setDefaultMatchDuration(Math.max(10, Math.min(120, Number(e.target.value) || 90)))}
+                                                    className="h-8 w-16 bg-slate-900 border-white/15 text-xs font-bold text-white text-center px-1.5"
+                                                />
+                                                <span className="text-[11px] text-slate-400">mins</span>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2">
+                                            {([
+                                                { id: "11v11", label: "11v11 (Default)" },
+                                                { id: "9v9", label: "9v9 (U11–U12)" },
+                                                { id: "7v7", label: "7v7 (U9–U10)" },
+                                                { id: "5v5", label: "5v5 (U7–U8)" },
+                                            ] as const).map((fmt) => {
+                                                const active = enabledMatchFormats.includes(fmt.id);
+                                                return (
+                                                    <button
+                                                        key={fmt.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (fmt.id === "11v11") return; // 11v11 is always kept as default base format
+                                                            setEnabledMatchFormats((prev) =>
+                                                                prev.includes(fmt.id)
+                                                                    ? prev.filter((f) => f !== fmt.id)
+                                                                    : [...prev, fmt.id]
+                                                            );
+                                                        }}
+                                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                                                            active
+                                                                ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-200"
+                                                                : "bg-slate-900/60 border-white/10 text-slate-400 hover:text-white"
+                                                        }`}
+                                                    >
+                                                        {active ? "✓ " : "+ "}
+                                                        {fmt.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        {enabledMatchFormats.some((f) => f !== "11v11") && (
+                                            <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-3">
+                                                <div>
+                                                    <div className="text-xs font-bold text-white">
+                                                        Youth Equal Play-Time Target (5v5 / 7v7 / 9v9 Only)
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400">
+                                                        Show equal game-time calculator on the bench for small-sided youth formats (never shown on 11v11).
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEqualPlayTimeEnabled((v) => !v)}
+                                                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all shrink-0 ${
+                                                        equalPlayTimeEnabled
+                                                            ? "bg-emerald-500 text-slate-950 border-emerald-400"
+                                                            : "bg-slate-900 text-slate-400 border-white/15"
+                                                    }`}
+                                                >
+                                                    {equalPlayTimeEnabled ? "ON" : "OFF"}
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Simplified 3-Card Finance Setup */}
