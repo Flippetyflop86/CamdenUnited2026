@@ -159,3 +159,61 @@ export const unproxiedSupabase = {
     ...rawClient,
     from: originalFrom
 } as typeof rawClient;
+
+/**
+ * Fetches `match_player_stats` safely for large multi-team clubs (e.g. 20 teams / 400+ players)
+ * and 3,000+ user databases by:
+ * 1. Chunking `playerIds` into batches of 80 UUIDs so HTTP GET URLs never exceed Cloudflare's 8KB header limit.
+ * 2. Auto-paginating each chunk in 1,000-row pages (`.range(offset, offset + 999)`) so a club with
+ *    thousands of historical stat rows across 20 teams never gets silently truncated at row 1,000.
+ */
+export async function fetchScopedMatchPlayerStats<T = any>(options?: {
+    playerIds?: string[];
+    columns?: string;
+}): Promise<T[]> {
+    const columns = options?.columns || "*";
+    let targetPlayerIds = (options?.playerIds || []).filter(Boolean);
+
+    if (!options?.playerIds) {
+        const { data: clubPlayers } = await supabase.from("players").select("id").range(0, 4999);
+        targetPlayerIds = (clubPlayers || []).map((p: any) => p.id).filter(Boolean);
+    }
+
+    if (targetPlayerIds.length === 0) {
+        return [];
+    }
+
+    const CHUNK_SIZE = 80;
+    const PAGE_SIZE = 1000;
+    const chunks: string[][] = [];
+    for (let i = 0; i < targetPlayerIds.length; i += CHUNK_SIZE) {
+        chunks.push(targetPlayerIds.slice(i, i + CHUNK_SIZE));
+    }
+
+    const chunkResults = await Promise.all(
+        chunks.map(async (chunkIds) => {
+            const collected: T[] = [];
+            let offset = 0;
+            while (true) {
+                const { data, error } = await supabase
+                    .from("match_player_stats")
+                    .select(columns)
+                    .in("player_id", chunkIds)
+                    .range(offset, offset + PAGE_SIZE - 1);
+
+                if (error || !data || data.length === 0) {
+                    break;
+                }
+                collected.push(...(data as T[]));
+                if (data.length < PAGE_SIZE) {
+                    break;
+                }
+                offset += PAGE_SIZE;
+            }
+            return collected;
+        })
+    );
+
+    return chunkResults.flat();
+}
+

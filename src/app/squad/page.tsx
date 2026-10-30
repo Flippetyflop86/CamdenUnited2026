@@ -49,7 +49,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { PageHeader } from "@/components/ui/page-header";
 import { PageSection } from "@/components/layout/page-section";
 import { SectionHeader } from "@/components/ui/section-header";
-import { supabase } from "@/lib/supabase";
+import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
 import imageCompression from "browser-image-compression";
 import { UploadCloud, Loader2 } from "lucide-react";
 import { logActivity } from "@/lib/activity";
@@ -410,10 +410,9 @@ export default function SquadPage() {
             const dbPlayers = playersRes.data || [];
             const matches = matchesRes.data || [];
             const playerIds = dbPlayers.map((p: any) => p.id).filter(Boolean);
-            const statsRes = playerIds.length > 0
-                ? await supabase.from("match_player_stats").select("*").in("player_id", playerIds).limit(5000)
-                : { data: [] };
-            const stats = statsRes.data || [];
+            const stats = playerIds.length > 0
+                ? await fetchScopedMatchPlayerStats({ playerIds })
+                : [];
 
             const matchSeasons = new Map<string, string>();
             const matchCompetitions = new Map<string, string>();

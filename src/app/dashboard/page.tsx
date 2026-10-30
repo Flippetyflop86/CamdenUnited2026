@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
-import { supabase } from "@/lib/supabase";
+import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer } from "@/lib/utils";
 import { parseStatTextString } from "@/lib/match-stats-sync";
 import { resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
@@ -245,18 +245,8 @@ export default function DashboardPage() {
     };
 
     const fetchMatchPlayerStats = async () => {
-        const { data: clubPlayers } = await supabase.from('players').select('id');
-        const playerIds = (clubPlayers || []).map((p: any) => p.id).filter(Boolean);
-        if (playerIds.length === 0) {
-            setMatchPlayerStats([]);
-            return;
-        }
-        const { data } = await supabase
-            .from('match_player_stats')
-            .select('*')
-            .in('player_id', playerIds)
-            .limit(5000);
-        if (data) setMatchPlayerStats(data);
+        const data = await fetchScopedMatchPlayerStats();
+        setMatchPlayerStats(data);
     };
 
     const fetchTrainingSessions = async () => {

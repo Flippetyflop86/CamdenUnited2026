@@ -50,7 +50,7 @@ import {
 } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
-import { supabase } from "@/lib/supabase";
+import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
 import { calculateMeetTime, resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
 import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, computeMatchOutcome, extractLineupFromRawNotes, computeLineupParticipation } from "@/lib/match-stats-sync";
@@ -298,17 +298,9 @@ export default function MatchdayXIPage() {
 
     const fetchSeasonStats = async () => {
         try {
-            const { data: clubPlayers } = await supabase.from('players').select('id');
-            const playerIds = (clubPlayers || []).map((p: any) => p.id).filter(Boolean);
-            if (playerIds.length === 0) {
-                setSeasonStatsMap({});
-                return;
-            }
-            const { data } = await supabase
-                .from('match_player_stats')
-                .select('player_id, goals, assists, minutes_played')
-                .in('player_id', playerIds)
-                .limit(5000);
+            const data = await fetchScopedMatchPlayerStats({
+                columns: 'player_id, goals, assists, minutes_played'
+            });
             if (data) {
                 const map: Record<string, { apps: number; goals: number; assists: number }> = {};
                 data.forEach((row: any) => {
