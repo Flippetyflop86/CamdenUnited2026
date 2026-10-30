@@ -1099,7 +1099,7 @@ export default function OppositionReportsPage() {
             ctx.fillStyle = "#34d399";
             ctx.font = "900 32px Inter, system-ui, sans-serif";
             ctx.fillText(
-                `⚽ ${(report.name || "OPPOSITION").toUpperCase()} TACTICAL PITCH (${report.formation || "4-2-3-1"})`,
+                `⚽ ${(report.name || "OPPOSITION").toUpperCase()} (${report.formation || "4-2-3-1"})`,
                 pitchCardX + 40,
                 pitchCardY + 58
             );
@@ -1434,7 +1434,7 @@ export default function OppositionReportsPage() {
                 </div>
                 <div class="pitch-row">
                     <div>
-                        <div class="box-title" style="color:#047857; margin-bottom:6px;">⚽ ${report.name} Tactical Pitch (${report.formation})</div>
+                        <div class="box-title" style="color:#047857; margin-bottom:6px;">⚽ ${report.name} (${report.formation})</div>
                         <div class="pitch-canvas">
                             <div style="position:absolute; inset:12px; border:2px solid rgba(255,255,255,0.55); border-radius:4px;"></div>
                             <div style="position:absolute; left:12px; right:12px; top:50%; border-top:2px solid rgba(255,255,255,0.55);"></div>
@@ -2476,7 +2476,7 @@ export default function OppositionReportsPage() {
                         <div className="p-3.5 flex flex-wrap items-center justify-between gap-2 border-b border-border">
                             <div>
                                 <h3 className="text-xs font-black uppercase tracking-wider text-foreground">
-                                    {activeReport.name || "Opposition"} Tactical Pitch ({activeReport.formation} • {activeOppFormat})
+                                    {activeReport.name || "Opposition"} ({activeReport.formation} • {activeOppFormat})
                                 </h3>
                                 <p className="text-[10px] text-muted-foreground">
                                     Tap any shirt number on the pitch to log player strengths, weaknesses &amp; role
@@ -3886,7 +3886,7 @@ export default function OppositionReportsPage() {
                             <div>
                                 <h3 className="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-2">
                                     <span>
-                                        {activeReport.name || "Opposition"} Tactical Pitch ({activeReport.formation} • {activeOppFormat})
+                                        {activeReport.name || "Opposition"} ({activeReport.formation} • {activeOppFormat})
                                     </span>
                                 </h3>
                                 <p className="text-[11px] text-muted-foreground">
