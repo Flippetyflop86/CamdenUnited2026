@@ -16,11 +16,6 @@ function getAdminClient() {
     );
 }
 
-function getSessionCode(id: string): string {
-    const cleanId = id.replace(/-/g, "");
-    return ("CF" + cleanId.substring(0, 4)).toUpperCase();
-}
-
 export async function POST(request: Request) {
     const supabaseAdmin = getAdminClient();
     try {
@@ -146,7 +141,6 @@ export async function POST(request: Request) {
             const name = recipient.first_name || "Player";
             const dateStr = eventContext?.date ? new Date(eventContext.date).toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }) : "Upcoming Session";
             const location = eventContext?.location || eventContext?.opponent || "TBD";
-            const code = eventContext ? getSessionCode(eventContext.id) : "";
             const tokenVal = eventContext?.event_token || eventContext?.id || "";
             const respondUrl = `${origin}/respond/${tokenVal}`;
 
@@ -159,7 +153,7 @@ export async function POST(request: Request) {
                 .replace(/{{FirstName}}/g, name)
                 .replace(/{{TrainingDate}}/g, dateStr)
                 .replace(/{{Location}}/g, location)
-                .replace(/{{SessionCode}}/g, code)
+                .replace(/{{SessionCode}}/g, "")
                 .replace(/{{RsvpLink}}/g, respondUrl)
                 .replace(/{{JoinLink}}/g, `${origin}/join`);
 

@@ -3121,30 +3121,24 @@ export default function MatchdayXIPage() {
             if (lineup.footwearNotes?.trim()) {
                 msgTemplate += `👟 Surface / Footwear: ${lineup.footwearNotes.trim()}\n`;
             }
-            msgTemplate += `🔑 Session Code: {code}\n\n`;
+            msgTemplate += `\n`;
         } else {
             msgTemplate += `*Upcoming Match TBD*\n\n`;
         }
-        msgTemplate += `🔴 Please confirm your availability for this match as soon as possible! Let's go!\n\n`;
-        if (nextMatch) {
-            const checkinLink = `${window.location.origin}/respond/${nextMatch.event_token || nextMatch.id}`;
-            msgTemplate += `🔗 Log availability here:\n${checkinLink}`;
-        }
+        msgTemplate += `🔴 Please confirm your availability for this match as soon as possible! Let's go!`;
 
         const dateFormatted = nextMatch 
             ? new Date(nextMatch.date).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) 
             : new Date().toLocaleDateString('en-GB');
 
         const meetTime = getFormattedMeetTime();
-        const sessionCode = nextMatch ? ("CF" + (nextMatch.event_token || nextMatch.id).replace(/-/g, "").substring(0, 4)).toUpperCase() : "TBD";
 
         const formattedMsg = msgTemplate
             .replace(/{opponent}/g, nextMatch ? nextMatch.opponent : "TBD")
             .replace(/{competition}/g, nextMatch ? (nextMatch.competition || "Match") : "Match")
             .replace(/{date}/g, dateFormatted)
             .replace(/{time}/g, nextMatch ? nextMatch.time : "TBD")
-            .replace(/{meet_time}/g, meetTime)
-            .replace(/{code}/g, sessionCode);
+            .replace(/{meet_time}/g, meetTime);
 
         navigator.clipboard.writeText(formattedMsg).then(() => {
             showToast("Availability Poll copied & opening WhatsApp");

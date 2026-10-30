@@ -141,7 +141,7 @@ export default function TemplatesPage() {
             {
                 name: "Outstanding RSVP Reminder",
                 subject: "⚠️ Availability Check-in: {{TrainingDate}}",
-                bodyContent: "Hi {{FirstName}},\n\nYou haven't updated your availability for our next session yet!\n\n📅 Date: {{TrainingDate}}\n📍 Location: {{Location}}\n\nClick the link below to verify with code {{SessionCode}} and confirm your slot:\n🔗 {{RsvpLink}}\n\nThank you,\nClub Management"
+                bodyContent: "Hi {{FirstName}},\n\nYou haven't updated your availability for our next session yet!\n\n📅 Date: {{TrainingDate}}\n📍 Location: {{Location}}\n\nClick the link below to confirm your availability:\n🔗 {{RsvpLink}}\n\nThank you,\nClub Management"
             },
             {
                 name: "Player Invite Link",

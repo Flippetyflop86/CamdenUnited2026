@@ -18,12 +18,6 @@ function getAdminClient() {
     );
 }
 
-// Generate a deterministic 6-character session code based on ID
-function getSessionCode(id: string): string {
-    const cleanId = id.replace(/-/g, "");
-    return ("CF" + cleanId.substring(0, 4)).toUpperCase();
-}
-
 // Position order helper
 const positionOrder: Record<string, number> = {
     "GK": 1, "RB": 2, "LB": 2, "CB": 2, "RWB": 2, "LWB": 2, "DEF": 2,
@@ -201,14 +195,14 @@ export async function GET(request: Request) {
     }
 }
 
-// POST handler: Verify Session Code and save RSVP
+// POST handler: Save player RSVP
 export async function POST(request: Request) {
     const supabaseAdmin = getAdminClient();
     try {
         const body = await request.json();
-        const { playerId, eventId, eventType, status, code, notes } = body;
+        const { playerId, eventId, eventType, status, notes } = body;
 
-        if (!playerId || !eventId || !eventType || !status || !code) {
+        if (!playerId || !eventId || !eventType || !status) {
             return NextResponse.json({ success: false, error: "Missing required parameters." }, { status: 400 });
         }
 
@@ -247,37 +241,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: "Player not found." }, { status: 404 });
         }
 
-        // 2. Verify Session Code (supports "CF" ClubFlow prefix as well as legacy "CU" invites)
-        let codeSuffix = "";
-        if (eventType === "match") {
-            const { data: match } = await supabaseAdmin
-                .from("matches")
-                .select("id, event_token")
-                .eq("id", eventId)
-                .single();
-            if (match) {
-                codeSuffix = (match.event_token || match.id).replace(/-/g, "").substring(0, 4).toUpperCase();
-            }
-        } else {
-            const { data: session } = await supabaseAdmin
-                .from("training_sessions")
-                .select("id, event_token")
-                .eq("id", eventId)
-                .single();
-            if (session) {
-                codeSuffix = (session.event_token || session.id).replace(/-/g, "").substring(0, 4).toUpperCase();
-            }
-        }
-
-        const enteredClean = (code || "").trim().toUpperCase();
-        if (!codeSuffix || (enteredClean !== `CF${codeSuffix}` && enteredClean !== `CU${codeSuffix}`)) {
-            return NextResponse.json({ success: false, error: "Incorrect session code. Please verify the code in the WhatsApp invite." }, { status: 401 });
-        }
-
         // Sanitize optional note so brackets cannot corrupt the [AVAILABILITY: [...]] tag
         const safeNote = String(notes || "").replace(/\[/g, "(").replace(/\]/g, ")").trim();
 
-        // 3. Update attendance
+        // 2. Update attendance
         if (eventType === "match") {
             const { data: match, error: fetchMatchErr } = await supabaseAdmin
                 .from("matches")

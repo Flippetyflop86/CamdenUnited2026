@@ -7,10 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { CalendarDays, Clock, MapPin, AlertCircle, RefreshCw, KeyRound, CheckCircle, UserCheck } from "lucide-react";
+import { CalendarDays, Clock, MapPin, AlertCircle, RefreshCw, CheckCircle, UserCheck } from "lucide-react";
 import { formatPlayerName } from "@/lib/utils";
 
-export default function SessionCodeResponderPage() {
+export default function AvailabilityResponderPage() {
     const params = useParams();
     const token = Array.isArray(params?.token) ? params.token[0] : params?.token;
 
@@ -22,12 +22,11 @@ export default function SessionCodeResponderPage() {
     const [players, setPlayers] = useState<any[]>([]);
     const [error, setError] = useState<string | null>(null);
 
-    // Verification modal states
+    // RSVP modal states
     const [selectedPlayer, setSelectedPlayer] = useState<any | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const [enteredCode, setEnteredCode] = useState("");
-    const [codeError, setCodeError] = useState("");
-    const [isVerifying, setIsVerifying] = useState(false);
+    const [submitError, setSubmitError] = useState("");
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // RSVP success indicator
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -61,36 +60,17 @@ export default function SessionCodeResponderPage() {
         }
     }, [token]);
 
-    const isVerifiedForSession = () => {
-        if (typeof window === "undefined" || !event) return false;
-        return localStorage.getItem(`cf_session_verified_${event.id}`) === "true";
-    };
-
-    const getSavedCode = () => {
-        if (typeof window === "undefined" || !event) return "";
-        return localStorage.getItem(`cf_session_code_${event.id}`) || "";
-    };
-
     const handlePlayerClick = (player: any) => {
         setSelectedPlayer(player);
         setSuccessMessage(null);
-        setCodeError("");
-        setRsvpNote(""); // Reset note input
- 
-        if (isVerifiedForSession()) {
-            setEnteredCode(getSavedCode());
-        } else if (token) {
-            const autoCode = ("CF" + String(token).replace(/-/g, "").substring(0, 4)).toUpperCase();
-            setEnteredCode(autoCode);
-        } else {
-            setEnteredCode("");
-        }
+        setSubmitError("");
+        setRsvpNote("");
         setIsModalOpen(true);
     };
  
-    const submitResponse = async (player: any, codeVal: string, status: "Available" | "Maybe" | "Unavailable", noteVal: string) => {
-        setIsVerifying(true);
-        setCodeError("");
+    const submitResponse = async (player: any, status: "Available" | "Maybe" | "Unavailable", noteVal: string) => {
+        setIsSubmitting(true);
+        setSubmitError("");
  
         try {
             const res = await fetch("/api/player/respond", {
@@ -101,7 +81,6 @@ export default function SessionCodeResponderPage() {
                     eventId: event.id,
                     eventType,
                     status,
-                    code: codeVal,
                     notes: noteVal
                 })
             });
@@ -109,14 +88,10 @@ export default function SessionCodeResponderPage() {
             const data = await res.json();
  
             if (!res.ok || !data.success) {
-                setCodeError(data.error || "Incorrect code. Please check the WhatsApp invite.");
-                setIsVerifying(false);
+                setSubmitError(data.error || "Could not save your RSVP. Please try again.");
+                setIsSubmitting(false);
                 return;
             }
- 
-            // Save verification locally
-            localStorage.setItem(`cf_session_verified_${event.id}`, "true");
-            localStorage.setItem(`cf_session_code_${event.id}`, codeVal);
  
             setIsModalOpen(false);
             setSuccessMessage(`${formatPlayerName(player)} marked as ${status}!`);
@@ -130,9 +105,9 @@ export default function SessionCodeResponderPage() {
             }, 2500);
  
         } catch (err: any) {
-            setCodeError("Connection error. Please try again.");
+            setSubmitError("Connection error. Please try again.");
         } finally {
-            setIsVerifying(false);
+            setIsSubmitting(false);
         }
     };
 
@@ -178,9 +153,6 @@ export default function SessionCodeResponderPage() {
                             <p className="text-xs text-slate-500 font-semibold">RSVP Portal</p>
                         </div>
                     </div>
-                    <Badge variant="outline" className="border-red-200 text-red-600 bg-red-50/50 px-2.5 py-1 font-bold">
-                        Session Code Mode
-                    </Badge>
                 </div>
             </div>
 
@@ -198,9 +170,9 @@ export default function SessionCodeResponderPage() {
                         </div>
                         <h2 className="text-xl font-black text-slate-900 mt-3">{eventName}</h2>
                         <CardDescription className="text-slate-500 leading-relaxed mt-1 font-medium">
-                            Please confirm whether you are attending the session on {formattedDate}. 
+                            Please confirm whether you are attending the session on {formattedDate}.
                             <span className="block mt-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
-                                💡 Select your name below and enter the session code shared in your WhatsApp message.
+                                💡 Select your name below to log your availability.
                             </span>
                         </CardDescription>
                     </CardHeader>
@@ -360,12 +332,10 @@ export default function SessionCodeResponderPage() {
                                         else if (record?.status === "Late") playerStatus = "Maybe";
                                     }
 
-                                    const isSessionVerified = isVerifiedForSession();
-
                                     return (
                                         <div
                                             key={player.id}
-                                            onClick={() => !isVerifying && handlePlayerClick(player)}
+                                            onClick={() => !isSubmitting && handlePlayerClick(player)}
                                             className={`
                                                 relative flex flex-col items-center p-4 rounded-xl border cursor-pointer select-none text-center gap-1.5 transition-all duration-150 min-h-[110px]
                                                 ${playerStatus === "Available"
@@ -376,12 +346,6 @@ export default function SessionCodeResponderPage() {
                                                 }
                                             `}
                                         >
-                                            {isSessionVerified && (
-                                                <div className="absolute top-2 right-2 flex items-center justify-center h-4.5 w-4.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-700 text-[8px] font-bold">
-                                                    ✓
-                                                </div>
-                                            )}
-
                                             <span className="text-[9px] font-extrabold text-slate-400 uppercase tracking-wider">
                                                 {player.position}
                                             </span>
@@ -418,7 +382,7 @@ export default function SessionCodeResponderPage() {
                 </Card>
             </div>
 
-            {/* Code Verification Modal */}
+            {/* RSVP Modal */}
             {isModalOpen && selectedPlayer && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
                     <div className="bg-white border border-slate-200 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
@@ -426,7 +390,7 @@ export default function SessionCodeResponderPage() {
                         <div className="p-5 border-b border-slate-150 bg-slate-50 flex justify-between items-start">
                             <div className="flex items-center gap-3">
                                 <div className="h-10 w-10 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center text-red-600">
-                                    <KeyRound className="h-5 w-5" />
+                                    <CheckCircle className="h-5 w-5" />
                                 </div>
                                 <div>
                                     <h3 className="font-extrabold text-lg text-slate-900">
@@ -445,32 +409,14 @@ export default function SessionCodeResponderPage() {
 
                         {/* Modal Content */}
                         <div className="p-5 space-y-4">
-                            {codeError && (
+                            {submitError && (
                                 <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-center gap-2.5 text-red-650 text-xs font-semibold">
                                     <AlertCircle className="h-4.5 w-4.5 shrink-0" />
-                                    <span>{codeError}</span>
+                                    <span>{submitError}</span>
                                 </div>
                             )}
 
                             <div className="space-y-4">
-                                {!isVerifiedForSession() && (
-                                    <div className="space-y-1.5">
-                                        <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                                            Please enter the 6-character session code from the WhatsApp invite.
-                                        </p>
-                                        <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Session Code</label>
-                                        <Input
-                                            type="text"
-                                            required
-                                            autoFocus
-                                            value={enteredCode}
-                                            onChange={(e) => setEnteredCode(e.target.value.toUpperCase().trim())}
-                                            placeholder="e.g. CFA5DC"
-                                            className="bg-slate-50 border-slate-200 text-slate-900 font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500 uppercase font-bold"
-                                        />
-                                    </div>
-                                )}
-
                                 <div className="space-y-1.5 pt-1">
                                     <label className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Notes / Reason (Optional)</label>
                                     <Input
@@ -487,30 +433,30 @@ export default function SessionCodeResponderPage() {
                                     <div className="grid grid-cols-3 gap-2">
                                         <Button 
                                             type="button"
-                                            disabled={isVerifying || (!isVerifiedForSession() && !enteredCode)}
-                                            onClick={() => submitResponse(selectedPlayer, enteredCode, "Available", rsvpNote)}
+                                            disabled={isSubmitting}
+                                            onClick={() => submitResponse(selectedPlayer, "Available", rsvpNote)}
                                             className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-10 transition-colors"
                                         >
                                             Available
                                         </Button>
                                         <Button 
                                             type="button"
-                                            disabled={isVerifying || (!isVerifiedForSession() && !enteredCode)}
-                                            onClick={() => submitResponse(selectedPlayer, enteredCode, "Maybe", rsvpNote)}
+                                            disabled={isSubmitting}
+                                            onClick={() => submitResponse(selectedPlayer, "Maybe", rsvpNote)}
                                             className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs h-10 transition-colors"
                                         >
                                             Maybe
                                         </Button>
                                         <Button 
                                             type="button"
-                                            disabled={isVerifying || (!isVerifiedForSession() && !enteredCode)}
-                                            onClick={() => submitResponse(selectedPlayer, enteredCode, "Unavailable", rsvpNote)}
+                                            disabled={isSubmitting}
+                                            onClick={() => submitResponse(selectedPlayer, "Unavailable", rsvpNote)}
                                             className="bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs h-10 transition-colors"
                                         >
                                             No
                                         </Button>
                                     </div>
-                                    {isVerifying && <p className="text-[10px] text-slate-500 text-center animate-pulse mt-1">Verifying code & saving RSVP...</p>}
+                                    {isSubmitting && <p className="text-[10px] text-slate-500 text-center animate-pulse mt-1">Saving RSVP...</p>}
                                 </div>
                             </div>
                         </div>

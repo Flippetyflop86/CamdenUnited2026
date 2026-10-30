@@ -291,13 +291,6 @@ export default function ComposeEmailsPage() {
                                     >
                                         + RSVP Link
                                     </Badge>
-                                    <Badge 
-                                        variant="secondary" 
-                                        className="cursor-pointer hover:bg-slate-200 text-[9px]"
-                                        onClick={() => insertMergeTag("{{SessionCode}}")}
-                                    >
-                                        + Code
-                                    </Badge>
                                 </div>
                             </div>
                             <Textarea 
@@ -383,7 +376,6 @@ export default function ComposeEmailsPage() {
                                 <p><strong>`{"{{TrainingDate}}"}`</strong>: Selected event date (e.g. Monday, 29 June)</p>
                                 <p><strong>`{"{{Location}}"}`</strong>: Session location / Opponent name</p>
                                 <p><strong>`{"{{RsvpLink}}"}`</strong>: Auto-generated responder link</p>
-                                <p><strong>`{"{{SessionCode}}"}`</strong>: Alphanumeric code (e.g. CUA5DC)</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -415,7 +407,6 @@ export default function ComposeEmailsPage() {
                                     .replace(/{{FirstName}}/g, "John")
                                     .replace(/{{TrainingDate}}/g, "Tuesday, 30 June")
                                     .replace(/{{Location}}/g, "Harris Lowe Academy")
-                                    .replace(/{{SessionCode}}/g, "CU38A2")
                                     .replace(/{{RsvpLink}}/g, "https://www.clubflow.org.uk/respond/dummy-uuid-token")
                                     .replace(/{{JoinLink}}/g, "https://www.clubflow.org.uk/join")
                                 }

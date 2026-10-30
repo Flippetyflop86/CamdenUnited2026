@@ -1153,11 +1153,6 @@ export default function MatchesPage() {
             parts.push(additionalNotes.trim());
         }
 
-        const tokenOrId = activeShareMatch.event_token || activeShareMatch.id;
-        const checkinLink = `${window.location.origin}/respond/${tokenOrId}`;
-        const sessionCode = ("CF" + tokenOrId.replace(/-/g, "").substring(0, 4)).toUpperCase();
-        parts.push(`\ud83d\udd17 Log availability here:\n${checkinLink}\n\ud83d\udd11 Session Code: *${sessionCode}*`);
-
         return parts.join("\n\n");
     };
 
