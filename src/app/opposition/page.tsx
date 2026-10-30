@@ -61,6 +61,8 @@ interface DangerManItem {
     name: string;
     position: string;
     foot: string;
+    strengths?: string;
+    weaknesses?: string;
     notes: string;
 }
 
@@ -68,6 +70,8 @@ interface PlayerProfileItem {
     positionIndex: number;
     role: string;
     foot: string;
+    strengths?: string;
+    weaknesses?: string;
     traits: string;
 }
 
@@ -754,6 +758,86 @@ export default function OppositionReportsPage() {
     const activeOppFormat: MatchFormat = getFormatFromFormation(activeReport.formation);
     const activeOppRomanLabel = FORMAT_ROMAN_LABEL[activeOppFormat] || "XI";
 
+    // Logically shorten player names for pitch badges ("Denis Aware" -> "D. Aware", "Matthew Panford (Unlikely to start)" -> "M. Panford", "Max Oaxton/Billett" -> "Oaxton/Bill.")
+    // Full names & notes remain intact in the side Players & Roles list.
+    const formatPitchPlayerName = (rawName: string): string => {
+        if (!rawName || !rawName.trim()) return "";
+        // 1. Strip parenthetical or bracketed annotations from the pitch badge
+        let cleaned = rawName
+            .replace(/\([^)]*\)/g, "")
+            .replace(/\[[^\]]*\]/g, "")
+            .trim();
+        if (!cleaned) cleaned = rawName.trim();
+
+        const shortenSingle = (namePart: string): string => {
+            const words = namePart.trim().split(/\s+/).filter(Boolean);
+            if (words.length === 0) return "";
+            if (words.length === 1) {
+                const w = words[0];
+                if (w.includes("-") && w.length > 12) {
+                    const hParts = w.split("-").filter(Boolean);
+                    if (hParts.length >= 2) {
+                        const cand = `${hParts[0]}-${hParts[1][0].toUpperCase()}.`;
+                        return cand.length <= 12 ? cand : w.slice(0, 11) + ".";
+                    }
+                }
+                return w.length > 12 ? w.slice(0, 11) + "." : w;
+            }
+            const firstInitial = words[0][0].toUpperCase();
+            const surname = words[words.length - 1];
+            const withInitial = `${firstInitial}. ${surname}`;
+            if (withInitial.length <= 12) return withInitial;
+            if (surname.length <= 12) return surname;
+            return surname.slice(0, 11) + ".";
+        };
+
+        // 2. Handle slash-separated alternatives (e.g. "Max Oaxton/Billett" or "Tyche/Macron")
+        if (cleaned.includes("/")) {
+            const opts = cleaned.split("/").map((s) => s.trim()).filter(Boolean);
+            if (opts.length >= 2) {
+                const getSurname = (s: string) => {
+                    const w = s.split(/\s+/).filter(Boolean);
+                    return w[w.length - 1] || s;
+                };
+                const s1 = getSurname(opts[0]);
+                const s2 = getSurname(opts[1]);
+                const combined = `${s1}/${s2}`;
+                if (combined.length <= 12) return combined;
+                return `${s1.slice(0, 6)}/${s2.slice(0, 4)}.`;
+            }
+        }
+
+        return shortenSingle(cleaned);
+    };
+
+    // Parse multi-line scouting notes (e.g. "Lemonious- technically good..." or "Tyche-CM- Likes to get on the ball...") into structured items instead of a wall of text
+    const parseScoutingNotesIntoItems = (rawText: string): { subject?: string; detail: string }[] => {
+        if (!rawText || !rawText.trim()) return [];
+        return rawText
+            .split(/\r?\n/)
+            .map((l) => l.trim().replace(/^[•\-*]\s*/, ""))
+            .filter(Boolean)
+            .map((line) => {
+                // Match "Player Name - Position - Note" or "Player Name - Note" or "Player Name: Note"
+                const multiDash = line.match(/^([A-Za-z0-9#\/()' .]{2,26}?)\s*-\s*([A-Za-z0-9\/]{1,8})\s*[-:]\s*(.+)$/);
+                if (multiDash) {
+                    return {
+                        subject: `${multiDash[1].trim()} (${multiDash[2].trim()})`,
+                        detail: multiDash[3].trim()
+                    };
+                }
+                const singleSep = line.match(/^([A-Za-z0-9#\/()' .-]{2,30}?)\s*[-–—:]\s+(.+)$/) ||
+                    line.match(/^([A-Za-z0-9#\/()'.]{2,24}?)\s*[-–—:]\s*(.+)$/);
+                if (singleSep && singleSep[1].split(/\s+/).length <= 4) {
+                    return {
+                        subject: singleSep[1].trim(),
+                        detail: singleSep[2].trim()
+                    };
+                }
+                return { detail: line };
+            });
+    };
+
     // #12: Ultra-HD 2x Retina (2160px wide) Shareable Scouting Graphic Generator (Dynamic Height — Never Cuts Off Sentences)
     const handleShareGraphic = async () => {
         const report = activeReport;
@@ -793,7 +877,6 @@ export default function OppositionReportsPage() {
                         const testLine = line ? `${line} ${word}` : word;
                         if (ctx.measureText(testLine).width > maxWidth && line) {
                             wrapped.push(line);
-                            // If a single word is wider than maxWidth, break it across lines
                             if (ctx.measureText(word).width > maxWidth) {
                                 let chunk = "";
                                 for (const ch of word) {
@@ -845,20 +928,32 @@ export default function OppositionReportsPage() {
                 report.dangerMenList.forEach((dm) => {
                     const tag = [dm.number ? `#${dm.number}` : "", dm.position, dm.name].filter(Boolean).join(" ");
                     const footStr = dm.foot ? ` (${dm.foot})` : "";
-                    dangerLines.push(`• ${tag}${footStr}: ${dm.notes || "Key threat"}`);
+                    const details = [
+                        dm.strengths ? `✅ Strengths: ${dm.strengths}` : "",
+                        dm.weaknesses ? `🎯 Exploit: ${dm.weaknesses}` : "",
+                        dm.notes || ""
+                    ]
+                        .filter(Boolean)
+                        .join(" | ");
+                    dangerLines.push(`• ${tag}${footStr}: ${details || "Key threat"}`);
                 });
             }
             if (report.dangerMen && report.dangerMen.trim()) {
-                dangerLines.push(report.dangerMen.trim());
+                const parsedItems = parseScoutingNotesIntoItems(report.dangerMen);
+                parsedItems.forEach((it) => {
+                    dangerLines.push(it.subject ? `• ${it.subject}: ${it.detail}` : `• ${it.detail}`);
+                });
             }
             formationPositions.forEach((pos, idx) => {
                 const pName = (report.lineup?.[idx] || "").trim();
                 const prof = (report.playerProfiles || []).find((p) => p.positionIndex === idx);
-                if (pName || prof?.role || prof?.traits) {
+                if (pName || prof?.role || prof?.strengths || prof?.weaknesses || prof?.traits) {
                     const dispPos = getDisplayPosition(pos.label);
                     const rolePart = prof?.role ? ` [${prof.role}]` : "";
+                    const strPart = prof?.strengths ? ` | ✅ ${prof.strengths}` : "";
+                    const wkPart = prof?.weaknesses ? ` | 🎯 ${prof.weaknesses}` : "";
                     const traitsPart = prof?.traits ? ` — ${prof.traits}` : "";
-                    dangerLines.push(`• #${pos.number} ${dispPos} ${pName || ""}${rolePart}${traitsPart}`.trim());
+                    dangerLines.push(`• #${pos.number} ${dispPos} ${pName || ""}${rolePart}${strPart}${wkPart}${traitsPart}`.trim());
                 }
             });
 
@@ -1004,7 +1099,7 @@ export default function OppositionReportsPage() {
             ctx.fillStyle = "#34d399";
             ctx.font = "900 32px Inter, system-ui, sans-serif";
             ctx.fillText(
-                `⚽ OPPOSITION PITCH & LINEUP (${report.formation || "4-2-3-1"})`,
+                `⚽ ${(report.name || "OPPOSITION").toUpperCase()} TACTICAL PITCH (${report.formation || "4-2-3-1"})`,
                 pitchCardX + 40,
                 pitchCardY + 58
             );
@@ -1058,19 +1153,19 @@ export default function OppositionReportsPage() {
             ctx.strokeRect(inX + (inW - boxW) / 2, inY, boxW, boxH);
             ctx.strokeRect(inX + (inW - boxW) / 2, inY + inH - boxH, boxW, boxH);
 
-            // Draw Opposition Players on the Pitch (with edge clamping so wide player names never cut off)
+            // Draw Opposition Players on the Pitch (shortened names, placed cleanly below shirt circle — zero overhang, zero overlap)
             ctx.textAlign = "center";
             ctx.textBaseline = "middle";
             formationPositions.forEach((pos, idx) => {
                 const cx = inX + (inW * pos.x) / 100;
-                const cy = inY + (inH * pos.y) / 100;
-                const isTopHalf = pos.y < 50 && pos.label !== "GK";
+                const cy = inY + (inH * pos.y) / 100 - 10;
                 const profile = (report.playerProfiles || []).find((p) => p.positionIndex === idx);
-                const playerName = (report.lineup?.[idx] || "").trim();
+                const rawPlayerName = (report.lineup?.[idx] || "").trim();
+                const shortName = formatPitchPlayerName(rawPlayerName);
                 const displayPos = getDisplayPosition(pos.label);
 
                 // Player Shirt Token Circle
-                const radius = 26;
+                const radius = 24;
                 ctx.beginPath();
                 ctx.arc(cx, cy, radius, 0, Math.PI * 2);
                 ctx.fillStyle = "#ffffff";
@@ -1080,29 +1175,28 @@ export default function OppositionReportsPage() {
                 ctx.stroke();
 
                 ctx.fillStyle = "#0f172a";
-                ctx.font = "900 22px Inter, system-ui, sans-serif";
+                ctx.font = "900 21px Inter, system-ui, sans-serif";
                 ctx.fillText(String(pos.number), cx, cy + 1);
 
-                // Player Name / Position Pill (clamped within pitch bounds)
-                const labelText = playerName || displayPos;
-                ctx.font = playerName
-                    ? "900 22px Inter, system-ui, sans-serif"
-                    : "800 19px Inter, system-ui, sans-serif";
+                // Player Name / Position Pill always placed cleanly BELOW the shirt circle
+                const labelText = shortName || displayPos;
+                ctx.font = shortName
+                    ? "800 19px Inter, system-ui, sans-serif"
+                    : "800 18px Inter, system-ui, sans-serif";
                 const textW = ctx.measureText(labelText).width;
-                const pillW = Math.max(textW + 24, 56);
-                const pillH = 34;
-                const unclampedPillX = cx - pillW / 2;
-                const pillX = Math.max(pX + 10, Math.min(pX + pW - pillW - 10, unclampedPillX));
-                const pillY = isTopHalf ? cy - radius - pillH - 8 : cy + radius + 8;
+                const pillW = Math.min(Math.max(textW + 20, 52), 185);
+                const pillH = 30;
+                const pillX = Math.max(pX + 8, Math.min(pX + pW - pillW - 8, cx - pillW / 2));
+                const pillY = cy + radius + 6;
 
                 roundRect(
                     pillX,
                     pillY,
                     pillW,
                     pillH,
-                    8,
-                    playerName ? "rgba(2, 6, 23, 0.94)" : "rgba(15, 23, 42, 0.82)",
-                    playerName ? "rgba(255, 255, 255, 0.35)" : "rgba(255, 255, 255, 0.18)",
+                    7,
+                    shortName ? "rgba(2, 6, 23, 0.94)" : "rgba(15, 23, 42, 0.82)",
+                    shortName ? "rgba(255, 255, 255, 0.35)" : "rgba(255, 255, 255, 0.18)",
                     2
                 );
                 ctx.fillStyle = "#ffffff";
@@ -1204,37 +1298,62 @@ export default function OppositionReportsPage() {
         const printWindow = window.open("", "_blank");
         if (!printWindow) return;
 
-        const dangerHtml = [
-            ...(report.dangerMenList || []).map(
-                (d) =>
-                    `<div><strong>${d.number ? `#${d.number} ` : ""}${d.name || "Player"} (${d.position} • ${d.foot} foot):</strong> ${d.notes || ""}</div>`
-            ),
-            report.dangerMen ? `<div style="margin-top:6px;">${report.dangerMen}</div>` : ""
+        // Build structured player cards for Danger Men & Key Threats (instead of walls of text)
+        const structuredDangerCardsHtml = [
+            ...(report.dangerMenList || []).map((d) => {
+                const badge = d.number ? `#${d.number.replace(/^#/, "")}` : d.position || "!";
+                return `
+                    <div style="padding:8px 10px; border:1px solid #fde68a; border-radius:8px; background:#ffffff; margin-bottom:6px;">
+                        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
+                            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+                                <span style="background:#f59e0b; color:#0f172a; font-weight:900; font-size:10.5px; padding:1px 6px; border-radius:4px;">${badge}</span>
+                                <span style="font-weight:900; font-size:12.5px; color:#0f172a;">${d.name || "Key Threat"}</span>
+                                ${d.position ? `<span style="font-size:10px; font-weight:800; color:#475569; background:#f1f5f9; padding:1px 6px; border-radius:4px;">${d.position}</span>` : ""}
+                            </div>
+                            ${d.foot ? `<span style="font-size:10.5px; font-weight:700; color:#b45309;">${d.foot} Foot</span>` : ""}
+                        </div>
+                        <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:4px;">
+                            ${d.strengths ? `<span style="font-size:11px; background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; padding:2px 7px; border-radius:5px;"><strong>💪 Strengths:</strong> ${d.strengths}</span>` : ""}
+                            ${d.weaknesses ? `<span style="font-size:11px; background:#fff1f2; color:#9f1239; border:1px solid #fecdd3; padding:2px 7px; border-radius:5px;"><strong>🎯 Exploit:</strong> ${d.weaknesses}</span>` : ""}
+                        </div>
+                        ${d.notes ? `<div style="font-size:12px; color:#334155; margin-top:4px;">${d.notes}</div>` : ""}
+                    </div>
+                `;
+            }),
+            ...parseScoutingNotesIntoItems(report.dangerMen || "").map((item) =>
+                item.subject
+                    ? `
+                        <div style="display:flex; align-items:flex-start; gap:8px; padding:6px 10px; border:1px solid #fde68a; border-radius:7px; background:#ffffff; margin-bottom:5px;">
+                            <span style="background:#fef3c7; color:#92400e; border:1px solid #fcd34d; font-weight:800; font-size:11px; padding:2px 8px; border-radius:5px; white-space:nowrap; flex-shrink:0;">${item.subject}</span>
+                            <span style="font-size:12px; color:#1e293b; line-height:1.4;">${item.detail}</span>
+                        </div>
+                    `
+                    : `
+                        <div style="display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border-left:3px solid #f59e0b; background:#ffffff; border-radius:4px; margin-bottom:4px; font-size:12px; color:#1e293b;">
+                            <span>•</span>
+                            <span>${item.detail}</span>
+                        </div>
+                    `
+            )
         ]
             .filter(Boolean)
             .join("");
 
+        // Pitch tokens: centered vertical flex stack (Circle on top, 3px gap, shortened Name Pill below — never overhangs numbers or overlaps)
         const pitchTokensHtml = formationPositions
             .map((pos, idx) => {
-                const isTopHalf = pos.y < 50 && pos.label !== "GK";
                 const profile = (report.playerProfiles || []).find((p) => p.positionIndex === idx);
-                const playerName = (report.lineup?.[idx] || "").trim();
+                const rawPlayerName = (report.lineup?.[idx] || "").trim();
+                const shortName = formatPitchPlayerName(rawPlayerName);
                 const displayPos = getDisplayPosition(pos.label);
                 const borderColor = profile?.role ? "#f59e0b" : "#dc2626";
-                const pillOffset = isTopHalf ? "bottom: 22px;" : "top: 22px;";
-                const pillHoriz =
-                    pos.x <= 16
-                        ? "left: -10px; transform: none;"
-                        : pos.x >= 84
-                            ? "right: -10px; transform: none;"
-                            : "left: 50%; transform: translateX(-50%);";
                 return `
-                    <div style="position:absolute; left:${pos.x}%; top:${pos.y}%; transform:translate(-50%, -50%); z-index:10;">
-                        <div style="width:30px; height:30px; border-radius:9999px; background:#ffffff; border:2.5px solid ${borderColor}; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; color:#0f172a; box-shadow:0 2px 6px rgba(0,0,0,0.35);">
+                    <div style="position:absolute; left:${pos.x}%; top:${pos.y}%; transform:translate(-50%, -50%); z-index:10; display:flex; flex-direction:column; align-items:center; gap:3px; pointer-events:none;">
+                        <div style="width:28px; height:28px; border-radius:9999px; background:#ffffff; border:2.5px solid ${borderColor}; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; color:#0f172a; box-shadow:0 2px 5px rgba(0,0,0,0.35); flex-shrink:0;">
                             ${pos.number}
                         </div>
-                        <div style="position:absolute; ${pillHoriz} ${pillOffset} white-space:nowrap; background:#020617; color:#ffffff; border:1px solid rgba(255,255,255,0.35); border-radius:6px; padding:2px 7px; font-size:11px; font-weight:800; box-shadow:0 2px 6px rgba(0,0,0,0.4);">
-                            ${playerName || displayPos}
+                        <div style="white-space:nowrap; max-width:96px; overflow:hidden; text-overflow:ellipsis; background:#020617; color:#ffffff; border:1px solid rgba(255,255,255,0.35); border-radius:5px; padding:1.5px 6px; font-size:9.5px; font-weight:800; line-height:1.2; box-shadow:0 2px 5px rgba(0,0,0,0.4);">
+                            ${shortName || displayPos}
                         </div>
                     </div>
                 `;
@@ -1246,12 +1365,25 @@ export default function OppositionReportsPage() {
                 const profile = (report.playerProfiles || []).find((p) => p.positionIndex === idx);
                 const playerName = (report.lineup?.[idx] || "").trim() || "—";
                 const displayPos = getDisplayPosition(pos.label);
+                const hasDetails = Boolean(profile?.strengths || profile?.weaknesses || profile?.traits);
                 return `
-                    <div style="display:flex; align-items:center; gap:8px; padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; background:#f8fafc; font-size:12px;">
-                        <span style="width:22px; height:22px; border-radius:9999px; background:#dc2626; color:#ffffff; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:900; flex-shrink:0;">${pos.number}</span>
-                        <span style="font-weight:800; color:#475569; width:34px; flex-shrink:0;">${displayPos}</span>
-                        <span style="font-weight:800; color:#0f172a; flex:1; word-break:break-word;">${playerName}</span>
-                        ${profile?.role ? `<span style="font-size:10px; font-weight:700; color:#b45309; background:#fef3c7; padding:1px 6px; border-radius:4px;">${profile.role}</span>` : ""}
+                    <div style="padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; background:#f8fafc; font-size:11.5px;">
+                        <div style="display:flex; align-items:center; gap:7px;">
+                            <span style="width:21px; height:21px; border-radius:9999px; background:#dc2626; color:#ffffff; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:900; flex-shrink:0;">${pos.number}</span>
+                            <span style="font-weight:800; color:#475569; width:30px; flex-shrink:0;">${displayPos}</span>
+                            <span style="font-weight:800; color:#0f172a; flex:1; word-break:break-word;">${playerName}</span>
+                            ${profile?.foot && profile.foot !== "Right" ? `<span style="font-size:9.5px; font-weight:700; color:#64748b;">${profile.foot}</span>` : ""}
+                            ${profile?.role ? `<span style="font-size:9.5px; font-weight:700; color:#b45309; background:#fef3c7; padding:1px 6px; border-radius:4px;">${profile.role}</span>` : ""}
+                        </div>
+                        ${
+                            hasDetails
+                                ? `<div style="margin-top:4px; padding-left:28px; display:flex; flex-wrap:wrap; gap:4px; font-size:10.5px;">
+                                    ${profile?.strengths ? `<span style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; padding:1px 5px; border-radius:4px;"><strong>💪</strong> ${profile.strengths}</span>` : ""}
+                                    ${profile?.weaknesses ? `<span style="background:#fff1f2; color:#9f1239; border:1px solid #fecdd3; padding:1px 5px; border-radius:4px;"><strong>🎯</strong> ${profile.weaknesses}</span>` : ""}
+                                    ${profile?.traits ? `<span style="color:#475569;">${profile.traits}</span>` : ""}
+                                   </div>`
+                                : ""
+                        }
                     </div>
                 `;
             })
@@ -1268,8 +1400,8 @@ export default function OppositionReportsPage() {
                     h1 { margin: 4px 0 0 0; font-size: 26px; font-weight: 900; word-break: break-word; }
                     .sub { font-size: 12px; font-weight: 800; color: #dc2626; text-transform: uppercase; letter-spacing: 0.06em; }
                     .stats-bar { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-                    .pitch-row { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 14px; margin-bottom: 16px; break-inside: avoid; }
-                    .pitch-canvas { position: relative; width: 100%; height: 390px; background: #047857; border-radius: 10px; overflow: hidden; border: 2px solid #065f46; }
+                    .pitch-row { display: grid; grid-template-columns: 1.12fr 0.88fr; gap: 14px; margin-bottom: 16px; break-inside: avoid; }
+                    .pitch-canvas { position: relative; width: 100%; height: 410px; background: #047857; border-radius: 10px; overflow: hidden; border: 2px solid #065f46; }
                     .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
                     .box { border: 1px solid #e2e8f0; border-left: 4px solid #dc2626; border-radius: 8px; padding: 12px; background: #ffffff; break-inside: avoid; }
                     .box-full { grid-column: 1 / -1; }
@@ -1302,7 +1434,7 @@ export default function OppositionReportsPage() {
                 </div>
                 <div class="pitch-row">
                     <div>
-                        <div class="box-title" style="color:#047857; margin-bottom:6px;">⚽ Opposition Tactical Pitch (${report.formation})</div>
+                        <div class="box-title" style="color:#047857; margin-bottom:6px;">⚽ ${report.name} Tactical Pitch (${report.formation})</div>
                         <div class="pitch-canvas">
                             <div style="position:absolute; inset:12px; border:2px solid rgba(255,255,255,0.55); border-radius:4px;"></div>
                             <div style="position:absolute; left:12px; right:12px; top:50%; border-top:2px solid rgba(255,255,255,0.55);"></div>
@@ -1313,7 +1445,7 @@ export default function OppositionReportsPage() {
                         </div>
                     </div>
                     <div>
-                        <div class="box-title" style="color:#0f172a; margin-bottom:6px;">👥 Opposition Players & Roles</div>
+                        <div class="box-title" style="color:#0f172a; margin-bottom:6px;">👥 ${report.name} Players & Roles</div>
                         <div style="display:grid; grid-template-columns:1fr; gap:4px;">
                             ${lineupRowsHtml}
                         </div>
@@ -1322,7 +1454,7 @@ export default function OppositionReportsPage() {
                 <div class="grid">
                     <div class="box box-full" style="border-left-color:#f59e0b; background:#fffbeb;">
                         <div class="box-title" style="color:#b45309;">⚠️ Danger Men & Key Threats</div>
-                        <div class="box-body">${dangerHtml || "No specific danger men recorded."}</div>
+                        <div class="box-body" style="white-space:normal;">${structuredDangerCardsHtml || "No specific danger men recorded."}</div>
                     </div>
                     <div class="box" style="border-left-color:#10b981;">
                         <div class="box-title" style="color:#047857;">💪 Strengths</div>
@@ -2001,9 +2133,27 @@ export default function OppositionReportsPage() {
                                                         }
                                                         className="h-8 text-xs font-semibold bg-surface-1"
                                                     />
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                                        <Input
+                                                            placeholder="💪 Strengths (e.g. Pace, 1v1, aerial)..."
+                                                            value={dm.strengths || ""}
+                                                            onChange={(e) =>
+                                                                handleUpdateDangerMan(dm.id, "strengths", e.target.value)
+                                                            }
+                                                            className="h-8 text-xs bg-emerald-500/5 border-emerald-500/30"
+                                                        />
+                                                        <Input
+                                                            placeholder="🎯 Weaknesses / Exploit (e.g. Press 1st touch)..."
+                                                            value={dm.weaknesses || ""}
+                                                            onChange={(e) =>
+                                                                handleUpdateDangerMan(dm.id, "weaknesses", e.target.value)
+                                                            }
+                                                            className="h-8 text-xs bg-rose-500/5 border-rose-500/30"
+                                                        />
+                                                    </div>
                                                     <textarea
                                                         rows={2}
-                                                        placeholder="Threat notes (e.g. Cuts inside onto right foot, rapid in behind)..."
+                                                        placeholder="Additional tactical notes..."
                                                         value={dm.notes}
                                                         onChange={(e) =>
                                                             handleUpdateDangerMan(dm.id, "notes", e.target.value)
@@ -2014,7 +2164,7 @@ export default function OppositionReportsPage() {
                                             ) : (
                                                 <div
                                                     onClick={handleEditReport}
-                                                    className="space-y-1 cursor-pointer"
+                                                    className="space-y-1.5 cursor-pointer"
                                                 >
                                                     <div className="flex items-center justify-between gap-2">
                                                         <div className="flex items-center gap-1.5 flex-wrap">
@@ -2052,6 +2202,20 @@ export default function OppositionReportsPage() {
                                                             </button>
                                                         </div>
                                                     </div>
+                                                    {(dm.strengths || dm.weaknesses) && (
+                                                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                                                            {dm.strengths && (
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                                                                    💪 {dm.strengths}
+                                                                </span>
+                                                            )}
+                                                            {dm.weaknesses && (
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                                                                    🎯 {dm.weaknesses}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     {dm.notes && (
                                                         <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words leading-relaxed">
                                                             {dm.notes}
@@ -2072,16 +2236,37 @@ export default function OppositionReportsPage() {
                                             prev ? { ...prev, dangerMen: e.target.value } : null
                                         )
                                     }
-                                    placeholder="General danger men notes (e.g. #10 dictates play, #7 takes all set pieces)..."
+                                    placeholder="Quick player notes — write 'Player Name - note' on each line to auto-format into player callout cards..."
                                     className="w-full min-h-[75px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none"
                                 />
                             ) : activeReport.dangerMen ? (
-                                <p
+                                <div
                                     onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text"
+                                    className="space-y-1.5 cursor-text"
                                 >
-                                    {activeReport.dangerMen}
-                                </p>
+                                    {parseScoutingNotesIntoItems(activeReport.dangerMen).map((item, idx) =>
+                                        item.subject ? (
+                                            <div
+                                                key={idx}
+                                                className="flex items-start gap-2 rounded-lg bg-surface-2/80 border border-border p-2"
+                                            >
+                                                <span className="px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/35 text-amber-400 text-[10px] font-extrabold shrink-0">
+                                                    {item.subject}
+                                                </span>
+                                                <span className="text-xs text-foreground leading-snug break-words">
+                                                    {item.detail}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <p
+                                                key={idx}
+                                                className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed"
+                                            >
+                                                {item.detail}
+                                            </p>
+                                        )
+                                    )}
+                                </div>
                             ) : (activeReport.dangerMenList || []).length === 0 ? (
                                 <p
                                     onClick={handleEditReport}
@@ -2291,10 +2476,10 @@ export default function OppositionReportsPage() {
                         <div className="p-3.5 flex flex-wrap items-center justify-between gap-2 border-b border-border">
                             <div>
                                 <h3 className="text-xs font-black uppercase tracking-wider text-foreground">
-                                    Tactical Pitch ({activeReport.formation} • {activeOppFormat})
+                                    {activeReport.name || "Opposition"} Tactical Pitch ({activeReport.formation} • {activeOppFormat})
                                 </h3>
                                 <p className="text-[10px] text-muted-foreground">
-                                    Tap any shirt number on the pitch to edit their role &amp; traits
+                                    Tap any shirt number on the pitch to log player strengths, weaknesses &amp; role
                                 </p>
                             </div>
                             <div className="flex items-center gap-1.5">
@@ -2329,7 +2514,7 @@ export default function OppositionReportsPage() {
                         </div>
 
                         {/* Pitch Canvas */}
-                        <div className="relative w-full bg-emerald-700" style={{ paddingBottom: "82%" }}>
+                        <div className="relative w-full bg-emerald-700" style={{ paddingBottom: "85%" }}>
                             <div className="absolute inset-0 opacity-40">
                                 <div className="absolute inset-3 border-2 border-white/60 rounded-sm"></div>
                                 <div className="absolute left-3 right-3 top-1/2 border-t-2 border-white/60"></div>
@@ -2345,48 +2530,42 @@ export default function OppositionReportsPage() {
                             </div>
 
                             {formationPositions.map((pos, idx) => {
-                                const isTopHalf = pos.y < 50 && pos.label !== "GK";
                                 const profile = (activeReport.playerProfiles || []).find(
                                     (p) => p.positionIndex === idx
                                 );
                                 const playerName = (activeReport.lineup?.[idx] || "").trim();
-                                const horizAlignCls =
-                                    pos.x <= 16
-                                        ? "-left-3 items-start"
-                                        : pos.x >= 84
-                                            ? "-right-3 items-end"
-                                            : "left-1/2 -translate-x-1/2 items-center";
+                                const shortPitchName = playerName ? formatPitchPlayerName(playerName) : "";
+                                const hasProfileData = Boolean(
+                                    profile?.role || profile?.strengths || profile?.weaknesses || profile?.traits
+                                );
                                 return (
                                     <div
                                         key={idx}
-                                        className="absolute z-20 cursor-pointer"
+                                        className="absolute z-20 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 cursor-pointer"
                                         style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
                                         onClick={() => handleOpenPositionProfile(idx)}
                                     >
                                         <div
-                                            className={`absolute -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white border-2 rounded-full flex items-center justify-center shadow-lg ${
-                                                profile?.role ? "border-amber-500" : "border-red-600"
+                                            className={`w-7 h-7 bg-white border-2 rounded-full flex items-center justify-center shadow-lg ${
+                                                hasProfileData ? "border-amber-500" : "border-red-600"
                                             }`}
                                         >
-                                            <span className="text-[11px] font-black text-slate-900">
+                                            <span className="text-[11px] font-black text-slate-900 leading-none">
                                                 {pos.number}
                                             </span>
                                         </div>
-                                        <div
-                                            className={`absolute z-30 flex flex-col ${horizAlignCls} ${
-                                                isTopHalf ? "bottom-5" : "top-5"
-                                            }`}
-                                        >
-                                            {playerName ? (
-                                                <span className="text-[11px] font-black tracking-tight text-white bg-slate-950/95 border border-white/30 px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap">
-                                                    {playerName}
-                                                </span>
-                                            ) : (
-                                                <span className="text-[10px] font-extrabold text-white/85 bg-slate-900/80 border border-white/15 px-1.5 py-0.5 rounded shadow-md whitespace-nowrap">
-                                                    {getDisplayPosition(pos.label)}
-                                                </span>
-                                            )}
-                                        </div>
+                                        {shortPitchName ? (
+                                            <span
+                                                title={playerName}
+                                                className="text-[10px] font-black tracking-tight text-white bg-slate-950/95 border border-white/30 px-1.5 py-0.5 rounded shadow-md whitespace-nowrap leading-none"
+                                            >
+                                                {shortPitchName}
+                                            </span>
+                                        ) : (
+                                            <span className="text-[9px] font-extrabold text-white/85 bg-slate-900/80 border border-white/15 px-1.5 py-0.5 rounded shadow-xs whitespace-nowrap leading-none">
+                                                {getDisplayPosition(pos.label)}
+                                            </span>
+                                        )}
                                     </div>
                                 );
                             })}
@@ -2402,26 +2581,47 @@ export default function OppositionReportsPage() {
                                     <div
                                         key={idx}
                                         onClick={() => handleOpenPositionProfile(idx)}
-                                        className="flex items-center gap-2 p-2 rounded-xl bg-surface-2/70 border border-border cursor-pointer"
+                                        className="p-2 rounded-xl bg-surface-2/70 border border-border cursor-pointer space-y-1.5"
                                     >
-                                        <div className="w-6 h-6 rounded-full bg-brand text-brand-foreground flex items-center justify-center shrink-0 text-[10px] font-black">
-                                            {pos.number}
-                                        </div>
-                                        <span className="text-[11px] font-extrabold text-muted-foreground w-9 shrink-0">
-                                            {getDisplayPosition(pos.label)}
-                                        </span>
-                                        <input
-                                            type="text"
-                                            value={activeReport.lineup?.[idx] || ""}
-                                            onChange={(e) => handleUpdateLineupName(idx, e.target.value)}
-                                            onClick={(e) => e.stopPropagation()}
-                                            placeholder="Add player name..."
-                                            className="flex-1 text-xs font-bold bg-surface-1 border border-border rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:border-brand"
-                                        />
-                                        {profile?.role && (
-                                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 shrink-0">
-                                                {profile.role}
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-6 h-6 rounded-full bg-brand text-brand-foreground flex items-center justify-center shrink-0 text-[10px] font-black">
+                                                {pos.number}
+                                            </div>
+                                            <span className="text-[11px] font-extrabold text-muted-foreground w-9 shrink-0">
+                                                {getDisplayPosition(pos.label)}
                                             </span>
+                                            <input
+                                                type="text"
+                                                value={activeReport.lineup?.[idx] || ""}
+                                                onChange={(e) => handleUpdateLineupName(idx, e.target.value)}
+                                                onClick={(e) => e.stopPropagation()}
+                                                placeholder="Add player name..."
+                                                className="flex-1 text-xs font-bold bg-surface-1 border border-border rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:border-brand"
+                                            />
+                                            {profile?.role && (
+                                                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 shrink-0">
+                                                    {profile.role}
+                                                </span>
+                                            )}
+                                        </div>
+                                        {(profile?.strengths || profile?.weaknesses || profile?.traits) && (
+                                            <div className="flex flex-wrap gap-1 pl-8">
+                                                {profile?.strengths && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                                                        💪 {profile.strengths}
+                                                    </span>
+                                                )}
+                                                {profile?.weaknesses && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                                                        🎯 {profile.weaknesses}
+                                                    </span>
+                                                )}
+                                                {profile?.traits && (
+                                                    <span className="text-[9px] text-muted-foreground">
+                                                        {profile.traits}
+                                                    </span>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
                                 );
@@ -3199,9 +3399,27 @@ export default function OppositionReportsPage() {
                                                             <Trash2 className="h-3.5 w-3.5" />
                                                         </button>
                                                     </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                                                        <Input
+                                                            placeholder="💪 Strengths (e.g. Pace, 1v1, aerial)..."
+                                                            value={dm.strengths || ""}
+                                                            onChange={(e) =>
+                                                                handleUpdateDangerMan(dm.id, "strengths", e.target.value)
+                                                            }
+                                                            className="h-8 text-xs bg-emerald-500/5 border-emerald-500/30"
+                                                        />
+                                                        <Input
+                                                            placeholder="🎯 Weaknesses / Exploit (e.g. Press 1st touch)..."
+                                                            value={dm.weaknesses || ""}
+                                                            onChange={(e) =>
+                                                                handleUpdateDangerMan(dm.id, "weaknesses", e.target.value)
+                                                            }
+                                                            className="h-8 text-xs bg-rose-500/5 border-rose-500/30"
+                                                        />
+                                                    </div>
                                                     <textarea
                                                         rows={2}
-                                                        placeholder="Threat notes (e.g. Rapid in behind, cuts inside onto left foot)..."
+                                                        placeholder="Additional tactical notes (e.g. Cuts inside onto left foot)..."
                                                         value={dm.notes}
                                                         onChange={(e) =>
                                                             handleUpdateDangerMan(dm.id, "notes", e.target.value)
@@ -3217,7 +3435,7 @@ export default function OppositionReportsPage() {
                                                     <div className="h-8 min-w-8 px-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-500 font-black text-xs flex items-center justify-center shrink-0">
                                                         {dm.number ? `#${dm.number.replace(/^#/, "")}` : dm.position || "!"}
                                                     </div>
-                                                    <div className="min-w-0 flex-1">
+                                                    <div className="min-w-0 flex-1 space-y-1">
                                                         <div className="flex items-center gap-1.5 flex-wrap">
                                                             <span className="text-xs font-extrabold text-foreground break-words">
                                                                 {dm.name || `Opposition ${dm.position || "Player"}`}
@@ -3233,9 +3451,25 @@ export default function OppositionReportsPage() {
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words leading-relaxed mt-0.5">
-                                                            {dm.notes || "Key threat"}
-                                                        </p>
+                                                        {(dm.strengths || dm.weaknesses) && (
+                                                            <div className="flex flex-wrap gap-1.5">
+                                                                {dm.strengths && (
+                                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                                                                        💪 {dm.strengths}
+                                                                    </span>
+                                                                )}
+                                                                {dm.weaknesses && (
+                                                                    <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                                                                        🎯 {dm.weaknesses}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                        {dm.notes && (
+                                                            <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words leading-relaxed">
+                                                                {dm.notes}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <button
                                                         type="button"
@@ -3267,16 +3501,37 @@ export default function OppositionReportsPage() {
                                             prev ? { ...prev, dangerMen: e.target.value } : null
                                         )
                                     }
-                                    placeholder="General notes on their key threats (e.g. #9 and #11 swap wings constantly, #6 dictates tempo if given time)..."
+                                    placeholder="Quick player notes — write 'Player Name - note' on each line to auto-format into individual player callout cards..."
                                     className="w-full min-h-[72px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-amber-500 outline-none resize-y"
                                 />
                             ) : activeReport.dangerMen ? (
-                                <p
+                                <div
                                     onClick={handleEditReport}
-                                    className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed bg-surface-2/60 hover:bg-surface-2 rounded-xl p-3 border border-border cursor-text transition-colors"
+                                    className="space-y-1.5 cursor-text"
                                 >
-                                    {activeReport.dangerMen}
-                                </p>
+                                    {parseScoutingNotesIntoItems(activeReport.dangerMen).map((item, idx) =>
+                                        item.subject ? (
+                                            <div
+                                                key={idx}
+                                                className="flex items-start gap-2.5 rounded-xl bg-surface-2/70 hover:bg-surface-2 border border-border p-2.5 transition-colors"
+                                            >
+                                                <span className="px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/35 text-amber-400 text-[11px] font-extrabold shrink-0">
+                                                    {item.subject}
+                                                </span>
+                                                <span className="text-xs md:text-sm text-foreground leading-snug break-words">
+                                                    {item.detail}
+                                                </span>
+                                            </div>
+                                        ) : (
+                                            <p
+                                                key={idx}
+                                                className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed bg-surface-2/60 hover:bg-surface-2 rounded-xl p-3 border border-border transition-colors"
+                                            >
+                                                {item.detail}
+                                            </p>
+                                        )
+                                    )}
+                                </div>
                             ) : (activeReport.dangerMenList || []).length === 0 ? (
                                 <p
                                     onClick={handleEditReport}
@@ -3630,13 +3885,12 @@ export default function OppositionReportsPage() {
                         <div className="p-4 flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <h3 className="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-2">
-                                    <span>Tactical Pitch Visualizer ({activeReport.formation} • {activeOppFormat})</span>
-                                    <span className="text-[10px] font-semibold text-muted-foreground normal-case">
-                                        (Optional)
+                                    <span>
+                                        {activeReport.name || "Opposition"} Tactical Pitch ({activeReport.formation} • {activeOppFormat})
                                     </span>
                                 </h3>
                                 <p className="text-[11px] text-muted-foreground">
-                                    Expand to map out their {activeOppFormat} lineup and individual position roles on the pitch
+                                    Click any shirt number on the pitch or row below to log player strengths, weaknesses &amp; tactical role
                                 </p>
                             </div>
                             <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -3685,7 +3939,7 @@ export default function OppositionReportsPage() {
                         {showPitchSection && (
                             <CardContent className="p-0 border-t border-border">
                                 {/* Pitch Canvas */}
-                                <div className="relative w-full bg-emerald-700" style={{ paddingBottom: "75%" }}>
+                                <div className="relative w-full bg-emerald-700" style={{ paddingBottom: "78%" }}>
                                     <div className="absolute inset-0 opacity-40">
                                         <div className="absolute inset-4 border-2 border-white/60 rounded-sm"></div>
                                         <div className="absolute left-4 right-4 top-1/2 border-t-2 border-white/60"></div>
@@ -3701,48 +3955,42 @@ export default function OppositionReportsPage() {
                                     </div>
 
                                     {formationPositions.map((pos, idx) => {
-                                        const isTopHalf = pos.y < 50 && pos.label !== "GK";
                                         const profile = (activeReport.playerProfiles || []).find(
                                             (p) => p.positionIndex === idx
                                         );
                                         const playerName = (activeReport.lineup?.[idx] || "").trim();
-                                        const horizAlignCls =
-                                            pos.x <= 16
-                                                ? "-left-4 items-start"
-                                                : pos.x >= 84
-                                                    ? "-right-4 items-end"
-                                                    : "left-1/2 -translate-x-1/2 items-center";
+                                        const shortPitchName = playerName ? formatPitchPlayerName(playerName) : "";
+                                        const hasProfileData = Boolean(
+                                            profile?.role || profile?.strengths || profile?.weaknesses || profile?.traits
+                                        );
                                         return (
                                             <div
                                                 key={idx}
-                                                className="absolute z-20 cursor-pointer group"
+                                                className="absolute z-20 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-1 cursor-pointer group"
                                                 style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
                                                 onClick={() => handleOpenPositionProfile(idx)}
                                             >
                                                 <div
-                                                    className={`absolute -translate-x-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 bg-white border-[2.5px] rounded-full flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform ${
-                                                        profile?.role ? "border-amber-500" : "border-red-600"
+                                                    className={`w-8 h-8 sm:w-9 sm:h-9 bg-white border-[2.5px] rounded-full flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform ${
+                                                        hasProfileData ? "border-amber-500" : "border-red-600"
                                                     }`}
                                                 >
-                                                    <span className="text-xs sm:text-sm font-black text-slate-900">
+                                                    <span className="text-xs sm:text-sm font-black text-slate-900 leading-none">
                                                         {pos.number}
                                                     </span>
                                                 </div>
-                                                <div
-                                                    className={`absolute z-30 flex flex-col ${horizAlignCls} ${
-                                                        isTopHalf ? "bottom-6" : "top-6"
-                                                    }`}
-                                                >
-                                                    {playerName ? (
-                                                        <span className="text-xs sm:text-sm font-black tracking-tight text-white bg-slate-950/95 border border-white/30 px-2.5 py-1 rounded-lg shadow-xl whitespace-nowrap">
-                                                            {playerName}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-[11px] sm:text-xs font-extrabold text-white/85 bg-slate-900/80 border border-white/15 px-2 py-0.5 rounded-md shadow-md whitespace-nowrap">
-                                                            {getDisplayPosition(pos.label)}
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                {shortPitchName ? (
+                                                    <span
+                                                        title={playerName}
+                                                        className="text-[11px] sm:text-xs font-black tracking-tight text-white bg-slate-950/95 border border-white/30 px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap leading-tight"
+                                                    >
+                                                        {shortPitchName}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] sm:text-[11px] font-extrabold text-white/85 bg-slate-900/80 border border-white/15 px-1.5 py-0.5 rounded shadow-md whitespace-nowrap leading-tight">
+                                                        {getDisplayPosition(pos.label)}
+                                                    </span>
+                                                )}
                                             </div>
                                         );
                                     })}
@@ -3759,26 +4007,47 @@ export default function OppositionReportsPage() {
                                                 <div
                                                     key={idx}
                                                     onClick={() => handleOpenPositionProfile(idx)}
-                                                    className="flex items-center gap-2.5 p-2 rounded-lg bg-surface-2/60 border border-border hover:border-brand/40 cursor-pointer"
+                                                    className="p-2 rounded-lg bg-surface-2/60 border border-border hover:border-brand/40 cursor-pointer space-y-1.5"
                                                 >
-                                                    <div className="w-7 h-7 rounded-full bg-brand text-brand-foreground flex items-center justify-center shrink-0 text-xs font-black">
-                                                        {pos.number}
-                                                    </div>
-                                                    <span className="text-xs font-extrabold text-muted-foreground w-10 shrink-0">
-                                                        {getDisplayPosition(pos.label)}
-                                                    </span>
-                                                    <input
-                                                        type="text"
-                                                        value={activeReport.lineup?.[idx] || ""}
-                                                        onChange={(e) => handleUpdateLineupName(idx, e.target.value)}
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        placeholder="Add player name..."
-                                                        className="flex-1 text-xs sm:text-sm font-bold bg-surface-1 border border-border rounded-md px-2.5 py-1.5 text-foreground outline-none focus:border-brand"
-                                                    />
-                                                    {profile?.role && (
-                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-500 shrink-0">
-                                                            {profile.role}
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="w-7 h-7 rounded-full bg-brand text-brand-foreground flex items-center justify-center shrink-0 text-xs font-black">
+                                                            {pos.number}
+                                                        </div>
+                                                        <span className="text-xs font-extrabold text-muted-foreground w-10 shrink-0">
+                                                            {getDisplayPosition(pos.label)}
                                                         </span>
+                                                        <input
+                                                            type="text"
+                                                            value={activeReport.lineup?.[idx] || ""}
+                                                            onChange={(e) => handleUpdateLineupName(idx, e.target.value)}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            placeholder="Add player name..."
+                                                            className="flex-1 text-xs sm:text-sm font-bold bg-surface-1 border border-border rounded-md px-2.5 py-1.5 text-foreground outline-none focus:border-brand"
+                                                        />
+                                                        {profile?.role && (
+                                                            <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-500 shrink-0">
+                                                                {profile.role}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {(profile?.strengths || profile?.weaknesses || profile?.traits) && (
+                                                        <div className="flex flex-wrap gap-1.5 pl-9">
+                                                            {profile?.strengths && (
+                                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
+                                                                    💪 {profile.strengths}
+                                                                </span>
+                                                            )}
+                                                            {profile?.weaknesses && (
+                                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400">
+                                                                    🎯 {profile.weaknesses}
+                                                                </span>
+                                                            )}
+                                                            {profile?.traits && (
+                                                                <span className="text-[10px] text-muted-foreground">
+                                                                    {profile.traits}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
                                             );
@@ -3821,11 +4090,10 @@ export default function OppositionReportsPage() {
                 open={selectedProfileIndex !== null}
                 onOpenChange={(open) => !open && setSelectedProfileIndex(null)}
             >
-                <DialogContent className="max-w-md bg-surface-1 border-border text-foreground rounded-2xl p-6">
+                <DialogContent className="max-w-md bg-surface-1 border-border text-foreground rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="text-base font-bold">
-                            Position Profile: {formationPositions[selectedProfileIndex || 0]?.label} (#
-                            {formationPositions[selectedProfileIndex || 0]?.number})
+                            {activeReport.name || "Opposition"} #{formationPositions[selectedProfileIndex || 0]?.number} ({formationPositions[selectedProfileIndex || 0]?.label})
                         </DialogTitle>
                     </DialogHeader>
                     {selectedProfileIndex !== null &&
@@ -3939,8 +4207,8 @@ export default function OppositionReportsPage() {
                             };
 
                             const traitsPlaceholderMap: Record<string, string> = {
-                                GK: "e.g. Struggles with high crosses under pressure, kicks long off right foot...",
-                                CB: "e.g. Dominant in the air, slow turning when balls are played in behind...",
+                                GK: "e.g. Kicks long off right foot, slow getting down to low shots...",
+                                CB: "e.g. Steps out aggressively, leaves space in behind...",
                                 RB: "e.g. Pushes high to overlap, leaves space in behind on transition...",
                                 LB: "e.g. Pushes high to overlap, leaves space in behind on transition...",
                                 RWB: "e.g. Provides main width, vulnerable when caught high upfield...",
@@ -3955,6 +4223,24 @@ export default function OppositionReportsPage() {
                                 ST: "e.g. Fast in behind, spins into channels, strong hold-up play..."
                             };
 
+                            const quickStrengthPresets = [
+                                "Pace in behind",
+                                "Strong 1v1",
+                                "Dictates tempo",
+                                "Physical / Aerial",
+                                "Cuts inside",
+                                "Set-piece threat"
+                            ];
+
+                            const quickWeaknessPresets = [
+                                "Press 1st touch",
+                                "Show onto weak foot",
+                                "Slow turning",
+                                "Space in behind",
+                                "Doesn't track back",
+                                "Struggles under high balls"
+                            ];
+
                             const roleOptions =
                                 positionRolesMap[rawLabel] ||
                                 positionRolesMap[displayPos] ||
@@ -3962,7 +4248,7 @@ export default function OppositionReportsPage() {
                             const traitsPlaceholder =
                                 traitsPlaceholderMap[rawLabel] ||
                                 traitsPlaceholderMap[displayPos] ||
-                                "e.g. Key strengths, weaknesses, or tactical tendencies...";
+                                "e.g. Additional tactical tendencies or matchup notes...";
 
                             const name = activeReport.lineup?.[selectedProfileIndex] || "";
                             const currentProfile = (activeReport.playerProfiles || []).find(
@@ -3971,11 +4257,32 @@ export default function OppositionReportsPage() {
                                 positionIndex: selectedProfileIndex,
                                 role: "",
                                 foot: "Right",
+                                strengths: "",
+                                weaknesses: "",
                                 traits: ""
                             };
 
+                            const togglePresetPhrase = (
+                                field: "strengths" | "weaknesses",
+                                phrase: string
+                            ) => {
+                                const existing = (currentProfile[field] || "").trim();
+                                const parts = existing
+                                    ? existing
+                                          .split(",")
+                                          .map((s) => s.trim())
+                                          .filter(Boolean)
+                                    : [];
+                                const nextParts = parts.includes(phrase)
+                                    ? parts.filter((p) => p !== phrase)
+                                    : [...parts, phrase];
+                                handleUpdatePositionProfile(selectedProfileIndex, {
+                                    [field]: nextParts.join(", ")
+                                });
+                            };
+
                             return (
-                                <div className="space-y-4 mt-2">
+                                <div className="space-y-3.5 mt-2">
                                     <div>
                                         <Label className="text-xs font-bold text-muted-foreground uppercase">
                                             Player Name
@@ -3995,6 +4302,11 @@ export default function OppositionReportsPage() {
                                             placeholder={`e.g. Opposition #${selectedPos?.number || 1} (${displayPos || "Player"})`}
                                             className="mt-1 bg-surface-2 border-border"
                                         />
+                                        {name && formatPitchPlayerName(name) !== name && (
+                                            <p className="text-[10px] text-muted-foreground mt-1">
+                                                Pitch display name: <span className="font-bold text-foreground">{formatPitchPlayerName(name)}</span> (full name shown in player list)
+                                            </p>
+                                        )}
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-3">
@@ -4045,9 +4357,85 @@ export default function OppositionReportsPage() {
                                         </div>
                                     </div>
 
+                                    {/* Structured Player Strengths */}
+                                    <div className="rounded-xl bg-emerald-500/5 border border-emerald-500/25 p-2.5 space-y-1.5">
+                                        <Label className="text-[11px] font-black text-emerald-500 uppercase flex items-center gap-1">
+                                            💪 Player Strengths (What They Do Well)
+                                        </Label>
+                                        <Input
+                                            value={currentProfile.strengths || ""}
+                                            onChange={(e) =>
+                                                handleUpdatePositionProfile(selectedProfileIndex, {
+                                                    strengths: e.target.value
+                                                })
+                                            }
+                                            placeholder="e.g. Rapid in behind, strong 1v1, good range of passing..."
+                                            className="h-8 text-xs bg-surface-1 border-emerald-500/30"
+                                        />
+                                        <div className="flex flex-wrap gap-1 pt-0.5">
+                                            {quickStrengthPresets.map((preset) => {
+                                                const active = (currentProfile.strengths || "")
+                                                    .toLowerCase()
+                                                    .includes(preset.toLowerCase());
+                                                return (
+                                                    <button
+                                                        key={preset}
+                                                        type="button"
+                                                        onClick={() => togglePresetPhrase("strengths", preset)}
+                                                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-colors ${
+                                                            active
+                                                                ? "bg-emerald-500 text-slate-950 border-emerald-500"
+                                                                : "bg-surface-2 text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/15"
+                                                        }`}
+                                                    >
+                                                        + {preset}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    {/* Structured Player Weaknesses / How to Exploit */}
+                                    <div className="rounded-xl bg-rose-500/5 border border-rose-500/25 p-2.5 space-y-1.5">
+                                        <Label className="text-[11px] font-black text-rose-500 uppercase flex items-center gap-1">
+                                            🎯 Player Weaknesses (How We Exploit Them)
+                                        </Label>
+                                        <Input
+                                            value={currentProfile.weaknesses || ""}
+                                            onChange={(e) =>
+                                                handleUpdatePositionProfile(selectedProfileIndex, {
+                                                    weaknesses: e.target.value
+                                                })
+                                            }
+                                            placeholder="e.g. Press 1st touch, show onto weak foot, slow turning..."
+                                            className="h-8 text-xs bg-surface-1 border-rose-500/30"
+                                        />
+                                        <div className="flex flex-wrap gap-1 pt-0.5">
+                                            {quickWeaknessPresets.map((preset) => {
+                                                const active = (currentProfile.weaknesses || "")
+                                                    .toLowerCase()
+                                                    .includes(preset.toLowerCase());
+                                                return (
+                                                    <button
+                                                        key={preset}
+                                                        type="button"
+                                                        onClick={() => togglePresetPhrase("weaknesses", preset)}
+                                                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-colors ${
+                                                            active
+                                                                ? "bg-rose-500 text-white border-rose-500"
+                                                                : "bg-surface-2 text-rose-400 border-rose-500/25 hover:bg-rose-500/15"
+                                                        }`}
+                                                    >
+                                                        + {preset}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
                                     <div>
                                         <Label className="text-xs font-bold text-muted-foreground uppercase">
-                                            Player Traits / Notes
+                                            Additional Notes
                                         </Label>
                                         <textarea
                                             value={currentProfile.traits}
@@ -4057,7 +4445,7 @@ export default function OppositionReportsPage() {
                                                 })
                                             }
                                             placeholder={traitsPlaceholder}
-                                            className="w-full mt-1 h-20 p-2 text-xs border border-border bg-surface-2 text-foreground rounded-md resize-none"
+                                            className="w-full mt-1 h-16 p-2 text-xs border border-border bg-surface-2 text-foreground rounded-md resize-none"
                                         />
                                     </div>
 
