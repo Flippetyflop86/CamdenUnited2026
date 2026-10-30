@@ -1,8 +1,19 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { MatchdayXI, MatchdayPlayerEventStats, Player, Match, Position } from "@/types";
-import { FORMATIONS, FORMATION_NAMES, getDisplayPosition } from "@/lib/formations";
+import { MatchdayXI, MatchdayPlayerEventStats, MatchFormat, Player, Match, Position } from "@/types";
+import {
+    FORMATIONS,
+    FORMATION_NAMES,
+    FORMATIONS_BY_FORMAT,
+    DEFAULT_FORMATION_BY_FORMAT,
+    FORMAT_PLAYER_COUNT,
+    FORMAT_DEFAULT_DURATION,
+    FORMAT_ROMAN_LABEL,
+    getFormatFromFormation,
+    inferFormatFromSquadName,
+    getDisplayPosition
+} from "@/lib/formations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +44,7 @@ import {
     Image as ImageIcon,
     ArrowLeftRight,
     UserPlus,
+    Users,
     Shirt,
     Star
 } from "lucide-react";
@@ -174,8 +186,8 @@ export default function MatchdayXIPage() {
         if (s === 'GK') return p === 'GK';
         
         // Centre Backs
-        if (['CB', 'LCB', 'RCB'].includes(s)) {
-            return ['CB', 'DEF'].includes(p);
+        if (['CB', 'LCB', 'RCB', 'DEF'].includes(s)) {
+            return ['CB', 'DEF', 'RB', 'LB'].includes(p);
         }
         
         // Left Backs
@@ -222,6 +234,10 @@ export default function MatchdayXIPage() {
         }
         if (player.secondaryPositions && player.secondaryPositions.some(pos => isIdealPosition(pos, slotLabel))) {
             return { status: "secondary", label: `Secondary position (${player.secondaryPositions.join(", ")})` };
+        }
+        const currentFormat = lineup?.matchFormat || (lineup?.formation ? getFormatFromFormation(lineup.formation) : "11v11");
+        if ((currentFormat === "5v5" || currentFormat === "7v7") && slotLabel.toUpperCase() !== "GK" && player.position.toUpperCase() !== "GK") {
+            return { status: "ideal", label: `Development rotation fit (${player.position} in ${slotLabel})` };
         }
         if (getPositionCategory(player.position) === getPositionCategory(slotLabel)) {
             return { status: "secondary", label: `Same unit (${player.position} in ${slotLabel})` };
@@ -366,9 +382,16 @@ export default function MatchdayXIPage() {
         if ((selectedMatchId || selectedMatchIdRef.current) && !isFallback) return;
 
         // Default empty lineup if nothing found
+        const inferredFormat = inferFormatFromSquadName(activeSquadTab) || "11v11";
         setLineup({
             id: "default-xi",
-            formation: "4-2-3-1",
+            matchFormat: inferredFormat,
+            formation: DEFAULT_FORMATION_BY_FORMAT[inferredFormat],
+            matchDurationMinutes: FORMAT_DEFAULT_DURATION[inferredFormat],
+            activePeriod: "full",
+            periodStarters: {},
+            parentFriendlyExport: inferredFormat !== "11v11",
+            footwearNotes: "",
             starters: {},
             substitutes: ["", "", "", "", ""],
             squad: activeSquadTab,
@@ -523,6 +546,7 @@ export default function MatchdayXIPage() {
         const notesMeetTime = (resolvedKo !== "14:00" && (rawNotesMeet === "13:00" || rawNotesMeet === "12:45")) ? "" : rawNotesMeet;
         const notesLocation = extractLocationFromNotes(currentMatch.notes);
         const defaultOffset = currentMatch.isHome ? 60 : 75;
+        const squadDefaultFormat: MatchFormat = inferFormatFromSquadName(activeSquadTab) || "11v11";
 
         const parsed = parseLineupFromNotes(currentMatch.notes);
         if (parsed) {
@@ -539,10 +563,27 @@ export default function MatchdayXIPage() {
                 ? parsed.venueNotes.trim()
                 : notesLocation;
 
+            // If a squad tab has a specific youth format and the fixture has no starters yet, auto-adopt the squad's format
+            const rawParsedFormation = parsed.formation && FORMATIONS[parsed.formation]
+                ? parsed.formation
+                : DEFAULT_FORMATION_BY_FORMAT[squadDefaultFormat];
+            const parsedFormat: MatchFormat = parsed.matchFormat
+                ? parsed.matchFormat
+                : (!hasStarters && squadDefaultFormat !== "11v11" ? squadDefaultFormat : getFormatFromFormation(rawParsedFormation));
+            const effectiveFormation = FORMATIONS_BY_FORMAT[parsedFormat].includes(rawParsedFormation)
+                ? rawParsedFormation
+                : DEFAULT_FORMATION_BY_FORMAT[parsedFormat];
+
             setMeetInputValue(resolvedMeetTime);
             setLineup({
                 id: `match-lineup-${currentMatch.id}`,
-                formation: parsed.formation || "4-2-3-1",
+                matchFormat: parsedFormat,
+                formation: effectiveFormation,
+                matchDurationMinutes: parsed.matchDurationMinutes || FORMAT_DEFAULT_DURATION[parsedFormat],
+                activePeriod: parsed.activePeriod || "full",
+                periodStarters: parsed.periodStarters || {},
+                parentFriendlyExport: typeof parsed.parentFriendlyExport === "boolean" ? parsed.parentFriendlyExport : (parsedFormat !== "11v11"),
+                footwearNotes: parsed.footwearNotes || "",
                 starters: parsed.starters || {},
                 substitutes: parsed.substitutes || ["", "", "", "", ""],
                 usedSubstitutes: parsed.usedSubstitutes || [],
@@ -572,12 +613,18 @@ export default function MatchdayXIPage() {
             return;
         }
 
-        // Fallback to blank lineup with metadata hydrated from match notes
+        // Fallback to blank lineup with metadata hydrated from match notes & squad format
         const fallbackMeetTime = notesMeetTime || calculateMeetTime(resolvedKo, -defaultOffset);
         setMeetInputValue(fallbackMeetTime);
         setLineup({
             id: `match-lineup-${selectedMatchId}`,
-            formation: "4-2-3-1",
+            matchFormat: squadDefaultFormat,
+            formation: DEFAULT_FORMATION_BY_FORMAT[squadDefaultFormat],
+            matchDurationMinutes: FORMAT_DEFAULT_DURATION[squadDefaultFormat],
+            activePeriod: "full",
+            periodStarters: {},
+            parentFriendlyExport: squadDefaultFormat !== "11v11",
+            footwearNotes: "",
             starters: {},
             substitutes: ["", "", "", "", ""],
             usedSubstitutes: [],
@@ -736,8 +783,15 @@ export default function MatchdayXIPage() {
             ? newLineup.meetTime.trim()
             : calculateMeetTime(effectiveKoTime, -normalizedOffset);
 
+        const effectiveFormat = newLineup.matchFormat || getFormatFromFormation(newLineup.formation);
         const serialized = {
+            matchFormat: effectiveFormat,
             formation: newLineup.formation,
+            matchDurationMinutes: newLineup.matchDurationMinutes || FORMAT_DEFAULT_DURATION[effectiveFormat],
+            activePeriod: newLineup.activePeriod || "full",
+            periodStarters: newLineup.periodStarters || {},
+            parentFriendlyExport: typeof newLineup.parentFriendlyExport === "boolean" ? newLineup.parentFriendlyExport : (effectiveFormat !== "11v11"),
+            footwearNotes: newLineup.footwearNotes || "",
             starters: newLineup.starters,
             substitutes: newLineup.substitutes,
             usedSubstitutes: newLineup.usedSubstitutes || [],
@@ -1281,27 +1335,215 @@ export default function MatchdayXIPage() {
         saveLineup(updated);
     };
 
-    const handleFormationChange = (newFormation: string) => {
-        if (lineup) {
-            const updated = {
-                ...lineup,
-                formation: newFormation,
-                starters: lineup.starters,
-                updatedAt: new Date().toISOString(),
-            };
-            setLineup(updated);
-            saveLineup(updated);
+    const handleFormationChange = (newFormation: string, explicitFormat?: MatchFormat) => {
+        if (!lineup) return;
+        const nextFormat: MatchFormat = explicitFormat || getFormatFromFormation(newFormation);
+        const newSlots = FORMATIONS[newFormation] || [];
+        const maxSlots = newSlots.length || 11;
+
+        const nextStarters: { [key: number]: string } = {};
+        const overflowPlayerIds: string[] = [];
+
+        Object.entries(lineup.starters || {}).forEach(([slotKey, pid]) => {
+            const idx = Number(slotKey);
+            if (!pid) return;
+            if (idx < maxSlots) {
+                nextStarters[idx] = pid;
+            } else {
+                overflowPlayerIds.push(pid);
+            }
+        });
+
+        const nextSubs = [...(lineup.substitutes || ["", "", "", "", ""])];
+        overflowPlayerIds.forEach(pid => {
+            if (nextSubs.includes(pid)) return;
+            const emptyIdx = nextSubs.findIndex(s => !s);
+            if (emptyIdx !== -1) {
+                nextSubs[emptyIdx] = pid;
+            } else {
+                nextSubs.push(pid);
+            }
+        });
+
+        const prevFormat = lineup.matchFormat || getFormatFromFormation(lineup.formation);
+        const nextDuration = prevFormat !== nextFormat
+            ? FORMAT_DEFAULT_DURATION[nextFormat]
+            : (lineup.matchDurationMinutes || FORMAT_DEFAULT_DURATION[nextFormat]);
+
+        const updated: MatchdayXI = {
+            ...lineup,
+            matchFormat: nextFormat,
+            formation: newFormation,
+            matchDurationMinutes: nextDuration,
+            starters: nextStarters,
+            substitutes: nextSubs,
+            updatedAt: new Date().toISOString(),
+        };
+        setLineup(updated);
+        saveLineup(updated);
+
+        if (overflowPlayerIds.length > 0) {
+            showToast(
+                `Switched to ${nextFormat} (${newFormation}) — moved ${overflowPlayerIds.length} player${overflowPlayerIds.length > 1 ? "s" : ""} safely to Bench`,
+                "info"
+            );
         }
+    };
+
+    const handleFormatChange = (newFormat: MatchFormat) => {
+        if (!lineup) return;
+        const currentFormat = lineup.matchFormat || getFormatFromFormation(lineup.formation);
+        if (currentFormat === newFormat && FORMATIONS_BY_FORMAT[newFormat].includes(lineup.formation)) return;
+        const nextFormation = FORMATIONS_BY_FORMAT[newFormat].includes(lineup.formation)
+            ? lineup.formation
+            : DEFAULT_FORMATION_BY_FORMAT[newFormat];
+        handleFormationChange(nextFormation, newFormat);
+    };
+
+    const handleMatchDurationChange = (minutes: number) => {
+        if (!lineup) return;
+        const updated: MatchdayXI = {
+            ...lineup,
+            matchDurationMinutes: minutes,
+            updatedAt: new Date().toISOString(),
+        };
+        setLineup(updated);
+        saveLineup(updated);
+        showToast(`Match duration set to ${minutes} mins`);
+    };
+
+    const handlePeriodChange = (nextPeriod: "full" | "Q1" | "Q2" | "Q3" | "Q4") => {
+        if (!lineup) return;
+        const currentPeriod = lineup.activePeriod || "full";
+        if (currentPeriod === nextPeriod) return;
+
+        const nextPeriodStarters = { ...(lineup.periodStarters || {}) };
+        if (currentPeriod !== "full") {
+            nextPeriodStarters[currentPeriod] = { ...lineup.starters };
+        }
+
+        let targetStarters = { ...lineup.starters };
+        if (nextPeriod !== "full") {
+            const savedForPeriod = nextPeriodStarters[nextPeriod];
+            if (savedForPeriod && Object.values(savedForPeriod).some(Boolean)) {
+                targetStarters = { ...savedForPeriod };
+            } else {
+                nextPeriodStarters[nextPeriod] = { ...lineup.starters };
+            }
+        }
+
+        const updated: MatchdayXI = {
+            ...lineup,
+            activePeriod: nextPeriod,
+            periodStarters: nextPeriodStarters,
+            starters: targetStarters,
+            updatedAt: new Date().toISOString(),
+        };
+        setLineup(updated);
+        saveLineup(updated);
+    };
+
+    const handleRotateQuarterLineup = () => {
+        if (!lineup) return;
+        const currentFormation = FORMATIONS[lineup.formation] || [];
+        const activeSubs = lineup.substitutes.filter(Boolean);
+        if (activeSubs.length === 0) {
+            showToast("Add players to the bench first to rotate quarters", "info");
+            return;
+        }
+
+        // Rotate bench players into outfield slots while moving replaced starters to bench
+        const newStarters = { ...lineup.starters };
+        const newSubs = [...lineup.substitutes];
+        const outfieldIndices = currentFormation
+            .map((_, idx) => idx)
+            .filter(idx => idx > 0);
+
+        let rotatedCount = 0;
+        newSubs.forEach((subId, subSlotIdx) => {
+            if (!subId) return;
+            const targetOutfieldIdx = outfieldIndices[rotatedCount % outfieldIndices.length];
+            if (targetOutfieldIdx !== undefined) {
+                const outgoingStarterId = newStarters[targetOutfieldIdx] || "";
+                newStarters[targetOutfieldIdx] = subId;
+                newSubs[subSlotIdx] = outgoingStarterId;
+                rotatedCount++;
+            }
+        });
+
+        const currentPeriod = lineup.activePeriod || "full";
+        const nextPeriodStarters = { ...(lineup.periodStarters || {}) };
+        if (currentPeriod !== "full") {
+            nextPeriodStarters[currentPeriod] = newStarters;
+        }
+
+        const updated: MatchdayXI = {
+            ...lineup,
+            starters: newStarters,
+            substitutes: newSubs,
+            periodStarters: nextPeriodStarters,
+            updatedAt: new Date().toISOString(),
+        };
+        setLineup(updated);
+        saveLineup(updated);
+        showToast(`Rotated ${rotatedCount} bench player${rotatedCount > 1 ? "s" : ""} into ${currentPeriod === "full" ? "Pitch" : currentPeriod} lineup`);
+    };
+
+    const handleDistributeEqualGameTime = () => {
+        if (!lineup) return;
+        const currentFormation = FORMATIONS[lineup.formation] || [];
+        const activeFormat = lineup.matchFormat || getFormatFromFormation(lineup.formation);
+        const duration = lineup.matchDurationMinutes || FORMAT_DEFAULT_DURATION[activeFormat];
+        const starterIds = Object.values(lineup.starters || {}).filter(Boolean);
+        const subIds = lineup.substitutes.filter(Boolean);
+
+        if (subIds.length === 0) {
+            showToast("Assign substitutes on the bench first to calculate equal rolling minutes", "info");
+            return;
+        }
+
+        const totalPlayers = starterIds.length + subIds.length;
+        const pitchSpots = currentFormation.length || FORMAT_PLAYER_COUNT[activeFormat];
+        const equalMins = Math.max(10, Math.min(duration, Math.round((duration * pitchSpots) / Math.max(pitchSpots, totalPlayers))));
+        const rollingEntryMin = Math.max(5, duration - equalMins);
+
+        const outfieldStarterIds = currentFormation
+            .map((_, idx) => lineup.starters[idx])
+            .filter((id, idx): id is string => Boolean(id && idx > 0));
+
+        const nextSubstitutions = subIds.map((subId, i) => ({
+            subId,
+            replacedId: outfieldStarterIds[i % Math.max(1, outfieldStarterIds.length)] || starterIds[0] || "",
+            minute: rollingEntryMin,
+            customMinutesPlayed: equalMins,
+        }));
+
+        const updated: MatchdayXI = {
+            ...lineup,
+            usedSubstitutes: Array.from(new Set([...(lineup.usedSubstitutes || []), ...subIds])),
+            substitutions: nextSubstitutions,
+            updatedAt: new Date().toISOString(),
+        };
+        setLineup(updated);
+        saveLineup(updated);
+        showToast(`Rolling subs set: ~${equalMins} mins equal game time across ${totalPlayers} players`);
     };
 
     const handleStarterChange = (positionIndex: number, playerId: string) => {
         if (lineup) {
-            const updated = {
+            const nextStarters = {
+                ...lineup.starters,
+                [positionIndex]: playerId,
+            };
+            const currentPeriod = lineup.activePeriod || "full";
+            const nextPeriodStarters = { ...(lineup.periodStarters || {}) };
+            if (currentPeriod !== "full") {
+                nextPeriodStarters[currentPeriod] = nextStarters;
+            }
+            const updated: MatchdayXI = {
                 ...lineup,
-                starters: {
-                    ...lineup.starters,
-                    [positionIndex]: playerId,
-                },
+                starters: nextStarters,
+                periodStarters: nextPeriodStarters,
                 updatedAt: new Date().toISOString(),
             };
             setLineup(updated);
@@ -2036,7 +2278,10 @@ export default function MatchdayXIPage() {
             const ctx = canvas.getContext("2d");
             if (!ctx) return;
 
-            const currentFormation = FORMATIONS[lineup.formation] || [];
+            const activeFmt: MatchFormat = lineup.matchFormat || getFormatFromFormation(lineup.formation);
+            const romanLbl = FORMAT_ROMAN_LABEL[activeFmt];
+            const currentFormation = FORMATIONS[lineup.formation] || FORMATIONS[DEFAULT_FORMATION_BY_FORMAT[activeFmt]] || [];
+            const benchBaseNum = (currentFormation.length || FORMAT_PLAYER_COUNT[activeFmt]) + 1;
             const outfieldColor = getEffectiveOutfieldKitColor();
             const gkColor = getEffectiveGkKitColor();
             const meetTimeStr = getFormattedMeetTime();
@@ -2062,8 +2307,8 @@ export default function MatchdayXIPage() {
             ctx.font = "bold 20px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif";
             ctx.textAlign = "center";
             const compText = nextMatch
-                ? `${(nextMatch.competition || "MATCHDAY").toUpperCase()} • ${new Date(nextMatch.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).toUpperCase()}`
-                : "MATCHDAY STARTING XI";
+                ? `${(nextMatch.competition || "MATCHDAY").toUpperCase()} • ${activeFmt} STARTING ${romanLbl} • ${new Date(nextMatch.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).toUpperCase()}`
+                : `MATCHDAY STARTING ${romanLbl} (${activeFmt})`;
             ctx.fillText(compText, W / 2, 56);
 
             ctx.fillStyle = "#ffffff";
@@ -2076,8 +2321,8 @@ export default function MatchdayXIPage() {
             ctx.fillStyle = "#cbd5e1";
             ctx.font = "bold 20px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif";
             const metaLine = nextMatch
-                ? `KO: ${nextMatch.time || "TBD"}   •   MEET: ${meetTimeStr}   •   VENUE: ${venueLabel}   •   FORMATION: ${lineup.formation}`
-                : `FORMATION: ${lineup.formation}`;
+                ? `KO: ${nextMatch.time || "TBD"}   •   MEET: ${meetTimeStr}   •   VENUE: ${venueLabel}   •   ${activeFmt} (${lineup.formation})`
+                : `FORMAT: ${activeFmt}   •   FORMATION: ${lineup.formation}`;
             ctx.fillText(metaLine, W / 2, 144);
 
             // 3. Pitch Box
@@ -2110,6 +2355,23 @@ export default function MatchdayXIPage() {
             ctx.arc(pitchX + pitchW / 2, midY, 85, 0, Math.PI * 2);
             ctx.stroke();
 
+            // Dashed 1/3 retreat lines for 5v5 and 7v7 (#4)
+            if (activeFmt === "5v5" || activeFmt === "7v7") {
+                ctx.save();
+                ctx.setLineDash([14, 12]);
+                ctx.strokeStyle = "rgba(255,255,255,0.35)";
+                ctx.lineWidth = 3;
+                const topThirdY = pitchY + pitchH * 0.33;
+                const bottomThirdY = pitchY + pitchH * 0.67;
+                ctx.beginPath();
+                ctx.moveTo(pitchX + 24, topThirdY);
+                ctx.lineTo(pitchX + pitchW - 24, topThirdY);
+                ctx.moveTo(pitchX + 24, bottomThirdY);
+                ctx.lineTo(pitchX + pitchW - 24, bottomThirdY);
+                ctx.stroke();
+                ctx.restore();
+            }
+
             // Penalty boxes
             const boxW = 320;
             const boxH = 135;
@@ -2117,6 +2379,7 @@ export default function MatchdayXIPage() {
             ctx.strokeRect(pitchX + (pitchW - boxW) / 2, pitchY + pitchH - 24 - boxH, boxW, boxH);
 
             // 4. Draw Players on Pitch
+            const badgeRadius = activeFmt === "5v5" || activeFmt === "7v7" ? 36 : 32;
             currentFormation.forEach((pos, idx) => {
                 const pid = lineup.starters[idx];
                 const playerObj = resolvePlayerOrTrialist(pid);
@@ -2133,7 +2396,7 @@ export default function MatchdayXIPage() {
                 // Circle Jersey Badge
                 ctx.save();
                 ctx.beginPath();
-                ctx.arc(cx, cy - 10, 32, 0, Math.PI * 2);
+                ctx.arc(cx, cy - 10, badgeRadius, 0, Math.PI * 2);
                 ctx.fillStyle = fillCol;
                 ctx.fill();
                 ctx.lineWidth = 4;
@@ -2202,7 +2465,7 @@ export default function MatchdayXIPage() {
             ctx.font = "bold 21px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif";
             if (activeSubs.length > 0) {
                 const subStrings = activeSubs.map(({ sIdx, player }) => {
-                    const num = getSlotDisplayNumber("sub", sIdx, 12 + sIdx, player);
+                    const num = getSlotDisplayNumber("sub", sIdx, benchBaseNum + sIdx, player);
                     return `#${num} ${getMatchdayDisplayName(player)}`;
                 });
                 ctx.fillText(subStrings.join("    •    "), pitchX + 28, footerY + 82, pitchW - 56);
@@ -2232,6 +2495,9 @@ export default function MatchdayXIPage() {
             if (lineup.freeKickTakerId) {
                 const fk = resolvePlayerOrTrialist(lineup.freeKickTakerId);
                 if (fk) roleLinesPush(roleItems, `Free Kicks: ${getMatchdayDisplayName(fk)}`);
+            }
+            if (lineup.footwearNotes?.trim()) {
+                roleLinesPush(roleItems, `Surface/Footwear: ${lineup.footwearNotes.trim()}`);
             }
 
             function roleLinesPush(arr: string[], item: string) {
@@ -2269,7 +2535,11 @@ export default function MatchdayXIPage() {
         if (!printWindow) return;
 
         const exportFileBaseName = getMatchSheetFileBaseName();
-        const formation = FORMATIONS[lineup.formation];
+        const activeFmt: MatchFormat = lineup.matchFormat || getFormatFromFormation(lineup.formation);
+        const romanLbl = FORMAT_ROMAN_LABEL[activeFmt];
+        const formation = FORMATIONS[lineup.formation] || FORMATIONS[DEFAULT_FORMATION_BY_FORMAT[activeFmt]];
+        const benchBaseNum = (formation.length || FORMAT_PLAYER_COUNT[activeFmt]) + 1;
+        const matchDur = lineup.matchDurationMinutes || FORMAT_DEFAULT_DURATION[activeFmt];
         const kitColor = getEffectiveOutfieldKitColor();
         const gkColor = getEffectiveGkKitColor();
 
@@ -2499,8 +2769,8 @@ export default function MatchdayXIPage() {
             <body>
                 <div class="header">
                     <div>
-                        <h1>${settings.name} — Matchday Team Sheet</h1>
-                        <div class="subtitle">${nextMatch ? `${nextMatch.isHome ? 'Home' : 'Away'} vs ${nextMatch.opponent} • ${nextMatch.competition || 'Match'}` : activeSquadTab}</div>
+                        <h1>${settings.name} — Matchday Team Sheet (${activeFmt})</h1>
+                        <div class="subtitle">${nextMatch ? `${nextMatch.isHome ? 'Home' : 'Away'} vs ${nextMatch.opponent} • ${nextMatch.competition || 'Match'} (${matchDur} mins)` : `${activeSquadTab} • ${activeFmt}`}</div>
                     </div>
                     ${settings.logo ? `<img src="${settings.logo}" class="logo" />` : ''}
                 </div>
@@ -2512,11 +2782,11 @@ export default function MatchdayXIPage() {
                     </div>
                     <div class="meta-item">
                         <span>Meet Time & Venue</span>
-                        <strong>${meetTime} (${venueDisplay})</strong>
+                        <strong>${meetTime} (${venueDisplay})${lineup.footwearNotes?.trim() ? ` • ${lineup.footwearNotes.trim()}` : ''}</strong>
                     </div>
                     <div class="meta-item">
-                        <span>Formation</span>
-                        <strong>${lineup.formation}</strong>
+                        <span>Format & Formation</span>
+                        <strong>${activeFmt} • ${lineup.formation} (${matchDur}m)</strong>
                     </div>
                     <div class="meta-item">
                         <span>Captain</span>
@@ -2552,7 +2822,7 @@ export default function MatchdayXIPage() {
 
                     <div>
                         <div class="panel">
-                            <h3>Starting XI</h3>
+                            <h3>Starting ${romanLbl} (${activeFmt})</h3>
                             <ul class="list">
                                 ${formation
                                     .map((pos, idx) => ({ pos, idx }))
@@ -2578,11 +2848,11 @@ export default function MatchdayXIPage() {
                             <ul class="list">
                                 ${lineup.substitutes.filter(Boolean).length > 0 ? lineup.substitutes.map((subId, subSlotIdx) => ({ subId, subSlotIdx })).filter(item => Boolean(item.subId)).map(({ subId, subSlotIdx }) => {
                                     const pObj = resolvePlayerOrTrialist(subId);
-                                    const subNum = getSlotDisplayNumber("sub", subSlotIdx, 12 + subSlotIdx, pObj);
+                                    const subNum = getSlotDisplayNumber("sub", subSlotIdx, benchBaseNum + subSlotIdx, pObj);
                                     const subDetail = lineup.substitutions?.find(s => s.subId === subId);
                                     const replacedPlayer = subDetail?.replacedId ? resolvePlayerOrTrialist(subDetail.replacedId) : null;
                                     const subNote = lineup.usedSubstitutes?.includes(subId)
-                                        ? (replacedPlayer ? `On ${subDetail?.minute || 60}' for ${getMatchdayDisplayName(replacedPlayer)}` : `Played`)
+                                        ? (replacedPlayer ? `On ${subDetail?.minute || Math.round((matchDur * 2) / 3)}' for ${getMatchdayDisplayName(replacedPlayer)}` : `Played`)
                                         : (pObj?.position || '');
                                     return `<li><span><strong>#${subNum}</strong> ${pObj ? getMatchdayDisplayName(pObj) : 'TBD'}</span><span style="color:#64748b;font-size:11px">${subNote}</span></li>`;
                                 }).join('') : '<li><span>No substitutes assigned</span></li>'}
@@ -2621,9 +2891,15 @@ export default function MatchdayXIPage() {
         printWindow.document.close();
     };
 
-    const handleCopyTeamSheetToWhatsApp = () => {
+    const handleCopyTeamSheetToWhatsApp = (forceParentFriendly?: boolean) => {
         if (!lineup) return;
-        const formation = FORMATIONS[lineup.formation] || [];
+        const activeFmt: MatchFormat = lineup.matchFormat || getFormatFromFormation(lineup.formation);
+        const romanLbl = FORMAT_ROMAN_LABEL[activeFmt];
+        const formation = FORMATIONS[lineup.formation] || FORMATIONS[DEFAULT_FORMATION_BY_FORMAT[activeFmt]] || [];
+        const benchBaseNum = (formation.length || FORMAT_PLAYER_COUNT[activeFmt]) + 1;
+        const matchDur = lineup.matchDurationMinutes || FORMAT_DEFAULT_DURATION[activeFmt];
+        const isParentMode = typeof forceParentFriendly === "boolean" ? forceParentFriendly : Boolean(lineup.parentFriendlyExport);
+
         const dateFormatted = nextMatch
             ? new Date(nextMatch.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
             : new Date().toLocaleDateString('en-GB');
@@ -2632,15 +2908,19 @@ export default function MatchdayXIPage() {
             ? lineup.venueNotes.trim()
             : (nextMatch ? (nextMatch.isHome ? (settings.homeGround || "Home") : "Away") : "");
 
-        let msg = `⚽ *${settings.name.toUpperCase()} — MATCHDAY SQUAD* ⚽\n`;
+        let msg = `⚽ *${settings.name.toUpperCase()} — ${isParentMode ? "MATCHDAY SQUAD & PARENTS INFO" : `MATCHDAY SQUAD (${activeFmt})`}* ⚽\n`;
         if (nextMatch) {
             msg += `*${nextMatch.isHome ? '🏠 Home' : '🚌 Away'} vs ${nextMatch.opponent}*\n`;
             msg += `🏆 ${nextMatch.competition || 'Match'} | 📅 ${dateFormatted}\n`;
             msg += `⏰ KO: ${nextMatch.time || 'TBD'} (📍 Meet: ${meetTime}${venueStr ? ` @ ${venueStr}` : ''})\n`;
         }
-        msg += `📋 Formation: *${lineup.formation}*\n\n`;
+        msg += `📋 Format: *${activeFmt}* (${lineup.formation} • ${matchDur} mins)\n`;
+        if (lineup.footwearNotes?.trim()) {
+            msg += `👟 Surface / Footwear: *${lineup.footwearNotes.trim()}*\n`;
+        }
+        msg += `\n`;
 
-        msg += `*STARTING XI:*\n`;
+        msg += `*STARTING ${romanLbl} (${activeFmt}):*\n`;
         formation
             .map((pos, idx) => ({ pos, idx }))
             .sort((a, b) => {
@@ -2659,10 +2939,10 @@ export default function MatchdayXIPage() {
 
         const activeSubsWithIdx = lineup.substitutes.map((subId, subSlotIdx) => ({ subId, subSlotIdx })).filter(item => Boolean(item.subId));
         if (activeSubsWithIdx.length > 0) {
-            msg += `\n*SUBSTITUTES:*\n`;
+            msg += `\n*${activeFmt !== "11v11" ? "ROLLING SUBSTITUTES / FINISHERS" : "SUBSTITUTES"}:*\n`;
             activeSubsWithIdx.forEach(({ subId, subSlotIdx }) => {
                 const pObj = resolvePlayerOrTrialist(subId);
-                const subNum = getSlotDisplayNumber("sub", subSlotIdx, 12 + subSlotIdx, pObj);
+                const subNum = getSlotDisplayNumber("sub", subSlotIdx, benchBaseNum + subSlotIdx, pObj);
                 msg += `${subNum}. ${pObj ? `${getMatchdayDisplayName(pObj)}${pObj.id.startsWith("trialist-") ? " (Guest)" : ` (${pObj.position})`}` : 'TBD'}\n`;
             });
         }
@@ -2684,16 +2964,28 @@ export default function MatchdayXIPage() {
             const fk = resolvePlayerOrTrialist(lineup.freeKickTakerId);
             if (fk) roleLines.push(`🎯 Free Kicks: ${getMatchdayDisplayName(fk)}`);
         }
-        if (roleLines.length > 0) {
+        if (roleLines.length > 0 && !isParentMode) {
             msg += `\n*ROLES & SET PIECES:*\n${roleLines.join("\n")}\n`;
         }
 
+        if (isParentMode) {
+            msg += `\n👨‍👩‍👧‍👦 *PARENTS & PLAYERS CHECKLIST:*\n`;
+            msg += `• Please arrive by *${meetTime}* ready for warm-up\n`;
+            if (lineup.footwearNotes?.trim()) {
+                msg += `• Footwear: *${lineup.footwearNotes.trim()}*\n`;
+            }
+            msg += `• Don't forget shin pads, club kit & a full water bottle 💧\n`;
+            if (activeFmt !== "11v11") {
+                msg += `• Rolling substitutions in operation so all players get strong game time 🔄\n`;
+            }
+        }
+
         if (lineup.tacticalNotes && lineup.tacticalNotes.trim()) {
-            msg += `\n📝 *TACTICAL NOTES:*\n${lineup.tacticalNotes.trim()}\n`;
+            msg += `\n📝 *${isParentMode ? "COACH'S NOTES" : "TACTICAL NOTES"}:*\n${lineup.tacticalNotes.trim()}\n`;
         }
 
         navigator.clipboard.writeText(msg).then(() => {
-            showToast("Team Sheet copied & opening WhatsApp");
+            showToast(isParentMode ? "Parent-Friendly Team Sheet copied & opening WhatsApp" : "Team Sheet copied & opening WhatsApp");
             const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
             window.open(whatsappUrl, '_blank');
         }).catch(() => {
@@ -2715,11 +3007,14 @@ export default function MatchdayXIPage() {
             if (lineup.venueNotes?.trim()) {
                 msgTemplate += `🏟️ Venue / Pitch: ${lineup.venueNotes.trim()}\n`;
             }
+            if (lineup.footwearNotes?.trim()) {
+                msgTemplate += `👟 Surface / Footwear: ${lineup.footwearNotes.trim()}\n`;
+            }
             msgTemplate += `🔑 Session Code: {code}\n\n`;
         } else {
             msgTemplate += `*Upcoming Match TBD*\n\n`;
         }
-        msgTemplate += `🔴 Please confirm your availability for this match as soon as possible! Let's go boys!\n\n`;
+        msgTemplate += `🔴 Please confirm your availability for this match as soon as possible! Let's go!\n\n`;
         if (nextMatch) {
             const checkinLink = `${window.location.origin}/respond/${nextMatch.event_token || nextMatch.id}`;
             msgTemplate += `🔗 Log availability here:\n${checkinLink}`;
@@ -2752,7 +3047,15 @@ export default function MatchdayXIPage() {
 
     if (!lineup) return <div>Loading...</div>;
 
-    const formation = FORMATIONS[lineup.formation];
+    const activeFormat: MatchFormat = lineup.matchFormat || getFormatFromFormation(lineup.formation);
+    const activeRomanLabel = FORMAT_ROMAN_LABEL[activeFormat];
+    const formation = FORMATIONS[lineup.formation] || FORMATIONS[DEFAULT_FORMATION_BY_FORMAT[activeFormat]];
+    const targetStarterCount = formation.length || FORMAT_PLAYER_COUNT[activeFormat];
+    const benchStartNumber = targetStarterCount + 1;
+    const effectiveMatchDuration = lineup.matchDurationMinutes || FORMAT_DEFAULT_DURATION[activeFormat];
+    const defaultSubMinute = Math.round((effectiveMatchDuration * 2) / 3);
+    const defaultSubPlayedMins = Math.max(10, effectiveMatchDuration - defaultSubMinute);
+
     const sortedFormationSlots = formation
         .map((pos, idx) => ({ pos, idx }))
         .sort((a, b) => {
@@ -2808,7 +3111,7 @@ export default function MatchdayXIPage() {
         return { lastMatchStarterIds: starterSet, lastMatchSubIds: subSet };
     })();
 
-    // Live calculation of minutes played and substitution badges (#7)
+    // Live calculation of minutes played and substitution badges (#7 & #9 format-aware match duration)
     const { liveMinutesMap, subbedOffMap } = (() => {
         const minutesMap = new Map<string, number>();
         const onPitchSince = new Map<string, number>();
@@ -2827,10 +3130,10 @@ export default function MatchdayXIPage() {
 
         const sortedSubs = [...(lineup.substitutions || [])]
             .filter(sub => sub.subId && (lineup.usedSubstitutes || []).includes(sub.subId))
-            .sort((a, b) => (Number(a.minute) || 60) - (Number(b.minute) || 60));
+            .sort((a, b) => (Number(a.minute) || defaultSubMinute) - (Number(b.minute) || defaultSubMinute));
 
         sortedSubs.forEach(sub => {
-            const subMin = Number(sub.minute) || 60;
+            const subMin = Number(sub.minute) || defaultSubMinute;
             if (sub.replacedId && onPitchSince.has(sub.replacedId)) {
                 const startedAt = onPitchSince.get(sub.replacedId)!;
                 const played = Math.max(0, subMin - startedAt);
@@ -2845,7 +3148,9 @@ export default function MatchdayXIPage() {
         });
 
         onPitchSince.forEach((startedAt, id) => {
-            const played = startedAt > 0 ? Math.max(1, 90 - startedAt) : Math.max(0, 90 - startedAt);
+            const played = startedAt > 0
+                ? Math.max(1, effectiveMatchDuration - startedAt)
+                : Math.max(0, effectiveMatchDuration - startedAt);
             minutesMap.set(id, (minutesMap.get(id) || 0) + played);
         });
 
@@ -2858,7 +3163,7 @@ export default function MatchdayXIPage() {
         (lineup.usedSubstitutes || []).forEach((id: string) => {
             if (id && minutesMap.get(id) === 0) {
                 const hasSubRecord = lineup.substitutions?.some(s => s.subId === id && s.replacedId);
-                if (!hasSubRecord) minutesMap.set(id, 30);
+                if (!hasSubRecord) minutesMap.set(id, defaultSubPlayedMins);
             }
         });
 
@@ -2952,43 +3257,44 @@ export default function MatchdayXIPage() {
     const handleQuickAssignFromSquad = (player: Player) => {
         if (!lineup) return;
         const displayName = formatPlayerName(player);
+        const startLabel = `Starting ${activeRomanLabel}`;
 
-        // 1. Try to find an ideal empty Starting XI slot
+        // 1. Try to find an ideal empty Starting slot
         for (let i = 0; i < formation.length; i++) {
             if (!lineup.starters[i] && isIdealPosition(player.position, formation[i].label)) {
                 handleStarterChange(i, player.id);
-                showToast(`Assigned ${displayName} to ${formation[i].label} (Starting XI)`);
+                showToast(`Assigned ${displayName} to ${formation[i].label} (${startLabel})`);
                 return;
             }
         }
 
-        // 2. Try secondary position match in Starting XI
+        // 2. Try secondary position match in Starting lineup
         if (player.secondaryPositions && player.secondaryPositions.length > 0) {
             for (let i = 0; i < formation.length; i++) {
                 if (!lineup.starters[i] && player.secondaryPositions.some(sec => isIdealPosition(sec, formation[i].label))) {
                     handleStarterChange(i, player.id);
-                    showToast(`Assigned ${displayName} to ${formation[i].label} (Starting XI)`);
+                    showToast(`Assigned ${displayName} to ${formation[i].label} (${startLabel})`);
                     return;
                 }
             }
         }
 
-        // 3. Try same position unit (GK / DEF / MID / FWD) in Starting XI
+        // 3. Try same position unit (GK / DEF / MID / FWD) in Starting lineup
         const playerCat = getPositionCategory(player.position);
         for (let i = 0; i < formation.length; i++) {
             if (!lineup.starters[i] && getPositionCategory(formation[i].label) === playerCat) {
                 handleStarterChange(i, player.id);
-                showToast(`Assigned ${displayName} to ${formation[i].label} (Starting XI)`);
+                showToast(`Assigned ${displayName} to ${formation[i].label} (${startLabel})`);
                 return;
             }
         }
 
-        // 4. Try any open Starting XI slot (preferring outfield for outfielders)
+        // 4. Try any open Starting slot (preferring outfield for outfielders)
         for (let i = 0; i < formation.length; i++) {
             if (!lineup.starters[i]) {
-                if (i === 0 && playerCat !== "GK" && Object.values(lineup.starters).filter(Boolean).length < 10) continue;
+                if (i === 0 && playerCat !== "GK" && Object.values(lineup.starters).filter(Boolean).length < targetStarterCount - 1) continue;
                 handleStarterChange(i, player.id);
-                showToast(`Assigned ${displayName} to ${formation[i].label} (Starting XI)`);
+                showToast(`Assigned ${displayName} to ${formation[i].label} (${startLabel})`);
                 return;
             }
         }
@@ -2997,7 +3303,7 @@ export default function MatchdayXIPage() {
         const emptySubIdx = lineup.substitutes.findIndex(id => !id);
         if (emptySubIdx !== -1) {
             handleSubChange(emptySubIdx, player.id);
-            showToast(`Assigned ${displayName} to Bench #${12 + emptySubIdx}`);
+            showToast(`Assigned ${displayName} to Bench #${benchStartNumber + emptySubIdx}`);
             return;
         }
 
@@ -3005,11 +3311,14 @@ export default function MatchdayXIPage() {
         const updated: MatchdayXI = { ...lineup, substitutes: newSubs, updatedAt: new Date().toISOString() };
         setLineup(updated);
         saveLineup(updated);
-        showToast(`Added ${displayName} to Bench #${11 + newSubs.length}`);
+        showToast(`Added ${displayName} to Bench #${targetStarterCount + newSubs.length}`);
     };
 
     const selectedStartersCount = Object.values(lineup.starters).filter(Boolean).length;
     const selectedSubsCount = lineup.substitutes.filter(Boolean).length;
+    const equalTargetMinutes = selectedStartersCount + selectedSubsCount > 0
+        ? Math.max(10, Math.min(effectiveMatchDuration, Math.round((effectiveMatchDuration * targetStarterCount) / Math.max(targetStarterCount, selectedStartersCount + selectedSubsCount))))
+        : effectiveMatchDuration;
     const configuredRolesCount =
         (lineup.captainId ? 1 : 0) +
         [lineup.penaltyTakerId, lineup.cornerTakerId, lineup.freeKickTakerId].filter(Boolean).length +
@@ -3188,7 +3497,7 @@ export default function MatchdayXIPage() {
                                             className="w-full px-3 py-2 text-left text-xs font-bold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
                                         >
                                             <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                                            <span>Auto-Pick Full Squad (XI + Bench)</span>
+                                            <span>Auto-Pick Full Squad ({activeRomanLabel} + Bench)</span>
                                         </button>
                                         <div className="my-1 border-t border-border/60" />
                                         <button
@@ -3197,7 +3506,7 @@ export default function MatchdayXIPage() {
                                             className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
                                         >
                                             <Sparkles className="h-3.5 w-3.5 text-amber-500/80 shrink-0" />
-                                            <span>Auto-Pick Starting XI Only</span>
+                                            <span>Auto-Pick Starting {activeRomanLabel} Only</span>
                                         </button>
                                         <button
                                             type="button"
@@ -3213,7 +3522,7 @@ export default function MatchdayXIPage() {
                                             className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
                                         >
                                             <RefreshCw className="h-3.5 w-3.5 text-primary shrink-0" />
-                                            <span>Copy Last Match XI</span>
+                                            <span>Copy Last Match {activeRomanLabel}</span>
                                         </button>
                                         <div className="my-1 border-t border-border" />
                                         <button
@@ -3241,14 +3550,23 @@ export default function MatchdayXIPage() {
                                     <ChevronDown className="h-3.5 w-3.5 ml-1 text-muted-foreground shrink-0" />
                                 </Button>
                                 {openActionDropdown === "share" && (
-                                    <div className="absolute right-0 mt-1.5 w-56 rounded-xl bg-surface-1 border border-border shadow-xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
+                                    <div className="absolute right-0 mt-1.5 w-60 rounded-xl bg-surface-1 border border-border shadow-xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
                                         <button
                                             type="button"
-                                            onClick={() => { setOpenActionDropdown(null); handleCopyTeamSheetToWhatsApp(); }}
+                                            onClick={() => { setOpenActionDropdown(null); handleCopyTeamSheetToWhatsApp(false); }}
                                             className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
                                         >
                                             <MessageCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                                            <span>Share XI on WhatsApp</span>
+                                            <span>Share Starting {activeRomanLabel} (WhatsApp)</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleCopyTeamSheetToWhatsApp(true); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                            title="Alphabetical Matchday Squad list without Starters vs Bench labels — ideal for Academy & Youth Parents groups"
+                                        >
+                                            <Users className="h-3.5 w-3.5 text-teal-500 shrink-0" />
+                                            <span>Share Parent-Friendly Squad List</span>
                                         </button>
                                         <button
                                             type="button"
@@ -3256,7 +3574,7 @@ export default function MatchdayXIPage() {
                                             className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
                                         >
                                             <ImageIcon className="h-3.5 w-3.5 text-primary shrink-0" />
-                                            <span>Download Pitch Graphic (PNG)</span>
+                                            <span>Download {activeFormat} Graphic (PNG)</span>
                                         </button>
                                         <button
                                             type="button"
@@ -3396,7 +3714,7 @@ export default function MatchdayXIPage() {
                                             className="w-full px-3 py-2 text-left text-xs font-bold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
                                         >
                                             <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                                            <span>Auto-Pick Full Squad (XI + Bench)</span>
+                                            <span>Auto-Pick Full Squad ({activeRomanLabel} + Bench)</span>
                                         </button>
                                         <div className="my-1 border-t border-border/60" />
                                         <button
@@ -3405,7 +3723,7 @@ export default function MatchdayXIPage() {
                                             className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
                                         >
                                             <Sparkles className="h-3.5 w-3.5 text-amber-500/80 shrink-0" />
-                                            <span>Auto-Pick Starting XI Only</span>
+                                            <span>Auto-Pick Starting {activeRomanLabel} Only</span>
                                         </button>
                                         <button
                                             type="button"
@@ -3421,7 +3739,7 @@ export default function MatchdayXIPage() {
                                             className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
                                         >
                                             <RefreshCw className="h-3.5 w-3.5 text-primary shrink-0" />
-                                            <span>Copy Last Match XI</span>
+                                            <span>Copy Last Match {activeRomanLabel}</span>
                                         </button>
                                         <div className="my-1 border-t border-border" />
                                         <button
@@ -3449,14 +3767,23 @@ export default function MatchdayXIPage() {
                                     <ChevronDown className="h-3.5 w-3.5 ml-1 text-muted-foreground" />
                                 </Button>
                                 {openActionDropdown === "share" && (
-                                    <div className="absolute right-0 mt-1.5 w-56 rounded-xl bg-surface-1 border border-border shadow-xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
+                                    <div className="absolute right-0 mt-1.5 w-60 rounded-xl bg-surface-1 border border-border shadow-xl py-1.5 z-40 animate-in fade-in zoom-in-95 duration-100">
                                         <button
                                             type="button"
-                                            onClick={() => { setOpenActionDropdown(null); handleCopyTeamSheetToWhatsApp(); }}
+                                            onClick={() => { setOpenActionDropdown(null); handleCopyTeamSheetToWhatsApp(false); }}
                                             className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
                                         >
                                             <MessageCircle className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                                            <span>Share XI on WhatsApp</span>
+                                            <span>Share Starting {activeRomanLabel} (WhatsApp)</span>
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => { setOpenActionDropdown(null); handleCopyTeamSheetToWhatsApp(true); }}
+                                            className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
+                                            title="Alphabetical Matchday Squad list without Starters vs Bench labels — ideal for Academy & Youth Parents groups"
+                                        >
+                                            <Users className="h-3.5 w-3.5 text-teal-500 shrink-0" />
+                                            <span>Share Parent-Friendly Squad List</span>
                                         </button>
                                         <button
                                             type="button"
@@ -3464,7 +3791,7 @@ export default function MatchdayXIPage() {
                                             className="w-full px-3 py-2 text-left text-xs font-semibold text-foreground hover:bg-surface-2 flex items-center gap-2.5"
                                         >
                                             <ImageIcon className="h-3.5 w-3.5 text-primary shrink-0" />
-                                            <span>Download Pitch Graphic (PNG)</span>
+                                            <span>Download {activeFormat} Graphic (PNG)</span>
                                         </button>
                                         <button
                                             type="button"
@@ -3577,7 +3904,7 @@ export default function MatchdayXIPage() {
                                 </select>
                             </div>
 
-                            <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1 flex-1 min-w-[220px]">
+                            <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1 flex-1 min-w-[200px]">
                                 <MapPin className="h-3.5 w-3.5 text-primary shrink-0" />
                                 <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">
                                     {nextMatch.isHome ? "Home:" : "Away:"}
@@ -3592,6 +3919,28 @@ export default function MatchdayXIPage() {
                                         }
                                     }}
                                     placeholder={`${nextMatch.isHome ? (settings.homeGround || "Home Ground") : "Away Venue"} — Add pitch #, postcode or parking info...`}
+                                    className="w-full bg-transparent text-xs font-medium text-foreground placeholder-muted-foreground focus:outline-none"
+                                />
+                            </div>
+
+                            {/* #13 Surface / Footwear Note for WhatsApp & Parent Team Sheets */}
+                            <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1 min-w-[180px]">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground shrink-0">
+                                    Surface:
+                                </span>
+                                <input
+                                    type="text"
+                                    value={lineup.footwearNotes ?? ""}
+                                    onChange={(e) => {
+                                        const updated: MatchdayXI = {
+                                            ...lineup,
+                                            footwearNotes: e.target.value,
+                                            updatedAt: new Date().toISOString()
+                                        };
+                                        setLineup(updated);
+                                        saveLineup(updated);
+                                    }}
+                                    placeholder="e.g. 3G Moulds Only / Grass..."
                                     className="w-full bg-transparent text-xs font-medium text-foreground placeholder-muted-foreground focus:outline-none"
                                 />
                             </div>
@@ -3619,11 +3968,11 @@ export default function MatchdayXIPage() {
                             : "text-muted-foreground hover:text-foreground"
                     }`}
                 >
-                    <span>Pitch XI</span>
+                    <span>Pitch {activeRomanLabel}</span>
                     <span className={`text-[9px] px-1.5 py-0.2 rounded-full font-black ${
                         mobileActiveTab === "pitch" ? "bg-black/20 text-white" : "bg-surface-2 text-muted-foreground"
                     }`}>
-                        {selectedStartersCount}/11
+                        {selectedStartersCount}/{targetStarterCount}
                     </span>
                 </button>
                 <button
@@ -3901,12 +4250,39 @@ export default function MatchdayXIPage() {
 
                 {/* Center Content - Formation Display (#3 Kit Selector, #6 Trialists, #10 Live Match Events) */}
                 <div className={`${mobileActiveTab === "pitch" ? "flex" : "hidden"} lg:flex lg:col-span-3 h-auto lg:h-full flex-col order-1 lg:order-2 min-h-0 overflow-hidden rounded-xl`}>
-                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 z-10 shrink-0">
-                        <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 pb-2 z-10 shrink-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
                             <div className="flex flex-col">
-                                <span className="cf-section-title">Starting XI</span>
-                                <span className="cf-metadata">{selectedStartersCount} / 11 Selected</span>
+                                <span className="cf-section-title">Starting {activeRomanLabel}</span>
+                                <span className="cf-metadata">
+                                    {selectedStartersCount} / {targetStarterCount} Selected • {effectiveMatchDuration}m Match
+                                </span>
                             </div>
+
+                            {/* #1 4-Way Match Format Pill Switcher (5v5 | 7v7 | 9v9 | 11v11) */}
+                            <div
+                                className="inline-flex items-center p-0.5 rounded-xl bg-surface-1 border border-border shadow-sm"
+                                title="Switch Matchday Format (5v5, 7v7, 9v9, or 11v11)"
+                            >
+                                {(["5v5", "7v7", "9v9", "11v11"] as const).map(fmt => {
+                                    const isActive = activeFormat === fmt;
+                                    return (
+                                        <button
+                                            key={fmt}
+                                            type="button"
+                                            onClick={() => handleFormatChange(fmt)}
+                                            className={`px-2 py-1 rounded-lg text-[10px] sm:text-[11px] font-black transition-all ${
+                                                isActive
+                                                    ? "bg-primary text-primary-foreground shadow-sm"
+                                                    : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                                            }`}
+                                        >
+                                            {fmt}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
                             {/* Mobile Quick Squad Switcher right on Pitch Toolbar */}
                             {currentSquads.length > 1 && (
                                 <select
@@ -3980,36 +4356,113 @@ export default function MatchdayXIPage() {
                                 />
                             </div>
 
-                            {/* #4 Only show Reset 1–11 button when custom numbers have been set */}
+                            {/* #4 Only show Reset 1–N button when custom numbers have been set */}
                             {lineup.customNumbers && Object.keys(lineup.customNumbers).length > 0 && (
                                 <button
                                     type="button"
                                     onClick={handleResetCustomNumbers}
                                     className="px-2.5 py-1.5 rounded-xl border border-border bg-surface-1 hover:bg-surface-2 text-foreground text-xs font-bold transition-colors flex items-center gap-1 shadow-sm"
-                                    title="Reset all shirt numbers back to 1–11"
+                                    title={`Reset all shirt numbers back to 1–${targetStarterCount}`}
                                 >
                                     <RotateCcw className="h-3 w-3 text-primary" />
-                                    <span>Reset 1–11</span>
+                                    <span>Reset 1–{targetStarterCount}</span>
                                 </button>
                             )}
 
+                            {/* #9 Format-Specific Match Duration Selector */}
+                            <select
+                                value={effectiveMatchDuration}
+                                onChange={(e) => handleMatchDurationChange(parseInt(e.target.value, 10) || 90)}
+                                title="Match Duration (used for automatic sub & appearance minutes)"
+                                className="px-2.5 py-1.5 border border-border rounded-xl text-xs font-bold focus:ring-2 focus:ring-primary focus:outline-none bg-surface-1 text-foreground shadow-sm hover:border-foreground/30 transition-colors cursor-pointer"
+                            >
+                                {[40, 50, 60, 70, 80, 90].map(mins => (
+                                    <option key={mins} value={mins} className="bg-surface-1 text-foreground">
+                                        {mins} mins
+                                    </option>
+                                ))}
+                            </select>
+
+                            {/* #1 Formation Dropdown filtered to activeFormat */}
                             <select
                                 value={lineup.formation}
                                 onChange={(e) => handleFormationChange(e.target.value)}
                                 className="px-3 py-1.5 border border-border rounded-xl text-xs font-bold focus:ring-2 focus:ring-primary focus:outline-none bg-surface-1 text-foreground shadow-sm hover:border-foreground/30 transition-colors cursor-pointer"
                             >
-                                {FORMATION_NAMES.map(name => (
-                                    <option key={name} value={name}>{name}</option>
+                                {(FORMATIONS_BY_FORMAT[activeFormat] || FORMATION_NAMES).map(name => (
+                                    <option key={name} value={name} className="bg-surface-1 text-foreground">
+                                        {name} ({activeFormat})
+                                    </option>
                                 ))}
                             </select>
                         </div>
                     </div>
+
+                    {/* #10 Quarter / Period Lineup Tabs & Rotation Helper (Shown for 5v5/7v7/9v9 or when quarters are used) */}
+                    {(activeFormat !== "11v11" || Boolean(lineup.activePeriod && lineup.activePeriod !== "full")) && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 pb-2 z-10 shrink-0">
+                            <div className="inline-flex items-center gap-1 p-0.5 rounded-xl bg-surface-1 border border-border shadow-sm">
+                                {([
+                                    { id: "full", label: "Full Match" },
+                                    { id: "Q1", label: "Q1" },
+                                    { id: "Q2", label: "Q2" },
+                                    { id: "Q3", label: "Q3" },
+                                    { id: "Q4", label: "Q4" }
+                                ] as const).map(period => {
+                                    const activeP = lineup.activePeriod || "full";
+                                    const isSavedPeriod = period.id !== "full" && Object.values(lineup.periodStarters?.[period.id] || {}).some(Boolean);
+                                    return (
+                                        <button
+                                            key={period.id}
+                                            type="button"
+                                            onClick={() => handlePeriodChange(period.id)}
+                                            className={`px-2.5 py-1 rounded-lg text-[10px] font-extrabold transition-all flex items-center gap-1 ${
+                                                activeP === period.id
+                                                    ? "bg-emerald-500 text-black shadow-sm"
+                                                    : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                                            }`}
+                                        >
+                                            <span>{period.label}</span>
+                                            {isSavedPeriod && activeP !== period.id && (
+                                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="flex items-center gap-1.5">
+                                {activeFormat === "5v5" || activeFormat === "7v7" ? (
+                                    <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                                        🔄 Dev Rotation Mode Active
+                                    </span>
+                                ) : null}
+                                <button
+                                    type="button"
+                                    onClick={handleRotateQuarterLineup}
+                                    title="Rotate bench substitutes onto the pitch for this quarter/period while keeping GK (#1)"
+                                    className="px-2.5 py-1 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-600 dark:text-amber-400 text-[10px] font-extrabold transition-colors flex items-center gap-1"
+                                >
+                                    <RefreshCw className="h-3 w-3" />
+                                    <span>Rotate Bench In</span>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="flex-1 flex items-center justify-center min-h-0">
                         <div className="relative w-full h-[460px] sm:h-[540px] lg:h-full max-w-[680px] mx-auto bg-[#2b7c3d] rounded-2xl shadow-xl overflow-hidden">
                             {/* Pitch markings */}
                             <div className="absolute inset-0 overflow-hidden rounded-sm pointer-events-none">
                                 <div className="absolute inset-2 border-2 border-white/40"></div>
                                 <div className="absolute left-2 right-2 top-1/2 border-t-2 border-white/40"></div>
+                                {/* #4 Small-sided 1/3 Retreat Lines for 5v5 and 7v7 */}
+                                {(activeFormat === "5v5" || activeFormat === "7v7") && (
+                                    <>
+                                        <div className="absolute left-2 right-2 top-[34%] border-t border-dashed border-white/30"></div>
+                                        <div className="absolute left-2 right-2 top-[66%] border-t border-dashed border-white/30"></div>
+                                    </>
+                                )}
                                 <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-12 h-12 sm:w-16 sm:h-16 border-2 border-white/40 rounded-full"></div>
                                 <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 bg-white/60 rounded-full"></div>
                                 <div className="absolute left-1/2 -translate-x-1/2 top-2 w-20 h-10 sm:w-24 sm:h-12 border-2 border-white/40 border-t-0"></div>
@@ -4077,9 +4530,9 @@ export default function MatchdayXIPage() {
                                             onClick={() => { setModalTab("swap"); setActiveSlot({ type: 'pitch', index: idx, label: pos.label }); }}
                                     >
                                         <div className="relative">
-                                            {/* Jersey SVG Icon colored dynamically based on kit selector & GK slot */}
+                                            {/* Jersey SVG Icon colored dynamically based on kit selector & GK slot (#4 Larger for 5v5/7v7) */}
                                             <svg 
-                                                className="w-9 h-9 sm:w-11 sm:h-11 drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)] mb-0.5 z-10 transition-transform group-hover:scale-105" 
+                                                className={`${activeFormat === "5v5" || activeFormat === "7v7" ? "w-10 h-10 sm:w-12 sm:h-12" : "w-9 h-9 sm:w-11 sm:h-11"} drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)] mb-0.5 z-10 transition-transform group-hover:scale-105`}
                                                 viewBox="0 0 100 100" 
                                                 fill="none" 
                                                 xmlns="http://www.w3.org/2000/svg"
@@ -4215,7 +4668,7 @@ export default function MatchdayXIPage() {
                                                 setEditingNamePlayerId(playerId);
                                                 setEditingNameValue(fullPlayerName);
                                             }}
-                                            className={`px-1.5 sm:px-2 py-0.5 rounded-full shadow-md min-w-[44px] sm:min-w-[64px] text-center relative transition-all flex items-center justify-center ${playerId ? 'bg-surface-1/95 border border-border backdrop-blur-sm' : 'bg-black/35 border border-white/20 backdrop-blur-sm'}`}
+                                            className={`px-1 sm:px-2 py-0.5 rounded-full shadow-md min-w-[38px] sm:min-w-[64px] text-center relative transition-all flex items-center justify-center ${playerId ? 'bg-surface-1/95 border border-border backdrop-blur-sm' : 'bg-black/35 border border-white/20 backdrop-blur-sm'}`}
                                         >
                                             {playerId && editingNamePlayerId === playerId ? (
                                                 <input
@@ -4242,7 +4695,7 @@ export default function MatchdayXIPage() {
                                                     className="w-[88px] sm:w-[104px] bg-surface-2 text-foreground text-[10px] sm:text-[11px] font-bold text-center rounded px-1 py-0.5 outline-none ring-1 ring-primary"
                                                 />
                                             ) : (
-                                                <span className={`text-[9px] sm:text-[11px] font-bold tracking-tight whitespace-nowrap truncate max-w-[74px] sm:max-w-[102px] ${playerId ? 'text-foreground' : 'text-white/75'}`}>
+                                                <span className={`text-[8.5px] sm:text-[11px] font-bold tracking-tight whitespace-nowrap truncate max-w-[62px] sm:max-w-[102px] ${playerId ? 'text-foreground' : 'text-white/75'}`}>
                                                     {playerId ? displayName : getDisplayPosition(pos.label)}
                                                 </span>
                                             )}
@@ -4311,10 +4764,10 @@ export default function MatchdayXIPage() {
                                 const player = resolvePlayerOrTrialist(rawSubId);
                                 const subId = player ? rawSubId : "";
                                 const displayName = getMatchdayDisplayName(player);
-                                const defaultSubNumber = 12 + idx;
+                                const defaultSubNumber = benchStartNumber + idx;
                                 const displayedSubNumber = getSlotDisplayNumber("sub", idx, defaultSubNumber, player);
                                 const isSubPlayed = Boolean(subId && lineup.usedSubstitutes?.includes(subId));
-                                const subMinutes = isSubPlayed ? (liveMinutesMap.get(subId) ?? 30) : 0;
+                                const subMinutes = isSubPlayed ? (liveMinutesMap.get(subId) ?? defaultSubPlayedMins) : 0;
 
                                 return (
                                     <button
@@ -4393,12 +4846,35 @@ export default function MatchdayXIPage() {
                             </button>
                         </div>
                     </div>
+
+                    {/* #8 Rolling Substitutions & Equal Game-Time Helper Banner */}
+                    {selectedSubsCount > 0 && (
+                        <div className="px-3 py-2 border-b border-border/60 bg-surface-2/60 flex items-center justify-between gap-2 shrink-0">
+                            <div className="flex flex-col min-w-0">
+                                <span className="text-[10px] font-extrabold text-foreground truncate">
+                                    Equal Game-Time Target: ~{equalTargetMinutes}m
+                                </span>
+                                <span className="text-[9px] text-muted-foreground truncate">
+                                    {selectedStartersCount + selectedSubsCount} players • {effectiveMatchDuration}m ({activeFormat})
+                                </span>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleDistributeEqualGameTime}
+                                title="Mark all bench players as Played and log equal rolling-sub minutes across the matchday squad"
+                                className="px-2 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-extrabold transition-colors shrink-0"
+                            >
+                                Equal Mins
+                            </button>
+                        </div>
+                    )}
+
                     <div className="p-3 space-y-2 overflow-y-auto flex-1 scrollbar-thin">
                         {lineup.substitutes.map((rawSubId, idx) => {
                             const player = resolvePlayerOrTrialist(rawSubId);
                             const subId = player ? rawSubId : "";
                             const displayName = getMatchdayDisplayName(player);
-                            const defaultSubNumber = 12 + idx;
+                            const defaultSubNumber = benchStartNumber + idx;
                             const subSlotKey = `sub-${idx}`;
                             const displayedSubNumber = getSlotDisplayNumber("sub", idx, defaultSubNumber, player);
                             const isEditingSubNumber = editingNumberSlot === subSlotKey;
@@ -4406,7 +4882,7 @@ export default function MatchdayXIPage() {
                             const hasCustomSubName = Boolean(subId && !isTrialist && lineup.customNames?.[subId]?.trim());
                             const subDetail = lineup.substitutions?.find(s => s.subId === subId);
                             const isSubPlayed = Boolean(subId && lineup.usedSubstitutes?.includes(subId));
-                            const subMinutes = isSubPlayed ? (liveMinutesMap.get(subId) ?? 30) : 0;
+                            const subMinutes = isSubPlayed ? (liveMinutesMap.get(subId) ?? defaultSubPlayedMins) : 0;
                             const subEvents = subId ? getPlayerMatchEventStats(subId) : undefined;
                             const isSubMotm = Boolean(subId && lineup.motmPlayerId === subId);
 
@@ -4614,10 +5090,10 @@ export default function MatchdayXIPage() {
                                                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider shrink-0">Subbed For:</span>
                                                 <select
                                                     value={subDetail?.replacedId || ""}
-                                                    onChange={(e) => handleSubDetailChange(subId, e.target.value, subDetail?.minute || 60, subDetail?.customMinutesPlayed)}
+                                                    onChange={(e) => handleSubDetailChange(subId, e.target.value, subDetail?.minute || defaultSubMinute, subDetail?.customMinutesPlayed)}
                                                     className="text-[10px] bg-surface-1 border border-border text-foreground rounded-md px-2 py-1 h-7 flex-1 min-w-0 outline-none font-medium focus:border-primary"
                                                 >
-                                                    <option value="">Replaced player...</option>
+                                                    <option value="">Replaced player (or Rolling Sub)...</option>
                                                     <optgroup label="Starters">
                                                         {sortedFormationSlots.map(({ pos, idx }) => {
                                                             const starterId = lineup.starters[idx];
@@ -4652,13 +5128,13 @@ export default function MatchdayXIPage() {
                                                         min="1"
                                                         max="120"
                                                         value={subDetail?.minute ?? ""}
-                                                        placeholder="60"
-                                                        onChange={(e) => handleSubDetailChange(subId, subDetail?.replacedId || "", parseInt(e.target.value) || 60, undefined)}
+                                                        placeholder={String(defaultSubMinute)}
+                                                        onChange={(e) => handleSubDetailChange(subId, subDetail?.replacedId || "", parseInt(e.target.value) || defaultSubMinute, undefined)}
                                                         className="text-[10px] bg-surface-1 border border-border text-foreground rounded-md px-1 py-0.5 h-6 w-11 text-center outline-none focus:border-primary"
                                                     />
                                                     <span>&apos;</span>
                                                 </div>
-                                                <div className="flex items-center gap-1" title="Total minutes played including stoppage time (auto-calculated from 90 - On, click to edit)">
+                                                <div className="flex items-center gap-1" title={`Total minutes played (auto-calculated from ${effectiveMatchDuration} - On, or click to set rolling sub minutes)`}>
                                                     <span>Played:</span>
                                                     <input
                                                         type="number"
@@ -4670,7 +5146,7 @@ export default function MatchdayXIPage() {
                                                             handleSubDetailChange(
                                                                 subId,
                                                                 subDetail?.replacedId || "",
-                                                                subDetail?.minute || 60,
+                                                                subDetail?.minute || defaultSubMinute,
                                                                 !isNaN(val) && val > 0 ? val : undefined
                                                             );
                                                         }}
@@ -4684,8 +5160,8 @@ export default function MatchdayXIPage() {
                                                     {typeof subDetail?.customMinutesPlayed === "number" && (
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleSubDetailChange(subId, subDetail?.replacedId || "", subDetail?.minute || 60, undefined)}
-                                                            title="Reset to auto-calculated minutes (90 - On)"
+                                                            onClick={() => handleSubDetailChange(subId, subDetail?.replacedId || "", subDetail?.minute || defaultSubMinute, undefined)}
+                                                            title={`Reset to auto-calculated minutes (${effectiveMatchDuration} - On)`}
                                                             className="text-muted-foreground hover:text-primary p-0.5"
                                                         >
                                                             <RotateCcw className="h-2.5 w-2.5" />
@@ -4972,7 +5448,7 @@ export default function MatchdayXIPage() {
                                         onClick={() => {
                                             const defaultNum = activeSlot.type === "pitch"
                                                 ? (formation[activeSlot.index]?.number || activeSlot.index + 1)
-                                                : (12 + activeSlot.index);
+                                                : (benchStartNumber + activeSlot.index);
                                             setTrialistInputNumber(String(defaultNum));
                                             setShowTrialistForm(prev => !prev);
                                         }}
@@ -5053,7 +5529,7 @@ export default function MatchdayXIPage() {
                                                     const slotKey = `${activeSlot.type}-${activeSlot.index}`;
                                                     const defaultNum = activeSlot.type === "pitch"
                                                         ? (formation[activeSlot.index]?.number || activeSlot.index + 1)
-                                                        : (12 + activeSlot.index);
+                                                        : (benchStartNumber + activeSlot.index);
                                                     const currentNum = lineup.customNumbers?.[slotKey] ?? getSlotDisplayNumber(activeSlot.type, activeSlot.index, defaultNum, activePlayer);
                                                     return (
                                                         <input
@@ -5193,7 +5669,7 @@ export default function MatchdayXIPage() {
                                                         <button
                                                             key={`swap-sub-${sIdx}`}
                                                             type="button"
-                                                            onClick={() => handleSwapSlots({ type: "sub", index: sIdx, label: `Sub #${12 + sIdx}` })}
+                                                            onClick={() => handleSwapSlots({ type: "sub", index: sIdx, label: `Sub #${benchStartNumber + sIdx}` })}
                                                             className="px-2 py-1 rounded-lg bg-surface-2 hover:bg-primary/15 border border-border hover:border-primary/40 text-[10px] font-bold text-foreground transition-colors flex items-center gap-1"
                                                         >
                                                             <span className="text-muted-foreground font-black">Sub:</span>

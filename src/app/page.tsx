@@ -292,14 +292,6 @@ function RealAppSidebar({
                 { name: "Recruitment", id: "recruitment", icon: UserPlus },
             ],
         },
-        {
-            group: "Financials",
-            items: [
-                { name: "Payments", icon: CreditCard },
-                { name: "Club Subs", icon: Coins },
-                { name: "Fines", icon: Gavel },
-            ],
-        },
     ];
 
     return (
@@ -379,7 +371,7 @@ function RealAppSidebar({
 }
 
 /**
- * SCREEN 1: FULL-SCALE REAL DASHBOARD (matching src/app/dashboard/page.tsx lines 808-1515)
+ * SCREEN 1: STREAMLINED REAL DASHBOARD (~65% content focus: Club Header + Splits, 3-Card Briefing Row, Season Leaderboards)
  */
 function FullDashboardPreview({
     onNavigate,
@@ -387,40 +379,40 @@ function FullDashboardPreview({
     onNavigate: (tab: ShowcaseTabId) => void;
 }) {
     return (
-        <div className="p-4 sm:p-6 space-y-4 bg-[#FCFCFD] text-neutral-900 select-none">
+        <div className="p-4 sm:p-5 space-y-3.5 bg-[#FCFCFD] text-neutral-900 select-none">
             {/* 1. Club Identity Header + Form + Home/Away Splits */}
-            <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-4 sm:p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-                <div className="flex items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-red-600 flex items-center justify-center font-black text-white text-base shadow-sm shrink-0">
+            <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-3.5 sm:p-4 flex flex-col xl:flex-row xl:items-center justify-between gap-3.5">
+                <div className="flex items-center gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-red-600 flex items-center justify-center font-black text-white text-sm shadow-sm shrink-0">
                         NU
                     </div>
-                    <div>
+                    <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-lg sm:text-xl font-black text-neutral-900 tracking-tight">
+                            <h3 className="text-base sm:text-lg font-black text-neutral-900 tracking-tight">
                                 Northbrook United
                             </h3>
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200/80">
                                 <Trophy className="w-3 h-3 text-amber-500" /> #1st in League
                             </span>
                             <span className="text-[11px] font-semibold text-neutral-400">
                                 Premier Division • 2025/26
                             </span>
                         </div>
-                        <div className="flex items-center gap-1.5 mt-2">
-                            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mr-1">
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                            <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider mr-0.5">
                                 Form:
                             </span>
                             {["W", "W", "D", "W", "W"].map((res, idx) => (
                                 <span
                                     key={idx}
-                                    className={`w-5 h-5 rounded text-[10px] font-black flex items-center justify-center text-white shadow-xs ${
+                                    className={`w-4 h-4 rounded text-[9px] font-black flex items-center justify-center text-white shadow-xs ${
                                         res === "W" ? "bg-emerald-500" : "bg-amber-400"
                                     }`}
                                 >
                                     {res}
                                 </span>
                             ))}
-                            <span className="ml-2 text-[11px] font-bold text-neutral-500">
+                            <span className="ml-1 text-[10px] sm:text-[11px] font-bold text-neutral-500">
                                 11W – 2D – 1L (35 Pts • 2.50 PPG)
                             </span>
                         </div>
@@ -428,10 +420,10 @@ function FullDashboardPreview({
                 </div>
 
                 {/* Home & Away Splits */}
-                <div className="grid grid-cols-2 gap-2.5 sm:w-auto shrink-0">
-                    <div className="bg-neutral-50 rounded-xl p-2.5 border border-neutral-200/80 flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
-                            <Home className="w-4 h-4" />
+                <div className="grid grid-cols-2 gap-2 sm:w-auto shrink-0">
+                    <div className="bg-neutral-50 rounded-xl p-2 border border-neutral-200/80 flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shrink-0">
+                            <Home className="w-3.5 h-3.5" />
                         </div>
                         <div>
                             <div className="text-[9px] font-bold uppercase tracking-wider text-neutral-400">
@@ -441,9 +433,9 @@ function FullDashboardPreview({
                             <div className="text-[10px] font-bold text-emerald-600">2.71 PPG</div>
                         </div>
                     </div>
-                    <div className="bg-neutral-50 rounded-xl p-2.5 border border-neutral-200/80 flex items-center gap-2.5">
-                        <div className="w-8 h-8 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
-                            <Plane className="w-4 h-4" />
+                    <div className="bg-neutral-50 rounded-xl p-2 border border-neutral-200/80 flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-blue-50 border border-blue-100 flex items-center justify-center text-blue-600 shrink-0">
+                            <Plane className="w-3.5 h-3.5" />
                         </div>
                         <div>
                             <div className="text-[9px] font-bold uppercase tracking-wider text-neutral-400">
@@ -456,130 +448,88 @@ function FullDashboardPreview({
                 </div>
             </div>
 
-            {/* 2. Needs Attention Manager Action Strip */}
-            <div className="bg-white rounded-xl border border-neutral-200/80 shadow-xs px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4 text-amber-500 shrink-0" />
-                    <span className="text-xs font-bold text-neutral-900">Needs Attention</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                    <button
-                        type="button"
-                        onClick={() => onNavigate("training")}
-                        className="text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/70 px-2.5 py-1 rounded-lg hover:bg-amber-100/70 transition-colors cursor-pointer"
-                    >
-                        3 players pending Thursday training RSVP →
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => onNavigate("opposition")}
-                        className="text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/70 px-2.5 py-1 rounded-lg hover:bg-indigo-100/70 transition-colors cursor-pointer"
-                    >
-                        Kingswood Rovers opposition report updated →
-                    </button>
-                    <span className="text-[11px] font-semibold bg-neutral-100 text-neutral-700 px-2.5 py-1 rounded-lg">
-                        2 outstanding match subs (£10)
-                    </span>
-                </div>
-            </div>
-
-            {/* 3. Three-Column Briefing Row: Next Match | Next Training | Last Match Recap */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            {/* 2. Three-Column Briefing Row: Next Match | Next Training | Last Match Recap */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5">
                 {/* Card 1: Next Match */}
-                <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-4 flex flex-col justify-between">
+                <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-3.5 flex flex-col justify-between">
                     <div>
-                        <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center justify-between mb-2">
                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
                                 <Calendar className="w-3.5 h-3.5 text-red-600" /> Next Match
                             </span>
-                            <div className="flex items-center gap-1.5">
-                                <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded-md bg-red-50 text-red-700 border border-red-200">
+                            <div className="flex items-center gap-1">
+                                <span className="px-1.5 py-0.5 text-[9px] font-black uppercase rounded-md bg-red-50 text-red-700 border border-red-200">
                                     3 DAYS
                                 </span>
-                                <span className="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <span className="px-1.5 py-0.5 text-[9px] font-extrabold uppercase rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
                                     HOME
                                 </span>
                             </div>
                         </div>
                         <div className="flex items-center gap-2">
-                            <div className="text-base font-black text-neutral-900">
+                            <div className="text-sm sm:text-base font-black text-neutral-900">
                                 vs Kingswood Rovers
                             </div>
                             <span className="px-1.5 py-0.5 text-[10px] font-black rounded bg-neutral-100 text-neutral-700 border border-neutral-200">
                                 #2nd
                             </span>
                         </div>
-                        <div className="text-[11px] text-neutral-500 mt-1.5 space-y-1 font-medium">
+                        <div className="text-[11px] text-neutral-500 mt-1 space-y-0.5 font-medium">
                             <div className="flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5 text-neutral-400" /> Sat 14 Nov • 14:00 KO
+                                <Clock className="w-3 h-3 text-neutral-400" /> Sat 14 Nov • 14:00 KO
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <MapPin className="w-3.5 h-3.5 text-neutral-400" /> Northbrook Community Ground
+                                <MapPin className="w-3 h-3 text-neutral-400" /> Northbrook Community Ground
                             </div>
                         </div>
                     </div>
 
-                    <div className="mt-3.5 pt-3 border-t border-neutral-100 space-y-2">
-                        <div className="flex items-center gap-2">
-                            <span className="flex-1 py-1.5 px-2.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-bold text-[11px] flex items-center justify-center gap-1">
-                                <Copy className="w-3 h-3" /> WhatsApp Copy
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => onNavigate("matchday-xi")}
-                                className="flex-1 py-1.5 px-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] text-center transition-colors cursor-pointer"
-                            >
-                                Matchday XI →
-                            </button>
-                        </div>
+                    <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center gap-2">
+                        <span className="flex-1 py-1.5 px-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-bold text-[10px] flex items-center justify-center gap-1">
+                            <Copy className="w-3 h-3" /> WhatsApp
+                        </span>
                         <button
                             type="button"
-                            onClick={() => onNavigate("opposition")}
-                            className="w-full py-1.5 px-2.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/60 font-bold text-[11px] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                            onClick={() => onNavigate("matchday-xi")}
+                            className="flex-1 py-1.5 px-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] text-center transition-colors cursor-pointer"
                         >
-                            <Shield className="w-3.5 h-3.5" /> Opposition Scouting Report
+                            Matchday XI →
                         </button>
                     </div>
                 </div>
 
                 {/* Card 2: Next Training */}
-                <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-4 flex flex-col justify-between">
+                <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-3.5 flex flex-col justify-between">
                     <div>
-                        <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center justify-between mb-2">
                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
                                 <ClipboardCheck className="w-3.5 h-3.5 text-emerald-600" /> Next Training
                             </span>
-                            <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="px-2 py-0.5 text-[9px] font-extrabold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
                                 18 Attending
                             </span>
                         </div>
-                        <div className="text-base font-black text-neutral-900">
+                        <div className="text-sm sm:text-base font-black text-neutral-900">
                             Thursday Night Session
                         </div>
-                        <div className="text-[11px] text-neutral-500 mt-1.5 space-y-1 font-medium">
+                        <div className="text-[11px] text-neutral-500 mt-1 space-y-0.5 font-medium">
                             <div className="flex items-center gap-1.5">
-                                <Clock className="w-3.5 h-3.5 text-neutral-400" /> Thu 12 Nov • 19:30 – 21:00
+                                <Clock className="w-3 h-3 text-neutral-400" /> Thu 12 Nov • 19:30 – 21:00
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <MapPin className="w-3.5 h-3.5 text-neutral-400" /> 3G Pitch 1 (Floodlit)
+                                <MapPin className="w-3 h-3 text-neutral-400" /> 3G Pitch 1 (Floodlit)
                             </div>
-                        </div>
-                        <div className="mt-2.5 px-2.5 py-1.5 rounded-lg bg-neutral-50 border border-neutral-200/70 text-[11px] text-neutral-700 font-semibold">
-                            <span className="text-neutral-400 font-bold uppercase text-[9px] mr-1.5">
-                                Focus:
-                            </span>
-                            Out of possession shape & attacking set pieces
                         </div>
                     </div>
 
-                    <div className="mt-3.5 pt-3 border-t border-neutral-100 flex items-center gap-2">
-                        <span className="flex-1 py-1.5 px-2.5 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-bold text-[11px] flex items-center justify-center gap-1">
-                            <Copy className="w-3 h-3" /> WhatsApp Copy
+                    <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center gap-2">
+                        <span className="flex-1 py-1.5 px-2 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-bold text-[10px] flex items-center justify-center gap-1">
+                            <Copy className="w-3 h-3" /> WhatsApp
                         </span>
                         <button
                             type="button"
                             onClick={() => onNavigate("training")}
-                            className="flex-1 py-1.5 px-2.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-[11px] text-center transition-colors cursor-pointer"
+                            className="flex-1 py-1.5 px-2 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-white font-bold text-[10px] text-center transition-colors cursor-pointer"
                         >
                             Attendance →
                         </button>
@@ -587,70 +537,42 @@ function FullDashboardPreview({
                 </div>
 
                 {/* Card 3: Last Match Recap */}
-                <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-4 flex flex-col justify-between">
+                <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-3.5 flex flex-col justify-between">
                     <div>
-                        <div className="flex items-center justify-between mb-2.5">
+                        <div className="flex items-center justify-between mb-2">
                             <span className="text-[10px] font-black uppercase tracking-wider text-neutral-400 flex items-center gap-1.5">
                                 <Activity className="w-3.5 h-3.5 text-blue-600" /> Last Match Recap
                             </span>
                             <div className="flex items-center gap-1.5">
                                 <span className="text-[10px] font-bold text-neutral-400">Sat 7 Nov</span>
-                                <span className="px-2 py-0.5 text-[10px] font-black uppercase rounded-md bg-emerald-500 text-white">
+                                <span className="px-1.5 py-0.5 text-[9px] font-black uppercase rounded-md bg-emerald-500 text-white">
                                     WIN
                                 </span>
                             </div>
                         </div>
 
-                        <div className="bg-neutral-50 rounded-xl p-2.5 border border-neutral-200/80 flex items-center justify-between">
+                        <div className="bg-neutral-50 rounded-xl p-2 border border-neutral-200/80 flex items-center justify-between">
                             <div>
                                 <div className="text-xs font-black text-neutral-900">
                                     Northbrook United
                                 </div>
-                                <div className="text-xs font-semibold text-neutral-500 mt-0.5">
+                                <div className="text-xs font-semibold text-neutral-500">
                                     Millbrook Town
                                 </div>
                             </div>
                             <div className="text-right">
-                                <div className="text-sm font-black text-emerald-600">3</div>
-                                <div className="text-sm font-bold text-neutral-400 mt-0.5">1</div>
+                                <div className="text-xs font-black text-emerald-600">3</div>
+                                <div className="text-xs font-bold text-neutral-400">1</div>
                             </div>
                         </div>
 
-                        {/* Goals / Assists / MOTM breakdown */}
-                        <div className="grid grid-cols-3 gap-1.5 mt-2.5">
-                            <div className="bg-neutral-900 text-white rounded-lg p-2">
-                                <div className="text-[9px] font-bold text-neutral-400 uppercase">
-                                    ⚽ Goals
-                                </div>
-                                <div className="text-[10px] font-bold text-white mt-0.5 leading-tight">
-                                    M. Vance (2)
-                                    <br />
-                                    C. Gallagher
-                                </div>
-                            </div>
-                            <div className="bg-neutral-900 text-white rounded-lg p-2">
-                                <div className="text-[9px] font-bold text-neutral-400 uppercase">
-                                    👟 Assists
-                                </div>
-                                <div className="text-[10px] font-bold text-white mt-0.5 leading-tight">
-                                    D. Sterling (2)
-                                    <br />
-                                    T. Vance
-                                </div>
-                            </div>
-                            <div className="bg-neutral-900 text-white rounded-lg p-2">
-                                <div className="text-[9px] font-bold text-amber-400 uppercase">
-                                    ⭐ MOTM
-                                </div>
-                                <div className="text-[10px] font-black text-amber-300 mt-0.5 leading-tight">
-                                    Marcus Vance
-                                </div>
-                                <div className="text-[9px] text-neutral-400 mt-0.5">9.2 Rating</div>
-                            </div>
+                        <div className="mt-2 flex items-center justify-between text-[10px] text-neutral-600 font-semibold px-1">
+                            <span>⚽ M. Vance (2), C. Gallagher</span>
+                            <span className="text-amber-700 font-bold">⭐ M. Vance</span>
                         </div>
                     </div>
 
-                    <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between text-[11px]">
+                    <div className="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between text-[10px]">
                         <span className="text-neutral-400 font-semibold">Premier Division</span>
                         <button
                             type="button"
@@ -663,278 +585,86 @@ function FullDashboardPreview({
                 </div>
             </div>
 
-            {/* 4. Season Leaderboards 4-Card Strip */}
+            {/* 3. Season Leaderboards 4-Card Strip */}
             <div>
                 <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-neutral-500">
                         Season Leaderboards (All Competitions)
                     </span>
-                    <span className="text-[11px] font-bold text-neutral-400">
+                    <span className="text-[10px] font-bold text-neutral-400">
                         14 Matches Played
                     </span>
                 </div>
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                    <div className="bg-white rounded-xl border border-neutral-200/80 p-3.5 shadow-xs">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+                    <div className="bg-white rounded-xl border border-neutral-200/80 p-3 shadow-xs">
                         <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400">
                                 Top Goalscorer
                             </span>
-                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-red-50 text-red-600">
+                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-red-50 text-red-600">
                                 FWD
                             </span>
                         </div>
-                        <div className="text-2xl font-black text-neutral-900 mt-1">14</div>
-                        <div className="text-xs font-extrabold text-neutral-800 mt-0.5">
+                        <div className="text-xl font-black text-neutral-900 mt-0.5">14</div>
+                        <div className="text-xs font-extrabold text-neutral-800">
                             Marcus Vance
                         </div>
-                        <div className="text-[10px] font-semibold text-neutral-400 mt-0.5">
-                            0.88 Goals / Game • 2 Pens
+                        <div className="text-[10px] font-semibold text-neutral-400">
+                            0.88 GPG • 2 Pens
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-neutral-200/80 p-3.5 shadow-xs">
+                    <div className="bg-white rounded-xl border border-neutral-200/80 p-3 shadow-xs">
                         <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400">
                                 Most Assists
                             </span>
-                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">
+                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-50 text-blue-600">
                                 MID
                             </span>
                         </div>
-                        <div className="text-2xl font-black text-neutral-900 mt-1">11</div>
-                        <div className="text-xs font-extrabold text-neutral-800 mt-0.5">
+                        <div className="text-xl font-black text-neutral-900 mt-0.5">11</div>
+                        <div className="text-xs font-extrabold text-neutral-800">
                             Declan Sterling
                         </div>
-                        <div className="text-[10px] font-semibold text-neutral-400 mt-0.5">
-                            18 Goal Contributions (7G, 11A)
+                        <div className="text-[10px] font-semibold text-neutral-400">
+                            18 G/A (7G, 11A)
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-neutral-200/80 p-3.5 shadow-xs">
+                    <div className="bg-white rounded-xl border border-neutral-200/80 p-3 shadow-xs">
                         <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400">
                                 Man of the Match
                             </span>
-                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
+                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-amber-50 text-amber-700">
                                 ⭐ MOTM
                             </span>
                         </div>
-                        <div className="text-2xl font-black text-neutral-900 mt-1">4</div>
-                        <div className="text-xs font-extrabold text-neutral-800 mt-0.5">
+                        <div className="text-xl font-black text-neutral-900 mt-0.5">4</div>
+                        <div className="text-xs font-extrabold text-neutral-800">
                             Callum Gallagher
                         </div>
-                        <div className="text-[10px] font-semibold text-neutral-400 mt-0.5">
+                        <div className="text-[10px] font-semibold text-neutral-400">
                             14 Starts • CM
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-neutral-200/80 p-3.5 shadow-xs">
+                    <div className="bg-white rounded-xl border border-neutral-200/80 p-3 shadow-xs">
                         <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                            <span className="text-[9px] font-bold uppercase tracking-wider text-neutral-400">
                                 Training Commitment
                             </span>
-                            <span className="text-[10px] font-black px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
+                            <span className="text-[9px] font-black px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">
                                 🔥 9 Streak
                             </span>
                         </div>
-                        <div className="text-2xl font-black text-emerald-600 mt-1">94%</div>
-                        <div className="text-xs font-extrabold text-neutral-800 mt-0.5">
+                        <div className="text-xl font-black text-emerald-600 mt-0.5">94%</div>
+                        <div className="text-xs font-extrabold text-neutral-800">
                             Harrison Cole
                         </div>
-                        <div className="text-[10px] font-semibold text-neutral-400 mt-0.5">
-                            17/18 Sessions • Squad Avg: 86%
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* 5. Bottom Split: League Table Context (Left) + Squad Availability & Absences (Right) */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-                {/* League Table Context (7 cols) */}
-                <div className="lg:col-span-7 bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-4">
-                    <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                            <Trophy className="w-4 h-4 text-amber-500" />
-                            <span className="text-xs font-black text-neutral-900">
-                                League Table Context
-                            </span>
-                            <span className="text-[10px] font-semibold text-neutral-400">
-                                Premier Division
-                            </span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-neutral-100 text-neutral-700 text-[10px] font-bold">
-                                <RefreshCw className="w-3 h-3" /> Sync Table
-                            </span>
-                        </div>
-                    </div>
-
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                            <thead>
-                                <tr className="border-b border-neutral-100 text-[9px] font-bold uppercase text-neutral-400">
-                                    <th className="py-1.5 px-2">Pos</th>
-                                    <th className="py-1.5 px-2">Club</th>
-                                    <th className="py-1.5 px-2 text-center">P</th>
-                                    <th className="py-1.5 px-2 text-center">W-D-L</th>
-                                    <th className="py-1.5 px-2 text-center">GD</th>
-                                    <th className="py-1.5 px-2 text-center">PPG</th>
-                                    <th className="py-1.5 px-2 text-center">Pts</th>
-                                    <th className="py-1.5 px-2 text-right">Form</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-neutral-100 text-[11px]">
-                                {[
-                                    {
-                                        pos: 1,
-                                        team: "Northbrook United",
-                                        p: 14,
-                                        wdl: "11-2-1",
-                                        gd: "+24",
-                                        ppg: "2.50",
-                                        pts: 35,
-                                        form: ["W", "W", "D", "W", "W"],
-                                        isUs: true,
-                                    },
-                                    {
-                                        pos: 2,
-                                        team: "Kingswood Rovers",
-                                        p: 14,
-                                        wdl: "10-2-2",
-                                        gd: "+18",
-                                        ppg: "2.29",
-                                        pts: 32,
-                                        form: ["W", "L", "W", "W", "D"],
-                                        isUs: false,
-                                    },
-                                    {
-                                        pos: 3,
-                                        team: "Highgate Rangers",
-                                        p: 14,
-                                        wdl: "9-2-3",
-                                        gd: "+14",
-                                        ppg: "2.07",
-                                        pts: 29,
-                                        form: ["W", "W", "L", "W", "W"],
-                                        isUs: false,
-                                    },
-                                ].map((row) => (
-                                    <tr
-                                        key={row.pos}
-                                        className={
-                                            row.isUs
-                                                ? "bg-red-50/70 font-bold text-neutral-900"
-                                                : "text-neutral-700"
-                                        }
-                                    >
-                                        <td className="py-2 px-2 font-black">{row.pos}</td>
-                                        <td className="py-2 px-2 font-extrabold flex items-center gap-1.5">
-                                            {row.team}
-                                            {row.pos === 2 && (
-                                                <span className="text-[9px] font-black px-1.5 py-0.2 rounded bg-amber-100 text-amber-800">
-                                                    NEXT OPP
-                                                </span>
-                                            )}
-                                        </td>
-                                        <td className="py-2 px-2 text-center">{row.p}</td>
-                                        <td className="py-2 px-2 text-center text-neutral-500">
-                                            {row.wdl}
-                                        </td>
-                                        <td className="py-2 px-2 text-center font-semibold text-emerald-700">
-                                            {row.gd}
-                                        </td>
-                                        <td className="py-2 px-2 text-center font-bold">
-                                            {row.ppg}
-                                        </td>
-                                        <td className="py-2 px-2 text-center font-black text-neutral-900">
-                                            {row.pts}
-                                        </td>
-                                        <td className="py-2 px-2">
-                                            <div className="flex items-center justify-end gap-0.5">
-                                                {row.form.map((f, i) => (
-                                                    <span
-                                                        key={i}
-                                                        className={`w-3.5 h-3.5 rounded-[3px] text-[8px] font-black text-white flex items-center justify-center ${
-                                                            f === "W"
-                                                                ? "bg-emerald-500"
-                                                                : f === "D"
-                                                                ? "bg-amber-400"
-                                                                : "bg-red-500"
-                                                        }`}
-                                                    >
-                                                        {f}
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                {/* Squad Availability & Absences (5 cols) */}
-                <div className="lg:col-span-5 bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-4 flex flex-col justify-between">
-                    <div>
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-black text-neutral-900">
-                                Squad Availability & Absences
-                            </span>
-                            <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                                21 Available
-                            </span>
-                        </div>
-                        <div className="text-[10px] font-semibold text-neutral-500 mb-3">
-                            21 Fit • 1 Injured • 1 Suspended • 1 Unavailable
-                        </div>
-
-                        <div className="space-y-2">
-                            {[
-                                {
-                                    name: "Kieran Byrne",
-                                    pos: "CB",
-                                    note: "Hamstring strain (Est. return 21 Nov)",
-                                    badge: "INJURED",
-                                    badgeStyle: "bg-red-50 text-red-700 border-red-200",
-                                },
-                                {
-                                    name: "Toby Alford",
-                                    pos: "CM",
-                                    note: "1-Match FA Suspension (5 Yellow Cards)",
-                                    badge: "SUSPENDED",
-                                    badgeStyle: "bg-amber-50 text-amber-800 border-amber-200",
-                                },
-                                {
-                                    name: "Liam O'Connor",
-                                    pos: "RB",
-                                    note: "Away with work this weekend",
-                                    badge: "AWAY",
-                                    badgeStyle: "bg-neutral-100 text-neutral-700 border-neutral-200",
-                                },
-                            ].map((item) => (
-                                <div
-                                    key={item.name}
-                                    className="flex items-center justify-between p-2 rounded-xl bg-neutral-50 border border-neutral-200/70"
-                                >
-                                    <div className="min-w-0">
-                                        <div className="text-[11px] font-bold text-neutral-900 flex items-center gap-1.5">
-                                            <span>{item.name}</span>
-                                            <span className="text-[9px] font-black text-neutral-400">
-                                                {item.pos}
-                                            </span>
-                                        </div>
-                                        <div className="text-[10px] text-neutral-500 truncate">
-                                            {item.note}
-                                        </div>
-                                    </div>
-                                    <span
-                                        className={`px-2 py-0.5 rounded text-[9px] font-black border shrink-0 ${item.badgeStyle}`}
-                                    >
-                                        {item.badge}
-                                    </span>
-                                </div>
-                            ))}
+                        <div className="text-[10px] font-semibold text-neutral-400">
+                            17/18 Sessions
                         </div>
                     </div>
                 </div>
@@ -944,38 +674,35 @@ function FullDashboardPreview({
 }
 
 /**
- * SCREEN 2: FULL-SCALE REAL MATCHDAY XI (matching src/app/matchday-xi/page.tsx)
+ * SCREEN 2: STREAMLINED MATCHDAY XI (~65% content height)
  */
 function FullMatchdayXiPreview() {
     return (
-        <div className="p-4 sm:p-6 bg-[#FCFCFD] text-neutral-900 select-none">
+        <div className="p-4 sm:p-5 bg-[#FCFCFD] text-neutral-900 select-none">
             {/* Top Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 mb-4 border-b border-neutral-200">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3.5 mb-3.5 border-b border-neutral-200">
                 <div>
-                    <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-black text-neutral-900">Matchday XI</h3>
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-red-50 text-red-700 border border-red-200">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base sm:text-lg font-black text-neutral-900">Matchday XI</h3>
+                        <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
                             Sat 14 Nov vs Kingswood Rovers (H)
                         </span>
                     </div>
-                    <p className="text-xs text-neutral-500 mt-0.5">
-                        Drag or tap players onto the pitch, assign set-piece roles, and export your team sheet graphic.
-                    </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="px-3 py-1.5 rounded-lg bg-white border border-neutral-200 text-neutral-700 text-xs font-bold shadow-2xs">
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-neutral-200 text-neutral-700 text-[11px] font-bold shadow-2xs">
                         Saved Lineup ✓
                     </span>
-                    <span className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold shadow-xs flex items-center gap-1.5">
-                        <Share2 className="w-3.5 h-3.5" /> Export Pitch Graphic
+                    <span className="px-2.5 py-1 rounded-lg bg-red-600 text-white text-[11px] font-bold shadow-xs flex items-center gap-1.5">
+                        <Share2 className="w-3 h-3" /> Export Pitch Graphic
                     </span>
                 </div>
             </div>
 
             {/* 3-Column Matchday XI Interface */}
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
                 {/* Left Column: Available Squad Pool */}
-                <div className="lg:col-span-3 bg-white rounded-xl border border-neutral-200 shadow-xs p-3.5">
+                <div className="lg:col-span-3 bg-white rounded-xl border border-neutral-200 shadow-xs p-3">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
                             <Users className="w-3.5 h-3.5 text-neutral-500" /> Available Squad
@@ -985,12 +712,7 @@ function FullMatchdayXiPreview() {
                         </span>
                     </div>
 
-                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-50 border border-neutral-200 text-neutral-400 text-[11px] mb-2">
-                        <Search className="w-3 h-3" />
-                        <span>Search players...</span>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1 mb-2.5">
+                    <div className="flex flex-wrap gap-1 mb-2">
                         {["All", "GK", "DEF", "MID", "FWD"].map((f, i) => (
                             <span
                                 key={f}
@@ -1006,15 +728,13 @@ function FullMatchdayXiPreview() {
                     </div>
 
                     <div className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">
-                        Remaining Unselected (5)
+                        Remaining Pool (3)
                     </div>
                     <div className="space-y-1.5">
                         {[
                             { name: "B. Holloway", pos: "GK", startedLast: false, att: "94%" },
                             { name: "C. Doyle", pos: "DEF", startedLast: true, att: "89%" },
-                            { name: "M. Richards", pos: "DEF", startedLast: false, att: "83%" },
                             { name: "L. Jennings", pos: "MID", startedLast: false, att: "94%" },
-                            { name: "T. Chambers", pos: "FWD", startedLast: false, att: "78%" },
                         ].map((p) => (
                             <div
                                 key={p.name}
@@ -1032,8 +752,8 @@ function FullMatchdayXiPreview() {
                                             Train: {p.att}
                                         </span>
                                         {p.startedLast && (
-                                            <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-blue-50 text-blue-600 border border-blue-200">
-                                                STARTED LAST
+                                            <span className="text-[8px] font-black px-1 py-0.2 rounded bg-emerald-50 text-emerald-700">
+                                                Started Last
                                             </span>
                                         )}
                                     </div>
@@ -1045,8 +765,8 @@ function FullMatchdayXiPreview() {
                 </div>
 
                 {/* Center Column: Controls + Green Pitch */}
-                <div className="lg:col-span-6 space-y-2.5">
-                    <div className="bg-white p-2.5 rounded-xl border border-neutral-200 shadow-xs flex flex-wrap items-center justify-between gap-2">
+                <div className="lg:col-span-6 space-y-2">
+                    <div className="bg-white p-2 rounded-xl border border-neutral-200 shadow-xs flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center bg-neutral-100 p-0.5 rounded-lg border border-neutral-200/60 text-[10px] font-bold">
                             <span className="px-2 py-1 rounded-md bg-white text-neutral-900 shadow-2xs">
                                 1–11 Numbers
@@ -1055,16 +775,16 @@ function FullMatchdayXiPreview() {
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-[10px] font-bold text-neutral-500">Kit:</span>
-                            <span className="w-4 h-4 rounded-full bg-[#e11d48] ring-2 ring-offset-1 ring-neutral-900" />
-                            <span className="w-4 h-4 rounded-full bg-[#2563eb]" />
-                            <span className="w-4 h-4 rounded-full bg-[#10b981]" />
-                            <span className="px-2.5 py-1 rounded-lg bg-neutral-100 border border-neutral-200 text-[11px] font-bold text-neutral-800">
+                            <span className="w-3.5 h-3.5 rounded-full bg-[#e11d48] ring-2 ring-offset-1 ring-neutral-900" />
+                            <span className="w-3.5 h-3.5 rounded-full bg-[#2563eb]" />
+                            <span className="w-3.5 h-3.5 rounded-full bg-[#10b981]" />
+                            <span className="px-2 py-0.5 rounded-lg bg-neutral-100 border border-neutral-200 text-[10px] font-bold text-neutral-800">
                                 4-3-3
                             </span>
                         </div>
                     </div>
 
-                    <div className="h-[430px] w-full">
+                    <div className="h-[340px] w-full">
                         <RealisticPitchMarkings>
                             <PitchJerseyNode
                                 x={50}
@@ -1094,28 +814,26 @@ function FullMatchdayXiPreview() {
                 </div>
 
                 {/* Right Column: Substitutes Bench & Synchronized Roles & Set Pieces */}
-                <div className="lg:col-span-3 space-y-3">
-                    <div className="bg-white rounded-xl border border-neutral-200 shadow-xs p-3.5">
-                        <div className="flex items-center justify-between mb-2">
+                <div className="lg:col-span-3 space-y-2.5">
+                    <div className="bg-white rounded-xl border border-neutral-200 shadow-xs p-3">
+                        <div className="flex items-center justify-between mb-1.5">
                             <span className="text-xs font-bold text-neutral-900">
                                 Substitutes Bench
                             </span>
-                            <span className="text-[10px] font-bold text-neutral-400">5 / 5</span>
+                            <span className="text-[10px] font-bold text-neutral-400">3 / 5</span>
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="space-y-1">
                             {[
                                 { num: 12, name: "S. Henderson", pos: "DEF" },
                                 { num: 14, name: "H. Cole", pos: "MID" },
                                 { num: 15, name: "N. Palmer", pos: "FWD" },
-                                { num: 16, name: "K. Reid", pos: "DEF" },
-                                { num: 17, name: "J. Maddox", pos: "GK" },
                             ].map((sub) => (
                                 <div
                                     key={sub.num}
-                                    className="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-neutral-50 border border-neutral-200/80 text-[11px]"
+                                    className="flex items-center justify-between px-2 py-1 rounded-lg bg-neutral-50 border border-neutral-200/80 text-[11px]"
                                 >
-                                    <div className="flex items-center gap-2">
-                                        <span className="w-5 h-5 rounded bg-neutral-900 text-white font-black text-[10px] flex items-center justify-center">
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="w-4 h-4 rounded bg-neutral-900 text-white font-black text-[9px] flex items-center justify-center">
                                             {sub.num}
                                         </span>
                                         <span className="font-bold text-neutral-800">
@@ -1130,22 +848,20 @@ function FullMatchdayXiPreview() {
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-xl border border-neutral-200 shadow-xs p-3.5">
-                        <div className="text-xs font-bold text-neutral-900 mb-2">
+                    <div className="bg-white rounded-xl border border-neutral-200 shadow-xs p-3">
+                        <div className="text-xs font-bold text-neutral-900 mb-1.5">
                             Roles & Set Pieces
                         </div>
-                        <div className="space-y-2 text-[11px]">
+                        <div className="space-y-1.5 text-[10px]">
                             {[
                                 { role: "Captain (C)", player: "5. D. Foster" },
-                                { role: "Vice Captain", player: "8. C. Gallagher" },
                                 { role: "Penalties", player: "9. M. Vance" },
-                                { role: "Direct Free Kicks", player: "10. D. Sterling" },
-                                { role: "Left Corners", player: "10. D. Sterling" },
-                                { role: "Right Corners", player: "7. O. Grant" },
+                                { role: "Free Kicks", player: "10. D. Sterling" },
+                                { role: "Corners", player: "7. O. Grant" },
                             ].map((r) => (
                                 <div key={r.role} className="flex items-center justify-between">
                                     <span className="text-neutral-500 font-medium">{r.role}</span>
-                                    <span className="font-bold text-neutral-900 bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200">
+                                    <span className="font-bold text-neutral-900 bg-neutral-100 px-1.5 py-0.5 rounded border border-neutral-200">
                                         {r.player}
                                     </span>
                                 </div>
@@ -1237,68 +953,47 @@ function FullTrainingPreview() {
             last5: ["×", "✓", "✓", "L", "✓"],
             pct: 89,
         },
-        {
-            rank: 5,
-            name: "Declan Sterling",
-            streak: 3,
-            pos: "MID",
-            attended: "15 / 18",
-            late: 0,
-            last5: ["✓", "×", "✓", "✓", "✓"],
-            pct: 83,
-        },
-        {
-            rank: 6,
-            name: "Callum Gallagher",
-            streak: 0,
-            pos: "MID",
-            attended: "14 / 18",
-            late: 2,
-            last5: ["✓", "L", "✓", "✓", "×"],
-            pct: 78,
-        },
     ];
 
     return (
-        <div className="p-4 sm:p-6 space-y-4 bg-[#FCFCFD] text-neutral-900 select-none">
+        <div className="p-4 sm:p-5 space-y-3.5 bg-[#FCFCFD] text-neutral-900 select-none">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div>
-                    <h3 className="text-lg font-black text-neutral-900">
+                    <h3 className="text-base sm:text-lg font-black text-neutral-900">
                         Training Schedule & Attendance
                     </h3>
-                    <p className="text-xs text-neutral-500">
-                        Manage weekly training sessions, coaching topics, and seasonal player commitment.
-                    </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="flex items-center bg-neutral-200/70 p-0.5 rounded-lg text-[11px] font-bold">
-                        <span className="px-2.5 py-1 text-neutral-600">Schedule</span>
-                        <span className="px-2.5 py-1 rounded-md bg-white text-neutral-900 shadow-2xs">
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center bg-neutral-200/70 p-0.5 rounded-lg text-[10px] font-bold">
+                        <span className="px-2 py-1 text-neutral-600">Schedule</span>
+                        <span className="px-2 py-1 rounded-md bg-white text-neutral-900 shadow-2xs">
                             Schedule + Attendance
                         </span>
                     </div>
-                    <span className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold flex items-center gap-1">
-                        <Plus className="w-3.5 h-3.5" /> Add Session
+                    <span className="px-2.5 py-1 rounded-lg bg-red-600 text-white text-[11px] font-bold flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> Add Session
                     </span>
                 </div>
             </div>
 
             {/* 7-Day Weekly Football Calendar Strip */}
-            <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-xs p-3.5">
-                <div className="flex items-center justify-between mb-2.5">
-                    <span className="text-xs font-black text-neutral-900 uppercase tracking-wider">
+            <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-xs p-3">
+                <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-black text-neutral-900 uppercase tracking-wider">
                         Training Week • 9 Nov – 15 Nov
                     </span>
-                    <span className="text-[11px] font-semibold text-neutral-400">
+                    <span className="text-[10px] font-semibold text-neutral-400">
                         2 Sessions • 1 Matchday
                     </span>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-7 gap-2">
+                <div className="grid grid-cols-3 sm:grid-cols-7 gap-2">
                     {trainingDays.map((d) => (
                         <div
                             key={d.day}
-                            className={`rounded-xl p-2.5 border text-left transition-all ${
+                            className={`rounded-xl p-2 border text-left transition-all ${
+                                d.type === "rest" ? "hidden sm:block " : ""
+                            }${
                                 d.type === "training"
                                     ? d.isNext
                                         ? "bg-emerald-50/70 border-emerald-300 ring-1 ring-emerald-200"
@@ -1313,34 +1008,34 @@ function FullTrainingPreview() {
                                 <span className="text-neutral-900">{d.date}</span>
                             </div>
                             {d.type === "training" && (
-                                <div className="mt-2">
+                                <div className="mt-1.5">
                                     <span className="inline-block px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-emerald-600 text-white">
-                                        TRAINING • {d.time}
+                                        {d.time}
                                     </span>
-                                    <div className="text-[10px] font-bold text-neutral-900 mt-1 leading-tight">
+                                    <div className="text-[10px] font-bold text-neutral-900 mt-1 leading-tight line-clamp-1">
                                         {d.title}
                                     </div>
-                                    <div className="text-[9px] font-semibold text-emerald-700 mt-1">
-                                        {d.attending} Attending
+                                    <div className="text-[9px] font-semibold text-emerald-700 mt-0.5">
+                                        {d.attending} Going
                                     </div>
                                 </div>
                             )}
                             {d.type === "match" && (
-                                <div className="mt-2">
+                                <div className="mt-1.5">
                                     <span className="inline-block px-1.5 py-0.2 rounded text-[8px] font-black uppercase bg-red-600 text-white">
-                                        MATCH • {d.time}
+                                        {d.time}
                                     </span>
-                                    <div className="text-[10px] font-black text-neutral-900 mt-1 leading-tight">
+                                    <div className="text-[10px] font-black text-neutral-900 mt-1 leading-tight line-clamp-1">
                                         {d.title}
                                     </div>
-                                    <div className="text-[9px] font-semibold text-red-700 mt-1">
+                                    <div className="text-[9px] font-semibold text-red-700 mt-0.5">
                                         {d.pitch}
                                     </div>
                                 </div>
                             )}
                             {d.type === "rest" && (
-                                <div className="mt-4 text-[10px] font-semibold text-neutral-400">
-                                    No session
+                                <div className="mt-3 text-[9px] font-semibold text-neutral-400">
+                                    Rest
                                 </div>
                             )}
                         </div>
@@ -1349,35 +1044,21 @@ function FullTrainingPreview() {
             </div>
 
             {/* Training Attendance Table Card */}
-            <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+            <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm p-3.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
                     <div>
-                        <div className="text-sm font-black text-neutral-900">
+                        <div className="text-xs sm:text-sm font-black text-neutral-900">
                             Training Attendance Leaderboard
                         </div>
-                        <div className="text-[11px] text-neutral-500">
+                        <div className="text-[10px] text-neutral-500">
                             18 Sessions Recorded • 86% Squad Average Commitment
                         </div>
                     </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div className="flex items-center gap-1">
-                            {["All Positions", "GK", "DEF", "MID", "FWD"].map((p, idx) => (
-                                <span
-                                    key={p}
-                                    className={`px-2 py-1 rounded-md text-[10px] font-bold ${
-                                        idx === 0
-                                            ? "bg-neutral-900 text-white"
-                                            : "bg-neutral-100 text-neutral-600"
-                                    }`}
-                                >
-                                    {p}
-                                </span>
-                            ))}
-                        </div>
-                        <span className="px-2.5 py-1 rounded-md bg-neutral-100 text-neutral-700 text-[10px] font-bold flex items-center gap-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="px-2 py-1 rounded-md bg-neutral-100 text-neutral-700 text-[10px] font-bold flex items-center gap-1">
                             <Share2 className="w-3 h-3" /> Share Graphic
                         </span>
-                        <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold flex items-center gap-1">
+                        <span className="px-2 py-1 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold flex items-center gap-1">
                             <FileSpreadsheet className="w-3 h-3" /> Export Excel
                         </span>
                     </div>
@@ -1387,56 +1068,46 @@ function FullTrainingPreview() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-neutral-200 text-[9px] font-bold uppercase text-neutral-400">
-                                <th className="py-2 px-2">Player</th>
-                                <th className="py-2 px-2">Pos</th>
-                                <th className="py-2 px-2 text-center">Attended</th>
-                                <th className="py-2 px-2 text-center">Late</th>
-                                <th className="py-2 px-2 text-center">Last 5 Sessions</th>
-                                <th className="py-2 px-2 text-right">Attendance %</th>
+                                <th className="py-1.5 px-2">Player</th>
+                                <th className="py-1.5 px-2">Pos</th>
+                                <th className="py-1.5 px-2 text-center">Attended</th>
+                                <th className="py-1.5 px-2 text-center hidden sm:table-cell">Last 5</th>
+                                <th className="py-1.5 px-2 text-right">Attendance %</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-100 text-xs">
                             {attendanceRows.map((row) => (
                                 <tr key={row.name} className="hover:bg-neutral-50/80">
-                                    <td className="py-2.5 px-2">
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-5 h-5 rounded-full bg-neutral-100 text-neutral-600 font-bold text-[10px] flex items-center justify-center">
+                                    <td className="py-2 px-2">
+                                        <div className="flex items-center gap-1.5">
+                                            <span className="w-4 h-4 rounded-full bg-neutral-100 text-neutral-600 font-bold text-[9px] flex items-center justify-center shrink-0">
                                                 {row.rank}
                                             </span>
-                                            <span className="font-bold text-neutral-900">
+                                            <span className="font-bold text-neutral-900 truncate">
                                                 {row.name}
                                             </span>
                                             {row.streak >= 4 && (
-                                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-black bg-orange-50 text-orange-700 border border-orange-200">
+                                                <span className="hidden sm:inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[8px] font-black bg-orange-50 text-orange-700 border border-orange-200">
                                                     <Flame className="w-2.5 h-2.5 text-orange-500" />
-                                                    {row.streak} Streak
+                                                    {row.streak}
                                                 </span>
                                             )}
                                         </div>
                                     </td>
-                                    <td className="py-2.5 px-2">
-                                        <span className="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-700 font-black text-[10px]">
+                                    <td className="py-2 px-2">
+                                        <span className="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-700 font-black text-[9px]">
                                             {row.pos}
                                         </span>
                                     </td>
-                                    <td className="py-2.5 px-2 text-center font-bold text-neutral-800">
+                                    <td className="py-2 px-2 text-center font-bold text-neutral-800 text-[11px]">
                                         {row.attended}
                                     </td>
-                                    <td className="py-2.5 px-2 text-center">
-                                        {row.late > 0 ? (
-                                            <span className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-800 border border-amber-200 text-[10px] font-bold">
-                                                {row.late} Late
-                                            </span>
-                                        ) : (
-                                            <span className="text-neutral-300">-</span>
-                                        )}
-                                    </td>
-                                    <td className="py-2.5 px-2">
+                                    <td className="py-2 px-2 hidden sm:table-cell">
                                         <div className="flex items-center justify-center gap-1">
                                             {row.last5.map((s, i) => (
                                                 <span
                                                     key={i}
-                                                    className={`w-5 h-5 rounded text-[10px] font-black flex items-center justify-center ${
+                                                    className={`w-4 h-4 rounded text-[9px] font-black flex items-center justify-center ${
                                                         s === "✓"
                                                             ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                                             : s === "L"
@@ -1449,15 +1120,15 @@ function FullTrainingPreview() {
                                             ))}
                                         </div>
                                     </td>
-                                    <td className="py-2.5 px-2 text-right">
+                                    <td className="py-2 px-2 text-right">
                                         <div className="flex items-center justify-end gap-2">
-                                            <div className="w-20 h-2 bg-neutral-100 rounded-full overflow-hidden hidden sm:block">
+                                            <div className="w-16 h-1.5 bg-neutral-100 rounded-full overflow-hidden hidden sm:block">
                                                 <div
                                                     className="h-full bg-emerald-500 rounded-full"
                                                     style={{ width: `${row.pct}%` }}
                                                 />
                                             </div>
-                                            <span className="font-black text-neutral-900 w-9">
+                                            <span className="font-black text-neutral-900 text-[11px]">
                                                 {row.pct}%
                                             </span>
                                         </div>
@@ -1473,7 +1144,7 @@ function FullTrainingPreview() {
 }
 
 /**
- * SCREEN 4: FULL-SCALE REAL FIXTURES & RESULTS (matching src/app/matches/page.tsx)
+ * SCREEN 4: STREAMLINED FIXTURES & RESULTS (~65% content height)
  */
 function FullFixturesPreview({
     onNavigate,
@@ -1503,45 +1174,20 @@ function FullFixturesPreview({
             assists: "👟 O. Grant, A. Clarke",
             motm: "⭐ MOTM: D. Foster",
         },
-        {
-            date: "Sat 24 Oct",
-            comp: "Premier Division",
-            home: "Northbrook United",
-            away: "Oakwood Albion",
-            score: "2 - 2",
-            outcome: "D",
-            scorers: "⚽ D. Sterling (14'), R. Bennett (76')",
-            assists: "👟 C. Gallagher, D. Sterling",
-            motm: "⭐ MOTM: D. Sterling",
-        },
-        {
-            date: "Sat 17 Oct",
-            comp: "County Senior Cup R2",
-            home: "Northbrook United",
-            away: "Stanmore Athletic",
-            score: "4 - 0",
-            outcome: "W",
-            scorers: "⚽ M. Vance (12', 44'), O. Grant (59'), N. Palmer (84')",
-            assists: "👟 E. Brooks (2), L. Vance",
-            motm: "⭐ MOTM: M. Vance",
-        },
     ];
 
     return (
-        <div className="p-4 sm:p-6 space-y-4 bg-[#FCFCFD] text-neutral-900 select-none">
+        <div className="p-4 sm:p-5 space-y-3.5 bg-[#FCFCFD] text-neutral-900 select-none">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div>
-                    <h3 className="text-lg font-black text-neutral-900">Fixtures & Results</h3>
-                    <p className="text-xs text-neutral-500">
-                        Manage your season schedule, log match events, and review saved lineups.
-                    </p>
+                    <h3 className="text-base sm:text-lg font-black text-neutral-900">Fixtures & Results</h3>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-1.5">
                     {["All Competitions", "League (14)", "Cup (3)"].map((tab, idx) => (
                         <span
                             key={tab}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold ${
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold ${
                                 idx === 0
                                     ? "bg-neutral-900 text-white"
                                     : "bg-white border border-neutral-200 text-neutral-600"
@@ -1550,27 +1196,27 @@ function FullFixturesPreview({
                             {tab}
                         </span>
                     ))}
-                    <span className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold flex items-center gap-1">
-                        <Plus className="w-3.5 h-3.5" /> Add Fixture
+                    <span className="px-2.5 py-1 rounded-lg bg-red-600 text-white text-[11px] font-bold flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> Add Fixture
                     </span>
                 </div>
             </div>
 
             {/* Upcoming Next Fixture Highlight Banner */}
-            <div className="bg-white rounded-2xl border-2 border-red-600/20 shadow-sm p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+            <div className="bg-white rounded-2xl border-2 border-red-600/20 shadow-sm p-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
                 <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                        <span className="px-2 py-0.5 rounded bg-red-600 text-white text-[10px] font-black uppercase">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="px-2 py-0.5 rounded bg-red-600 text-white text-[9px] font-black uppercase">
                             NEXT FIXTURE • SAT 14 NOV • 14:00
                         </span>
-                        <span className="text-xs font-bold text-neutral-500">
+                        <span className="text-[11px] font-bold text-neutral-500">
                             Premier Division • Matchweek 15
                         </span>
                     </div>
-                    <div className="text-lg font-black text-neutral-900">
+                    <div className="text-base font-black text-neutral-900">
                         Northbrook United vs Kingswood Rovers (#2nd)
                     </div>
-                    <div className="text-xs text-neutral-500 font-medium">
+                    <div className="text-[11px] text-neutral-500 font-medium">
                         Venue: Northbrook Community Ground (Home) • Kit: Crimson / White
                     </div>
                 </div>
@@ -1578,14 +1224,14 @@ function FullFixturesPreview({
                     <button
                         type="button"
                         onClick={() => onNavigate("matchday-xi")}
-                        className="px-3 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-bold cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold cursor-pointer"
                     >
                         Open Matchday XI →
                     </button>
                     <button
                         type="button"
                         onClick={() => onNavigate("opposition")}
-                        className="px-3 py-2 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-xs font-bold cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 text-[11px] font-bold cursor-pointer"
                     >
                         Opposition Report →
                     </button>
@@ -1594,33 +1240,33 @@ function FullFixturesPreview({
 
             {/* Completed Results Timeline */}
             <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm divide-y divide-neutral-100">
-                <div className="px-4 py-3 flex items-center justify-between">
-                    <span className="text-xs font-black uppercase tracking-wider text-neutral-500">
+                <div className="px-3.5 py-2.5 flex items-center justify-between">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-neutral-500">
                         Recent Completed Matches
                     </span>
-                    <span className="text-[11px] font-bold text-emerald-600">
+                    <span className="text-[10px] font-bold text-emerald-600">
                         42 Goals Scored • 18 Conceded
                     </span>
                 </div>
                 {completedMatches.map((m) => (
                     <div
                         key={m.date}
-                        className="p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3 hover:bg-neutral-50/70"
+                        className="p-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 hover:bg-neutral-50/70"
                     >
-                        <div className="flex items-start sm:items-center gap-3">
+                        <div className="flex items-start sm:items-center gap-2.5">
                             <span
-                                className={`w-8 h-8 rounded-xl font-black text-xs text-white flex items-center justify-center shrink-0 ${
+                                className={`w-7 h-7 rounded-xl font-black text-xs text-white flex items-center justify-center shrink-0 ${
                                     m.outcome === "W" ? "bg-emerald-500" : "bg-amber-400"
                                 }`}
                             >
                                 {m.outcome}
                             </span>
                             <div>
-                                <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-1.5">
                                     <span className="text-xs font-black text-neutral-900">
                                         {m.home}
                                     </span>
-                                    <span className="px-2 py-0.5 rounded bg-neutral-900 text-white font-black text-xs">
+                                    <span className="px-1.5 py-0.5 rounded bg-neutral-900 text-white font-black text-[11px]">
                                         {m.score}
                                     </span>
                                     <span className="text-xs font-black text-neutral-900">
@@ -1630,18 +1276,16 @@ function FullFixturesPreview({
                                         • {m.date} ({m.comp})
                                     </span>
                                 </div>
-                                <div className="flex flex-wrap items-center gap-3 mt-1.5 text-[11px] text-neutral-600 font-medium">
+                                <div className="flex flex-wrap items-center gap-2 mt-1 text-[10px] text-neutral-600 font-medium">
                                     <span>{m.scorers}</span>
-                                    <span className="text-neutral-400">|</span>
-                                    <span>{m.assists}</span>
-                                    <span className="px-2 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200 font-bold text-[10px]">
+                                    <span className="px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200 font-bold text-[9px]">
                                         {m.motm}
                                     </span>
                                 </div>
                             </div>
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
-                            <span className="px-2.5 py-1 rounded-lg bg-neutral-100 text-neutral-700 text-[10px] font-bold">
+                            <span className="px-2 py-1 rounded-lg bg-neutral-100 text-neutral-700 text-[10px] font-bold">
                                 XI & Stats Logged ✓
                             </span>
                         </div>
@@ -1653,13 +1297,13 @@ function FullFixturesPreview({
 }
 
 /**
- * SCREEN 5: FULL-SCALE REAL RECRUITMENT & TRIALISTS (matching src/app/recruitment/page.tsx)
+ * SCREEN 5: STREAMLINED RECRUITMENT & TRIALISTS (~65% content height)
  */
 function FullRecruitmentPreview() {
     const stages = [
         { label: "Scouted", count: 8, color: "bg-neutral-100 text-neutral-800" },
         { label: "Contacted", count: 5, color: "bg-blue-50 text-blue-700" },
-        { label: "Invited to Training", count: 4, color: "bg-indigo-50 text-indigo-700" },
+        { label: "Invited", count: 4, color: "bg-indigo-50 text-indigo-700" },
         { label: "On Trial", count: 3, color: "bg-amber-50 text-amber-800" },
         { label: "Signed", count: 2, color: "bg-emerald-50 text-emerald-700" },
     ];
@@ -1687,64 +1331,36 @@ function FullRecruitmentPreview() {
             rating: "4.0",
             notes: "12 goals in 14 games this season. Explosive pace in behind; attending next Tuesday session.",
         },
-        {
-            name: "Ethan Walters",
-            age: 25,
-            pos: "CM / CDM",
-            foot: "Right",
-            currentClub: "Stanmore Athletic",
-            stage: "Contacted",
-            stageBadge: "bg-blue-50 text-blue-700 border-blue-200",
-            rating: "4.0",
-            notes: "Watched twice vs Highgate. High work-rate box-to-box #8, strong ball winner in midfield.",
-        },
-        {
-            name: "Zac Henderson",
-            age: 24,
-            pos: "GK",
-            foot: "Right",
-            currentClub: "Signed to First Team",
-            stage: "Signed",
-            stageBadge: "bg-emerald-50 text-emerald-700 border-emerald-200",
-            rating: "4.5",
-            notes: "Completed 3-week trial. Converted to full First Team squad member with one click.",
-        },
     ];
 
     return (
-        <div className="p-4 sm:p-6 space-y-4 bg-[#FCFCFD] text-neutral-900 select-none">
+        <div className="p-4 sm:p-5 space-y-3.5 bg-[#FCFCFD] text-neutral-900 select-none">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                 <div>
-                    <h3 className="text-lg font-black text-neutral-900">
+                    <h3 className="text-base sm:text-lg font-black text-neutral-900">
                         Player Recruitment
                     </h3>
-                    <p className="text-xs text-neutral-500">
-                        Track opposition standouts, manage trialists in training, and convert signings to your squad.
-                    </p>
                 </div>
-                <div className="flex items-center gap-2">
-                    <span className="px-2.5 py-1.5 rounded-lg bg-white border border-neutral-200 text-neutral-700 text-xs font-bold flex items-center gap-1">
-                        <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" /> Export Excel
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-neutral-200 text-neutral-700 text-[11px] font-bold flex items-center gap-1">
+                        <FileSpreadsheet className="w-3 h-3 text-emerald-600" /> Export Excel
                     </span>
-                    <span className="px-2.5 py-1.5 rounded-lg bg-white border border-neutral-200 text-neutral-700 text-xs font-bold flex items-center gap-1">
-                        <FileText className="w-3.5 h-3.5 text-red-600" /> Export PDF
-                    </span>
-                    <span className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-xs font-bold flex items-center gap-1">
-                        <Plus className="w-3.5 h-3.5" /> Add Scouting Target
+                    <span className="px-2.5 py-1 rounded-lg bg-red-600 text-white text-[11px] font-bold flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> Add Target
                     </span>
                 </div>
             </div>
 
             {/* 5 Pipeline Stage Pills */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 {stages.map((s) => (
                     <div
                         key={s.label}
-                        className="bg-white rounded-xl border border-neutral-200/80 p-3 shadow-2xs flex items-center justify-between"
+                        className="bg-white rounded-xl border border-neutral-200/80 p-2.5 shadow-2xs flex items-center justify-between"
                     >
-                        <span className="text-xs font-bold text-neutral-700">{s.label}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-black ${s.color}`}>
+                        <span className="text-[11px] font-bold text-neutral-700">{s.label}</span>
+                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${s.color}`}>
                             {s.count}
                         </span>
                     </div>
@@ -1752,46 +1368,46 @@ function FullRecruitmentPreview() {
             </div>
 
             {/* Scouting Target Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {targets.map((t) => (
                     <div
                         key={t.name}
-                        className="bg-white rounded-2xl border border-neutral-200/80 shadow-xs p-4 flex flex-col justify-between"
+                        className="bg-white rounded-2xl border border-neutral-200/80 shadow-xs p-3.5 flex flex-col justify-between"
                     >
                         <div>
                             <div className="flex items-start justify-between gap-2">
                                 <div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex flex-wrap items-center gap-1.5">
                                         <span className="text-sm font-black text-neutral-900">
                                             {t.name}
                                         </span>
-                                        <span className="px-1.5 py-0.5 rounded bg-neutral-900 text-white text-[10px] font-black">
+                                        <span className="px-1.5 py-0.5 rounded bg-neutral-900 text-white text-[9px] font-black">
                                             {t.pos}
                                         </span>
-                                        <span className="text-[11px] font-semibold text-neutral-400">
-                                            Age {t.age} • {t.foot} Foot
+                                        <span className="text-[10px] font-semibold text-neutral-400">
+                                            Age {t.age} • {t.foot}
                                         </span>
                                     </div>
                                     <div className="text-[11px] font-semibold text-neutral-500 mt-0.5">
-                                        Current Club: {t.currentClub}
+                                        Club: {t.currentClub}
                                     </div>
                                 </div>
                                 <span
-                                    className={`px-2.5 py-0.5 rounded-full text-[10px] font-black border ${t.stageBadge}`}
+                                    className={`px-2 py-0.5 rounded-full text-[9px] font-black border shrink-0 ${t.stageBadge}`}
                                 >
                                     {t.stage}
                                 </span>
                             </div>
 
-                            <p className="mt-2.5 text-xs text-neutral-600 bg-neutral-50 p-2.5 rounded-xl border border-neutral-200/60 leading-relaxed">
+                            <p className="mt-2 text-[11px] text-neutral-600 bg-neutral-50 p-2.5 rounded-xl border border-neutral-200/60 leading-relaxed">
                                 “{t.notes}”
                             </p>
                         </div>
 
-                        <div className="mt-3 pt-2.5 border-t border-neutral-100 flex items-center justify-between text-[11px]">
+                        <div className="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between text-[10px]">
                             <span className="inline-flex items-center gap-1 font-bold text-amber-600">
-                                <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                                {t.rating} / 5.0 Scout Rating
+                                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                                {t.rating} / 5.0 Rating
                             </span>
                             <span className="font-bold text-neutral-700 hover:text-red-600">
                                 Convert to Squad →
@@ -1805,85 +1421,62 @@ function FullRecruitmentPreview() {
 }
 
 /**
- * SCREEN 6: FULL-SCALE REAL OPPOSITION REPORTS (matching src/app/opposition/page.tsx)
+ * SCREEN 6: STREAMLINED OPPOSITION REPORTS (~65% content height)
  */
 function FullOppositionPreview() {
     return (
-        <div className="p-4 sm:p-6 space-y-4 bg-[#FCFCFD] text-neutral-900 select-none">
+        <div className="p-4 sm:p-5 space-y-3.5 bg-[#FCFCFD] text-neutral-900 select-none">
             {/* Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div>
-                    <div className="flex items-center gap-2">
-                        <h3 className="text-lg font-black text-neutral-900">
-                            Opposition Scouting Report
-                        </h3>
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-amber-50 text-amber-800 border border-amber-200">
-                            vs Kingswood Rovers (Sat 14 Nov)
-                        </span>
-                    </div>
-                    <p className="text-xs text-neutral-500">
-                        Tactical breakdown, set-piece routines, key threats, and expected opposition starting shape.
-                    </p>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-black text-neutral-900">
+                        Opposition Scouting Report
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-800 border border-amber-200">
+                        vs Kingswood Rovers (Sat 14 Nov)
+                    </span>
                 </div>
                 <div className="flex items-center gap-2">
-                    <span className="px-3 py-1.5 rounded-lg bg-white border border-neutral-200 text-neutral-700 text-xs font-bold">
-                        Preferred Shape: 4-2-3-1
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-neutral-200 text-neutral-700 text-[11px] font-bold">
+                        Shape: 4-2-3-1
                     </span>
-                    <span className="px-3 py-1.5 rounded-lg bg-neutral-900 text-white text-xs font-bold flex items-center gap-1.5">
-                        <FileText className="w-3.5 h-3.5" /> Export PDF Report
+                    <span className="px-2.5 py-1 rounded-lg bg-neutral-900 text-white text-[11px] font-bold flex items-center gap-1.5">
+                        <FileText className="w-3 h-3" /> Export PDF
                     </span>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-start">
-                {/* Left 7 Cols: 4 Tactical Analysis Cards + Danger Men */}
-                <div className="lg:col-span-7 space-y-3.5">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="bg-white rounded-xl border border-neutral-200 p-3.5 shadow-2xs">
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
+                {/* Left 7 Cols: 2 Key Tactical Cards + Danger Men */}
+                <div className="lg:col-span-7 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-2xs">
                             <div className="text-[10px] font-black uppercase tracking-wider text-emerald-700 mb-1">
                                 1. In Possession & Build-Up
                             </div>
-                            <p className="text-xs text-neutral-600 leading-relaxed">
-                                Look to play early diagonals into #9 Callum Bradshaw, with #10 Luke Pennant collecting second balls in the half-spaces. Right-back overlaps aggressively on every transition.
+                            <p className="text-[11px] text-neutral-600 leading-relaxed">
+                                Early diagonals into #9 Callum Bradshaw, with #10 Luke Pennant collecting second balls in the half-spaces.
                             </p>
                         </div>
 
-                        <div className="bg-white rounded-xl border border-neutral-200 p-3.5 shadow-2xs">
-                            <div className="text-[10px] font-black uppercase tracking-wider text-blue-700 mb-1">
-                                2. Out of Possession Shape
-                            </div>
-                            <p className="text-xs text-neutral-600 leading-relaxed">
-                                Settle into a compact 4-4-2 mid-block. They leave wide channels open behind their advancing full-backs when possession turns over quickly.
-                            </p>
-                        </div>
-
-                        <div className="bg-white rounded-xl border border-neutral-200 p-3.5 shadow-2xs">
-                            <div className="text-[10px] font-black uppercase tracking-wider text-amber-700 mb-1">
-                                3. Set-Piece Routines
-                            </div>
-                            <p className="text-xs text-neutral-600 leading-relaxed">
-                                Inswinging corners target #5 Mark Dawson at the near post for flick-ons. Defensively, they use zonal marking and struggle against back-post runners.
-                            </p>
-                        </div>
-
-                        <div className="bg-white rounded-xl border border-neutral-200 p-3.5 shadow-2xs">
+                        <div className="bg-white rounded-xl border border-neutral-200 p-3 shadow-2xs">
                             <div className="text-[10px] font-black uppercase tracking-wider text-red-700 mb-1">
-                                4. Key Weaknesses to Exploit
+                                2. Key Weaknesses to Exploit
                             </div>
-                            <p className="text-xs text-neutral-600 leading-relaxed">
-                                Left centre-back turns slowly when isolated 1v1 against pace. Press their #4 pivot early when receiving facing his own goal.
+                            <p className="text-[11px] text-neutral-600 leading-relaxed">
+                                Left centre-back turns slowly when isolated 1v1 against pace. Wide channels open behind their advancing full-backs.
                             </p>
                         </div>
                     </div>
 
                     {/* Danger Men Card */}
-                    <div className="bg-white rounded-xl border border-neutral-200 p-4 shadow-2xs">
-                        <div className="flex items-center justify-between mb-2.5">
+                    <div className="bg-white rounded-xl border border-neutral-200 p-3.5 shadow-2xs">
+                        <div className="flex items-center justify-between mb-2">
                             <span className="text-xs font-black text-neutral-900 flex items-center gap-1.5">
-                                <Swords className="w-4 h-4 text-red-600" /> Opposition Key Threats (Danger Men)
+                                <Swords className="w-3.5 h-3.5 text-red-600" /> Key Threats (Danger Men)
                             </span>
                             <span className="text-[10px] font-semibold text-neutral-400">
-                                One-click send to Recruitment
+                                Send to Recruitment
                             </span>
                         </div>
                         <div className="space-y-2">
@@ -1892,22 +1485,22 @@ function FullOppositionPreview() {
                                     num: 9,
                                     name: "Callum Bradshaw",
                                     pos: "ST",
-                                    notes: "11 Goals in 14 games. Physical target man, lethal inside the 6-yard box.",
+                                    notes: "11 Goals in 14 games. Physical target man, lethal in the box.",
                                 },
                                 {
                                     num: 10,
                                     name: "Luke Pennant",
                                     pos: "CAM",
-                                    notes: "8 Assists. Takes all corners and direct free kicks; left-footed playmaker.",
+                                    notes: "8 Assists. Takes all corners and direct free kicks.",
                                 },
                             ].map((d) => (
                                 <div
                                     key={d.num}
-                                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 rounded-xl bg-neutral-50 border border-neutral-200/80"
+                                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-xl bg-neutral-50 border border-neutral-200/80"
                                 >
                                     <div>
                                         <div className="text-xs font-black text-neutral-900 flex items-center gap-1.5">
-                                            <span className="px-1.5 py-0.2 rounded bg-red-600 text-white text-[10px]">
+                                            <span className="px-1.5 py-0.2 rounded bg-red-600 text-white text-[9px]">
                                                 #{d.num}
                                             </span>
                                             <span>{d.name}</span>
@@ -1915,12 +1508,12 @@ function FullOppositionPreview() {
                                                 ({d.pos})
                                             </span>
                                         </div>
-                                        <div className="text-[11px] text-neutral-600 mt-0.5">
+                                        <div className="text-[10px] text-neutral-600 mt-0.5">
                                             {d.notes}
                                         </div>
                                     </div>
-                                    <span className="px-2.5 py-1 rounded-lg bg-white border border-neutral-200 text-[10px] font-bold text-neutral-800 shrink-0">
-                                        + Send to Recruitment
+                                    <span className="px-2 py-1 rounded-lg bg-white border border-neutral-200 text-[10px] font-bold text-neutral-800 shrink-0 self-start sm:self-center">
+                                        + Recruit
                                     </span>
                                 </div>
                             ))}
@@ -1929,16 +1522,16 @@ function FullOppositionPreview() {
                 </div>
 
                 {/* Right 5 Cols: Expected Opposition Pitch Shape */}
-                <div className="lg:col-span-5 bg-white rounded-xl border border-neutral-200 p-3.5 shadow-2xs">
-                    <div className="flex items-center justify-between mb-2">
+                <div className="lg:col-span-5 bg-white rounded-xl border border-neutral-200 p-3 shadow-2xs">
+                    <div className="flex items-center justify-between mb-1.5">
                         <span className="text-xs font-bold text-neutral-900">
                             Expected Opposition XI (4-2-3-1)
                         </span>
                         <span className="text-[10px] font-bold text-red-600">
-                            ★ Key Threats Marked
+                            ★ Key Threats
                         </span>
                     </div>
-                    <div className="h-[340px] w-full">
+                    <div className="h-[275px] w-full">
                         <RealisticPitchMarkings>
                             <PitchJerseyNode
                                 x={50}
@@ -2256,12 +1849,12 @@ export default function LandingPage() {
                         </div>
 
                         {/* Active Screen Context Banner */}
-                        <div className="mt-5 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-2 px-2">
-                            <div className="flex items-center gap-2.5">
-                                <span className="px-2.5 py-1 rounded-md bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold">
+                        <div className="mt-5 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-2.5 px-1 sm:px-2">
+                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                                <span className="self-start inline-flex items-center px-3 py-1 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 text-[11px] font-semibold tracking-wide whitespace-nowrap">
                                     {currentShowcase.badge}
                                 </span>
-                                <h2 className="text-sm sm:text-base font-bold text-white">
+                                <h2 className="text-sm sm:text-base font-semibold text-white leading-snug tracking-tight">
                                     {currentShowcase.headline}
                                 </h2>
                             </div>
@@ -2279,9 +1872,9 @@ export default function LandingPage() {
                                     <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
                                     <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f]" />
                                 </div>
-                                <div className="px-4 py-1 rounded-md bg-[#1f1f1f] border border-neutral-700/70 text-[11px] font-mono text-neutral-300 flex items-center gap-2">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                                    <span>{currentShowcase.url}</span>
+                                <div className="px-3 sm:px-4 py-1 rounded-md bg-[#1f1f1f] border border-neutral-700/70 text-[10px] sm:text-[11px] font-mono text-neutral-300 flex items-center gap-2 truncate max-w-[220px] sm:max-w-none">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                                    <span className="truncate">{currentShowcase.url}</span>
                                 </div>
                                 <div className="hidden sm:flex items-center gap-2 text-[11px] font-semibold text-neutral-400">
                                     <span>Live Interactive Preview</span>
@@ -2289,7 +1882,7 @@ export default function LandingPage() {
                             </div>
 
                             {/* Real Application Shell: Dark #171717 Left Sidebar + Light #FCFCFD Main Canvas */}
-                            <div className="flex min-h-[620px] bg-[#FCFCFD]">
+                            <div className="flex min-h-[410px] bg-[#FCFCFD]">
                                 <RealAppSidebar
                                     activeNav={activeTab}
                                     onSelectTab={(tab) => setActiveTab(tab)}
@@ -2535,24 +2128,6 @@ export default function LandingPage() {
                                             </span>
                                         </div>
                                     </div>
-
-                                    {/* Last Match Recap Mobile Card */}
-                                    <div className="bg-white rounded-xl p-3 border border-neutral-200 shadow-2xs">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-[9px] font-black uppercase text-neutral-400">
-                                                Last Result
-                                            </span>
-                                            <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-emerald-500 text-white">
-                                                WIN 3 - 1
-                                            </span>
-                                        </div>
-                                        <div className="text-xs font-bold text-neutral-900">
-                                            Northbrook 3 – 1 Millbrook Town
-                                        </div>
-                                        <div className="text-[10px] text-neutral-500 mt-1">
-                                            ⚽ M. Vance (2), C. Gallagher • ⭐ MOTM: M. Vance
-                                        </div>
-                                    </div>
                                 </div>
                             </div>
                             <div className="mt-3 text-center">
@@ -2577,7 +2152,7 @@ export default function LandingPage() {
                                 </div>
 
                                 <div className="p-3 space-y-2.5">
-                                    <div className="h-[270px] w-full">
+                                    <div className="h-[225px] w-full">
                                         <RealisticPitchMarkings>
                                             <PitchJerseyNode
                                                 x={50}
@@ -2666,7 +2241,7 @@ export default function LandingPage() {
                                             Bench & Set Pieces
                                         </div>
                                         <div className="text-neutral-600 font-semibold truncate">
-                                            Subs: 12 S. Henderson, 14 H. Cole, 15 N. Palmer, 16 K. Reid
+                                            Subs: 12 S. Henderson, 14 H. Cole, 15 N. Palmer
                                         </div>
                                         <div className="flex items-center justify-between pt-1 border-t border-neutral-100 text-neutral-800 font-bold">
                                             <span>Capt: D. Foster</span>
@@ -2728,13 +2303,6 @@ export default function LandingPage() {
                                                 pos: "GK",
                                                 streak: "🔥 5",
                                                 last5: ["✓", "✓", "✓", "✓", "✓"],
-                                                pct: "89%",
-                                            },
-                                            {
-                                                name: "Marcus Vance",
-                                                pos: "FWD",
-                                                streak: "🔥 4",
-                                                last5: ["×", "✓", "✓", "L", "✓"],
                                                 pct: "89%",
                                             },
                                         ].map((p) => (
@@ -2939,7 +2507,7 @@ export default function LandingPage() {
             {/* Footer */}
             <footer className="border-t border-white/[0.08] py-10 px-4 sm:px-6 lg:px-8 bg-[#05070e]">
                 <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-500">
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex flex-wrap items-center justify-center gap-2 text-center sm:text-left">
                         <img
                             src="/clubflow-logo.png"
                             alt="ClubFlow"
@@ -2948,7 +2516,7 @@ export default function LandingPage() {
                         <span className="font-bold text-neutral-300">ClubFlow</span>
                         <span>• Grassroots, Semi-Pro & Academy Football Operations</span>
                     </div>
-                    <div className="flex items-center gap-6">
+                    <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6">
                         <a href="#preview" className="hover:text-neutral-300">
                             Inside the App
                         </a>

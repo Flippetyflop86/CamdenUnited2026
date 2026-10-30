@@ -603,6 +603,9 @@ export function computeLineupParticipation(parsedLineup: any): Map<string, Lineu
     });
 
     // Calculate minutes played using a chronological substitution timeline
+    const matchDuration = Number(parsedLineup.matchDurationMinutes) > 0 ? Number(parsedLineup.matchDurationMinutes) : 90;
+    const defaultSubMin = Math.round((matchDuration * 2) / 3);
+    const defaultSubPlayed = Math.max(10, matchDuration - defaultSubMin);
     const minutesMap = new Map<string, number>();
     const onPitchSince = new Map<string, number>();
     const subEventsMap = new Map<string, { type: "on" | "off"; minute: number }[]>();
@@ -620,10 +623,10 @@ export function computeLineupParticipation(parsedLineup: any): Map<string, Lineu
 
     const sortedSubs = [...rawSubs]
         .filter((sub) => sub && sub.subId)
-        .sort((a, b) => (Number(a.minute) || 60) - (Number(b.minute) || 60));
+        .sort((a, b) => (Number(a.minute) || defaultSubMin) - (Number(b.minute) || defaultSubMin));
 
     sortedSubs.forEach((sub) => {
-        const subMin = Number(sub.minute) || 60;
+        const subMin = Number(sub.minute) || defaultSubMin;
 
         if (isRealPlayerId(sub.replacedId) && onPitchSince.has(sub.replacedId)) {
             const startedAt = onPitchSince.get(sub.replacedId)!;
@@ -645,7 +648,7 @@ export function computeLineupParticipation(parsedLineup: any): Map<string, Lineu
     });
 
     onPitchSince.forEach((startedAt, id) => {
-        const played = startedAt > 0 ? Math.max(1, 90 - startedAt) : Math.max(0, 90 - startedAt);
+        const played = startedAt > 0 ? Math.max(1, matchDuration - startedAt) : Math.max(0, matchDuration - startedAt);
         minutesMap.set(id, (minutesMap.get(id) || 0) + played);
     });
 
@@ -659,7 +662,7 @@ export function computeLineupParticipation(parsedLineup: any): Map<string, Lineu
         if ((minutesMap.get(id) || 0) === 0) {
             const hasSubRecord = sortedSubs.some((s) => s.subId === id);
             if (!hasSubRecord) {
-                minutesMap.set(id, 30);
+                minutesMap.set(id, defaultSubPlayed);
             }
         }
     });
@@ -668,7 +671,7 @@ export function computeLineupParticipation(parsedLineup: any): Map<string, Lineu
         const ev = matchEvents[id] || {};
         result.set(id, {
             participationType: "STARTER",
-            minutesPlayed: minutesMap.get(id) ?? 90,
+            minutesPlayed: minutesMap.get(id) ?? matchDuration,
             subEvents: subEventsMap.get(id) || [],
             goals: Number(ev.goals) || 0,
             assists: Number(ev.assists) || 0,
@@ -681,7 +684,7 @@ export function computeLineupParticipation(parsedLineup: any): Map<string, Lineu
         const ev = matchEvents[id] || {};
         result.set(id, {
             participationType: "SUB",
-            minutesPlayed: minutesMap.get(id) ?? 30,
+            minutesPlayed: minutesMap.get(id) ?? defaultSubPlayed,
             subEvents: subEventsMap.get(id) || [],
             goals: Number(ev.goals) || 0,
             assists: Number(ev.assists) || 0,

@@ -166,9 +166,17 @@ export interface MatchdayPlayerEventStats {
     redCards: number;
 }
 
+export type MatchFormat = "5v5" | "7v7" | "9v9" | "11v11";
+
 export interface MatchdayXI {
     id: string;
     formation: string;
+    matchFormat?: MatchFormat;
+    matchDurationMinutes?: number;
+    activePeriod?: "full" | "Full" | "Q1" | "Q2" | "Q3" | "Q4" | "H1" | "H2";
+    periodStarters?: Record<string, Record<string, string>>;
+    parentFriendlyExport?: boolean;
+    footwearNotes?: string;
     starters: {
         [key: string]: string; // position index -> playerId
     };

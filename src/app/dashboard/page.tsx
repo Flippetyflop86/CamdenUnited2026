@@ -64,6 +64,8 @@ export default function DashboardPage() {
     const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
     const [dismissedPriorities, setDismissedPriorities] = useState<string[]>([]);
     const [standingsTable, setStandingsTable] = useState<StandingsRow[]>([]);
+    const [hasLeagueTeamsInDb, setHasLeagueTeamsInDb] = useState<boolean>(false);
+    const [isInitialLoaded, setIsInitialLoaded] = useState<boolean>(false);
     const [copiedWhatsApp, setCopiedWhatsApp] = useState<"match" | "training" | null>(null);
     const [hideSetupChecklist, setHideSetupChecklist] = useState<boolean>(false);
 
@@ -83,7 +85,7 @@ export default function DashboardPage() {
         }
     };
 
-    // Load standings table from localStorage or Supabase settings
+    // Load standings table from localStorage, settings, or Supabase LEAGUE_TABLE_CACHE
     useEffect(() => {
         if (typeof window === "undefined") return;
         const normalizeRows = (rows: any[]): StandingsRow[] =>
@@ -103,7 +105,7 @@ export default function DashboardPage() {
                     is_our_club: Boolean(r.is_our_club),
                 }));
 
-        const loadStandings = () => {
+        const loadStandings = async () => {
             try {
                 const scopedKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
                 const raw =
@@ -127,7 +129,47 @@ export default function DashboardPage() {
                     const normalized = normalizeRows(settings.lastImportHistory.leagueTable);
                     if (normalized.length > 0) {
                         setStandingsTable(normalized);
+                        localStorage.setItem(scopedKey, JSON.stringify(normalized));
+                        return;
                     }
+                }
+
+                // Fallback 1: Check Supabase documents for LEAGUE_TABLE_CACHE
+                let docQuery = supabase
+                    .from("documents")
+                    .select("url")
+                    .eq("category", "LEAGUE_TABLE_CACHE");
+                if (clubId) {
+                    docQuery = docQuery.eq("club_id", clubId);
+                }
+                const { data: docData } = await docQuery.maybeSingle();
+                if (docData?.url) {
+                    const parsedDoc = JSON.parse(docData.url);
+                    const rows = Array.isArray(parsedDoc)
+                        ? parsedDoc
+                        : Array.isArray(parsedDoc?.standings)
+                        ? parsedDoc.standings
+                        : [];
+                    if (rows.length > 0) {
+                        const normalized = normalizeRows(rows);
+                        if (normalized.length > 0) {
+                            setStandingsTable(normalized);
+                            localStorage.setItem(scopedKey, JSON.stringify(normalized));
+                            return;
+                        }
+                    }
+                }
+
+                // Fallback 2: Check if league_teams have already been populated in Supabase
+                let teamsQuery = supabase
+                    .from("league_teams")
+                    .select("id", { count: "exact", head: true });
+                if (clubId) {
+                    teamsQuery = teamsQuery.eq("club_id", clubId);
+                }
+                const { count } = await teamsQuery;
+                if ((count || 0) > 0) {
+                    setHasLeagueTeamsInDb(true);
                 }
             } catch (e) {
                 // Ignore parse error
@@ -184,12 +226,15 @@ export default function DashboardPage() {
         return () => clearInterval(timer);
     }, [nextMatch]);
 
-    const fetchData = () => {
-        fetchMatches();
-        fetchSquad();
-        fetchMatchPlayerStats();
-        fetchTrainingSessions();
-        fetchPaymentRequests();
+    const fetchData = async () => {
+        await Promise.allSettled([
+            fetchMatches(),
+            fetchSquad(),
+            fetchMatchPlayerStats(),
+            fetchTrainingSessions(),
+            fetchPaymentRequests(),
+        ]);
+        setIsInitialLoaded(true);
     };
 
     const fetchMatchPlayerStats = async () => {
@@ -626,6 +671,12 @@ export default function DashboardPage() {
         localStorage.setItem(`clubflow_dismissed_priorities_${todayStr}`, JSON.stringify(updated));
     };
 
+    const isLeagueConnected =
+        standingsTable.length > 0 ||
+        hasLeagueTeamsInDb ||
+        Boolean(settings.leagueUrl) ||
+        Boolean(settings.leaguePosition && String(settings.leaguePosition) !== "N/A");
+
     const actionItems = useMemo(() => {
         const items: { id: string; label: string; sub: string; href: string; tone: "amber" | "rose" | "brand" }[] = [];
 
@@ -673,7 +724,7 @@ export default function DashboardPage() {
             });
         }
 
-        if (standingsTable.length === 0) {
+        if (isInitialLoaded && !isLeagueConnected) {
             items.push({
                 id: "connect_league",
                 label: "Connect your League Table",
@@ -684,7 +735,7 @@ export default function DashboardPage() {
         }
 
         return items.filter(item => !dismissedPriorities.includes(item.id));
-    }, [overduePendingMatches, nextMatch, unavailablePlayers.length, injuredPlayers.length, suspendedPlayers.length, holidayPlayers.length, totalOutstandingAmount, outstandingInvoices.length, standingsTable.length, dismissedPriorities]);
+    }, [overduePendingMatches, nextMatch, unavailablePlayers.length, injuredPlayers.length, suspendedPlayers.length, holidayPlayers.length, totalOutstandingAmount, outstandingInvoices.length, isInitialLoaded, isLeagueConnected, dismissedPriorities]);
 
     // 1-Tap WhatsApp Copy Helpers (Addition #6)
     const copyMatchForWhatsApp = async () => {
@@ -752,7 +803,7 @@ export default function DashboardPage() {
         {
             id: "league",
             label: "Sync League Table",
-            done: standingsTable.length > 0,
+            done: isLeagueConnected,
             href: "/league",
         },
     ];
@@ -765,7 +816,7 @@ export default function DashboardPage() {
                 {/* ========================================================= */}
                 {/* POST-ONBOARDING CLUB SETUP CHECKLIST BANNER               */}
                 {/* ========================================================= */}
-                {!hideSetupChecklist && completedSetupCount < 4 && (
+                {isInitialLoaded && !hideSetupChecklist && completedSetupCount < 4 && (
                     <div className="bg-surface-1 border border-brand/30 rounded-2xl p-4 md:p-5 shadow-xs">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                             <div className="flex items-center gap-2.5">

@@ -3,7 +3,16 @@
 import { useState, useEffect, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { FORMATIONS, FORMATION_NAMES, getDisplayPosition } from "@/lib/formations";
+import {
+    FORMATIONS,
+    FORMATION_NAMES,
+    FORMATIONS_BY_FORMAT,
+    DEFAULT_FORMATION_BY_FORMAT,
+    FORMAT_ROMAN_LABEL,
+    getFormatFromFormation,
+    getDisplayPosition,
+    MatchFormat
+} from "@/lib/formations";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -969,6 +978,25 @@ export default function OppositionReportsPage() {
     };
 
     const formationPositions = FORMATIONS[activeReport.formation] || FORMATIONS["4-2-3-1"] || [];
+    const activeOppFormat: MatchFormat = getFormatFromFormation(activeReport.formation);
+    const activeOppRomanLabel = FORMAT_ROMAN_LABEL[activeOppFormat] || "XI";
+
+    const handleOppFormatChange = (fmt: MatchFormat) => {
+        const defaultForm = DEFAULT_FORMATION_BY_FORMAT[fmt] || "4-2-3-1";
+        if (isEditing && editedReport) {
+            setEditedReport({ ...editedReport, formation: defaultForm });
+        } else {
+            const base = selectedReport || editedReport || createBlankReport();
+            setEditedReport({
+                ...base,
+                formation: defaultForm,
+                dangerMenList: [...(base.dangerMenList || [])],
+                playerProfiles: [...(base.playerProfiles || [])],
+                lineup: [...(base.lineup || [])]
+            });
+            setIsEditing(true);
+        }
+    };
 
     const filteredSavedReports = useMemo(() => {
         if (!teamSearch.trim()) return reports;
@@ -1265,7 +1293,7 @@ export default function OppositionReportsPage() {
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="space-y-1">
                                     <Label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                                        Expected Formation
+                                        Expected Formation ({activeOppFormat})
                                     </Label>
                                     <select
                                         value={editedReport?.formation || "4-2-3-1"}
@@ -1276,10 +1304,14 @@ export default function OppositionReportsPage() {
                                         }
                                         className="w-full h-9 px-2.5 rounded-lg border border-border bg-surface-2 text-xs font-bold text-foreground"
                                     >
-                                        {FORMATION_NAMES.map((name) => (
-                                            <option key={name} value={name}>
-                                                {name}
-                                            </option>
+                                        {(["11v11", "9v9", "7v7", "5v5"] as const).map((fmt) => (
+                                            <optgroup key={fmt} label={`${fmt} Formations`}>
+                                                {FORMATIONS_BY_FORMAT[fmt].map((name) => (
+                                                    <option key={name} value={name}>
+                                                        {name} ({fmt})
+                                                    </option>
+                                                ))}
+                                            </optgroup>
                                         ))}
                                     </select>
                                 </div>
@@ -1852,24 +1884,42 @@ export default function OppositionReportsPage() {
                 {/* 9. MOBILE TAB CONTENT: PITCH & XI */}
                 {(mobileTab === "pitch" || (mobileTab === "all" && showPitchSection)) && (
                     <div className="rounded-2xl bg-surface-1 border border-border overflow-hidden shadow-xs">
-                        <div className="p-3.5 flex items-center justify-between border-b border-border">
+                        <div className="p-3.5 flex flex-wrap items-center justify-between gap-2 border-b border-border">
                             <div>
                                 <h3 className="text-xs font-black uppercase tracking-wider text-foreground">
-                                    Tactical Pitch ({activeReport.formation})
+                                    Tactical Pitch ({activeReport.formation} • {activeOppFormat})
                                 </h3>
                                 <p className="text-[10px] text-muted-foreground">
                                     Tap any shirt number on the pitch to edit their role &amp; traits
                                 </p>
                             </div>
-                            {mobileTab === "all" && (
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPitchSection(false)}
-                                    className="text-[11px] font-bold text-muted-foreground"
-                                >
-                                    Hide
-                                </button>
-                            )}
+                            <div className="flex items-center gap-1.5">
+                                <div className="inline-flex items-center p-0.5 rounded-lg bg-surface-2 border border-border">
+                                    {(["5v5", "7v7", "9v9", "11v11"] as const).map((fmt) => (
+                                        <button
+                                            key={fmt}
+                                            type="button"
+                                            onClick={() => handleOppFormatChange(fmt)}
+                                            className={`px-1.5 py-0.5 rounded text-[9px] font-black transition-all ${
+                                                activeOppFormat === fmt
+                                                    ? "bg-brand text-brand-foreground"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            }`}
+                                        >
+                                            {fmt}
+                                        </button>
+                                    ))}
+                                </div>
+                                {mobileTab === "all" && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPitchSection(false)}
+                                        className="text-[11px] font-bold text-muted-foreground ml-1"
+                                    >
+                                        Hide
+                                    </button>
+                                )}
+                            </div>
                         </div>
 
                         {/* Pitch Canvas */}
@@ -1877,6 +1927,12 @@ export default function OppositionReportsPage() {
                             <div className="absolute inset-0 opacity-40">
                                 <div className="absolute inset-3 border-2 border-white/60 rounded-sm"></div>
                                 <div className="absolute left-3 right-3 top-1/2 border-t-2 border-white/60"></div>
+                                {(activeOppFormat === "5v5" || activeOppFormat === "7v7") && (
+                                    <>
+                                        <div className="absolute left-3 right-3 top-[34%] border-t border-dashed border-white/45"></div>
+                                        <div className="absolute left-3 right-3 top-[66%] border-t border-dashed border-white/45"></div>
+                                    </>
+                                )}
                                 <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 border-2 border-white/60 rounded-full"></div>
                                 <div className="absolute left-1/2 -translate-x-1/2 top-3 w-28 h-12 border-2 border-white/60 border-t-0"></div>
                                 <div className="absolute left-1/2 -translate-x-1/2 bottom-3 w-28 h-12 border-2 border-white/60 border-b-0"></div>
@@ -1909,7 +1965,7 @@ export default function OppositionReportsPage() {
                                                 isTopHalf ? "bottom-4" : "top-4"
                                             }`}
                                         >
-                                            <span className="text-[8px] font-bold text-white bg-slate-900/80 px-1.5 py-0.5 rounded whitespace-nowrap">
+                                            <span className="text-[8px] font-bold text-white bg-slate-900/80 px-1 py-0.5 rounded whitespace-nowrap truncate max-w-[62px]">
                                                 {playerName || getDisplayPosition(pos.label)}
                                             </span>
                                         </div>
@@ -1918,7 +1974,7 @@ export default function OppositionReportsPage() {
                             })}
                         </div>
 
-                        {/* Mobile 11-Player List */}
+                        {/* Mobile Lineup List */}
                         <div className="p-3 space-y-1.5">
                             {formationPositions.map((pos, idx) => {
                                 const profile = (activeReport.playerProfiles || []).find(
@@ -1975,7 +2031,7 @@ export default function OppositionReportsPage() {
                         className="w-full py-2.5 px-3 rounded-xl bg-surface-1 border border-border text-xs font-extrabold text-foreground flex items-center justify-center gap-1.5"
                     >
                         <Eye className="h-3.5 w-3.5 text-brand" />
-                        Show Optional Tactical Pitch &amp; 11-Man Lineup ({activeReport.formation})
+                        Show Optional Tactical Pitch &amp; {activeOppFormat} Lineup ({activeReport.formation})
                     </button>
                 )}
 
@@ -2389,7 +2445,7 @@ export default function OppositionReportsPage() {
                                             </div>
                                             <div className="space-y-1">
                                                 <Label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                                                    Expected Shape
+                                                    Expected Shape ({activeOppFormat})
                                                 </Label>
                                                 <select
                                                     value={editedReport?.formation || "4-2-3-1"}
@@ -2400,10 +2456,14 @@ export default function OppositionReportsPage() {
                                                     }
                                                     className="w-full h-10 px-3 rounded-md border border-border bg-surface-2 text-xs font-bold text-foreground outline-none"
                                                 >
-                                                    {FORMATION_NAMES.map((name) => (
-                                                        <option key={name} value={name}>
-                                                            {name}
-                                                        </option>
+                                                    {(["11v11", "9v9", "7v7", "5v5"] as const).map((fmt) => (
+                                                        <optgroup key={fmt} label={`${fmt} Formations`}>
+                                                            {FORMATIONS_BY_FORMAT[fmt].map((name) => (
+                                                                <option key={name} value={name}>
+                                                                    {name} ({fmt})
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
                                                     ))}
                                                 </select>
                                             </div>
@@ -2415,7 +2475,7 @@ export default function OppositionReportsPage() {
                                                     Opposition Dossier
                                                 </span>
                                                 <Badge variant="outline" className="text-[11px] font-extrabold">
-                                                    Shape: {activeReport.formation}
+                                                    Shape: {activeReport.formation} ({activeOppFormat})
                                                 </Badge>
                                                 <span className="text-[11px] text-muted-foreground">
                                                     Updated {formatDateShort(activeReport.updatedAt)}
@@ -3142,39 +3202,57 @@ export default function OppositionReportsPage() {
                     {/* #10: OPTIONAL / COLLAPSIBLE PITCH VISUALIZER & LINEUP     */}
                     {/* ========================================================= */}
                     <Card className="bg-surface-1 border-border shadow-xs overflow-hidden">
-                        <div className="p-4 flex items-center justify-between gap-3">
+                        <div className="p-4 flex flex-wrap items-center justify-between gap-3">
                             <div>
                                 <h3 className="text-xs font-black uppercase tracking-wider text-foreground flex items-center gap-2">
-                                    <span>Tactical Pitch Visualizer ({activeReport.formation})</span>
+                                    <span>Tactical Pitch Visualizer ({activeReport.formation} • {activeOppFormat})</span>
                                     <span className="text-[10px] font-semibold text-muted-foreground normal-case">
                                         (Optional)
                                     </span>
                                 </h3>
                                 <p className="text-[11px] text-muted-foreground">
-                                    Expand if you want to map out their full 11-man lineup and individual position roles on a pitch
+                                    Expand to map out their {activeOppFormat} lineup and individual position roles on the pitch
                                 </p>
                             </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={() => setShowPitchSection((prev) => !prev)}
-                                className="h-8 text-xs font-bold border-border bg-surface-2 text-foreground shrink-0"
-                            >
-                                {showPitchSection ? (
-                                    <>
-                                        <EyeOff className="h-3.5 w-3.5 mr-1.5" />
-                                        Hide Pitch
-                                        <ChevronUp className="h-3.5 w-3.5 ml-1" />
-                                    </>
-                                ) : (
-                                    <>
-                                        <Eye className="h-3.5 w-3.5 mr-1.5 text-brand" />
-                                        Show Pitch &amp; XI
-                                        <ChevronDown className="h-3.5 w-3.5 ml-1" />
-                                    </>
-                                )}
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                <div className="inline-flex items-center p-0.5 rounded-xl bg-surface-2 border border-border">
+                                    {(["5v5", "7v7", "9v9", "11v11"] as const).map((fmt) => (
+                                        <button
+                                            key={fmt}
+                                            type="button"
+                                            onClick={() => handleOppFormatChange(fmt)}
+                                            className={`px-2 py-1 rounded-lg text-[10px] font-black transition-all ${
+                                                activeOppFormat === fmt
+                                                    ? "bg-brand text-brand-foreground shadow-xs"
+                                                    : "text-muted-foreground hover:text-foreground"
+                                            }`}
+                                        >
+                                            {fmt}
+                                        </button>
+                                    ))}
+                                </div>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setShowPitchSection((prev) => !prev)}
+                                    className="h-8 text-xs font-bold border-border bg-surface-2 text-foreground shrink-0"
+                                >
+                                    {showPitchSection ? (
+                                        <>
+                                            <EyeOff className="h-3.5 w-3.5 mr-1.5" />
+                                            Hide Pitch
+                                            <ChevronUp className="h-3.5 w-3.5 ml-1" />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Eye className="h-3.5 w-3.5 mr-1.5 text-brand" />
+                                            Show Pitch &amp; {activeOppRomanLabel}
+                                            <ChevronDown className="h-3.5 w-3.5 ml-1" />
+                                        </>
+                                    )}
+                                </Button>
+                            </div>
                         </div>
 
                         {showPitchSection && (
@@ -3184,6 +3262,12 @@ export default function OppositionReportsPage() {
                                     <div className="absolute inset-0 opacity-40">
                                         <div className="absolute inset-4 border-2 border-white/60 rounded-sm"></div>
                                         <div className="absolute left-4 right-4 top-1/2 border-t-2 border-white/60"></div>
+                                        {(activeOppFormat === "5v5" || activeOppFormat === "7v7") && (
+                                            <>
+                                                <div className="absolute left-4 right-4 top-[34%] border-t border-dashed border-white/45"></div>
+                                                <div className="absolute left-4 right-4 top-[66%] border-t border-dashed border-white/45"></div>
+                                            </>
+                                        )}
                                         <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 border-2 border-white/60 rounded-full"></div>
                                         <div className="absolute left-1/2 -translate-x-1/2 top-4 w-32 h-16 border-2 border-white/60 border-t-0"></div>
                                         <div className="absolute left-1/2 -translate-x-1/2 bottom-4 w-32 h-16 border-2 border-white/60 border-b-0"></div>

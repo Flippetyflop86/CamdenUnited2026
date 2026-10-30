@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import {
     Search,
     Plus,
+    UserPlus,
     Trash2,
     Edit2,
     MapPin,
@@ -79,8 +80,8 @@ export default function RecruitmentPage() {
     const [recruits, setRecruits] = useState<Recruit[]>([]);
     const [squadPlayers, setSquadPlayers] = useState<SquadComparisonPlayer[]>([]);
 
-    // View & UI State (#21)
-    const [viewMode, setViewMode] = useState<"cards" | "table">("cards");
+    // View & UI State (#21) — Default to Spreadsheet ("table") on desktop
+    const [viewMode, setViewMode] = useState<"cards" | "table">("table");
     const [expandedPositions, setExpandedPositions] = useState<string[]>(["GK", "DEF", "MID", "FWD"]);
     const [enlargedRecruit, setEnlargedRecruit] = useState<Recruit | null>(null);
 
@@ -806,20 +807,20 @@ export default function RecruitmentPage() {
             {/* MOBILE RECRUITMENT & PITCHSIDE BLACK BOOK (< 768px)               */}
             {/* ================================================================= */}
             <div className="md:hidden space-y-3">
-                {/* 1. Mobile Header & Pitchside Action Bar */}
+                {/* 1. Mobile Header & Action Bar */}
                 <div className="rounded-2xl bg-surface-1 border border-border p-3.5 space-y-3 shadow-xs">
                     <div className="flex items-start justify-between gap-2">
-                        <div>
+                        <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                                <h2 className="text-lg font-black tracking-tight text-foreground">
+                                <h2 className="text-lg font-black tracking-tight text-foreground truncate">
                                     Player Recruitment
                                 </h2>
-                                <span className="px-2 py-0.5 rounded-full bg-red-600/15 text-red-400 border border-red-500/30 text-[11px] font-black">
+                                <span className="px-2 py-0.5 rounded-full bg-brand/15 text-brand border border-brand/30 text-[11px] font-black shrink-0">
                                     {recruits.length}
                                 </span>
                             </div>
-                            <p className="text-[11px] text-muted-foreground">
-                                Pitchside scouting, trialists &amp; recruitment targets
+                            <p className="text-[11px] text-muted-foreground truncate">
+                                Scouting targets, trialists &amp; player comparisons
                             </p>
                         </div>
 
@@ -828,37 +829,39 @@ export default function RecruitmentPage() {
                             onClick={() => setShowMobileExportBar((v) => !v)}
                             className={`px-2.5 py-1.5 rounded-xl border text-[11px] font-extrabold flex items-center gap-1 transition-colors shrink-0 ${
                                 showMobileExportBar
-                                    ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+                                    ? "bg-brand/15 text-brand border-brand/30"
                                     : "bg-surface-2 text-foreground border-border"
                             }`}
                         >
                             <FileSpreadsheet className="h-3.5 w-3.5 text-emerald-500" />
-                            Excel / Tools
+                            Export
                         </button>
                     </div>
 
-                    {/* Primary Mobile Action Buttons: Pitchside Quick-Scout + Full Add + Compare */}
+                    {/* Primary Mobile Action Buttons: Quick Add + Full Dossier + Compare */}
                     <div className="grid grid-cols-3 gap-2">
                         <Button
                             type="button"
                             size="sm"
+                            variant="outline"
                             onClick={() => setShowMobileQuickScout((v) => !v)}
-                            className={`h-9 text-xs font-extrabold ${
+                            className={`h-9 text-xs font-bold border ${
                                 showMobileQuickScout
-                                    ? "bg-amber-500 hover:bg-amber-600 text-slate-950"
-                                    : "bg-amber-500/15 hover:bg-amber-500/25 text-amber-400 border border-amber-500/40"
+                                    ? "bg-brand/15 text-brand border-brand/40"
+                                    : "bg-surface-2 hover:bg-surface-2/80 text-foreground border-border"
                             }`}
                         >
-                            ⚡ Quick Scout
+                            <Plus className="h-3.5 w-3.5 mr-1 text-brand" />
+                            Quick Add
                         </Button>
                         <Button
                             type="button"
                             size="sm"
                             onClick={() => setIsDialogOpen(true)}
-                            className="h-9 text-xs font-extrabold bg-red-600 hover:bg-red-700 text-white"
+                            className="h-9 text-xs font-extrabold bg-brand hover:bg-brand/90 text-white"
                         >
-                            <Plus className="h-3.5 w-3.5 mr-1" />
-                            Full Add
+                            <UserPlus className="h-3.5 w-3.5 mr-1" />
+                            Full Profile
                         </Button>
                         <Button
                             type="button"
@@ -867,7 +870,7 @@ export default function RecruitmentPage() {
                             onClick={() => openComparisonModal()}
                             className="h-9 text-xs font-bold border-border bg-surface-2"
                         >
-                            <GitCompare className="h-3.5 w-3.5 mr-1 text-amber-500" />
+                            <GitCompare className="h-3.5 w-3.5 mr-1 text-brand" />
                             Compare {compareIds.length > 0 ? `(${compareIds.length})` : ""}
                         </Button>
                     </div>
@@ -915,100 +918,142 @@ export default function RecruitmentPage() {
                     )}
                 </div>
 
-                {/* 2. ⚡ Pitchside 5-Second Quick-Scout Drawer (Mobile Exclusive) */}
+                {/* 2. Clean Quick Add Target Card (Mobile) */}
                 {showMobileQuickScout && (
-                    <div className="rounded-2xl bg-surface-1 border-2 border-amber-500/50 p-3.5 space-y-2.5 shadow-lg">
-                        <div className="flex items-center justify-between">
-                            <span className="text-xs font-black uppercase tracking-wider text-amber-400">
-                                ⚡ Pitchside 5-Second Quick Scout
-                            </span>
+                    <div className="rounded-2xl bg-surface-1 border border-border p-4 space-y-3 shadow-sm">
+                        <div className="flex items-center justify-between border-b border-border pb-2.5">
+                            <div>
+                                <h3 className="text-xs font-black uppercase tracking-wider text-foreground">
+                                    Quick Add Recruitment Target
+                                </h3>
+                                <p className="text-[11px] text-muted-foreground">
+                                    Log a player in seconds — add full notes later
+                                </p>
+                            </div>
                             <button
                                 type="button"
                                 onClick={() => setShowMobileQuickScout(false)}
-                                className="text-muted-foreground hover:text-foreground"
+                                className="h-7 w-7 rounded-lg bg-surface-2 flex items-center justify-center text-muted-foreground hover:text-foreground"
                             >
-                                <X className="h-4 w-4" />
+                                <X className="h-3.5 w-3.5" />
                             </button>
                         </div>
-                        <div className="grid grid-cols-[1fr_76px_82px] gap-1.5">
-                            <Input
-                                placeholder="Name or Shirt # (e.g. #11 Winger)"
-                                value={mobileQuickForm.name}
-                                onChange={(e) =>
-                                    setMobileQuickForm({ ...mobileQuickForm, name: e.target.value })
-                                }
-                                className="h-8 text-xs bg-surface-2"
-                            />
-                            <select
-                                value={mobileQuickForm.primaryPosition}
-                                onChange={(e) =>
-                                    setMobileQuickForm({
-                                        ...mobileQuickForm,
-                                        primaryPosition: e.target.value,
-                                    })
-                                }
-                                className="h-8 rounded-md border border-border bg-surface-2 px-1.5 text-xs font-bold"
-                            >
-                                {ALL_RECRUIT_POSITIONS.map((p) => (
-                                    <option key={p} value={p}>
-                                        {p}
-                                    </option>
-                                ))}
-                            </select>
-                            <select
-                                value={mobileQuickForm.preferredFoot}
-                                onChange={(e) =>
-                                    setMobileQuickForm({
-                                        ...mobileQuickForm,
-                                        preferredFoot: e.target.value as any,
-                                    })
-                                }
-                                className="h-8 rounded-md border border-border bg-surface-2 px-1.5 text-xs font-semibold"
-                            >
-                                <option value="Right">R Foot</option>
-                                <option value="Left">L Foot</option>
-                                <option value="Both">Both</option>
-                            </select>
-                        </div>
-                        <div className="grid grid-cols-2 gap-1.5">
-                            <Input
-                                placeholder="Current Club (optional)"
-                                value={mobileQuickForm.currentClub}
-                                onChange={(e) =>
-                                    setMobileQuickForm({
-                                        ...mobileQuickForm,
-                                        currentClub: e.target.value,
-                                    })
-                                }
-                                className="h-8 text-xs bg-surface-2"
-                            />
-                            <Input
-                                placeholder="Phone / WhatsApp (optional)"
-                                value={mobileQuickForm.phone}
-                                onChange={(e) =>
-                                    setMobileQuickForm({ ...mobileQuickForm, phone: e.target.value })
-                                }
-                                className="h-8 text-xs bg-surface-2"
-                            />
-                        </div>
-                        <div className="flex items-center justify-between gap-2">
-                            <Input
-                                placeholder="Quick note (e.g. Rapid in behind, spoke after game)..."
-                                value={mobileQuickForm.notes}
-                                onChange={(e) =>
-                                    setMobileQuickForm({ ...mobileQuickForm, notes: e.target.value })
-                                }
-                                className="h-8 text-xs bg-surface-2 flex-1"
-                            />
-                            <Button
-                                type="button"
-                                size="sm"
-                                disabled={!mobileQuickForm.name.trim() || isSavingQuickScout}
-                                onClick={handleMobileQuickScoutSave}
-                                className="h-8 px-3 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs shrink-0"
-                            >
-                                {isSavingQuickScout ? "Saving..." : "Save"}
-                            </Button>
+
+                        <div className="space-y-2.5">
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                                    Player Name
+                                </label>
+                                <Input
+                                    placeholder="e.g. Callum Mercer"
+                                    value={mobileQuickForm.name}
+                                    onChange={(e) =>
+                                        setMobileQuickForm({ ...mobileQuickForm, name: e.target.value })
+                                    }
+                                    className="h-9 text-xs bg-surface-2 border-border"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                                        Primary Position
+                                    </label>
+                                    <select
+                                        value={mobileQuickForm.primaryPosition}
+                                        onChange={(e) =>
+                                            setMobileQuickForm({
+                                                ...mobileQuickForm,
+                                                primaryPosition: e.target.value,
+                                            })
+                                        }
+                                        className="w-full h-9 rounded-lg border border-border bg-surface-2 px-2.5 text-xs font-bold text-foreground"
+                                    >
+                                        {ALL_RECRUIT_POSITIONS.map((p) => (
+                                            <option key={p} value={p}>
+                                                {p}
+                                            </option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                                        Preferred Foot
+                                    </label>
+                                    <select
+                                        value={mobileQuickForm.preferredFoot}
+                                        onChange={(e) =>
+                                            setMobileQuickForm({
+                                                ...mobileQuickForm,
+                                                preferredFoot: e.target.value as any,
+                                            })
+                                        }
+                                        className="w-full h-9 rounded-lg border border-border bg-surface-2 px-2.5 text-xs font-semibold text-foreground"
+                                    >
+                                        <option value="Right">Right Foot</option>
+                                        <option value="Left">Left Foot</option>
+                                        <option value="Both">Both Feet</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                                        Current Club
+                                    </label>
+                                    <Input
+                                        placeholder="Optional"
+                                        value={mobileQuickForm.currentClub}
+                                        onChange={(e) =>
+                                            setMobileQuickForm({
+                                                ...mobileQuickForm,
+                                                currentClub: e.target.value,
+                                            })
+                                        }
+                                        className="h-9 text-xs bg-surface-2 border-border"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                                        Phone / WhatsApp
+                                    </label>
+                                    <Input
+                                        placeholder="Optional"
+                                        value={mobileQuickForm.phone}
+                                        onChange={(e) =>
+                                            setMobileQuickForm({ ...mobileQuickForm, phone: e.target.value })
+                                        }
+                                        className="h-9 text-xs bg-surface-2 border-border"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-1">
+                                    Scouting Note
+                                </label>
+                                <div className="flex items-center gap-2">
+                                    <Input
+                                        placeholder="Key strengths, availability, or referral..."
+                                        value={mobileQuickForm.notes}
+                                        onChange={(e) =>
+                                            setMobileQuickForm({ ...mobileQuickForm, notes: e.target.value })
+                                        }
+                                        className="h-9 text-xs bg-surface-2 border-border flex-1"
+                                    />
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={!mobileQuickForm.name.trim() || isSavingQuickScout}
+                                        onClick={handleMobileQuickScoutSave}
+                                        className="h-9 px-4 bg-brand hover:bg-brand/90 text-white font-extrabold text-xs shrink-0"
+                                    >
+                                        {isSavingQuickScout ? "Saving..." : "Save Target"}
+                                    </Button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -1222,9 +1267,7 @@ export default function RecruitmentPage() {
                                 return (
                                     <div
                                         key={recruit.id}
-                                        className={`rounded-2xl bg-slate-950 border-2 ${getPositionBorder(
-                                            recruit.primaryPosition
-                                        )} p-3 space-y-2.5 shadow-sm`}
+                                        className="rounded-2xl bg-surface-1 border border-border p-3.5 space-y-2.5 shadow-xs"
                                     >
                                         {/* Top Row: Name, Pos, Foot, Rating, and Quick Stage Dropdown */}
                                         <div className="flex items-start justify-between gap-2">
@@ -1233,16 +1276,16 @@ export default function RecruitmentPage() {
                                                 className="min-w-0 flex-1 cursor-pointer"
                                             >
                                                 <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className="px-1.5 py-0.5 rounded bg-red-600/20 text-red-400 border border-red-500/30 text-[10px] font-black">
+                                                    <span className="px-2 py-0.5 rounded-md bg-brand/15 text-brand border border-brand/30 text-[10px] font-black">
                                                         {recruit.primaryPosition}
                                                         {recruit.secondaryPosition
                                                             ? `/${recruit.secondaryPosition}`
                                                             : ""}
                                                     </span>
-                                                    <span className="text-sm font-extrabold text-white truncate">
+                                                    <span className="text-sm font-extrabold text-foreground truncate">
                                                         {recruit.name}
                                                     </span>
-                                                    <span className="text-[10px] text-slate-400 font-semibold">
+                                                    <span className="text-[10px] text-muted-foreground font-semibold">
                                                         {recruit.age ? `${recruit.age}yo` : ""} •{" "}
                                                         {recruit.preferredFoot || "R"} Foot
                                                     </span>
@@ -1252,7 +1295,7 @@ export default function RecruitmentPage() {
                                                     <span className="text-amber-400 font-bold tracking-tight">
                                                         {"★".repeat(recruit.starRating || 3)}
                                                     </span>
-                                                    <span className="text-slate-300 font-semibold">
+                                                    <span className="text-muted-foreground font-semibold">
                                                         {recruit.status === "Unattached" ? (
                                                             <span className="text-emerald-400">Free Agent</span>
                                                         ) : (
@@ -1260,7 +1303,7 @@ export default function RecruitmentPage() {
                                                         )}
                                                     </span>
                                                     {recruit.highestLevel && (
-                                                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold">
+                                                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-bold">
                                                             {recruit.highestLevel}
                                                         </span>
                                                     )}
@@ -1285,12 +1328,12 @@ export default function RecruitmentPage() {
                                                         pipelineStage: e.target.value as RecruitPipelineStage,
                                                     })
                                                 }
-                                                className={`rounded-lg px-2 py-1 text-[10px] font-extrabold border bg-slate-900 shrink-0 ${getPipelineBadgeStyle(
+                                                className={`rounded-lg px-2 py-1 text-[10px] font-extrabold border bg-surface-2 shrink-0 ${getPipelineBadgeStyle(
                                                     recruit.pipelineStage
                                                 )}`}
                                             >
                                                 {PIPELINE_STAGES.map((st) => (
-                                                    <option key={st} value={st} className="bg-slate-900 text-white">
+                                                    <option key={st} value={st} className="bg-surface-1 text-foreground">
                                                         {st}
                                                     </option>
                                                 ))}
@@ -1301,10 +1344,10 @@ export default function RecruitmentPage() {
                                         {(recruit.clubConnection || recruit.notes) && (
                                             <div
                                                 onClick={() => setEnlargedRecruit(recruit)}
-                                                className="text-[11px] text-slate-400 bg-slate-900/70 rounded-lg px-2.5 py-1.5 border border-slate-800 line-clamp-2 cursor-pointer"
+                                                className="text-[11px] text-muted-foreground bg-surface-2/70 rounded-xl px-2.5 py-1.5 border border-border line-clamp-2 cursor-pointer"
                                             >
                                                 {recruit.clubConnection && (
-                                                    <span className="text-red-400 font-semibold mr-1.5">
+                                                    <span className="text-brand font-semibold mr-1.5">
                                                         🔗 {recruit.clubConnection}:
                                                     </span>
                                                 )}
@@ -1313,14 +1356,14 @@ export default function RecruitmentPage() {
                                         )}
 
                                         {/* Bottom Thumb Action Bar: WhatsApp, Call, Compare, Edit, Dossier, Sign */}
-                                        <div className="flex items-center justify-between gap-1.5 pt-0.5">
+                                        <div className="flex items-center justify-between gap-1.5 pt-0.5 flex-wrap">
                                             <div className="flex items-center gap-1.5">
                                                 {waUrl && (
                                                     <a
                                                         href={waUrl}
                                                         target="_blank"
                                                         rel="noreferrer"
-                                                        className="h-7 px-2.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-extrabold flex items-center gap-1"
+                                                        className="h-7 px-2.5 rounded-lg bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] font-extrabold flex items-center gap-1"
                                                     >
                                                         <MessageCircle className="h-3 w-3" />
                                                         WhatsApp
@@ -1329,7 +1372,7 @@ export default function RecruitmentPage() {
                                                 {recruit.phone && (
                                                     <a
                                                         href={`tel:${recruit.phone}`}
-                                                        className="h-7 px-2 rounded-lg bg-sky-500/15 text-sky-300 border border-sky-500/30 text-[10px] font-bold flex items-center gap-1"
+                                                        className="h-7 px-2 rounded-lg bg-sky-500/15 text-sky-400 border border-sky-500/30 text-[10px] font-bold flex items-center gap-1"
                                                     >
                                                         <Phone className="h-3 w-3" />
                                                     </a>
@@ -1339,8 +1382,8 @@ export default function RecruitmentPage() {
                                                     onClick={() => toggleCompareRecruit(recruit.id)}
                                                     className={`h-7 px-2 rounded-lg border text-[10px] font-bold flex items-center gap-1 ${
                                                         isCompared
-                                                            ? "bg-amber-500 text-slate-950 border-amber-400"
-                                                            : "bg-slate-900 text-slate-300 border-slate-800"
+                                                            ? "bg-brand text-white border-brand"
+                                                            : "bg-surface-2 text-foreground border-border"
                                                     }`}
                                                 >
                                                     <GitCompare className="h-3 w-3" />
@@ -1352,21 +1395,21 @@ export default function RecruitmentPage() {
                                                 <button
                                                     type="button"
                                                     onClick={() => handleEdit(recruit)}
-                                                    className="h-7 px-2 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 text-[10px] font-bold"
+                                                    className="h-7 px-2 rounded-lg bg-surface-2 border border-border text-muted-foreground hover:text-foreground text-[10px] font-bold"
                                                 >
                                                     Edit
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setEnlargedRecruit(recruit)}
-                                                    className="h-7 px-2.5 rounded-lg bg-slate-900 border border-slate-800 text-white text-[10px] font-bold"
+                                                    className="h-7 px-2.5 rounded-lg bg-surface-2 border border-border text-foreground text-[10px] font-bold"
                                                 >
                                                     Dossier
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => handleSignPlayer(recruit)}
-                                                    className="h-7 px-2.5 rounded-lg bg-red-600 text-white text-[10px] font-extrabold"
+                                                    className="h-7 px-2.5 rounded-lg bg-brand text-white text-[10px] font-extrabold"
                                                 >
                                                     Sign
                                                 </button>
@@ -1381,8 +1424,8 @@ export default function RecruitmentPage() {
 
                 {/* 7. Floating Mobile Comparison Bar when targets are selected */}
                 {compareIds.length > 0 && (
-                    <div className="fixed bottom-16 left-3 right-3 z-40 rounded-2xl bg-slate-950/95 backdrop-blur-md border border-amber-500/50 p-2.5 shadow-2xl flex items-center justify-between gap-2">
-                        <span className="text-xs font-extrabold text-amber-400 pl-1">
+                    <div className="fixed bottom-16 left-3 right-3 z-40 rounded-2xl bg-surface-1/95 backdrop-blur-md border border-brand/40 p-2.5 shadow-2xl flex items-center justify-between gap-2">
+                        <span className="text-xs font-extrabold text-brand pl-1">
                             {compareIds.length} {compareIds.length === 1 ? "Target" : "Targets"} Selected
                         </span>
                         <div className="flex items-center gap-1.5">
@@ -1390,14 +1433,14 @@ export default function RecruitmentPage() {
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => setCompareIds([])}
-                                className="h-8 px-2.5 text-xs text-slate-400"
+                                className="h-8 px-2.5 text-xs text-muted-foreground"
                             >
                                 Clear
                             </Button>
                             <Button
                                 size="sm"
                                 onClick={() => openComparisonModal()}
-                                className="h-8 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black"
+                                className="h-8 px-3 rounded-xl bg-brand hover:bg-brand/90 text-white text-xs font-black"
                             >
                                 <GitCompare className="h-3.5 w-3.5 mr-1" />
                                 Compare Side-by-Side
@@ -1479,7 +1522,7 @@ export default function RecruitmentPage() {
                         <Button
                             size="sm"
                             onClick={() => setIsDialogOpen(true)}
-                            className="h-9 text-xs font-extrabold bg-red-600 hover:bg-red-700 text-white"
+                            className="h-9 text-xs font-extrabold bg-brand hover:bg-brand/90 text-white"
                         >
                             <Plus className="h-4 w-4 mr-1.5" />
                             Add Target
@@ -1494,12 +1537,12 @@ export default function RecruitmentPage() {
                         onClick={() => setStageFilter("ALL")}
                         className={`p-2.5 rounded-xl border text-left transition-all ${
                             stageFilter === "ALL"
-                                ? "bg-red-600 text-white border-red-500 shadow-sm"
-                                : "bg-surface-1 border-border hover:border-red-500/40"
+                                ? "bg-brand/15 text-brand border-brand/40 shadow-xs"
+                                : "bg-surface-1 border-border hover:border-brand/40"
                         }`}
                     >
                         <div className="text-[10px] font-bold uppercase tracking-wider opacity-80">Total Targets</div>
-                        <div className="text-lg font-black mt-0.5">{recruits.length}</div>
+                        <div className="text-lg font-black mt-0.5 text-foreground">{recruits.length}</div>
                     </button>
                     {PIPELINE_STAGES.map((stage) => {
                         const isSelected = stageFilter === stage;
@@ -1510,14 +1553,14 @@ export default function RecruitmentPage() {
                                 onClick={() => setStageFilter(isSelected ? "ALL" : stage)}
                                 className={`p-2.5 rounded-xl border text-left transition-all ${
                                     isSelected
-                                        ? "bg-red-600 text-white border-red-500 shadow-sm"
-                                        : "bg-surface-1 border-border hover:border-red-500/40"
+                                        ? "bg-brand/15 text-brand border-brand/40 shadow-xs"
+                                        : "bg-surface-1 border-border hover:border-brand/40"
                                 }`}
                             >
                                 <div className="text-[10px] font-bold uppercase tracking-wider truncate opacity-80">
                                     {stage}
                                 </div>
-                                <div className="text-lg font-black mt-0.5">{stageCounts[stage] || 0}</div>
+                                <div className="text-lg font-black mt-0.5 text-foreground">{stageCounts[stage] || 0}</div>
                             </button>
                         );
                     })}
@@ -1553,27 +1596,27 @@ export default function RecruitmentPage() {
                                 <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5">
                                     <button
                                         type="button"
-                                        onClick={() => setViewMode("cards")}
-                                        className={`px-2.5 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors ${
-                                            viewMode === "cards"
-                                                ? "bg-red-600 text-white shadow-xs"
-                                                : "text-muted-foreground hover:text-foreground"
-                                        }`}
-                                    >
-                                        <LayoutGrid className="h-3.5 w-3.5" />
-                                        <span>Cards</span>
-                                    </button>
-                                    <button
-                                        type="button"
                                         onClick={() => setViewMode("table")}
                                         className={`px-2.5 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors ${
                                             viewMode === "table"
-                                                ? "bg-red-600 text-white shadow-xs"
+                                                ? "bg-brand text-white shadow-xs"
                                                 : "text-muted-foreground hover:text-foreground"
                                         }`}
                                     >
                                         <TableIcon className="h-3.5 w-3.5" />
                                         <span>Spreadsheet</span>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setViewMode("cards")}
+                                        className={`px-2.5 py-1.5 rounded-md text-xs font-bold flex items-center gap-1.5 transition-colors ${
+                                            viewMode === "cards"
+                                                ? "bg-brand text-white shadow-xs"
+                                                : "text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        <LayoutGrid className="h-3.5 w-3.5" />
+                                        <span>Cards</span>
                                     </button>
                                 </div>
                             </div>
@@ -1976,7 +2019,7 @@ export default function RecruitmentPage() {
                                                         No {section.title.toLowerCase()} matching current filters.
                                                     </div>
                                                 ) : (
-                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
                                                         {sectionRecruits.map((recruit) => {
                                                             const waUrl = formatWhatsAppUrl(
                                                                 recruit.phone || "",
@@ -1988,28 +2031,48 @@ export default function RecruitmentPage() {
                                                             return (
                                                                 <Card
                                                                     key={recruit.id}
-                                                                    className={`overflow-hidden hover:shadow-lg transition-all duration-200 group relative border-2 bg-slate-950 ${getPositionBorder(
-                                                                        recruit.primaryPosition
-                                                                    )} flex flex-col h-full`}
+                                                                    className="overflow-hidden hover:border-brand/40 hover:shadow-md transition-all duration-200 group border border-border bg-surface-1 rounded-2xl flex flex-col h-full"
                                                                 >
-                                                                    <CardHeader className="p-0 flex-1 flex flex-col">
-                                                                        <div className="bg-slate-900 p-3.5 flex flex-col items-center justify-center flex-1 relative border-b border-slate-800">
-                                                                            {/* Top-left Quick Actions + Compare */}
-                                                                            <div className="absolute top-2.5 left-2.5 flex items-center gap-1 z-20">
+                                                                    {/* Clean Structured Header — Full Player Name, Position Badge, Rating & Actions */}
+                                                                    <CardHeader className="p-4 pb-3 border-b border-border bg-surface-2/40 space-y-2.5">
+                                                                        <div className="flex items-center justify-between gap-2">
+                                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                                <span className="px-2 py-0.5 rounded-lg bg-brand/15 text-brand border border-brand/30 text-xs font-black">
+                                                                                    {recruit.primaryPosition}
+                                                                                </span>
+                                                                                {recruit.secondaryPosition && (
+                                                                                    <span className="px-1.5 py-0.5 rounded-md bg-surface-2 text-muted-foreground border border-border text-[10px] font-bold">
+                                                                                        {recruit.secondaryPosition}
+                                                                                    </span>
+                                                                                )}
+                                                                                <Badge
+                                                                                    className={`text-[9px] px-1.5 py-0.5 border ${
+                                                                                        recruit.status === "Unattached"
+                                                                                            ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                                                                                            : "bg-sky-500/15 text-sky-400 border-sky-500/30"
+                                                                                    }`}
+                                                                                >
+                                                                                    {recruit.status === "Unattached"
+                                                                                        ? "Free Agent"
+                                                                                        : "Attached"}
+                                                                                </Badge>
+                                                                            </div>
+
+                                                                            <div className="flex items-center gap-1 shrink-0">
                                                                                 <button
                                                                                     type="button"
                                                                                     onClick={(e) => {
                                                                                         e.stopPropagation();
                                                                                         toggleCompareRecruit(recruit.id);
                                                                                     }}
-                                                                                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold border transition-colors flex items-center gap-1 ${
+                                                                                    className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors flex items-center gap-1 ${
                                                                                         isCompared
-                                                                                            ? "bg-amber-500 text-slate-950 border-amber-400"
-                                                                                            : "bg-slate-800/90 text-slate-300 border-slate-700 hover:border-amber-500/50"
+                                                                                            ? "bg-brand text-white border-brand"
+                                                                                            : "bg-surface-2 text-muted-foreground border-border hover:text-foreground"
                                                                                     }`}
                                                                                     title="Compare player side-by-side"
                                                                                 >
-                                                                                    <GitCompare className="h-2.5 w-2.5" />
+                                                                                    <GitCompare className="h-3 w-3" />
                                                                                     {isCompared ? "Comparing" : "Compare"}
                                                                                 </button>
                                                                                 <button
@@ -2018,10 +2081,10 @@ export default function RecruitmentPage() {
                                                                                         e.stopPropagation();
                                                                                         handleEdit(recruit);
                                                                                     }}
-                                                                                    className="p-1.5 bg-slate-800 hover:bg-blue-900/50 rounded-full text-slate-400 hover:text-blue-400"
+                                                                                    className="p-1.5 bg-surface-2 hover:bg-surface-1 border border-border rounded-lg text-muted-foreground hover:text-foreground transition-colors"
                                                                                     title="Edit Recruit"
                                                                                 >
-                                                                                    <Edit2 className="h-3 w-3" />
+                                                                                    <Edit2 className="h-3.5 w-3.5" />
                                                                                 </button>
                                                                                 <button
                                                                                     type="button"
@@ -2029,52 +2092,31 @@ export default function RecruitmentPage() {
                                                                                         e.stopPropagation();
                                                                                         handleDelete(recruit.id);
                                                                                     }}
-                                                                                    className="p-1.5 bg-slate-800 hover:bg-red-900/50 rounded-full text-slate-400 hover:text-red-400"
+                                                                                    className="p-1.5 bg-surface-2 hover:bg-rose-500/15 border border-border rounded-lg text-muted-foreground hover:text-rose-400 transition-colors"
                                                                                     title="Delete Recruit"
                                                                                 >
-                                                                                    <Trash2 className="h-3 w-3" />
+                                                                                    <Trash2 className="h-3.5 w-3.5" />
                                                                                 </button>
                                                                             </div>
+                                                                        </div>
 
-                                                                            {/* Top-right Badges (#11 Pipeline Stage & Status) */}
-                                                                            <div className="absolute top-2.5 right-2.5 flex flex-col items-end gap-1 z-20">
-                                                                                <Badge
-                                                                                    className={`text-[9px] px-1.5 py-0.5 border ${
-                                                                                        recruit.status === "Unattached"
-                                                                                            ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
-                                                                                            : "bg-indigo-500/20 text-indigo-400 border-indigo-500/30"
-                                                                                    }`}
+                                                                        <div className="flex items-start justify-between gap-2 pt-0.5">
+                                                                            <div className="min-w-0 flex-1">
+                                                                                <CardTitle
+                                                                                    onClick={() => setEnlargedRecruit(recruit)}
+                                                                                    className="text-foreground text-base font-black truncate hover:text-brand cursor-pointer transition-colors"
                                                                                 >
-                                                                                    {recruit.status === "Unattached"
-                                                                                        ? "Free Agent"
-                                                                                        : "Attached"}
-                                                                                </Badge>
-                                                                                <span
-                                                                                    className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${getCommuteBadgeStyle(
-                                                                                        recruit.commutePracticality
-                                                                                    )}`}
-                                                                                >
-                                                                                    {recruit.commutePracticality || "Easy / Local"}
-                                                                                </span>
-                                                                            </div>
-
-                                                                            {/* Avatar Circle */}
-                                                                            <div
-                                                                                onClick={() => setEnlargedRecruit(recruit)}
-                                                                                className="cursor-pointer h-16 w-16 rounded-full bg-slate-800 flex items-center justify-center border-2 border-slate-700 shadow-xl mt-6 hover:border-red-500 transition-colors"
-                                                                            >
-                                                                                <span className="text-xl font-bold bg-gradient-to-br from-red-400 to-red-600 bg-clip-text text-transparent">
-                                                                                    {recruit.name
-                                                                                        .split(/\s+/)
-                                                                                        .map((n) => n[0])
-                                                                                        .join("")
-                                                                                        .toUpperCase()
-                                                                                        .slice(0, 2)}
-                                                                                </span>
+                                                                                    {recruit.name}
+                                                                                </CardTitle>
+                                                                                <p className="text-muted-foreground text-xs font-semibold mt-0.5">
+                                                                                    {recruit.age ? `${recruit.age} yrs` : "Age TBC"} •{" "}
+                                                                                    {recruit.preferredFoot || "Right"} Foot
+                                                                                    {recruit.location ? ` • ${recruit.location}` : ""}
+                                                                                </p>
                                                                             </div>
 
                                                                             {/* Interactive 5-Star Rating (#10) */}
-                                                                            <div className="flex items-center gap-0.5 mt-2">
+                                                                            <div className="flex items-center gap-0.5 shrink-0 pt-0.5">
                                                                                 {[1, 2, 3, 4, 5].map((star) => (
                                                                                     <button
                                                                                         key={star}
@@ -2090,101 +2132,99 @@ export default function RecruitmentPage() {
                                                                                             className={`h-3.5 w-3.5 ${
                                                                                                 star <= (recruit.starRating || 3)
                                                                                                     ? "fill-amber-400 text-amber-400"
-                                                                                                    : "text-slate-700"
+                                                                                                    : "text-muted-foreground/30"
                                                                                             }`}
                                                                                         />
                                                                                     </button>
                                                                                 ))}
                                                                             </div>
-
-                                                                            {/* Name, Position, Foot & Age */}
-                                                                            <div className="mt-1.5 text-center w-full px-1">
-                                                                                <CardTitle
-                                                                                    onClick={() => setEnlargedRecruit(recruit)}
-                                                                                    className="text-white text-sm sm:text-base font-bold truncate hover:text-red-400 cursor-pointer transition-colors"
-                                                                                >
-                                                                                    {recruit.name}
-                                                                                </CardTitle>
-                                                                                <p className="text-slate-400 text-[11px] font-medium mt-0.5">
-                                                                                    <span className="text-red-400 font-bold">
-                                                                                        {recruit.primaryPosition}
-                                                                                    </span>
-                                                                                    {recruit.secondaryPosition
-                                                                                        ? ` (${recruit.secondaryPosition})`
-                                                                                        : ""}{" "}
-                                                                                    • {recruit.preferredFoot || "Right"} Foot •{" "}
-                                                                                    {recruit.age || "?"} yo
-                                                                                </p>
-                                                                            </div>
                                                                         </div>
                                                                     </CardHeader>
 
-                                                                    <CardContent className="p-3 space-y-2 text-xs flex-none">
-                                                                        {/* Inline Pipeline Stage Selector (#11) */}
-                                                                        <div className="flex items-center justify-between gap-2 bg-slate-900/80 px-2.5 py-1.5 rounded-lg border border-slate-800">
-                                                                            <span className="text-[9px] uppercase font-bold text-slate-400">
-                                                                                Stage
-                                                                            </span>
-                                                                            <select
-                                                                                value={
-                                                                                    recruit.pipelineStage ||
-                                                                                    (recruit.onTrial ? "On Trial" : "Scouted")
-                                                                                }
-                                                                                onChange={(e) =>
-                                                                                    handleQuickUpdateRecruit(recruit, {
-                                                                                        pipelineStage: e.target
-                                                                                            .value as RecruitPipelineStage,
-                                                                                    })
-                                                                                }
-                                                                                className={`rounded px-2 py-0.5 text-[10px] font-bold border bg-slate-950 ${getPipelineBadgeStyle(
-                                                                                    recruit.pipelineStage
+                                                                    <CardContent className="p-4 space-y-2.5 text-xs flex-1">
+                                                                        {/* Inline Pipeline Stage + Commute Row */}
+                                                                        <div className="flex items-center justify-between gap-2 bg-surface-2/70 px-3 py-2 rounded-xl border border-border">
+                                                                            <div className="flex items-center gap-1.5">
+                                                                                <span className="text-[10px] uppercase font-bold text-muted-foreground">
+                                                                                    Stage:
+                                                                                </span>
+                                                                                <select
+                                                                                    value={
+                                                                                        recruit.pipelineStage ||
+                                                                                        (recruit.onTrial ? "On Trial" : "Scouted")
+                                                                                    }
+                                                                                    onChange={(e) =>
+                                                                                        handleQuickUpdateRecruit(recruit, {
+                                                                                            pipelineStage: e.target
+                                                                                                .value as RecruitPipelineStage,
+                                                                                        })
+                                                                                    }
+                                                                                    className={`rounded-lg px-2 py-0.5 text-[10px] font-extrabold border bg-surface-1 ${getPipelineBadgeStyle(
+                                                                                        recruit.pipelineStage
+                                                                                    )}`}
+                                                                                >
+                                                                                    {PIPELINE_STAGES.map((st) => (
+                                                                                        <option
+                                                                                            key={st}
+                                                                                            value={st}
+                                                                                            className="bg-surface-1 text-foreground"
+                                                                                        >
+                                                                                            {st}
+                                                                                        </option>
+                                                                                    ))}
+                                                                                </select>
+                                                                            </div>
+
+                                                                            <span
+                                                                                className={`text-[9px] font-bold px-2 py-0.5 rounded-md border ${getCommuteBadgeStyle(
+                                                                                    recruit.commutePracticality
                                                                                 )}`}
                                                                             >
-                                                                                {PIPELINE_STAGES.map((st) => (
-                                                                                    <option
-                                                                                        key={st}
-                                                                                        value={st}
-                                                                                        className="bg-slate-900 text-white"
-                                                                                    >
-                                                                                        {st}
-                                                                                    </option>
-                                                                                ))}
-                                                                            </select>
+                                                                                {recruit.commutePracticality || "Easy / Local"}
+                                                                            </span>
                                                                         </div>
 
-                                                                        <div className="grid grid-cols-2 gap-1.5 text-[11px]">
-                                                                            <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800/60">
-                                                                                <div className="text-slate-500 text-[9px] uppercase">
+                                                                        <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                                                            <div className="bg-surface-2/50 p-2 rounded-xl border border-border">
+                                                                                <div className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider">
                                                                                     Current Club
                                                                                 </div>
-                                                                                <div className="font-bold text-white truncate">
+                                                                                <div className="font-bold text-foreground truncate mt-0.5">
                                                                                     {recruit.status === "Unattached"
                                                                                         ? "Free Agent"
                                                                                         : recruit.currentClub || "Unknown"}
                                                                                 </div>
                                                                             </div>
-                                                                            <div className="bg-slate-900/60 p-1.5 rounded border border-slate-800/60">
-                                                                                <div className="text-slate-500 text-[9px] uppercase">
-                                                                                    Highest Level
+                                                                            <div className="bg-surface-2/50 p-2 rounded-xl border border-border">
+                                                                                <div className="text-muted-foreground text-[9px] font-bold uppercase tracking-wider">
+                                                                                    Level / Role
                                                                                 </div>
-                                                                                <div className="font-bold text-amber-400 truncate">
-                                                                                    {recruit.highestLevel || recruit.scoutedRole}
+                                                                                <div className="font-bold text-brand truncate mt-0.5">
+                                                                                    {recruit.highestLevel || recruit.scoutedRole || "First Team"}
                                                                                 </div>
                                                                             </div>
                                                                         </div>
 
                                                                         {recruit.previousClubs && (
-                                                                            <div className="text-[10px] text-slate-400 bg-slate-900/40 px-2 py-1 rounded border border-slate-800/50 truncate">
-                                                                                <span className="text-slate-500 font-semibold">
+                                                                            <div className="text-[11px] text-muted-foreground bg-surface-2/40 px-2.5 py-1.5 rounded-xl border border-border truncate">
+                                                                                <span className="font-bold text-foreground">
                                                                                     Prev:{" "}
                                                                                 </span>
                                                                                 {recruit.previousClubs}
                                                                             </div>
                                                                         )}
 
-                                                                        {recruit.clubConnection && (
-                                                                            <div className="text-[10px] text-red-400 bg-red-950/20 border border-red-900/30 px-2 py-1 rounded truncate italic">
-                                                                                🔗 {recruit.clubConnection}
+                                                                        {(recruit.clubConnection || recruit.notes) && (
+                                                                            <div
+                                                                                onClick={() => setEnlargedRecruit(recruit)}
+                                                                                className="text-[11px] text-muted-foreground bg-surface-2/40 border border-border px-2.5 py-2 rounded-xl line-clamp-2 cursor-pointer"
+                                                                            >
+                                                                                {recruit.clubConnection && (
+                                                                                    <span className="text-brand font-bold mr-1">
+                                                                                        🔗 {recruit.clubConnection}:
+                                                                                    </span>
+                                                                                )}
+                                                                                {recruit.notes}
                                                                             </div>
                                                                         )}
 
@@ -2196,7 +2236,7 @@ export default function RecruitmentPage() {
                                                                                         href={waUrl}
                                                                                         target="_blank"
                                                                                         rel="noreferrer"
-                                                                                        className="flex-1 py-1 px-2 rounded bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold flex items-center justify-center gap-1"
+                                                                                        className="flex-1 py-1.5 px-2.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold flex items-center justify-center gap-1"
                                                                                     >
                                                                                         <MessageCircle className="h-3 w-3" />
                                                                                         WhatsApp
@@ -2205,7 +2245,7 @@ export default function RecruitmentPage() {
                                                                                 {recruit.phone && (
                                                                                     <a
                                                                                         href={`tel:${recruit.phone}`}
-                                                                                        className="py-1 px-2 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 text-[10px] font-bold flex items-center gap-1"
+                                                                                        className="py-1.5 px-2.5 rounded-xl bg-surface-2 hover:bg-surface-2/80 text-foreground border border-border text-[10px] font-bold flex items-center gap-1"
                                                                                         title={recruit.phone}
                                                                                     >
                                                                                         <Phone className="h-3 w-3" />
@@ -2219,7 +2259,7 @@ export default function RecruitmentPage() {
                                                                                         )}`}
                                                                                         target="_blank"
                                                                                         rel="noreferrer"
-                                                                                        className="py-1 px-2 rounded bg-pink-500/15 hover:bg-pink-500/25 text-pink-400 border border-pink-500/30 text-[10px] font-bold flex items-center gap-1"
+                                                                                        className="py-1.5 px-2.5 rounded-xl bg-pink-500/15 hover:bg-pink-500/25 text-pink-400 border border-pink-500/30 text-[10px] font-bold flex items-center gap-1"
                                                                                         title={recruit.instagram}
                                                                                     >
                                                                                         <Instagram className="h-3 w-3" />
@@ -2229,17 +2269,17 @@ export default function RecruitmentPage() {
                                                                         )}
                                                                     </CardContent>
 
-                                                                    <CardFooter className="p-3 pt-0 mt-auto grid grid-cols-2 gap-2">
+                                                                    <CardFooter className="p-4 pt-0 mt-auto grid grid-cols-2 gap-2">
                                                                         <Button
                                                                             variant="outline"
                                                                             onClick={() => setEnlargedRecruit(recruit)}
-                                                                            className="w-full h-8 text-xs bg-slate-900 hover:bg-slate-800 text-white border-slate-800"
+                                                                            className="w-full h-8 text-xs font-bold bg-surface-2 hover:bg-surface-2/80 text-foreground border-border"
                                                                         >
                                                                             Full Dossier
                                                                         </Button>
                                                                         <Button
                                                                             onClick={() => handleSignPlayer(recruit)}
-                                                                            className="w-full bg-red-600 hover:bg-red-700 text-white text-xs h-8 font-bold"
+                                                                            className="w-full bg-brand hover:bg-brand/90 text-white text-xs h-8 font-extrabold"
                                                                         >
                                                                             Sign Player
                                                                         </Button>

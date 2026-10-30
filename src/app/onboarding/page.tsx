@@ -740,6 +740,31 @@ function OnboardingContent() {
                 await supabase.from("league_teams").insert(newTeamRows);
             }
 
+            // Persist league table to Supabase documents (LEAGUE_TABLE_CACHE) across devices
+            const tableJson = JSON.stringify(normalizedStandings);
+            const { data: existingCache } = await supabase
+                .from("documents")
+                .select("id")
+                .eq("club_id", clubId)
+                .eq("category", "LEAGUE_TABLE_CACHE")
+                .maybeSingle();
+
+            if (existingCache?.id) {
+                await supabase
+                    .from("documents")
+                    .update({ url: tableJson, created_at: new Date().toISOString() })
+                    .eq("id", existingCache.id);
+            } else {
+                await supabase.from("documents").insert({
+                    club_id: clubId,
+                    title: "League Standings Cache",
+                    category: "LEAGUE_TABLE_CACHE",
+                    file_type: "JSON",
+                    size_label: "Auto",
+                    url: tableJson,
+                });
+            }
+
             await updateSettings({
                 leaguePosition: ourRow ? ourRow.position : settings.leaguePosition,
                 lastImportHistory: {
@@ -938,7 +963,17 @@ function OnboardingContent() {
                 { position: 5, pos: 5, team_name: "Finsbury Park Rovers", team: "Finsbury Park Rovers", played: 10, won: 4, drawn: 2, lost: 4, goals_for: 15, gf: 15, goals_against: 16, ga: 16, goal_difference: -1, gd: -1, points: 14, pts: 14, is_our_club: false },
                 { position: 6, pos: 6, team_name: "Hampstead Town", team: "Hampstead Town", played: 10, won: 2, drawn: 1, lost: 7, goals_for: 10, gf: 10, goals_against: 22, ga: 22, goal_difference: -12, gd: -12, points: 7, pts: 7, is_our_club: false },
             ];
-            localStorage.setItem(`clubflow_league_table_${clubId}`, JSON.stringify(sampleTable));
+            const sampleTableJson = JSON.stringify(sampleTable);
+            localStorage.setItem(`clubflow_league_table_${clubId}`, sampleTableJson);
+
+            await supabase.from("documents").insert({
+                club_id: clubId,
+                title: "League Standings Cache",
+                category: "LEAGUE_TABLE_CACHE",
+                file_type: "JSON",
+                size_label: "Auto",
+                url: sampleTableJson,
+            });
 
             setImportedPlayersCount((prev) => prev + samplePlayers.length);
             setImportedFixturesCount((prev) => prev + sampleMatches.length);
@@ -2120,26 +2155,27 @@ function OnboardingContent() {
                                         </div>
                                     </div>
 
-                                    {/* 4 Import Sub-Tabs */}
+                                        {/* 4 Import Sub-Tabs */}
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                         {[
-                                            { id: "squad", label: "1. Paste Squad", icon: Users },
-                                            { id: "table", label: "2. League Import (Table)", icon: Trophy },
-                                            { id: "fixtures", label: "3. League Import (Fixtures)", icon: Calendar },
-                                            { id: "demo", label: "4. Sample Data", icon: Sparkles },
+                                            { id: "squad", label: "1. Paste Squad", shortLabel: "1. Squad", icon: Users },
+                                            { id: "table", label: "2. League Import (Table)", shortLabel: "2. League Table", icon: Trophy },
+                                            { id: "fixtures", label: "3. League Import (Fixtures)", shortLabel: "3. Fixtures", icon: Calendar },
+                                            { id: "demo", label: "4. Sample Data", shortLabel: "4. Sample Data", icon: Sparkles },
                                         ].map((t) => (
                                             <button
                                                 key={t.id}
                                                 type="button"
                                                 onClick={() => setImportTab(t.id as any)}
-                                                className={`flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-xs font-bold border transition-all ${
+                                                className={`flex items-center justify-center gap-1.5 py-2.5 px-2.5 sm:px-3 rounded-xl text-xs font-bold border transition-all ${
                                                     importTab === t.id
                                                         ? "bg-white text-slate-950 border-white shadow"
                                                         : "bg-slate-950/60 border-white/10 text-slate-300 hover:border-white/25"
                                                 }`}
                                             >
                                                 <t.icon className="w-3.5 h-3.5 shrink-0" />
-                                                <span className="truncate">{t.label}</span>
+                                                <span className="hidden sm:inline truncate">{t.label}</span>
+                                                <span className="sm:hidden truncate">{t.shortLabel}</span>
                                             </button>
                                         ))}
                                     </div>
@@ -2644,11 +2680,11 @@ function OnboardingContent() {
                             }`}
                         >
                             <div className="sticky top-28 bg-slate-900/80 border border-white/10 rounded-3xl p-5 backdrop-blur-xl shadow-2xl space-y-4">
-                                <div className="flex items-center justify-between">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                                     <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
                                         <Eye className="w-3.5 h-3.5 text-emerald-400" /> Live Matchday Preview
                                     </span>
-                                    <div className="inline-flex rounded-xl bg-slate-950 p-1 border border-white/10">
+                                    <div className="inline-flex self-start sm:self-auto rounded-xl bg-slate-950 p-1 border border-white/10">
                                         {[
                                             { id: "pitch", label: "Pitch & Kits" },
                                             { id: "dashboard", label: "Next Match" },

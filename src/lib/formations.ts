@@ -246,27 +246,223 @@ export const FORMATIONS: Record<string, FormationPosition[]> = {
         { x: 35, y: 45, label: "CM",  number: 10 },
         { x: 68, y: 83, label: "ST",  number: 11 },
     ],
+
+    // =========================================================================
+    // 9v9 FORMATIONS (U11–U12 Youth Academy & Small-Sided)
+    // =========================================================================
+    "3-2-3": [
+        { x: 50, y: 7,  label: "GK",  number: 1 },
+        { x: 18, y: 27, label: "RB",  number: 2 },
+        { x: 50, y: 25, label: "CB",  number: 5 },
+        { x: 82, y: 27, label: "LB",  number: 3 },
+        { x: 36, y: 52, label: "CM",  number: 4 },
+        { x: 64, y: 52, label: "CM",  number: 6 },
+        { x: 16, y: 78, label: "RW",  number: 7 },
+        { x: 50, y: 82, label: "ST",  number: 9 },
+        { x: 84, y: 78, label: "LW",  number: 8 },
+    ],
+    "3-3-2": [
+        { x: 50, y: 7,  label: "GK",  number: 1 },
+        { x: 18, y: 27, label: "RB",  number: 2 },
+        { x: 50, y: 25, label: "CB",  number: 5 },
+        { x: 82, y: 27, label: "LB",  number: 3 },
+        { x: 18, y: 53, label: "RM",  number: 7 },
+        { x: 50, y: 50, label: "CM",  number: 4 },
+        { x: 82, y: 53, label: "LM",  number: 6 },
+        { x: 35, y: 81, label: "ST",  number: 8 },
+        { x: 65, y: 81, label: "ST",  number: 9 },
+    ],
+    "4-3-1": [
+        { x: 50, y: 7,  label: "GK",  number: 1 },
+        { x: 14, y: 27, label: "RB",  number: 2 },
+        { x: 38, y: 26, label: "RCB", number: 4 },
+        { x: 62, y: 26, label: "LCB", number: 5 },
+        { x: 86, y: 27, label: "LB",  number: 3 },
+        { x: 22, y: 54, label: "RM",  number: 7 },
+        { x: 50, y: 52, label: "CM",  number: 6 },
+        { x: 78, y: 54, label: "LM",  number: 8 },
+        { x: 50, y: 82, label: "ST",  number: 9 },
+    ],
+    "2-4-2": [
+        { x: 50, y: 7,  label: "GK",  number: 1 },
+        { x: 34, y: 26, label: "RCB", number: 2 },
+        { x: 66, y: 26, label: "LCB", number: 3 },
+        { x: 14, y: 52, label: "RM",  number: 7 },
+        { x: 38, y: 50, label: "CM",  number: 4 },
+        { x: 62, y: 50, label: "CM",  number: 6 },
+        { x: 86, y: 52, label: "LM",  number: 5 },
+        { x: 35, y: 81, label: "ST",  number: 8 },
+        { x: 65, y: 81, label: "ST",  number: 9 },
+    ],
+    "3-4-1": [
+        { x: 50, y: 7,  label: "GK",  number: 1 },
+        { x: 18, y: 27, label: "RB",  number: 2 },
+        { x: 50, y: 25, label: "CB",  number: 5 },
+        { x: 82, y: 27, label: "LB",  number: 3 },
+        { x: 14, y: 54, label: "RM",  number: 7 },
+        { x: 38, y: 50, label: "CM",  number: 4 },
+        { x: 62, y: 50, label: "CM",  number: 6 },
+        { x: 86, y: 54, label: "LM",  number: 8 },
+        { x: 50, y: 82, label: "ST",  number: 9 },
+    ],
+
+    // =========================================================================
+    // 7v7 FORMATIONS (U9–U10 Mini-Soccer & 7-a-side)
+    // =========================================================================
+    "2-3-1": [
+        { x: 50, y: 8,  label: "GK",  number: 1 },
+        { x: 32, y: 29, label: "RCB", number: 2 },
+        { x: 68, y: 29, label: "LCB", number: 3 },
+        { x: 18, y: 56, label: "RM",  number: 7 },
+        { x: 50, y: 53, label: "CM",  number: 4 },
+        { x: 82, y: 56, label: "LM",  number: 6 },
+        { x: 50, y: 81, label: "ST",  number: 5 },
+    ],
+    "3-2-1": [
+        { x: 50, y: 8,  label: "GK",  number: 1 },
+        { x: 18, y: 29, label: "RB",  number: 2 },
+        { x: 50, y: 27, label: "CB",  number: 4 },
+        { x: 82, y: 29, label: "LB",  number: 3 },
+        { x: 34, y: 55, label: "CM",  number: 5 },
+        { x: 66, y: 55, label: "CM",  number: 6 },
+        { x: 50, y: 81, label: "ST",  number: 7 },
+    ],
+    "2-1-2-1": [
+        { x: 50, y: 8,  label: "GK",  number: 1 },
+        { x: 32, y: 28, label: "RCB", number: 2 },
+        { x: 68, y: 28, label: "LCB", number: 3 },
+        { x: 50, y: 45, label: "DM",  number: 4 },
+        { x: 22, y: 63, label: "RM",  number: 7 },
+        { x: 78, y: 63, label: "LM",  number: 6 },
+        { x: 50, y: 82, label: "ST",  number: 5 },
+    ],
+    "3-1-2": [
+        { x: 50, y: 8,  label: "GK",  number: 1 },
+        { x: 18, y: 29, label: "RB",  number: 2 },
+        { x: 50, y: 27, label: "CB",  number: 4 },
+        { x: 82, y: 29, label: "LB",  number: 3 },
+        { x: 50, y: 53, label: "CM",  number: 5 },
+        { x: 34, y: 80, label: "ST",  number: 6 },
+        { x: 66, y: 80, label: "ST",  number: 7 },
+    ],
+
+    // =========================================================================
+    // 5v5 FORMATIONS (U7–U8 Development & 5-a-side)
+    // =========================================================================
+    "1-2-1": [
+        { x: 50, y: 9,  label: "GK",  number: 1 },
+        { x: 50, y: 31, label: "CB",  number: 2 },
+        { x: 22, y: 56, label: "RM",  number: 3 },
+        { x: 78, y: 56, label: "LM",  number: 4 },
+        { x: 50, y: 80, label: "ST",  number: 5 },
+    ],
+    "2-2": [
+        { x: 50, y: 9,  label: "GK",  number: 1 },
+        { x: 30, y: 34, label: "RCB", number: 2 },
+        { x: 70, y: 34, label: "LCB", number: 3 },
+        { x: 30, y: 74, label: "ST",  number: 4 },
+        { x: 70, y: 74, label: "ST",  number: 5 },
+    ],
+    "1-1-2": [
+        { x: 50, y: 9,  label: "GK",  number: 1 },
+        { x: 50, y: 30, label: "CB",  number: 2 },
+        { x: 50, y: 54, label: "CM",  number: 3 },
+        { x: 30, y: 78, label: "ST",  number: 4 },
+        { x: 70, y: 78, label: "ST",  number: 5 },
+    ],
+    "2-1-1": [
+        { x: 50, y: 9,  label: "GK",  number: 1 },
+        { x: 30, y: 32, label: "RCB", number: 2 },
+        { x: 70, y: 32, label: "LCB", number: 3 },
+        { x: 50, y: 56, label: "CM",  number: 4 },
+        { x: 50, y: 80, label: "ST",  number: 5 },
+    ],
+};
+
+export type MatchFormat = "5v5" | "7v7" | "9v9" | "11v11";
+
+export const FORMATIONS_BY_FORMAT: Record<MatchFormat, string[]> = {
+    "5v5": ["1-2-1", "2-2", "1-1-2", "2-1-1"],
+    "7v7": ["2-3-1", "3-2-1", "2-1-2-1", "3-1-2"],
+    "9v9": ["3-2-3", "3-3-2", "4-3-1", "2-4-2", "3-4-1"],
+    "11v11": [
+        "4-4-2",
+        "4-3-3",
+        "4-2-3-1",
+        "4-1-4-1",
+        "4-5-1",
+        "4-3-2-1",
+        "4-1-2-1-2",
+        "4-2-2-2",
+        "4-4-1-1",
+        "4-2-4",
+        "3-5-2",
+        "3-4-3",
+        "3-4-1-2",
+        "3-4-2-1",
+        "3-1-4-2",
+        "3-2-5",
+        "5-3-2",
+        "5-4-1",
+    ],
+};
+
+export const DEFAULT_FORMATION_BY_FORMAT: Record<MatchFormat, string> = {
+    "5v5": "1-2-1",
+    "7v7": "2-3-1",
+    "9v9": "3-2-3",
+    "11v11": "4-3-3",
+};
+
+export const FORMAT_PLAYER_COUNT: Record<MatchFormat, number> = {
+    "5v5": 5,
+    "7v7": 7,
+    "9v9": 9,
+    "11v11": 11,
+};
+
+export const FORMAT_DEFAULT_DURATION: Record<MatchFormat, number> = {
+    "5v5": 40,
+    "7v7": 50,
+    "9v9": 60,
+    "11v11": 90,
+};
+
+export const FORMAT_ROMAN_LABEL: Record<MatchFormat, string> = {
+    "5v5": "V",
+    "7v7": "VII",
+    "9v9": "IX",
+    "11v11": "XI",
+};
+
+export const getFormatFromFormation = (formationName?: string): MatchFormat => {
+    if (!formationName) return "11v11";
+    if (FORMATIONS_BY_FORMAT["5v5"].includes(formationName)) return "5v5";
+    if (FORMATIONS_BY_FORMAT["7v7"].includes(formationName)) return "7v7";
+    if (FORMATIONS_BY_FORMAT["9v9"].includes(formationName)) return "9v9";
+    return "11v11";
+};
+
+export const inferFormatFromSquadName = (squadName?: string): MatchFormat | null => {
+    if (!squadName) return null;
+    const s = squadName.toLowerCase().trim();
+    if (/\b(5v5|5-a-side)\b/.test(s) || /\bu[678]s?\b/.test(s) || /\bunder\s*[678]\b/.test(s)) {
+        return "5v5";
+    }
+    if (/\b(7v7|7-a-side)\b/.test(s) || /\bu(9|10)s?\b/.test(s) || /\bunder\s*(9|10)\b/.test(s)) {
+        return "7v7";
+    }
+    if (/\b(9v9|9-a-side)\b/.test(s) || /\bu(11|12)s?\b/.test(s) || /\bunder\s*(11|12)\b/.test(s)) {
+        return "9v9";
+    }
+    return null;
 };
 
 export const FORMATION_NAMES = [
-    "4-4-2",
-    "4-3-3",
-    "4-2-3-1",
-    "4-1-4-1",
-    "4-5-1",
-    "4-3-2-1",
-    "4-1-2-1-2",
-    "4-2-2-2",
-    "4-4-1-1",
-    "4-2-4",
-    "3-5-2",
-    "3-4-3",
-    "3-4-1-2",
-    "3-4-2-1",
-    "3-1-4-2",
-    "3-2-5",
-    "5-3-2",
-    "5-4-1",
+    ...FORMATIONS_BY_FORMAT["11v11"],
+    ...FORMATIONS_BY_FORMAT["9v9"],
+    ...FORMATIONS_BY_FORMAT["7v7"],
+    ...FORMATIONS_BY_FORMAT["5v5"],
 ];
 
 export const getDisplayPosition = (label: string): string => {
@@ -283,3 +479,4 @@ export const getDisplayPosition = (label: string): string => {
     };
     return map[label] || label;
 };
+
