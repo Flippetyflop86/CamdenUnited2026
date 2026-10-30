@@ -80,6 +80,13 @@ function stripLineupFromNotes(notes?: string): string {
 
 function extractMeetTimeFromNotes(notes?: string): string {
     if (!notes) return "";
+    const confirmMatch = notes.match(/\[ConfirmDetails:\s*([^\]]*)\]/i);
+    if (confirmMatch && confirmMatch[1]) {
+        try {
+            const parsed = JSON.parse(decodeURIComponent(confirmMatch[1].trim()));
+            if (parsed?.meetTimeExact) return String(parsed.meetTimeExact).trim();
+        } catch {}
+    }
     const m = notes.match(/\[MeetTime:\s*([^\]]*)\]/i);
     return m ? m[1].trim() : "";
 }
@@ -99,6 +106,17 @@ function upsertNotesMetadata(cleanNotes: string, meetTime?: string, venueNotes?:
             updated = updated.replace(/\[MeetTime:\s*[^\]]*\]/i, `[MeetTime: ${meetTime.trim()}]`);
         } else {
             updated = `[MeetTime: ${meetTime.trim()}]${updated ? `\n${updated}` : ""}`;
+        }
+        const confirmMatch = updated.match(/\[ConfirmDetails:\s*([^\]]*)\]/i);
+        if (confirmMatch && confirmMatch[1]) {
+            try {
+                const parsed = JSON.parse(decodeURIComponent(confirmMatch[1].trim()));
+                parsed.meetTimeExact = meetTime.trim();
+                updated = updated.replace(
+                    /\[ConfirmDetails:\s*[^\]]*\]/i,
+                    `[ConfirmDetails: ${encodeURIComponent(JSON.stringify(parsed))}]`
+                );
+            } catch {}
         }
     }
     if (venueNotes !== undefined && venueNotes.trim()) {
@@ -543,10 +561,12 @@ export default function MatchdayXIPage() {
 
         fetchCurrentMatchStats(selectedMatchId);
 
-        const rawNotesMeet = extractMeetTimeFromNotes(currentMatch.notes);
-        const notesMeetTime = (resolvedKo !== "14:00" && (rawNotesMeet === "13:00" || rawNotesMeet === "12:45")) ? "" : rawNotesMeet;
+        const notesMeetTime = extractMeetTimeFromNotes(currentMatch.notes);
         const notesLocation = extractLocationFromNotes(currentMatch.notes);
-        const defaultOffset = currentMatch.isHome ? 60 : 75;
+        const savedClubOffset = settings.matchdayConfirmDefaults?.meetTimeOffset
+            ? Math.abs(parseInt(settings.matchdayConfirmDefaults.meetTimeOffset))
+            : 0;
+        const defaultOffset = savedClubOffset || (currentMatch.isHome ? 60 : 75);
         const enabledFormats: MatchFormat[] = settings.enabledMatchFormats?.length
             ? settings.enabledMatchFormats
             : ["11v11"];
@@ -563,10 +583,7 @@ export default function MatchdayXIPage() {
                 ? Math.abs(parsed.meetOffsetMinutes)
                 : defaultOffset;
             const rawParsedMeet = (parsed.meetTime && parsed.meetTime.trim()) ? parsed.meetTime.trim() : "";
-            const effectiveParsedMeet = (resolvedKo !== "14:00" && (rawParsedMeet === "13:00" || rawParsedMeet === "12:45")) ? "" : rawParsedMeet;
-            const resolvedMeetTime = effectiveParsedMeet
-                ? effectiveParsedMeet
-                : (notesMeetTime || calculateMeetTime(resolvedKo, -normalizedOffset));
+            const resolvedMeetTime = notesMeetTime || rawParsedMeet || calculateMeetTime(resolvedKo, -normalizedOffset);
             const resolvedVenue = (parsed.venueNotes && parsed.venueNotes.trim())
                 ? parsed.venueNotes.trim()
                 : notesLocation;

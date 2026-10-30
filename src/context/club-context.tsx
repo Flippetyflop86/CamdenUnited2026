@@ -3,6 +3,25 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useAuth } from "./auth-context";
 
+export interface MatchdayConfirmDefaults {
+    stadiumAddress?: string;
+    surfaceType?: string;
+    refFee?: string;
+    paymentMethod?: string;
+    dietaryDetails?: string;
+    kitColors?: string;
+    meetTimeOffset?: string;
+    meetTimeExact?: string;
+    refName?: string;
+    pollMeetLocation?: string;
+    pollAdditionalNotes?: string;
+    pollIncludeOpponent?: boolean;
+    pollIncludeCompetition?: boolean;
+    pollIncludeVenue?: boolean;
+    pollIncludeKickoff?: boolean;
+    pollIncludeMeetTime?: boolean;
+}
+
 interface ClubSettings {
     name: string;
     logo: string | null;
@@ -50,6 +69,7 @@ interface ClubSettings {
     enabledMatchFormats: ("5v5" | "7v7" | "9v9" | "11v11")[];
     equalPlayTimeEnabled: boolean;
     defaultMatchDuration: number;
+    matchdayConfirmDefaults?: MatchdayConfirmDefaults;
 }
 
 interface ClubContextType {
@@ -108,7 +128,8 @@ const defaultSettings: ClubSettings = {
     useMatchdayNumbering: false,
     enabledMatchFormats: ["11v11"],
     equalPlayTimeEnabled: false,
-    defaultMatchDuration: 90
+    defaultMatchDuration: 90,
+    matchdayConfirmDefaults: {}
 };
 
 const ClubContext = createContext<ClubContextType | undefined>(undefined);
@@ -226,6 +247,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                     let parsedEnabledFormats: ("5v5" | "7v7" | "9v9" | "11v11")[] = ["11v11"];
                     let parsedEqualPlayTime = false;
                     let parsedDefaultDuration = 90;
+                    let parsedConfirmDefaults: MatchdayConfirmDefaults = {};
 
                     if (typeof window !== "undefined") {
                         try {
@@ -240,6 +262,16 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                                 }
                                 if (typeof cachedObj.defaultMatchDuration === "number" && cachedObj.defaultMatchDuration > 0) {
                                     parsedDefaultDuration = cachedObj.defaultMatchDuration;
+                                }
+                                if (cachedObj.matchdayConfirmDefaults && typeof cachedObj.matchdayConfirmDefaults === "object") {
+                                    parsedConfirmDefaults = { ...cachedObj.matchdayConfirmDefaults };
+                                }
+                            }
+                            const standaloneConfirmStr = localStorage.getItem("clubflow_confirm_defaults");
+                            if (standaloneConfirmStr) {
+                                const standaloneConfirm = JSON.parse(standaloneConfirmStr);
+                                if (standaloneConfirm && typeof standaloneConfirm === "object") {
+                                    parsedConfirmDefaults = { ...parsedConfirmDefaults, ...standaloneConfirm };
                                 }
                             }
                         } catch {}
@@ -258,6 +290,9 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                                 }
                                 if (typeof cfg.defaultMatchDuration === "number" && cfg.defaultMatchDuration > 0) {
                                     parsedDefaultDuration = cfg.defaultMatchDuration;
+                                }
+                                if (cfg.confirmDefaults && typeof cfg.confirmDefaults === "object") {
+                                    parsedConfirmDefaults = { ...parsedConfirmDefaults, ...cfg.confirmDefaults };
                                 }
                             }
                         } catch {}
@@ -309,7 +344,8 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         useMatchdayNumbering: data.use_matchday_numbering || false,
                         enabledMatchFormats: parsedEnabledFormats,
                         equalPlayTimeEnabled: parsedEqualPlayTime,
-                        defaultMatchDuration: parsedDefaultDuration
+                        defaultMatchDuration: parsedDefaultDuration,
+                        matchdayConfirmDefaults: parsedConfirmDefaults
                     };
                     setSettings(loadedSettings);
                     if (typeof window !== 'undefined') {
@@ -340,6 +376,16 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         const nextEnabledFormats = newSettings.enabledMatchFormats ?? settings.enabledMatchFormats ?? ["11v11"];
         const nextEqualPlayTime = newSettings.equalPlayTimeEnabled ?? settings.equalPlayTimeEnabled ?? false;
         const nextDefaultDuration = newSettings.defaultMatchDuration ?? settings.defaultMatchDuration ?? 90;
+        const nextConfirmDefaults: MatchdayConfirmDefaults = {
+            ...(settings.matchdayConfirmDefaults || {}),
+            ...(newSettings.matchdayConfirmDefaults || {})
+        };
+
+        if (typeof window !== "undefined" && newSettings.matchdayConfirmDefaults) {
+            try {
+                localStorage.setItem("clubflow_confirm_defaults", JSON.stringify(nextConfirmDefaults));
+            } catch {}
+        }
 
         // Embed _matchdayConfig into whatsapp_poll_message JSON so it persists on the clubs row without schema issues
         const rawPollMsg = newSettings.whatsappPollMessage ?? settings.whatsappPollMessage;
@@ -357,9 +403,11 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             }
         }
         finalPollMsgObj._matchdayConfig = {
+            ...(finalPollMsgObj._matchdayConfig || {}),
             enabledMatchFormats: nextEnabledFormats.includes("11v11") ? nextEnabledFormats : ["11v11", ...nextEnabledFormats],
             equalPlayTimeEnabled: nextEqualPlayTime,
-            defaultMatchDuration: nextDefaultDuration
+            defaultMatchDuration: nextDefaultDuration,
+            confirmDefaults: nextConfirmDefaults
         };
         const serializedPollMessage = JSON.stringify(finalPollMsgObj);
 
@@ -461,20 +509,26 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             }
         }
 
-        if (error) {
-            const errorObj = error as any;
-            const errorMsg = errorObj.message || errorObj.details || JSON.stringify(errorObj);
-            console.error("Failed to save settings:", errorMsg, errorObj);
-            throw new Error(errorMsg);
-        }
-
-        // Apply Update to State & Local Cache after DB succeeds
-        const updated = { ...settings, ...newSettings, secondaryColor: finalSecondaryColor };
+        // Apply Update to State & Local Cache
+        const updated: ClubSettings = {
+            ...settings,
+            ...newSettings,
+            secondaryColor: finalSecondaryColor,
+            whatsappPollMessage: serializedPollMessage,
+            matchdayConfirmDefaults: nextConfirmDefaults
+        };
         setSettings(updated);
         if (typeof window !== "undefined") {
             try {
                 localStorage.setItem("clubflow_cache_clubSettings", JSON.stringify(updated));
             } catch (e) {}
+        }
+
+        if (error) {
+            const errorObj = error as any;
+            const errorMsg = errorObj.message || errorObj.details || JSON.stringify(errorObj);
+            console.error("Failed to save settings:", errorMsg, errorObj);
+            throw new Error(errorMsg);
         }
     };
 

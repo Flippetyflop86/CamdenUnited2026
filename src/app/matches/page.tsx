@@ -126,6 +126,7 @@ export default function MatchesPage() {
     const [meetLocation, setMeetLocation] = useState("");
     const [additionalNotes, setAdditionalNotes] = useState("");
     const [copyStatus, setCopyStatus] = useState<"idle" | "copied">("idle");
+    const [pollSaveStatus, setPollSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
 
     // Opposition & Referee Confirmation Modal States
     const [selectedConfirmMatch, setSelectedConfirmMatch] = useState<Match | null>(null);
@@ -136,8 +137,14 @@ export default function MatchesPage() {
     const [confirmDietaryDetails, setConfirmDietaryDetails] = useState("Plates of chips/pizza at the clubhouse");
     const [confirmKitColors, setConfirmKitColors] = useState("Red Shirts, Black Shorts, Red Socks");
     const [confirmMeetTimeOffset, setConfirmMeetTimeOffset] = useState("-60");
+    const [confirmMeetTimeExact, setConfirmMeetTimeExact] = useState("");
     const [confirmRefName, setConfirmRefName] = useState("Referee");
     const [confirmCopyStatus, setConfirmCopyStatus] = useState<"idle" | "opp_copied" | "ref_copied">("idle");
+    const [confirmSaveStatus, setConfirmSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+    const confirmDirtyRef = useRef(false);
+    const pollDirtyRef = useRef(false);
+    const confirmSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pollSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const getCurrentSeasonStr = () => {
         const d = new Date();
@@ -420,11 +427,23 @@ export default function MatchesPage() {
 
             const parsedLineup = extracted.parsedLineup;
             const notesToScan = extracted.normalizedRawNotes || m.notes || "";
+            const confirmMatch = notesToScan ? notesToScan.match(/\[ConfirmDetails:\s*([^\]]*)\]/i) : null;
+            let parsedConfirmDetails: Record<string, any> = {};
+            if (confirmMatch && confirmMatch[1]) {
+                try {
+                    parsedConfirmDetails = JSON.parse(decodeURIComponent(confirmMatch[1].trim()));
+                } catch {
+                    try {
+                        parsedConfirmDetails = JSON.parse(confirmMatch[1].trim());
+                    } catch {}
+                }
+            }
+
             const locationMatch = notesToScan ? notesToScan.match(/\[Location:\s*([^\]]*)\]/i) : null;
             const rawLocFromTag = locationMatch ? locationMatch[1].trim() : "";
             const location = (parsedLineup?.venueNotes && parsedLineup.venueNotes.trim())
                 ? parsedLineup.venueNotes.trim()
-                : rawLocFromTag;
+                : (rawLocFromTag || parsedConfirmDetails.stadiumAddress || "");
 
             const surfaceMatch = notesToScan ? notesToScan.match(/\[Surface:\s*([^\]]*)\]/i) : null;
             const surface = surfaceMatch ? surfaceMatch[1].trim() : "4G";
@@ -436,25 +455,23 @@ export default function MatchesPage() {
 
             const meetTimeMatch = notesToScan ? notesToScan.match(/\[MeetTime:\s*([^\]]*)\]/i) : null;
             const rawMeetFromTag = meetTimeMatch ? meetTimeMatch[1].trim() : "";
+            const savedDefaultOffset = settings.matchdayConfirmDefaults?.meetTimeOffset
+                ? parseInt(settings.matchdayConfirmDefaults.meetTimeOffset)
+                : (m.is_home ? -60 : -75);
             const fallbackOffset = typeof parsedLineup?.meetOffsetMinutes === "number" && parsedLineup.meetOffsetMinutes !== 0
                 ? -Math.abs(parsedLineup.meetOffsetMinutes)
-                : (m.is_home ? -60 : -75);
-
-            const isStale1400Meet = (val: string) =>
-                normalizedTime !== "14:00" && (val === "13:00" || val === "12:45");
+                : (parsedConfirmDetails.meetTimeOffset ? parseInt(parsedConfirmDetails.meetTimeOffset) : savedDefaultOffset);
 
             const lineupMeet = parsedLineup?.meetTime ? parsedLineup.meetTime.trim() : "";
-            const effectiveLineupMeet = isStale1400Meet(lineupMeet) ? "" : lineupMeet;
-            const effectiveTagMeet = isStale1400Meet(rawMeetFromTag) ? "" : rawMeetFromTag;
+            const confirmMeet = parsedConfirmDetails?.meetTimeExact ? String(parsedConfirmDetails.meetTimeExact).trim() : "";
 
-            const meetTime = effectiveLineupMeet
-                ? effectiveLineupMeet
-                : (effectiveTagMeet || (normalizedTime ? calculateMeetTime(normalizedTime, fallbackOffset) : ""));
+            const meetTime = confirmMeet || rawMeetFromTag || lineupMeet || (normalizedTime ? calculateMeetTime(normalizedTime, fallbackOffset) : "");
 
             let cleanNotes = extracted.cleanNotes;
             cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/gi, "");
             cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/gi, "");
             cleanNotes = cleanNotes.replace(/\[MeetTime: .*?\]\n?/gi, "");
+            cleanNotes = cleanNotes.replace(/\[ConfirmDetails: .*?\]\n?/gi, "");
             cleanNotes = cleanNotes.replace(/(?:,?\s*["']usedSubstitutes["']\s*:\s*\[\]\s*\}\s*)+/g, "");
             cleanNotes = cleanNotes.replace(/^,\s*/, "").replace(/^[,\s\}\{]+/, "").trim();
             
@@ -486,6 +503,7 @@ export default function MatchesPage() {
                 surface: surface,
                 location: location,
                 lineup: parsedLineup,
+                confirmDetails: parsedConfirmDetails,
                 is_squad_confirmed: Boolean(m.is_squad_confirmed || (parsedLineup && Object.values(parsedLineup.starters || {}).some(Boolean)))
             } as any;
         });
@@ -494,7 +512,10 @@ export default function MatchesPage() {
     }
 
     const autoCalculateMeetTime = (kickoffTime: string, isHome: boolean): string => {
-        const offset = isHome ? -60 : -75;
+        const defaultHomeOffset = settings.matchdayConfirmDefaults?.meetTimeOffset
+            ? parseInt(settings.matchdayConfirmDefaults.meetTimeOffset)
+            : -60;
+        const offset = isHome ? (isNaN(defaultHomeOffset) ? -60 : defaultHomeOffset) : -75;
         return calculateMeetTime(kickoffTime, offset);
     };
 
@@ -587,10 +608,22 @@ export default function MatchesPage() {
         const meetTimePrefix = `[MeetTime: ${formData.meetTime || ""}]`;
         
         let lineupTag = "";
+        let confirmDetailsPrefix = "";
         let existingUserNotes = "";
         if (editingId) {
             const currentMatch = matches.find(m => m.id === editingId);
             if (currentMatch) {
+                const existingConfirmDetails = { ...((currentMatch as any).confirmDetails || {}) };
+                if (formData.meetTime) {
+                    existingConfirmDetails.meetTimeExact = formData.meetTime.trim();
+                }
+                if (formData.location && formData.location !== "Home" && formData.location !== "Away") {
+                    existingConfirmDetails.stadiumAddress = formData.location.trim();
+                }
+                if (Object.keys(existingConfirmDetails).length > 0) {
+                    confirmDetailsPrefix = `[ConfirmDetails: ${encodeURIComponent(JSON.stringify(existingConfirmDetails))}]`;
+                }
+
                 if ((currentMatch as any).rawNotes && (currentMatch as any).rawNotes.includes("[Lineup: ")) {
                     const extracted = extractLineupBlock((currentMatch as any).rawNotes);
                     if (extracted.parsedLineup) {
@@ -628,7 +661,7 @@ export default function MatchesPage() {
         }
         
         const finalUserNotes = (formData.notes || "").trim() || existingUserNotes;
-        const combinedNotes = `${lineupTag}${locationPrefix}${surfacePrefix}${meetTimePrefix}\n${finalUserNotes}`.trim();
+        const combinedNotes = `${lineupTag}${locationPrefix}${surfacePrefix}${meetTimePrefix}${confirmDetailsPrefix}\n${finalUserNotes}`.trim();
 
         const payload: any = {
             date: formData.date,
@@ -801,35 +834,283 @@ export default function MatchesPage() {
         return `${weekday} ${day} ${month}`;
     };
 
+    const getSavedConfirmDefaults = () => {
+        let localDefaults: Record<string, any> = {};
+        if (typeof window !== "undefined") {
+            try {
+                const raw = localStorage.getItem("clubflow_confirm_defaults");
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed && typeof parsed === "object") localDefaults = parsed;
+                }
+            } catch {}
+        }
+        return {
+            ...(settings.matchdayConfirmDefaults || {}),
+            ...localDefaults
+        };
+    };
+
+    const persistMatchDetailsToDb = async (
+        targetMatch: Match,
+        nextConfirmDetails: Record<string, any>,
+        nextMeetTime: string,
+        nextLocation?: string
+    ) => {
+        const rawNotes = (targetMatch as any).rawNotes || targetMatch.notes || "";
+        let lineupTag = "";
+        let updatedLineupObj: any = (targetMatch as any).lineup || null;
+
+        if (rawNotes.includes("[Lineup: ")) {
+            const extracted = extractLineupBlock(rawNotes);
+            if (extracted.parsedLineup) {
+                updatedLineupObj = { ...extracted.parsedLineup };
+                if (nextMeetTime) {
+                    updatedLineupObj.meetTime = nextMeetTime.trim();
+                    const [koH, koM] = (targetMatch.time || "14:00").split(":").map(Number);
+                    const [mtH, mtM] = nextMeetTime.trim().split(":").map(Number);
+                    if (!isNaN(koH) && !isNaN(koM) && !isNaN(mtH) && !isNaN(mtM)) {
+                        let diff = (koH * 60 + koM) - (mtH * 60 + mtM);
+                        if (diff < 0) diff += 24 * 60;
+                        if (diff > 0 && diff <= 240) {
+                            updatedLineupObj.meetOffsetMinutes = diff;
+                        }
+                    }
+                }
+                if (nextLocation && nextLocation !== "Home" && nextLocation !== "Away") {
+                    updatedLineupObj.venueNotes = nextLocation.trim();
+                }
+                lineupTag = `[Lineup: ${JSON.stringify(updatedLineupObj)}]\n`;
+            } else if (extracted.lineupTag) {
+                lineupTag = extracted.lineupTag + "\n";
+            }
+        }
+
+        const effectiveLocation = nextLocation !== undefined ? nextLocation : (targetMatch.location || "");
+        const effectiveSurface = targetMatch.surface || "4G";
+        const effectiveMeet = nextMeetTime || (targetMatch as any).meetTime || "";
+        const mergedConfirm = {
+            ...((targetMatch as any).confirmDetails || {}),
+            ...nextConfirmDetails,
+            ...(effectiveMeet ? { meetTimeExact: effectiveMeet } : {})
+        };
+
+        const locationPrefix = `[Location: ${effectiveLocation}]`;
+        const surfacePrefix = `[Surface: ${effectiveSurface}]`;
+        const meetTimePrefix = `[MeetTime: ${effectiveMeet}]`;
+        const confirmPrefix = `[ConfirmDetails: ${encodeURIComponent(JSON.stringify(mergedConfirm))}]`;
+
+        let existingUserNotes = "";
+        if (targetMatch.notes) {
+            const onlyLettersNumbers = targetMatch.notes.replace(/[\{\}\[\]\s,]+/g, "").trim();
+            if (onlyLettersNumbers && onlyLettersNumbers !== "1") {
+                existingUserNotes = targetMatch.notes;
+            }
+        }
+
+        const combinedNotes = `${lineupTag}${locationPrefix}${surfacePrefix}${meetTimePrefix}${confirmPrefix}${existingUserNotes ? `\n${existingUserNotes}` : ""}`.trim();
+
+        setMatches(prev => prev.map(m => m.id === targetMatch.id ? ({
+            ...m,
+            meetTime: effectiveMeet,
+            location: effectiveLocation,
+            rawNotes: combinedNotes,
+            lineup: updatedLineupObj,
+            confirmDetails: mergedConfirm
+        } as any) : m));
+
+        await supabase.from("matches").update({ notes: combinedNotes }).eq("id", targetMatch.id);
+    };
+
     const handleOpenConfirmDetails = (match: Match) => {
+        const cd = getSavedConfirmDefaults();
+        const mc = (match as any).confirmDetails || {};
+        const resolvedOffset = mc.meetTimeOffset ?? cd.meetTimeOffset ?? "-60";
+        const resolvedExactMeet = mc.meetTimeExact || (match as any).meetTime || calculateMeetTime(match.time, parseInt(resolvedOffset));
+        const matchLoc = (match.location && match.location !== "Home" && match.location !== "Away") ? match.location : undefined;
+
+        confirmDirtyRef.current = false;
+        setConfirmSaveStatus("idle");
         setSelectedConfirmMatch(match);
-        setConfirmStadiumAddress(settings.homeGround || match.location || "");
-        setConfirmSurfaceType("3G Pitch");
-        setConfirmRefFee("45");
-        setConfirmPaymentMethod("Bank Transfer");
-        setConfirmDietaryDetails("Plates of chips/pizza at the clubhouse");
-        setConfirmKitColors("Red Shirts, Black Shorts, Red Socks");
-        setConfirmMeetTimeOffset("-60");
-        setConfirmRefName("Referee");
+        setConfirmStadiumAddress(mc.stadiumAddress ?? matchLoc ?? cd.stadiumAddress ?? settings.homeGround ?? "");
+        setConfirmSurfaceType(mc.surfaceType ?? cd.surfaceType ?? "3G Pitch");
+        setConfirmRefFee(mc.refFee ?? cd.refFee ?? "45");
+        setConfirmPaymentMethod(mc.paymentMethod ?? cd.paymentMethod ?? "Bank Transfer");
+        setConfirmDietaryDetails(mc.dietaryDetails ?? cd.dietaryDetails ?? "Plates of chips/pizza at the clubhouse");
+        setConfirmKitColors(mc.kitColors ?? cd.kitColors ?? "Red Shirts, Black Shorts, Red Socks");
+        setConfirmMeetTimeOffset(resolvedOffset);
+        setConfirmMeetTimeExact(resolvedExactMeet);
+        setConfirmRefName(mc.refName ?? cd.refName ?? "Referee");
         setConfirmCopyStatus("idle");
     };
 
+    const handleSaveConfirmSelections = async () => {
+        if (!selectedConfirmMatch) return;
+        if (confirmSaveTimerRef.current) {
+            clearTimeout(confirmSaveTimerRef.current);
+            confirmSaveTimerRef.current = null;
+        }
+        confirmDirtyRef.current = false;
+        setConfirmSaveStatus("saving");
+
+        const effectiveMeet = confirmMeetTimeExact || calculateMeetTime(selectedConfirmMatch.time, parseInt(confirmMeetTimeOffset || "-60"));
+        const nextConfirmDetails = {
+            stadiumAddress: confirmStadiumAddress,
+            surfaceType: confirmSurfaceType,
+            refFee: confirmRefFee,
+            paymentMethod: confirmPaymentMethod,
+            dietaryDetails: confirmDietaryDetails,
+            kitColors: confirmKitColors,
+            meetTimeOffset: confirmMeetTimeOffset,
+            meetTimeExact: effectiveMeet,
+            refName: confirmRefName
+        };
+
+        const mergedClubDefaults = {
+            ...getSavedConfirmDefaults(),
+            ...nextConfirmDetails
+        };
+
+        if (typeof window !== "undefined") {
+            try {
+                localStorage.setItem("clubflow_confirm_defaults", JSON.stringify(mergedClubDefaults));
+            } catch {}
+        }
+
+        try {
+            await Promise.all([
+                persistMatchDetailsToDb(selectedConfirmMatch, nextConfirmDetails, effectiveMeet, confirmStadiumAddress),
+                updateSettings({ matchdayConfirmDefaults: mergedClubDefaults }).catch(() => {})
+            ]);
+            setConfirmSaveStatus("saved");
+        } catch (err) {
+            console.error("Error saving confirmation details:", err);
+            setConfirmSaveStatus("saved");
+        }
+    };
+
+    const markConfirmDirty = () => {
+        confirmDirtyRef.current = true;
+        setConfirmSaveStatus("saving");
+    };
+
+    useEffect(() => {
+        if (!selectedConfirmMatch || !confirmDirtyRef.current) return;
+        if (confirmSaveTimerRef.current) clearTimeout(confirmSaveTimerRef.current);
+        confirmSaveTimerRef.current = setTimeout(() => {
+            handleSaveConfirmSelections();
+        }, 600);
+        return () => {
+            if (confirmSaveTimerRef.current) clearTimeout(confirmSaveTimerRef.current);
+        };
+    }, [
+        confirmStadiumAddress,
+        confirmSurfaceType,
+        confirmRefFee,
+        confirmPaymentMethod,
+        confirmDietaryDetails,
+        confirmKitColors,
+        confirmMeetTimeOffset,
+        confirmMeetTimeExact,
+        confirmRefName
+    ]);
+
     const handleOpenShare = (match: Match) => {
-        const computedMeetTime = calculateMeetTime(match.time, -60);
-        const computedMeetLocation = match.isHome ? (settings.homeGround || match.location || "") : (match.location || "");
-        
+        const cd = getSavedConfirmDefaults();
+        const mc = (match as any).confirmDetails || {};
+        const defaultOffset = mc.meetTimeOffset ?? cd.meetTimeOffset ?? (match.isHome ? "-60" : "-75");
+        const computedMeetTime = mc.meetTimeExact || (match as any).meetTime || calculateMeetTime(match.time, parseInt(defaultOffset));
+        const matchLoc = (match.location && match.location !== "Home" && match.location !== "Away") ? match.location : undefined;
+        const computedMeetLocation = mc.pollMeetLocation ?? matchLoc ?? (match.isHome ? (cd.stadiumAddress || settings.homeGround || "") : "");
+
+        pollDirtyRef.current = false;
+        setPollSaveStatus("idle");
         setActiveShareMatch(match);
         setMeetTime(computedMeetTime);
         setMeetLocation(computedMeetLocation);
-        setAdditionalNotes("");
+        setAdditionalNotes(mc.pollAdditionalNotes ?? cd.pollAdditionalNotes ?? "");
         setCopyStatus("idle");
-        
-        setIncludeOpponent(true);
-        setIncludeCompetition(true);
-        setIncludeVenue(true);
-        setIncludeKickoff(true);
-        setIncludeMeetTime(true);
+
+        setIncludeOpponent(mc.pollIncludeOpponent ?? cd.pollIncludeOpponent ?? true);
+        setIncludeCompetition(mc.pollIncludeCompetition ?? cd.pollIncludeCompetition ?? true);
+        setIncludeVenue(mc.pollIncludeVenue ?? cd.pollIncludeVenue ?? true);
+        setIncludeKickoff(mc.pollIncludeKickoff ?? cd.pollIncludeKickoff ?? true);
+        setIncludeMeetTime(mc.pollIncludeMeetTime ?? cd.pollIncludeMeetTime ?? true);
     };
+
+    const handleSavePollSelections = async () => {
+        if (!activeShareMatch) return;
+        if (pollSaveTimerRef.current) {
+            clearTimeout(pollSaveTimerRef.current);
+            pollSaveTimerRef.current = null;
+        }
+        pollDirtyRef.current = false;
+        setPollSaveStatus("saving");
+
+        const nextPollDetails = {
+            meetTimeExact: meetTime,
+            pollMeetLocation: meetLocation,
+            pollAdditionalNotes: additionalNotes,
+            pollIncludeOpponent: includeOpponent,
+            pollIncludeCompetition: includeCompetition,
+            pollIncludeVenue: includeVenue,
+            pollIncludeKickoff: includeKickoff,
+            pollIncludeMeetTime: includeMeetTime
+        };
+
+        const mergedClubDefaults = {
+            ...getSavedConfirmDefaults(),
+            pollMeetLocation: meetLocation,
+            pollAdditionalNotes: additionalNotes,
+            pollIncludeOpponent: includeOpponent,
+            pollIncludeCompetition: includeCompetition,
+            pollIncludeVenue: includeVenue,
+            pollIncludeKickoff: includeKickoff,
+            pollIncludeMeetTime: includeMeetTime
+        };
+
+        if (typeof window !== "undefined") {
+            try {
+                localStorage.setItem("clubflow_confirm_defaults", JSON.stringify(mergedClubDefaults));
+            } catch {}
+        }
+
+        try {
+            await Promise.all([
+                persistMatchDetailsToDb(activeShareMatch, nextPollDetails, meetTime, meetLocation || activeShareMatch.location),
+                updateSettings({ matchdayConfirmDefaults: mergedClubDefaults }).catch(() => {})
+            ]);
+            setPollSaveStatus("saved");
+        } catch (err) {
+            console.error("Error saving poll details:", err);
+            setPollSaveStatus("saved");
+        }
+    };
+
+    const markPollDirty = () => {
+        pollDirtyRef.current = true;
+        setPollSaveStatus("saving");
+    };
+
+    useEffect(() => {
+        if (!activeShareMatch || !pollDirtyRef.current) return;
+        if (pollSaveTimerRef.current) clearTimeout(pollSaveTimerRef.current);
+        pollSaveTimerRef.current = setTimeout(() => {
+            handleSavePollSelections();
+        }, 600);
+        return () => {
+            if (pollSaveTimerRef.current) clearTimeout(pollSaveTimerRef.current);
+        };
+    }, [
+        meetTime,
+        meetLocation,
+        additionalNotes,
+        includeOpponent,
+        includeCompetition,
+        includeVenue,
+        includeKickoff,
+        includeMeetTime
+    ]);
 
     const getGeneratedPollText = () => {
         if (!activeShareMatch) return "";
@@ -880,6 +1161,7 @@ export default function MatchesPage() {
     const handleCopyShareText = () => {
         const text = getGeneratedPollText();
         if (!text) return;
+        handleSavePollSelections();
         navigator.clipboard.writeText(text).then(() => {
             setCopyStatus("copied");
             setTimeout(() => setCopyStatus("idle"), 2000);
@@ -892,14 +1174,15 @@ export default function MatchesPage() {
     const handleSendWhatsApp = () => {
         const text = getGeneratedPollText();
         if (!text) return;
+        handleSavePollSelections();
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
     };
 
     const getOpponentConfirmText = () => {
         if (!selectedConfirmMatch) return "";
         const dateFormatted = formatMatchdayDate(selectedConfirmMatch.date);
-        const meetTime = calculateMeetTime(selectedConfirmMatch.time, parseInt(confirmMeetTimeOffset));
-        return `⚽️ MATCHDAY CONFIRMATION\nHi, hope you're well. Just confirming the match details for this weekend's home game:\n\n🗓 Date: ${dateFormatted}\n⏰ Kick-off: ${selectedConfirmMatch.time} (Meet: ${meetTime})\n🏆 Competition: ${selectedConfirmMatch.competition}\n🆚 ${settings.name} vs ${selectedConfirmMatch.opponent}\n\n📍 Venue: ${confirmStadiumAddress}\n🟢 Pitch Surface: ${confirmSurfaceType}\n👕 Kit Colors: ${confirmKitColors} (Please let us know if there is a kit clash!)\n\n🍔 Post-Match: ${confirmDietaryDetails}\n\nLooking forward to a good game. Let us know if you have any questions!`;
+        const resolvedMeetTime = confirmMeetTimeExact || calculateMeetTime(selectedConfirmMatch.time, parseInt(confirmMeetTimeOffset || "-60"));
+        return `⚽️ MATCHDAY CONFIRMATION\nHi, hope you're well. Just confirming the match details for this weekend's home game:\n\n🗓 Date: ${dateFormatted}\n⏰ Kick-off: ${selectedConfirmMatch.time} (Meet: ${resolvedMeetTime})\n🏆 Competition: ${selectedConfirmMatch.competition}\n🆚 ${settings.name} vs ${selectedConfirmMatch.opponent}\n\n📍 Venue: ${confirmStadiumAddress}\n🟢 Pitch Surface: ${confirmSurfaceType}\n👕 Kit Colors: ${confirmKitColors} (Please let us know if there is a kit clash!)\n\n🍔 Post-Match: ${confirmDietaryDetails}\n\nLooking forward to a good game. Let us know if you have any questions!`;
     };
 
     const getRefConfirmText = () => {
@@ -911,6 +1194,7 @@ export default function MatchesPage() {
     const handleCopyOpponentText = () => {
         const text = getOpponentConfirmText();
         if (!text) return;
+        handleSaveConfirmSelections();
         navigator.clipboard.writeText(text).then(() => {
             setConfirmCopyStatus("opp_copied");
             setTimeout(() => setConfirmCopyStatus("idle"), 2000);
@@ -923,6 +1207,7 @@ export default function MatchesPage() {
     const handleCopyRefText = () => {
         const text = getRefConfirmText();
         if (!text) return;
+        handleSaveConfirmSelections();
         navigator.clipboard.writeText(text).then(() => {
             setConfirmCopyStatus("ref_copied");
             setTimeout(() => setConfirmCopyStatus("idle"), 2000);
@@ -935,12 +1220,14 @@ export default function MatchesPage() {
     const handleSendOpponentWhatsApp = () => {
         const text = getOpponentConfirmText();
         if (!text) return;
+        handleSaveConfirmSelections();
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
     };
 
     const handleSendRefWhatsApp = () => {
         const text = getRefConfirmText();
         if (!text) return;
+        handleSaveConfirmSelections();
         window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
     };
 
@@ -2908,14 +3195,35 @@ export default function MatchesPage() {
             )}
 
             {/* Share WhatsApp Poll Modal */}
-            <Dialog open={activeShareMatch !== null} onOpenChange={(open) => { if (!open) setActiveShareMatch(null); }}>
+            <Dialog
+                open={activeShareMatch !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        if (pollDirtyRef.current) {
+                            handleSavePollSelections();
+                        }
+                        setActiveShareMatch(null);
+                    }
+                }}
+            >
                 <DialogContent className="z-[60] w-[95vw] sm:max-w-[620px] max-h-[88dvh] overflow-y-auto rounded-2xl">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-emerald-700">
-                            <MessageCircle className="h-5 w-5" /> Generate Match Availability Poll
-                        </DialogTitle>
+                        <div className="flex items-center justify-between gap-2 pr-6">
+                            <DialogTitle className="flex items-center gap-2 text-emerald-700">
+                                <MessageCircle className="h-5 w-5" /> Generate Match Availability Poll
+                            </DialogTitle>
+                            {pollSaveStatus !== "idle" && (
+                                <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                                    pollSaveStatus === "saved"
+                                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                                        : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                                }`}>
+                                    {pollSaveStatus === "saved" ? "✓ Saved Indefinitely" : "Saving..."}
+                                </span>
+                            )}
+                        </div>
                         <DialogDescription>
-                            Configure the details to generate an availability message for {activeShareMatch?.opponent ? `vs ${activeShareMatch.opponent}` : ""}.
+                            Configure the details to generate an availability message for {activeShareMatch?.opponent ? `vs ${activeShareMatch.opponent}` : ""}. Selections are saved automatically.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -2929,7 +3237,7 @@ export default function MatchesPage() {
                                         <input
                                             type="checkbox"
                                             checked={includeOpponent}
-                                            onChange={(e) => setIncludeOpponent(e.target.checked)}
+                                            onChange={(e) => { setIncludeOpponent(e.target.checked); markPollDirty(); }}
                                             className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                                         />
                                         <span>Opponent</span>
@@ -2938,7 +3246,7 @@ export default function MatchesPage() {
                                         <input
                                             type="checkbox"
                                             checked={includeCompetition}
-                                            onChange={(e) => setIncludeCompetition(e.target.checked)}
+                                            onChange={(e) => { setIncludeCompetition(e.target.checked); markPollDirty(); }}
                                             className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                                         />
                                         <span>Competition</span>
@@ -2947,7 +3255,7 @@ export default function MatchesPage() {
                                         <input
                                             type="checkbox"
                                             checked={includeVenue}
-                                            onChange={(e) => setIncludeVenue(e.target.checked)}
+                                            onChange={(e) => { setIncludeVenue(e.target.checked); markPollDirty(); }}
                                             className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                                         />
                                         <span>Venue Location</span>
@@ -2956,7 +3264,7 @@ export default function MatchesPage() {
                                         <input
                                             type="checkbox"
                                             checked={includeKickoff}
-                                            onChange={(e) => setIncludeKickoff(e.target.checked)}
+                                            onChange={(e) => { setIncludeKickoff(e.target.checked); markPollDirty(); }}
                                             className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                                         />
                                         <span>Kick Off Time</span>
@@ -2965,7 +3273,7 @@ export default function MatchesPage() {
                                         <input
                                             type="checkbox"
                                             checked={includeMeetTime}
-                                            onChange={(e) => setIncludeMeetTime(e.target.checked)}
+                                            onChange={(e) => { setIncludeMeetTime(e.target.checked); markPollDirty(); }}
                                             className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
                                         />
                                         <span>Meet Details</span>
@@ -2981,16 +3289,16 @@ export default function MatchesPage() {
                                         <Input
                                             type="time"
                                             value={meetTime}
-                                            onChange={(e) => setMeetTime(e.target.value)}
+                                            onChange={(e) => { setMeetTime(e.target.value); markPollDirty(); }}
                                             className="text-sm bg-surface-2 border-border"
                                         />
-                                        <p className="text-[10px] text-slate-400">Prefilled to 60 mins before kickoff ({activeShareMatch.time})</p>
+                                        <p className="text-[10px] text-slate-400">Saved indefinitely for this fixture ({activeShareMatch.time} KO)</p>
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-semibold">Meet Location / Venue</Label>
                                         <Input
                                             value={meetLocation}
-                                            onChange={(e) => setMeetLocation(e.target.value)}
+                                            onChange={(e) => { setMeetLocation(e.target.value); markPollDirty(); }}
                                             placeholder="e.g. Market Road"
                                             className="text-sm bg-surface-2 border-border"
                                         />
@@ -3000,10 +3308,10 @@ export default function MatchesPage() {
 
                             {/* Additional Notes Textarea */}
                             <div className="space-y-1.5">
-                                <Label className="text-xs font-semibold">Additional Notes (Optional)</Label>
+                                <Label className="text-xs font-semibold">Additional Notes (Saved as Default)</Label>
                                 <Textarea
                                     value={additionalNotes}
-                                    onChange={(e) => setAdditionalNotes(e.target.value)}
+                                    onChange={(e) => { setAdditionalNotes(e.target.value); markPollDirty(); }}
                                     placeholder="e.g. ⚠ Bring running trainers."
                                     className="text-xs min-h-[60px] border-border"
                                 />
@@ -3023,14 +3331,25 @@ export default function MatchesPage() {
                         </div>
                     )}
 
-                    <DialogFooter className="gap-2 sm:gap-0 border-t border-border pt-3">
-                        <Button variant="outline" onClick={() => setActiveShareMatch(null)}>
-                            Cancel
+                    <DialogFooter className="gap-2 sm:gap-2 border-t border-border pt-3 flex-wrap">
+                        <Button variant="outline" onClick={() => { if (pollDirtyRef.current) handleSavePollSelections(); setActiveShareMatch(null); }}>
+                            Close
+                        </Button>
+                        <Button
+                            variant="outline"
+                            onClick={handleSavePollSelections}
+                            className={`font-semibold transition-all ${
+                                pollSaveStatus === "saved"
+                                    ? "border-emerald-500/50 text-emerald-600 bg-emerald-500/10"
+                                    : "border-border text-foreground"
+                            }`}
+                        >
+                            {pollSaveStatus === "saved" ? "✓ Selections Saved" : "Save Selections"}
                         </Button>
                         <Button
                             variant={copyStatus === "copied" ? "default" : "secondary"}
                             onClick={handleCopyShareText}
-                            className={`font-semibold min-w-[160px] transition-all ${
+                            className={`font-semibold min-w-[150px] transition-all ${
                                 copyStatus === "copied" 
                                     ? "bg-green-600 hover:bg-green-600 text-white" 
                                     : "bg-surface-3 hover:bg-surface-4 text-foreground"
@@ -3049,14 +3368,35 @@ export default function MatchesPage() {
             </Dialog>
 
             {/* Opposition & Referee Confirmation Modal */}
-            <Dialog open={selectedConfirmMatch !== null} onOpenChange={(open) => { if (!open) setSelectedConfirmMatch(null); }}>
+            <Dialog
+                open={selectedConfirmMatch !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        if (confirmDirtyRef.current) {
+                            handleSaveConfirmSelections();
+                        }
+                        setSelectedConfirmMatch(null);
+                    }
+                }}
+            >
                 <DialogContent className="z-[60] w-[95vw] sm:max-w-[800px] max-h-[90dvh] overflow-y-auto rounded-2xl">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-2 text-blue-700">
-                            <Share2 className="h-5 w-5" /> Home Game Confirmation Details
-                        </DialogTitle>
+                        <div className="flex items-center justify-between gap-2 pr-6">
+                            <DialogTitle className="flex items-center gap-2 text-blue-700">
+                                <Share2 className="h-5 w-5" /> Home Game Confirmation Details
+                            </DialogTitle>
+                            {confirmSaveStatus !== "idle" && (
+                                <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                                    confirmSaveStatus === "saved"
+                                        ? "bg-emerald-500/10 text-emerald-600 border-emerald-500/30"
+                                        : "bg-amber-500/10 text-amber-600 border-amber-500/30"
+                                }`}>
+                                    {confirmSaveStatus === "saved" ? "✓ Saved Indefinitely" : "Saving..."}
+                                </span>
+                            )}
+                        </div>
                         <DialogDescription>
-                            Review and customize the matchday details for opposition managers, secretaries, and referees.
+                            Review and customize the matchday details for opposition managers, secretaries, and referees. All changes are saved indefinitely.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -3070,16 +3410,19 @@ export default function MatchesPage() {
                                     <Label className="text-xs font-semibold">Stadium / Home Ground Address</Label>
                                     <Input 
                                         value={confirmStadiumAddress}
-                                        onChange={(e) => setConfirmStadiumAddress(e.target.value)}
+                                        onChange={(e) => { setConfirmStadiumAddress(e.target.value); markConfirmDirty(); }}
                                         className="text-xs border-border"
                                         placeholder="Enter stadium address"
                                     />
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-3">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     <div className="space-y-1.5">
                                         <Label className="text-xs font-semibold">Pitch Surface</Label>
-                                        <Select value={confirmSurfaceType} onValueChange={setConfirmSurfaceType}>
+                                        <Select
+                                            value={confirmSurfaceType}
+                                            onValueChange={(val) => { setConfirmSurfaceType(val); markConfirmDirty(); }}
+                                        >
                                             <SelectTrigger className="text-xs border-border">
                                                 <SelectValue />
                                             </SelectTrigger>
@@ -3092,8 +3435,17 @@ export default function MatchesPage() {
                                         </Select>
                                     </div>
                                     <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold">Meet Time (Offset)</Label>
-                                        <Select value={confirmMeetTimeOffset} onValueChange={setConfirmMeetTimeOffset}>
+                                        <Label className="text-xs font-semibold">Meet Offset</Label>
+                                        <Select
+                                            value={confirmMeetTimeOffset}
+                                            onValueChange={(val) => {
+                                                setConfirmMeetTimeOffset(val);
+                                                if (selectedConfirmMatch) {
+                                                    setConfirmMeetTimeExact(calculateMeetTime(selectedConfirmMatch.time, parseInt(val)));
+                                                }
+                                                markConfirmDirty();
+                                            }}
+                                        >
                                             <SelectTrigger className="text-xs border-border">
                                                 <SelectValue />
                                             </SelectTrigger>
@@ -3106,13 +3458,36 @@ export default function MatchesPage() {
                                             </SelectContent>
                                         </Select>
                                     </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-semibold">Meet Time</Label>
+                                        <Input
+                                            type="time"
+                                            value={confirmMeetTimeExact}
+                                            onChange={(e) => {
+                                                const newMeet = e.target.value;
+                                                setConfirmMeetTimeExact(newMeet);
+                                                if (selectedConfirmMatch && newMeet) {
+                                                    const [koH, koM] = (selectedConfirmMatch.time || "14:00").split(":").map(Number);
+                                                    const [mtH, mtM] = newMeet.split(":").map(Number);
+                                                    if (!isNaN(koH) && !isNaN(koM) && !isNaN(mtH) && !isNaN(mtM)) {
+                                                        const diff = (mtH * 60 + mtM) - (koH * 60 + koM);
+                                                        if (["-30", "-45", "-60", "-75", "-90"].includes(String(diff))) {
+                                                            setConfirmMeetTimeOffset(String(diff));
+                                                        }
+                                                    }
+                                                }
+                                                markConfirmDirty();
+                                            }}
+                                            className="text-xs border-border"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="space-y-1.5">
                                     <Label className="text-xs font-semibold">Our Kit Colors</Label>
                                     <Input 
                                         value={confirmKitColors}
-                                        onChange={(e) => setConfirmKitColors(e.target.value)}
+                                        onChange={(e) => { setConfirmKitColors(e.target.value); markConfirmDirty(); }}
                                         className="text-xs border-border"
                                         placeholder="e.g. Red Shirts, Black Shorts"
                                     />
@@ -3122,7 +3497,7 @@ export default function MatchesPage() {
                                     <Label className="text-xs font-semibold">Post-Match Hospitality / Dietary</Label>
                                     <Input 
                                         value={confirmDietaryDetails}
-                                        onChange={(e) => setConfirmDietaryDetails(e.target.value)}
+                                        onChange={(e) => { setConfirmDietaryDetails(e.target.value); markConfirmDirty(); }}
                                         className="text-xs border-border"
                                         placeholder="e.g. Food provided at the pub"
                                     />
@@ -3134,7 +3509,7 @@ export default function MatchesPage() {
                                         <Label className="text-xs font-semibold">Referee Name</Label>
                                         <Input 
                                             value={confirmRefName}
-                                            onChange={(e) => setConfirmRefName(e.target.value)}
+                                            onChange={(e) => { setConfirmRefName(e.target.value); markConfirmDirty(); }}
                                             className="text-xs border-border"
                                             placeholder="e.g. Mark, Sir, etc."
                                         />
@@ -3144,14 +3519,17 @@ export default function MatchesPage() {
                                             <Label className="text-xs font-semibold">Referee Fee (£)</Label>
                                             <Input 
                                                 value={confirmRefFee}
-                                                onChange={(e) => setConfirmRefFee(e.target.value)}
+                                                onChange={(e) => { setConfirmRefFee(e.target.value); markConfirmDirty(); }}
                                                 className="text-xs border-border"
                                                 placeholder="e.g. 45"
                                             />
                                         </div>
                                         <div className="space-y-1.5">
                                             <Label className="text-xs font-semibold">Payment Method</Label>
-                                            <Select value={confirmPaymentMethod} onValueChange={setConfirmPaymentMethod}>
+                                            <Select
+                                                value={confirmPaymentMethod}
+                                                onValueChange={(val) => { setConfirmPaymentMethod(val); markConfirmDirty(); }}
+                                            >
                                                 <SelectTrigger className="text-xs border-border">
                                                     <SelectValue />
                                                 </SelectTrigger>
@@ -3234,9 +3612,25 @@ export default function MatchesPage() {
                         </div>
                     )}
 
-                    <DialogFooter className="border-t border-border pt-3">
-                        <Button variant="outline" onClick={() => setSelectedConfirmMatch(null)}>
+                    <DialogFooter className="border-t border-border pt-3 flex items-center justify-between sm:justify-end gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                if (confirmDirtyRef.current) handleSaveConfirmSelections();
+                                setSelectedConfirmMatch(null);
+                            }}
+                        >
                             Close
+                        </Button>
+                        <Button
+                            onClick={handleSaveConfirmSelections}
+                            className={`font-semibold transition-all ${
+                                confirmSaveStatus === "saved"
+                                    ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                            }`}
+                        >
+                            {confirmSaveStatus === "saved" ? "✓ Selections Saved" : "Save Selections"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
