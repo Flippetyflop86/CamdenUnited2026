@@ -2006,7 +2006,7 @@ export default function OppositionReportsPage() {
                                 const profile = (activeReport.playerProfiles || []).find(
                                     (p) => p.positionIndex === idx
                                 );
-                                const playerName = activeReport.lineup?.[idx] || "";
+                                const playerName = (activeReport.lineup?.[idx] || "").trim();
                                 return (
                                     <div
                                         key={idx}
@@ -2015,22 +2015,28 @@ export default function OppositionReportsPage() {
                                         onClick={() => handleOpenPositionProfile(idx)}
                                     >
                                         <div
-                                            className={`absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-white border-2 rounded-full flex items-center justify-center shadow-lg ${
+                                            className={`absolute -translate-x-1/2 -translate-y-1/2 w-8 h-8 bg-white border-2 rounded-full flex items-center justify-center shadow-lg ${
                                                 profile?.role ? "border-amber-500" : "border-red-600"
                                             }`}
                                         >
-                                            <span className="text-[9px] font-black text-slate-900">
+                                            <span className="text-[11px] font-black text-slate-900">
                                                 {pos.number}
                                             </span>
                                         </div>
                                         <div
                                             className={`absolute -translate-x-1/2 z-30 flex flex-col items-center ${
-                                                isTopHalf ? "bottom-4" : "top-4"
+                                                isTopHalf ? "bottom-5" : "top-5"
                                             }`}
                                         >
-                                            <span className="text-[8px] font-bold text-white bg-slate-900/80 px-1 py-0.5 rounded whitespace-nowrap truncate max-w-[62px]">
-                                                {playerName || getDisplayPosition(pos.label)}
-                                            </span>
+                                            {playerName ? (
+                                                <span className="text-[11px] font-black tracking-tight text-white bg-slate-950/95 border border-white/30 px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap truncate max-w-[96px]">
+                                                    {playerName}
+                                                </span>
+                                            ) : (
+                                                <span className="text-[10px] font-extrabold text-white/85 bg-slate-900/80 border border-white/15 px-1.5 py-0.5 rounded shadow-md whitespace-nowrap">
+                                                    {getDisplayPosition(pos.label)}
+                                                </span>
+                                            )}
                                         </div>
                                     </div>
                                 );
@@ -2061,7 +2067,7 @@ export default function OppositionReportsPage() {
                                             onChange={(e) => handleUpdateLineupName(idx, e.target.value)}
                                             onClick={(e) => e.stopPropagation()}
                                             placeholder="Add player name..."
-                                            className="flex-1 text-xs bg-surface-1 border border-border rounded-lg px-2 py-1 text-foreground outline-none focus:border-brand"
+                                            className="flex-1 text-xs font-bold bg-surface-1 border border-border rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:border-brand"
                                         />
                                         {profile?.role && (
                                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 shrink-0">
@@ -3333,7 +3339,7 @@ export default function OppositionReportsPage() {
                                         const profile = (activeReport.playerProfiles || []).find(
                                             (p) => p.positionIndex === idx
                                         );
-                                        const playerName = activeReport.lineup?.[idx] || "";
+                                        const playerName = (activeReport.lineup?.[idx] || "").trim();
                                         return (
                                             <div
                                                 key={idx}
@@ -3342,22 +3348,28 @@ export default function OppositionReportsPage() {
                                                 onClick={() => handleOpenPositionProfile(idx)}
                                             >
                                                 <div
-                                                    className={`absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 bg-white border-2 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform ${
+                                                    className={`absolute -translate-x-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 bg-white border-[2.5px] rounded-full flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform ${
                                                         profile?.role ? "border-amber-500" : "border-red-600"
                                                     }`}
                                                 >
-                                                    <span className="text-[9px] sm:text-[10px] font-black text-slate-900">
+                                                    <span className="text-xs sm:text-sm font-black text-slate-900">
                                                         {pos.number}
                                                     </span>
                                                 </div>
                                                 <div
                                                     className={`absolute -translate-x-1/2 z-30 flex flex-col items-center ${
-                                                        isTopHalf ? "bottom-4" : "top-4"
+                                                        isTopHalf ? "bottom-6" : "top-6"
                                                     }`}
                                                 >
-                                                    <span className="text-[8px] font-bold text-white bg-slate-900/75 px-1.5 py-0.5 rounded whitespace-nowrap">
-                                                        {playerName || getDisplayPosition(pos.label)}
-                                                    </span>
+                                                    {playerName ? (
+                                                        <span className="text-xs sm:text-sm font-black tracking-tight text-white bg-slate-950/95 border border-white/30 px-2.5 py-1 rounded-lg shadow-xl whitespace-nowrap">
+                                                            {playerName}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-[11px] sm:text-xs font-extrabold text-white/85 bg-slate-900/80 border border-white/15 px-2 py-0.5 rounded-md shadow-md whitespace-nowrap">
+                                                            {getDisplayPosition(pos.label)}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -3377,10 +3389,10 @@ export default function OppositionReportsPage() {
                                                     onClick={() => handleOpenPositionProfile(idx)}
                                                     className="flex items-center gap-2.5 p-2 rounded-lg bg-surface-2/60 border border-border hover:border-brand/40 cursor-pointer"
                                                 >
-                                                    <div className="w-6 h-6 rounded-full bg-brand text-brand-foreground flex items-center justify-center shrink-0 text-[10px] font-black">
+                                                    <div className="w-7 h-7 rounded-full bg-brand text-brand-foreground flex items-center justify-center shrink-0 text-xs font-black">
                                                         {pos.number}
                                                     </div>
-                                                    <span className="text-xs font-bold text-muted-foreground w-10 shrink-0">
+                                                    <span className="text-xs font-extrabold text-muted-foreground w-10 shrink-0">
                                                         {getDisplayPosition(pos.label)}
                                                     </span>
                                                     <input
@@ -3389,10 +3401,10 @@ export default function OppositionReportsPage() {
                                                         onChange={(e) => handleUpdateLineupName(idx, e.target.value)}
                                                         onClick={(e) => e.stopPropagation()}
                                                         placeholder="Add player name..."
-                                                        className="flex-1 text-xs bg-surface-1 border border-border rounded px-2 py-1 text-foreground outline-none focus:border-brand"
+                                                        className="flex-1 text-xs sm:text-sm font-bold bg-surface-1 border border-border rounded-md px-2.5 py-1.5 text-foreground outline-none focus:border-brand"
                                                     />
                                                     {profile?.role && (
-                                                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 shrink-0">
+                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-500 shrink-0">
                                                             {profile.role}
                                                         </span>
                                                     )}
@@ -3446,6 +3458,140 @@ export default function OppositionReportsPage() {
                     </DialogHeader>
                     {selectedProfileIndex !== null &&
                         (() => {
+                            const selectedPos = formationPositions[selectedProfileIndex];
+                            const rawLabel = (selectedPos?.label || "").toUpperCase();
+                            const displayPos = getDisplayPosition(rawLabel);
+
+                            const positionRolesMap: Record<string, string[]> = {
+                                GK: [
+                                    "Shot-Stopper (Traditional GK)",
+                                    "Sweeper Keeper",
+                                    "Ball-Playing Keeper (Builds Short)",
+                                    "Commanding GK (Cross Claimer)",
+                                    "Direct / Long-Distribution GK"
+                                ],
+                                CB: [
+                                    "Ball-Playing Defender",
+                                    "No-Nonsense CB",
+                                    "Aggressive Stopper (Steps In)",
+                                    "Covering / Sweeper CB",
+                                    "Aerial / Physical CB",
+                                    "Wide Centre-Back"
+                                ],
+                                RB: [
+                                    "Overlapping Full-Back",
+                                    "Defensive / Stay-Back Full-Back",
+                                    "Attacking Wing-Back",
+                                    "Inverted Full-Back",
+                                    "Direct Crossing Full-Back"
+                                ],
+                                LB: [
+                                    "Overlapping Full-Back",
+                                    "Defensive / Stay-Back Full-Back",
+                                    "Attacking Wing-Back",
+                                    "Inverted Full-Back",
+                                    "Direct Crossing Full-Back"
+                                ],
+                                RWB: [
+                                    "Attacking Wing-Back",
+                                    "Overlapping Wing-Back",
+                                    "Two-Way / Balanced Wing-Back",
+                                    "Inverted Wing-Back",
+                                    "Defensive Wing-Back"
+                                ],
+                                LWB: [
+                                    "Attacking Wing-Back",
+                                    "Overlapping Wing-Back",
+                                    "Two-Way / Balanced Wing-Back",
+                                    "Inverted Wing-Back",
+                                    "Defensive Wing-Back"
+                                ],
+                                DM: [
+                                    "Holding Pivot / Anchor Man",
+                                    "Deep-Lying Playmaker",
+                                    "Ball-Winning Destroyer",
+                                    "Half-Back (Drops into Defence)",
+                                    "Box-to-Box Pivot"
+                                ],
+                                CM: [
+                                    "Box-to-Box Midfielder",
+                                    "Deep-Lying Playmaker",
+                                    "Ball-Winning Midfielder",
+                                    "Attacking #8 (Late Box Runner)",
+                                    "Half-Space Runner (Mezzala)",
+                                    "Sitting / Controlling CM"
+                                ],
+                                CAM: [
+                                    "Advanced Playmaker (#10)",
+                                    "Shadow Striker (Box Crasher)",
+                                    "Free Role / Roaming Playmaker",
+                                    "Second Striker",
+                                    "High-Pressing #10"
+                                ],
+                                RM: [
+                                    "Touchline Winger (Crosses Early)",
+                                    "Inverted Winger / Inside Forward",
+                                    "Direct 1v1 Dribbler",
+                                    "Wide Playmaker",
+                                    "Defensive / Track-Back Wide Mid"
+                                ],
+                                LM: [
+                                    "Touchline Winger (Crosses Early)",
+                                    "Inverted Winger / Inside Forward",
+                                    "Direct 1v1 Dribbler",
+                                    "Wide Playmaker",
+                                    "Defensive / Track-Back Wide Mid"
+                                ],
+                                RW: [
+                                    "Inverted Winger / Inside Forward",
+                                    "Touchline Winger",
+                                    "Direct 1v1 Dribbler",
+                                    "Pace in Behind / Channel Threat",
+                                    "Wide Playmaker"
+                                ],
+                                LW: [
+                                    "Inverted Winger / Inside Forward",
+                                    "Touchline Winger",
+                                    "Direct 1v1 Dribbler",
+                                    "Pace in Behind / Channel Threat",
+                                    "Wide Playmaker"
+                                ],
+                                ST: [
+                                    "Target Man (Hold-Up #9)",
+                                    "Poacher (Box Finisher)",
+                                    "Pace in Behind / Channel Runner",
+                                    "Pressing Forward",
+                                    "False 9 (Drops Deep)",
+                                    "Complete Forward"
+                                ]
+                            };
+
+                            const traitsPlaceholderMap: Record<string, string> = {
+                                GK: "e.g. Struggles with high crosses under pressure, kicks long off right foot...",
+                                CB: "e.g. Dominant in the air, slow turning when balls are played in behind...",
+                                RB: "e.g. Pushes high to overlap, leaves space in behind on transition...",
+                                LB: "e.g. Pushes high to overlap, leaves space in behind on transition...",
+                                RWB: "e.g. Provides main width, vulnerable when caught high upfield...",
+                                LWB: "e.g. Provides main width, vulnerable when caught high upfield...",
+                                DM: "e.g. Dictates tempo if given time, press early on first touch...",
+                                CM: "e.g. Makes late runs into the box, strong engine...",
+                                CAM: "e.g. Finds pockets between the lines, dangerous on the half-turn...",
+                                RM: "e.g. Looks to deliver early crosses into the box...",
+                                LM: "e.g. Looks to deliver early crosses into the box...",
+                                RW: "e.g. Cuts inside onto stronger foot, dangerous 1v1...",
+                                LW: "e.g. Cuts inside onto stronger foot, dangerous 1v1...",
+                                ST: "e.g. Fast in behind, spins into channels, strong hold-up play..."
+                            };
+
+                            const roleOptions =
+                                positionRolesMap[rawLabel] ||
+                                positionRolesMap[displayPos] ||
+                                positionRolesMap.CM;
+                            const traitsPlaceholder =
+                                traitsPlaceholderMap[rawLabel] ||
+                                traitsPlaceholderMap[displayPos] ||
+                                "e.g. Key strengths, weaknesses, or tactical tendencies...";
+
                             const name = activeReport.lineup?.[selectedProfileIndex] || "";
                             const currentProfile = (activeReport.playerProfiles || []).find(
                                 (p) => p.positionIndex === selectedProfileIndex
@@ -3474,7 +3620,7 @@ export default function OppositionReportsPage() {
                                                     handleSavePositionProfileModal();
                                                 }
                                             }}
-                                            placeholder="e.g. Opposition #9"
+                                            placeholder={`e.g. Opposition #${selectedPos?.number || 1} (${displayPos || "Player"})`}
                                             className="mt-1 bg-surface-2 border-border"
                                         />
                                     </div>
@@ -3482,7 +3628,7 @@ export default function OppositionReportsPage() {
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <Label className="text-xs font-bold text-muted-foreground uppercase">
-                                                Tactical Role
+                                                {displayPos} Tactical Role
                                             </Label>
                                             <select
                                                 value={currentProfile.role}
@@ -3493,17 +3639,18 @@ export default function OppositionReportsPage() {
                                                 }
                                                 className="w-full mt-1 px-3 py-2 border border-border rounded-md text-xs bg-surface-2 text-foreground"
                                             >
-                                                <option value="">Select Role...</option>
-                                                <option value="Sweeper Keeper">Sweeper Keeper</option>
-                                                <option value="Ball Playing Defender">Ball Playing Defender</option>
-                                                <option value="No-Nonsense CB">No-Nonsense CB</option>
-                                                <option value="Wing-Back">Wing-Back</option>
-                                                <option value="Deep Lying Playmaker">Deep Lying Playmaker</option>
-                                                <option value="Box-to-Box Midfielder">Box-to-Box Midfielder</option>
-                                                <option value="Advanced Playmaker">Advanced Playmaker</option>
-                                                <option value="Inverted Winger">Inverted Winger</option>
-                                                <option value="Target Man">Target Man</option>
-                                                <option value="Poacher">Poacher</option>
+                                                <option value="">Select {displayPos} Role...</option>
+                                                {currentProfile.role &&
+                                                    !roleOptions.includes(currentProfile.role) && (
+                                                        <option value={currentProfile.role}>
+                                                            {currentProfile.role}
+                                                        </option>
+                                                    )}
+                                                {roleOptions.map((roleOpt) => (
+                                                    <option key={roleOpt} value={roleOpt}>
+                                                        {roleOpt}
+                                                    </option>
+                                                ))}
                                             </select>
                                         </div>
                                         <div>
@@ -3537,7 +3684,7 @@ export default function OppositionReportsPage() {
                                                     traits: e.target.value
                                                 })
                                             }
-                                            placeholder="e.g. Fast in behind, weak left foot..."
+                                            placeholder={traitsPlaceholder}
                                             className="w-full mt-1 h-20 p-2 text-xs border border-border bg-surface-2 text-foreground rounded-md resize-none"
                                         />
                                     </div>
