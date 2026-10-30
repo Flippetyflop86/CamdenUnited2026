@@ -75,11 +75,11 @@ export function MatchPreparation({ nextMatch }: MatchPreparationProps) {
                     </Card>
                 </Link>
 
-                {/* Matchday XI */}
+                {/* Matchday Planner */}
                 <Link href={`/matchday-xi?match=${nextMatch.id}`} className="block group">
                     <Card className="border-border bg-surface-1 p-5 hover:bg-surface-2 transition-colors h-full flex flex-col">
                         <div className="flex items-center justify-between mb-3">
-                            <span className="text-sm font-medium text-foreground">Matchday XI</span>
+                            <span className="text-sm font-medium text-foreground">Matchday Planner</span>
                             {isSquadConfirmed ? (
                                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                             ) : (

@@ -14,7 +14,7 @@ export const ALL_PAGE_PERMISSIONS: PagePermission[] = [
     { key: "squad",       label: "Squad",         href: "/squad",       description: "View and manage players",         group: "On the Pitch" },
     { key: "training",    label: "Training",       href: "/training",    description: "Training sessions and plans",     group: "On the Pitch" },
     { key: "matches",     label: "Fixtures",       href: "/matches",     description: "Fixtures and results",            group: "On the Pitch" },
-    { key: "matchday-xi", label: "Matchday XI",    href: "/matchday-xi", description: "Lineup and tactics board",        group: "On the Pitch" },
+    { key: "matchday-xi", label: "Matchday Planner", href: "/matchday-xi", description: "Lineup and tactics board",      group: "On the Pitch" },
     // Analysis
     { key: "opposition", label: "Opposition Reports", href: "/opposition", description: "Scouting and opposition notes", group: "Analysis" },
     { key: "league",     label: "League Table",        href: "/league",     description: "Live league standings",         group: "Analysis" },

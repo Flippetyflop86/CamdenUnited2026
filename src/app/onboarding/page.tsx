@@ -83,7 +83,7 @@ const ROLE_PRESETS = [
     {
         id: "manager",
         label: "First-Team Manager / Head Coach",
-        desc: "Focus on Squad, Matchday XI, Training, Fixtures, Opposition & Recruitment",
+        desc: "Focus on Squad, Matchday Planner, Training, Fixtures, Opposition & Recruitment",
         tabs: ["squad", "training", "matches", "matchday-xi", "opposition", "league", "recruitment", "staff", "documents"],
     },
     {
@@ -101,7 +101,7 @@ const ROLE_PRESETS = [
     {
         id: "coach",
         label: "Coach / Tactical Analyst",
-        desc: "Pure pitch focus: Squad, Training, Matchday XI, Matches, League & Opposition",
+        desc: "Pure pitch focus: Squad, Training, Matchday Planner, Matches, League & Opposition",
         tabs: ["squad", "training", "matches", "matchday-xi", "opposition", "league", "recruitment"],
     },
 ];
@@ -1668,7 +1668,7 @@ function OnboardingContent() {
                                             <div className="p-3 rounded-xl bg-slate-900/90 border border-white/10 flex items-center justify-between">
                                                 <div>
                                                     <div className="text-xs font-bold text-white">Goalkeeper Jersey</div>
-                                                    <div className="text-[10px] text-slate-400">Used on Matchday XI graphic</div>
+                                                    <div className="text-[10px] text-slate-400">Used on Matchday Planner graphic</div>
                                                 </div>
                                                 <input
                                                     type="color"
@@ -1703,6 +1703,114 @@ function OnboardingContent() {
                                                 />
                                             </div>
                                         </div>
+                                    </div>
+
+                                    {/* Match Formats (11v11 Default + Optional Youth Formats) & Coach Match Length Setup */}
+                                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-white/10 space-y-3.5">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <div>
+                                                <div className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
+                                                    <Sliders className="w-3.5 h-3.5 text-emerald-400" /> Match Format &amp; Game Length (Minutes)
+                                                </div>
+                                                <p className="text-[11px] text-slate-400 mt-0.5">
+                                                    11v11 is default. Enable youth/small-sided formats if applicable and set how many minutes your matches are.
+                                                </p>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex flex-wrap gap-2">
+                                            {([
+                                                { id: "11v11", label: "11v11 (Default)", defaultMins: 90 },
+                                                { id: "9v9", label: "9v9 (U11–U12)", defaultMins: 60 },
+                                                { id: "7v7", label: "7v7 (U9–U10)", defaultMins: 50 },
+                                                { id: "5v5", label: "5v5 (U7–U8)", defaultMins: 40 },
+                                            ] as const).map((fmt) => {
+                                                const active = enabledMatchFormats.includes(fmt.id);
+                                                return (
+                                                    <button
+                                                        key={fmt.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            if (fmt.id === "11v11") return;
+                                                            setEnabledMatchFormats((prev) => {
+                                                                const isAdding = !prev.includes(fmt.id);
+                                                                if (isAdding && defaultMatchDuration === 90) {
+                                                                    setDefaultMatchDuration(fmt.defaultMins);
+                                                                }
+                                                                return isAdding
+                                                                    ? [...prev, fmt.id]
+                                                                    : prev.filter((f) => f !== fmt.id);
+                                                            });
+                                                        }}
+                                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                                                            active
+                                                                ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-200"
+                                                                : "bg-slate-900/60 border-white/10 text-slate-400 hover:text-white"
+                                                        }`}
+                                                    >
+                                                        {active ? "✓ " : "+ "}
+                                                        {fmt.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+
+                                        <div className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
+                                            <span className="text-xs font-bold text-slate-300">
+                                                How many minutes are your matches?
+                                            </span>
+                                            <div className="flex flex-wrap items-center gap-1.5">
+                                                {[40, 50, 60, 70, 80, 90].map((mins) => (
+                                                    <button
+                                                        key={mins}
+                                                        type="button"
+                                                        onClick={() => setDefaultMatchDuration(mins)}
+                                                        className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border transition-all ${
+                                                            defaultMatchDuration === mins
+                                                                ? "bg-emerald-500 text-slate-950 border-emerald-400"
+                                                                : "bg-slate-900 text-slate-400 border-white/10 hover:text-white"
+                                                        }`}
+                                                    >
+                                                        {mins}m
+                                                    </button>
+                                                ))}
+                                                <div className="flex items-center gap-1 ml-1">
+                                                    <Input
+                                                        type="number"
+                                                        min={10}
+                                                        max={120}
+                                                        value={defaultMatchDuration}
+                                                        onChange={(e) => setDefaultMatchDuration(Math.max(10, Math.min(120, Number(e.target.value) || 90)))}
+                                                        className="h-7 w-14 bg-slate-900 border-white/15 text-xs font-bold text-white text-center px-1"
+                                                    />
+                                                    <span className="text-[11px] text-slate-400">mins</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {enabledMatchFormats.some((f) => f !== "11v11") && (
+                                            <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-3">
+                                                <div>
+                                                    <div className="text-xs font-bold text-white">
+                                                        Youth Equal Play-Time Target (5v5 / 7v7 / 9v9 Only)
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400">
+                                                        Show equal game-time calculator on the bench for youth formats (never shown in 11v11).
+                                                    </div>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setEqualPlayTimeEnabled((v) => !v)}
+                                                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all shrink-0 ${
+                                                        equalPlayTimeEnabled
+                                                            ? "bg-emerald-500 text-slate-950 border-emerald-400"
+                                                            : "bg-slate-900 text-slate-400 border-white/15"
+                                                    }`}
+                                                >
+                                                    {equalPlayTimeEnabled ? "ON" : "OFF"}
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Your Role & Workspace Navigation Tabs */}
@@ -2497,7 +2605,7 @@ function OnboardingContent() {
                                             </div>
                                             <p className="text-xs text-slate-300 leading-relaxed">
                                                 Don’t have your squad list handy right now? Load a sample 16-man squad (fictional players + positions), 4 fixtures,
-                                                and a 6-team league table so you can immediately explore the Matchday XI pitch
+                                                and a 6-team league table so you can immediately explore the Matchday Planner pitch
                                                 builder and stats hub.
                                             </p>
                                             <Button
@@ -2708,7 +2816,7 @@ function OnboardingContent() {
                                                 className="h-11 border-white/20 bg-white/5 hover:bg-white/10 text-white font-bold"
                                             >
                                                 <Shirt className="w-4 h-4 mr-2 text-emerald-400" />
-                                                Open Matchday XI
+                                                Open Matchday Planner
                                             </Button>
                                             <Button
                                                 type="button"

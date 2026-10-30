@@ -70,8 +70,8 @@ const SHOWCASE_TABS: {
     },
     {
         id: "matchday-xi",
-        label: "Matchday XI",
-        shortLabel: "Matchday XI",
+        label: "Matchday Planner",
+        shortLabel: "Matchday Planner",
         url: "app.clubflow.org.uk/matchday-xi",
         badge: "Selection & Tactics",
         headline: "Pick your starting XI from available players, assign set pieces & export your matchday graphic.",
@@ -96,7 +96,7 @@ const SHOWCASE_TABS: {
         badge: "Season Schedule",
         headline: "Every league and cup fixture, result, goalscorer, assist, and saved lineup in one timeline.",
         description:
-            "Log match results in seconds, record goals, assists, cards, and Man of the Match awards, and jump straight into the saved Matchday XI or opposition report for any fixture.",
+            "Log match results in seconds, record goals, assists, cards, and Man of the Match awards, and jump straight into the saved Matchday Planner or opposition report for any fixture.",
     },
     {
         id: "recruitment",
@@ -127,7 +127,7 @@ const FAQ_ITEMS = [
     },
     {
         q: "Does ClubFlow work on mobile as well as laptop and desktop?",
-        a: "Yes. Every screen in ClubFlow is built to work on both desktop and mobile browsers. You can plan your Matchday XI and opposition reports on a laptop mid-week, then check attendance, log match stats, or copy your WhatsApp briefing pitchside from your phone.",
+        a: "Yes. Every screen in ClubFlow is built to work on both desktop and mobile browsers. You can plan your Matchday Planner and opposition reports on a laptop mid-week, then check attendance, log match stats, or copy your WhatsApp briefing pitchside from your phone.",
     },
     {
         q: "How long does it take to set up my club?",
@@ -139,7 +139,7 @@ const FAQ_ITEMS = [
     },
     {
         q: "Can I export graphics and spreadsheets for my coaching staff and players?",
-        a: "Yes. You can export Matchday XI pitch graphics, training attendance leaderboards, one-click WhatsApp fixture and training briefings, and Excel/PDF reports for recruitment and squad records.",
+        a: "Yes. You can export Matchday Planner pitch graphics, training attendance leaderboards, one-click WhatsApp fixture and training briefings, and Excel/PDF reports for recruitment and squad records.",
     },
     {
         q: "Is our club data private to our staff?",
@@ -286,7 +286,7 @@ function RealAppSidebar({
                 { name: "Squad", icon: Users },
                 { name: "Training", id: "training", icon: ClipboardCheck },
                 { name: "Fixtures", id: "fixtures", icon: Calendar },
-                { name: "Matchday XI", id: "matchday-xi", icon: Shirt },
+                { name: "Matchday Planner", id: "matchday-xi", icon: Shirt },
                 { name: "League Table", icon: Trophy },
                 { name: "Opposition Reports", id: "opposition", icon: Shield },
                 { name: "Recruitment", id: "recruitment", icon: UserPlus },
@@ -493,7 +493,7 @@ function FullDashboardPreview({
                             onClick={() => onNavigate("matchday-xi")}
                             className="flex-1 py-1.5 px-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] text-center transition-colors cursor-pointer"
                         >
-                            Matchday XI →
+                            Matchday Planner →
                         </button>
                     </div>
                 </div>
@@ -683,7 +683,7 @@ function FullMatchdayXiPreview() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3.5 mb-3.5 border-b border-neutral-200">
                 <div>
                     <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="text-base sm:text-lg font-black text-neutral-900">Matchday XI</h3>
+                        <h3 className="text-base sm:text-lg font-black text-neutral-900">Matchday Planner</h3>
                         <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
                             Sat 14 Nov vs Kingswood Rovers (H)
                         </span>
@@ -699,7 +699,7 @@ function FullMatchdayXiPreview() {
                 </div>
             </div>
 
-            {/* 3-Column Matchday XI Interface */}
+            {/* 3-Column Matchday Planner Interface */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-start">
                 {/* Left Column: Available Squad Pool */}
                 <div className="lg:col-span-3 bg-white rounded-xl border border-neutral-200 shadow-xs p-3">
@@ -1226,7 +1226,7 @@ function FullFixturesPreview({
                         onClick={() => onNavigate("matchday-xi")}
                         className="px-3 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-[11px] font-bold cursor-pointer"
                     >
-                        Open Matchday XI →
+                        Open Matchday Planner →
                     </button>
                     <button
                         type="button"
@@ -1944,7 +1944,7 @@ export default function LandingPage() {
                                     </p>
                                 </div>
                                 <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-bold text-neutral-300">
-                                    <span>Matchday XI • Opposition Report</span>
+                                    <span>Matchday Planner • Opposition Report</span>
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -2124,7 +2124,7 @@ export default function LandingPage() {
                                                 WhatsApp Copy
                                             </span>
                                             <span className="py-1.5 rounded-lg bg-red-600 text-white font-bold text-[10px] text-center">
-                                                Matchday XI
+                                                Matchday Planner
                                             </span>
                                         </div>
                                     </div>
@@ -2138,13 +2138,13 @@ export default function LandingPage() {
                             </div>
                         </div>
 
-                        {/* PHONE 2: Mobile Matchday XI */}
+                        {/* PHONE 2: Mobile Matchday Planner */}
                         <div className="w-full max-w-[330px] rounded-[36px] p-3 bg-[#161922] border-2 border-white/15 shadow-2xl">
                             <div className="rounded-[26px] overflow-hidden bg-[#FCFCFD] text-neutral-900 border border-neutral-200">
                                 <div className="h-12 bg-[#171717] text-white px-3.5 flex items-center justify-between">
                                     <div className="flex items-center gap-2">
                                         <Shirt className="w-4 h-4 text-red-500" />
-                                        <span className="font-bold text-xs">Matchday XI</span>
+                                        <span className="font-bold text-xs">Matchday Planner</span>
                                     </div>
                                     <span className="px-2 py-0.5 rounded bg-red-600 text-[10px] font-bold">
                                         4-3-3
@@ -2251,7 +2251,7 @@ export default function LandingPage() {
                                 </div>
                             </div>
                             <div className="mt-3 text-center">
-                                <div className="text-xs font-bold text-white">Mobile Matchday XI</div>
+                                <div className="text-xs font-bold text-white">Mobile Matchday Planner</div>
                                 <div className="text-[11px] text-neutral-400">
                                     Starting lineup, bench & set-piece takers
                                 </div>
@@ -2483,7 +2483,7 @@ export default function LandingPage() {
                             Ready to organise your club properly?
                         </h2>
                         <p className="mt-4 text-base sm:text-lg text-neutral-300 max-w-2xl mx-auto">
-                            Set up your club workspace in minutes and bring your squad, training attendance, Matchday XI, and opposition prep into one place.
+                            Set up your club workspace in minutes and bring your squad, training attendance, Matchday Planner, and opposition prep into one place.
                         </p>
                         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
                             <Link

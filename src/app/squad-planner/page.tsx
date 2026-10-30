@@ -434,7 +434,7 @@ export default function SquadPlannerPage() {
                             disabled={loading}
                             className="w-full h-14 text-lg font-bold bg-brand hover:bg-brand-dark text-white rounded-xl shadow-md hover:shadow-lg transition-all"
                         >
-                            {loading ? "Generating..." : "✅ Use Saved Matchday XI (Recommended)"}
+                            {loading ? "Generating..." : "✅ Use Saved Matchday Planner (Recommended)"}
                         </Button>
                         <Button 
                             onClick={handleSkipOnboarding}

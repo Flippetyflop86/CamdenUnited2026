@@ -67,7 +67,7 @@ const navItems: NavItem[] = [
         href: "/squad",
         subItems: [
             { label: "Players", href: "/squad" },
-            { label: "Matchday XI", href: "/matchday-xi" },
+            { label: "Matchday Planner", href: "/matchday-xi" },
         ]
     },
     { label: "Training", href: "/training", icon: Activity },

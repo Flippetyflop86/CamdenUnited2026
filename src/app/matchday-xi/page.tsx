@@ -2800,7 +2800,7 @@ export default function MatchdayXIPage() {
                 <div class="header">
                     <div>
                         <h1>${settings.name} — Matchday Team Sheet (${activeFmt})</h1>
-                        <div class="subtitle">${nextMatch ? `${nextMatch.isHome ? 'Home' : 'Away'} vs ${nextMatch.opponent} • ${nextMatch.competition || 'Match'} (${matchDur} mins)` : `${activeSquadTab} • ${activeFmt}`}</div>
+                        <div class="subtitle">${nextMatch ? `${nextMatch.isHome ? 'Home' : 'Away'} vs ${nextMatch.opponent} • ${nextMatch.competition || 'Match'}${activeFmt !== '11v11' ? ` (${matchDur} mins)` : ''}` : `${activeSquadTab} • ${activeFmt}`}</div>
                     </div>
                     ${settings.logo ? `<img src="${settings.logo}" class="logo" />` : ''}
                 </div>
@@ -2816,7 +2816,7 @@ export default function MatchdayXIPage() {
                     </div>
                     <div class="meta-item">
                         <span>Format & Formation</span>
-                        <strong>${activeFmt} • ${lineup.formation} (${matchDur}m)</strong>
+                        <strong>${activeFmt} • ${lineup.formation}${activeFmt !== '11v11' ? ` (${matchDur}m)` : ''}</strong>
                     </div>
                     <div class="meta-item">
                         <span>Captain</span>
@@ -3086,7 +3086,9 @@ export default function MatchdayXIPage() {
     const formation = FORMATIONS[lineup.formation] || FORMATIONS[DEFAULT_FORMATION_BY_FORMAT[activeFormat]];
     const targetStarterCount = formation.length || FORMAT_PLAYER_COUNT[activeFormat];
     const benchStartNumber = targetStarterCount + 1;
-    const effectiveMatchDuration = lineup.matchDurationMinutes || (activeFormat === "11v11" ? (settings.defaultMatchDuration || 90) : FORMAT_DEFAULT_DURATION[activeFormat]);
+    const effectiveMatchDuration = activeFormat === "11v11"
+        ? 90
+        : (settings.defaultMatchDuration || FORMAT_DEFAULT_DURATION[activeFormat]);
     const isEqualPlayTimeActive = activeFormat !== "11v11" && (
         typeof lineup.equalPlayTimeEnabled === "boolean"
             ? lineup.equalPlayTimeEnabled
@@ -4294,7 +4296,7 @@ export default function MatchdayXIPage() {
                             <div className="flex flex-col">
                                 <span className="cf-section-title">Starting {activeRomanLabel}</span>
                                 <span className="cf-metadata">
-                                    {selectedStartersCount} / {targetStarterCount} Selected • {effectiveMatchDuration}m Match
+                                    {selectedStartersCount} / {targetStarterCount} Selected
                                 </span>
                             </div>
 
@@ -4409,38 +4411,6 @@ export default function MatchdayXIPage() {
                                     <span>Reset 1–{targetStarterCount}</span>
                                 </button>
                             )}
-
-                            {/* #9 Configurable Total Match Time Length (mins) */}
-                            <div
-                                className="inline-flex items-center gap-1 px-2.5 py-1 border border-border rounded-xl bg-surface-1 text-foreground shadow-sm"
-                                title="Configure total match length in minutes (used for automatic sub & appearance minutes)"
-                            >
-                                <Clock className="h-3 w-3 text-muted-foreground shrink-0" />
-                                <input
-                                    type="number"
-                                    min={10}
-                                    max={120}
-                                    list="match-duration-presets"
-                                    value={effectiveMatchDuration}
-                                    onChange={(e) => {
-                                        const val = parseInt(e.target.value, 10);
-                                        if (!isNaN(val) && val > 0) {
-                                            handleMatchDurationChange(val, true);
-                                        }
-                                    }}
-                                    onBlur={(e) => {
-                                        const val = parseInt(e.target.value, 10) || 90;
-                                        handleMatchDurationChange(val, false);
-                                    }}
-                                    className="w-10 bg-transparent text-xs font-bold text-foreground text-center focus:outline-none"
-                                />
-                                <span className="text-[10px] font-bold text-muted-foreground">mins</span>
-                                <datalist id="match-duration-presets">
-                                    {[40, 50, 60, 70, 80, 90].map(mins => (
-                                        <option key={mins} value={mins} />
-                                    ))}
-                                </datalist>
-                            </div>
 
                             {/* #1 Formation Dropdown filtered to activeFormat */}
                             <select

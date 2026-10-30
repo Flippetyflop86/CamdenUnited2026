@@ -1024,7 +1024,7 @@ export default function SquadPage() {
                 .in("id", selectedPlayerIds);
 
             if (error) throw error;
-            const label = field === "is_in_training_squad" ? "Training Tracker" : "Matchday XI Tracker";
+            const label = field === "is_in_training_squad" ? "Training Tracker" : "Matchday Planner Tracker";
             logActivity(
                 "Bulk Tracker Update",
                 `${value ? "Added" : "Removed"} ${selectedPlayerIds.length} player(s) ${value ? "to" : "from"} ${label}.`
@@ -3187,7 +3187,7 @@ export default function SquadPage() {
                                                  className="h-4 w-4 rounded border-gray-300 text-slate-900 focus:ring-slate-900"
                                              />
                                              <label htmlFor="matchdayTracker" className="text-xs font-medium text-slate-700 cursor-pointer">
-                                                 Include in Matchday XI Tracker
+                                                 Include in Matchday Planner Tracker
                                              </label>
                                          </div>
                                      </div>

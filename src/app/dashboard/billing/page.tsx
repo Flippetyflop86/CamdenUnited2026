@@ -95,7 +95,7 @@ export default function BillingPage() {
                 "Squad Management",
                 "Training Attendance Log",
                 "Basic Fixtures & Score logging",
-                "Matchday XI Team Builder",
+                "Matchday Planner & Team Builder",
                 "League Table Syncing",
             ],
             color: "border-slate-200 bg-white"

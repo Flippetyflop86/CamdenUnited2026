@@ -396,12 +396,12 @@ export function QuickResultScorersModal({
                         </DialogTitle>
                         <Button asChild variant="outline" size="sm" className="h-7 text-[11px] sm:text-xs bg-surface-1 border-border px-2.5">
                             <Link href={`/matchday-xi?match=${match.id}`}>
-                                <Users className="h-3.5 w-3.5 mr-1 text-brand" /> Matchday XI
+                                <Users className="h-3.5 w-3.5 mr-1 text-brand" /> Matchday Planner
                             </Link>
                         </Button>
                     </div>
                     <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground">
-                        Changes here automatically sync with <strong>Matchday XI</strong> and <strong>Squad Player Stats</strong>.
+                        Changes here automatically sync with <strong>Matchday Planner</strong> and <strong>Squad Player Stats</strong>.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -496,7 +496,7 @@ export function QuickResultScorersModal({
                                             : "text-muted-foreground hover:text-foreground"
                                     }`}
                                 >
-                                    Matchday XI ({matchdaySquadCount})
+                                    Matchday Planner ({matchdaySquadCount})
                                 </button>
                                 <button
                                     type="button"
@@ -523,19 +523,19 @@ export function QuickResultScorersModal({
                         </div>
 
                         {isLoading ? (
-                            <div className="py-10 text-center text-xs text-muted-foreground">Loading Matchday XI &amp; match stats...</div>
+                            <div className="py-10 text-center text-xs text-muted-foreground">Loading Matchday Planner &amp; match stats...</div>
                         ) : (
                             <div className="border border-border rounded-xl divide-y divide-border max-h-[290px] overflow-y-auto bg-surface-2/30">
                                 {sortedFilteredPlayers.length === 0 && filterTab === "active" && !search.trim() ? (
                                     <div className="p-6 text-center space-y-2.5">
                                         <p className="text-xs font-medium text-muted-foreground">
-                                            No Matchday XI has been saved for this match yet.
+                                            No Matchday Planner has been saved for this match yet.
                                         </p>
                                         <div className="flex flex-wrap items-center justify-center gap-2">
                                             <Button asChild size="sm" variant="outline" className="h-7 text-xs">
                                                 <Link href={`/matchday-xi?match=${match.id}`}>
                                                     <Users className="h-3.5 w-3.5 mr-1.5 text-brand" />
-                                                    Set Matchday XI First
+                                                    Set Matchday Planner First
                                                 </Link>
                                             </Button>
                                             <Button

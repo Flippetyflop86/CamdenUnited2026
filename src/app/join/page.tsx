@@ -23,6 +23,8 @@ function JoinPageInner() {
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [showPassword, setShowPassword] = useState(false);
+    const [coachFormat, setCoachFormat] = useState<"11v11" | "9v9" | "7v7" | "5v5">("11v11");
+    const [coachMatchDuration, setCoachMatchDuration] = useState<number>(90);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -70,15 +72,38 @@ function JoinPageInner() {
         setError("");
 
         try {
-            // 1. Sign up the user
+            // 1. Sign up the user with their individual coach match format & duration preferences
             const { data: authData, error: signupError } = await supabase.auth.signUp({
                 email: invite.email,
                 password,
-                options: { data: { full_name: name.trim() } }
+                options: {
+                    data: {
+                        full_name: name.trim(),
+                        coach_match_format: coachFormat,
+                        coach_match_duration: coachMatchDuration,
+                    }
+                }
             });
 
             if (signupError) throw signupError;
             if (!authData.user) throw new Error("Signup failed — no user returned.");
+
+            if (typeof window !== "undefined") {
+                try {
+                    const cachedRaw = localStorage.getItem("clubflow_cache_clubSettings");
+                    const cached = cachedRaw ? JSON.parse(cachedRaw) : {};
+                    const existingFormats: string[] = Array.isArray(cached.enabledMatchFormats) ? cached.enabledMatchFormats : ["11v11"];
+                    const mergedFormats = Array.from(new Set([...existingFormats, "11v11", coachFormat]));
+                    localStorage.setItem(
+                        "clubflow_cache_clubSettings",
+                        JSON.stringify({
+                            ...cached,
+                            enabledMatchFormats: mergedFormats,
+                            defaultMatchDuration: coachMatchDuration,
+                        })
+                    );
+                } catch {}
+            }
 
             // 4. Redirect to dashboard (or confirm email page)
             if (authData.session) {
@@ -198,6 +223,49 @@ function JoinPageInner() {
                                     onChange={(e) => setConfirmPassword(e.target.value)}
                                     className="bg-slate-800 border-slate-700 text-white focus-visible:ring-red-500"
                                 />
+                            </div>
+                            <div className="space-y-2.5 pt-2 border-t border-slate-800">
+                                <Label className="text-slate-300 text-xs font-semibold">
+                                    Your Team&apos;s Match Format &amp; Game Length
+                                </Label>
+                                <div className="grid grid-cols-4 gap-1.5">
+                                    {([
+                                        { id: "11v11", mins: 90 },
+                                        { id: "9v9", mins: 60 },
+                                        { id: "7v7", mins: 50 },
+                                        { id: "5v5", mins: 40 },
+                                    ] as const).map((fmt) => (
+                                        <button
+                                            key={fmt.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setCoachFormat(fmt.id);
+                                                setCoachMatchDuration(fmt.mins);
+                                            }}
+                                            className={`py-1.5 rounded-lg text-xs font-bold border transition-all ${
+                                                coachFormat === fmt.id
+                                                    ? "bg-red-600 text-white border-red-500"
+                                                    : "bg-slate-800 text-slate-400 border-slate-700 hover:text-white"
+                                            }`}
+                                        >
+                                            {fmt.id}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="flex items-center justify-between gap-2 pt-1">
+                                    <span className="text-xs text-slate-400">How many minutes are your games?</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <Input
+                                            type="number"
+                                            min={10}
+                                            max={120}
+                                            value={coachMatchDuration}
+                                            onChange={(e) => setCoachMatchDuration(Math.max(10, Math.min(120, Number(e.target.value) || 90)))}
+                                            className="h-8 w-16 bg-slate-800 border-slate-700 text-white text-xs font-bold text-center px-1.5"
+                                        />
+                                        <span className="text-xs text-slate-400">mins</span>
+                                    </div>
+                                </div>
                             </div>
                         </CardContent>
                         <CardFooter>

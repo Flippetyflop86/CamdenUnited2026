@@ -219,7 +219,7 @@ export function NextMatchHero({
                         <Button asChild size="sm" className="h-9 bg-brand hover:bg-brand/90 text-brand-foreground font-bold text-xs w-full px-2">
                             <Link href={`/matchday-xi?match=${match.id}`}>
                                 <Users className="h-3.5 w-3.5 mr-1 shrink-0" />
-                                <span className="truncate">Matchday XI</span>
+                                <span className="truncate">Matchday Planner</span>
                             </Link>
                         </Button>
                         <Button asChild size="sm" variant="outline" className="h-9 bg-surface-2 hover:bg-surface-2/80 text-foreground border-border font-bold text-xs w-full px-2">
@@ -331,7 +331,7 @@ export function NextMatchHero({
                         <Button asChild size="sm" className="bg-brand hover:bg-brand/90 text-brand-foreground font-semibold">
                             <Link href={`/matchday-xi?match=${match.id}`}>
                                 <Users className="h-4 w-4 mr-1.5" />
-                                Matchday XI
+                                Matchday Planner
                             </Link>
                         </Button>
 

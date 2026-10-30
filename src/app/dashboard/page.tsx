@@ -696,7 +696,7 @@ export default function DashboardPage() {
             if (!hasSavedLineup) {
                 items.push({
                     id: `xi_${nextMatch.id}`,
-                    label: `Select Matchday XI vs ${nextMatch.opponent}`,
+                    label: `Open Matchday Planner vs ${nextMatch.opponent}`,
                     sub: `${formatDate(nextMatch.date)} (${nextMatch.isHome ? "Home" : "Away"})`,
                     href: "/matchday-xi",
                     tone: "brand"
@@ -1125,7 +1125,7 @@ export default function DashboardPage() {
                                             href="/matchday-xi"
                                             className="h-8 px-3 rounded-md bg-brand hover:bg-brand/90 text-white text-xs font-bold inline-flex items-center justify-center gap-1 transition-colors"
                                         >
-                                            Matchday XI <ArrowRight className="h-3.5 w-3.5" />
+                                            Matchday Planner <ArrowRight className="h-3.5 w-3.5" />
                                         </Link>
                                     </div>
                                     <Link

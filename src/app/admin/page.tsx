@@ -1154,7 +1154,7 @@ export default function AdminPage() {
                                 <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                                     <div className="space-y-0.5">
                                         <Label className="text-xs font-semibold text-slate-700">Default Total Match Length (Minutes)</Label>
-                                        <p className="text-[11px] text-slate-500">Can also be adjusted per fixture on the Matchday XI page.</p>
+                                        <p className="text-[11px] text-slate-500">Used for your team&apos;s matches in the Matchday Planner.</p>
                                     </div>
                                     <div className="flex items-center gap-1.5">
                                         {[40, 50, 60, 70, 80, 90].map((m) => (

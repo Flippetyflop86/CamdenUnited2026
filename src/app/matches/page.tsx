@@ -1611,7 +1611,7 @@ export default function MatchesPage() {
                             size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-brand"
                             onClick={() => router.push(`/matchday-xi?match=${match.id}`)}
-                            title="Open Matchday XI for this match"
+                            title="Open Matchday Planner for this match"
                         >
                             <Users className="h-4 w-4" />
                         </Button>
@@ -1856,7 +1856,7 @@ export default function MatchesPage() {
                             className="w-full text-xs font-bold border-border text-foreground hover:bg-surface-2 flex items-center justify-center gap-1.5"
                         >
                             <Users className="h-3.5 w-3.5" />
-                            Matchday XI &amp; Subs
+                            Matchday Planner &amp; Subs
                         </Button>
                     </div>
                 )}
