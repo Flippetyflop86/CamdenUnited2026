@@ -10,7 +10,7 @@ import { Search, Mail, Eye, RefreshCw, AlertCircle, BarChart3, TrendingUp, Check
 import { useAuth } from "@/context/auth-context";
 
 export default function HistoryPage() {
-    const { clubId } = useAuth();
+    const { clubId, session } = useAuth();
 
     const [history, setHistory] = useState<any[]>([]);
     const [analytics, setAnalytics] = useState<any>({ sent: 0, delivered: 0, failed: 0, bounceRate: "0.0%" });
@@ -28,7 +28,11 @@ export default function HistoryPage() {
         setError(null);
         setNeedsSetup(false);
         try {
-            const res = await fetch(`/api/communications/history?clubId=${clubId}`);
+            const res = await fetch(`/api/communications/history?clubId=${clubId}`, {
+                headers: session?.access_token
+                    ? { Authorization: `Bearer ${session.access_token}` }
+                    : {}
+            });
             const data = await res.json();
             if (!res.ok) {
                 setError(data.error || "Failed to load history.");
@@ -58,7 +62,7 @@ export default function HistoryPage() {
         if (clubId) {
             loadHistory();
         }
-    }, [clubId]);
+    }, [clubId, session?.access_token]);
 
     const filteredHistory = history.filter(item =>
         item.subject.toLowerCase().includes(searchTerm.toLowerCase()) ||

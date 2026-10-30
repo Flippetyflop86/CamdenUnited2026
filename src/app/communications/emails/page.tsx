@@ -9,9 +9,10 @@ import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Mail, Send, Eye, FileText, RefreshCw, AlertCircle, FileWarning, HelpCircle } from "lucide-react";
 import { useAuth } from "@/context/auth-context";
+import { supabase } from "@/lib/supabase";
 
 export default function ComposeEmailsPage() {
-    const { clubId } = useAuth();
+    const { clubId, session } = useAuth();
 
     // Data lists
     const [templates, setTemplates] = useState<any[]>([]);
@@ -40,8 +41,14 @@ export default function ComposeEmailsPage() {
         setError(null);
         setNeedsSetup(false);
         try {
+            const authHeaders: Record<string, string> = session?.access_token
+                ? { Authorization: `Bearer ${session.access_token}` }
+                : {};
+
             // 1. Fetch templates
-            const tmplRes = await fetch(`/api/communications/templates?clubId=${clubId}`);
+            const tmplRes = await fetch(`/api/communications/templates?clubId=${clubId}`, {
+                headers: authHeaders
+            });
             const tmplData = await tmplRes.json();
             
             // Catch lack of tables
@@ -53,17 +60,6 @@ export default function ComposeEmailsPage() {
             if (tmplRes.ok && tmplData.success) {
                 setTemplates(tmplData.templates || []);
             }
-
-            // To keep things simple and avoid extra endpoint calls, we can fetch training sessions & matches list directly using client supabase:
-            // Let's mock a simple list of recent events or get them from our context settings if needed
-            // Actually, we can fetch live training sessions directly using client supabase:
-            // Since this page runs in the manager dashboard (where user is logged in), they have read privileges!
-            // That means we can query Supabase directly for training sessions and matches!
-            const { createClient } = await import("@supabase/supabase-js");
-            const supabase = createClient(
-                process.env.NEXT_PUBLIC_SUPABASE_URL!,
-                process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-            );
 
             const [tRes, mRes] = await Promise.all([
                 supabase.from("training_sessions").select("id, date, topic, location").order("date", { ascending: false }).limit(10),
@@ -96,7 +92,7 @@ export default function ComposeEmailsPage() {
         if (clubId) {
             loadPageData();
         }
-    }, [clubId]);
+    }, [clubId, session?.access_token]);
 
     const handleTemplateChange = (id: string) => {
         setSelectedTemplateId(id);
@@ -133,7 +129,10 @@ export default function ComposeEmailsPage() {
         try {
             const res = await fetch("/api/communications/email", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+                },
                 body: JSON.stringify({
                     clubId,
                     recipientGroup,

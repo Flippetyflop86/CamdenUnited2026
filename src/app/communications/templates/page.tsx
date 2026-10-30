@@ -10,7 +10,7 @@ import { Trash2, Edit3, Plus, FileText, Sparkles, RefreshCw, AlertCircle } from 
 import { useAuth } from "@/context/auth-context";
 
 export default function TemplatesPage() {
-    const { clubId } = useAuth();
+    const { clubId, session } = useAuth();
 
     const [templates, setTemplates] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -25,12 +25,19 @@ export default function TemplatesPage() {
     const [formError, setFormError] = useState("");
     const [isSaving, setIsSaving] = useState(false);
 
+    const getAuthHeaders = (includeJson = false): Record<string, string> => ({
+        ...(includeJson ? { "Content-Type": "application/json" } : {}),
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {})
+    });
+
     const loadTemplates = async () => {
         if (!clubId) return;
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch(`/api/communications/templates?clubId=${clubId}`);
+            const res = await fetch(`/api/communications/templates?clubId=${clubId}`, {
+                headers: getAuthHeaders()
+            });
             const data = await res.json();
             if (!res.ok || !data.success) {
                 setError(data.error || "Failed to load templates.");
@@ -48,7 +55,7 @@ export default function TemplatesPage() {
         if (clubId) {
             loadTemplates();
         }
-    }, [clubId]);
+    }, [clubId, session?.access_token]);
 
     const handleCreateNew = () => {
         setEditingTemplate(null);
@@ -71,7 +78,10 @@ export default function TemplatesPage() {
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this template?")) return;
         try {
-            const res = await fetch(`/api/communications/templates?id=${id}`, { method: "DELETE" });
+            const res = await fetch(`/api/communications/templates?id=${id}&clubId=${clubId || ""}`, {
+                method: "DELETE",
+                headers: getAuthHeaders()
+            });
             const data = await res.json();
             if (res.ok && data.success) {
                 setTemplates(prev => prev.filter(t => t.id !== id));
@@ -96,7 +106,7 @@ export default function TemplatesPage() {
         try {
             const res = await fetch("/api/communications/templates", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: getAuthHeaders(true),
                 body: JSON.stringify({
                     id: editingTemplate?.id,
                     clubId,
@@ -145,7 +155,7 @@ export default function TemplatesPage() {
             for (const item of defaults) {
                 await fetch("/api/communications/templates", {
                     method: "POST",
-                    headers: { "Content-Type": "application/json" },
+                    headers: getAuthHeaders(true),
                     body: JSON.stringify({
                         clubId,
                         name: item.name,

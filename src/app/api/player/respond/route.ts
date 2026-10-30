@@ -149,11 +149,28 @@ export async function GET(request: Request) {
 
         const allCombinedPlayers = [...cleanPlayers, ...cleanRecruits];
 
+        // Sanitize event.notes on the server so private manager metadata (unreleased starting XIs,
+        // referee fee confirmations, etc.) is never exposed in the public RSVP payload or UI
+        const rawNotes: string = event.notes || "";
+        const locationMatch = rawNotes.match(/\[Location:\s*(.*?)\]/);
+        const sanitizedNotes = rawNotes
+            .replace(/\[Lineup:\s*\{[\s\S]*?\}\]/g, "")
+            .replace(/\[ConfirmDetails:\s*\{[\s\S]*?\}\]/g, "")
+            .replace(/\[Location:\s*.*?\]/g, "")
+            .replace(/\[Surface:\s*.*?\]/g, "")
+            .replace(/\[MeetTime:\s*.*?\]/g, "")
+            .trim();
+
+        const sanitizedEvent = {
+            ...event,
+            location: locationMatch?.[1]?.trim() || event.location,
+            notes: sanitizedNotes
+        };
+
         return NextResponse.json({
             success: true,
-            event,
+            event: sanitizedEvent,
             eventType,
-            sessionCode: getSessionCode(event.id),
             players: allCombinedPlayers
         });
 

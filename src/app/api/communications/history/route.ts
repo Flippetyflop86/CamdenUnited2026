@@ -4,7 +4,6 @@ import { createClient } from "@supabase/supabase-js";
 function getAdminClient() {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!key) {
-        console.warn("SUPABASE_SERVICE_ROLE_KEY environment variable is missing on the server. Falling back to Anon Key.");
         return createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -14,6 +13,24 @@ function getAdminClient() {
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         key
     );
+}
+
+async function verifyClubAccess(request: Request, supabaseAdmin: any, targetClubId: string): Promise<boolean> {
+    const authHeader = request.headers.get("Authorization");
+    const token = authHeader?.split(" ")[1];
+    if (!token) return false;
+
+    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    if (error || !user) return false;
+
+    const { data: member } = await supabaseAdmin
+        .from("club_members")
+        .select("club_id")
+        .eq("user_id", user.id)
+        .eq("club_id", targetClubId)
+        .maybeSingle();
+
+    return Boolean(member);
 }
 
 export async function GET(request: Request) {
@@ -26,6 +43,11 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, error: "Club ID is required" }, { status: 400 });
         }
 
+        const hasAccess = await verifyClubAccess(request, supabaseAdmin, clubId);
+        if (!hasAccess) {
+            return NextResponse.json({ success: false, error: "Unauthorized access to club communications" }, { status: 403 });
+        }
+
         const { data: history, error } = await supabaseAdmin
             .from("email_history")
             .select("*")
@@ -33,18 +55,16 @@ export async function GET(request: Request) {
             .order("created_at", { ascending: false });
 
         if (error) {
-            // Handle table-not-exist gracefully
             if (error.code === "P0001" || error.message.includes("does not exist")) {
-                return NextResponse.json({ 
-                    success: false, 
+                return NextResponse.json({
+                    success: false,
                     error: "Email system tables are not set up. Please run the SQL migration script in your Supabase Editor first.",
-                    needsSetup: true 
+                    needsSetup: true
                 }, { status: 200 });
             }
             throw error;
         }
 
-        // Calculate analytics
         let totalSent = 0;
         let totalDelivered = 0;
         let totalFailed = 0;

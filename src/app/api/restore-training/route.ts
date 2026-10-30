@@ -1,19 +1,24 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-export async function GET() {
+export async function POST(request: Request) {
     try {
         const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
         if (!supabaseUrl || !serviceKey) {
-            return NextResponse.json({ 
-                success: false, 
-                error: 'Server credentials missing. Ensure SUPABASE_SERVICE_ROLE_KEY is set.' 
+            return NextResponse.json({
+                success: false,
+                error: 'Server credentials missing.'
             }, { status: 500 });
         }
 
-        // Initialize admin client to bypass RLS policies
+        const authHeader = request.headers.get("Authorization");
+        const token = authHeader?.split(" ")[1];
+        if (!token) {
+            return NextResponse.json({ success: false, error: "Unauthorized: Missing authentication token" }, { status: 401 });
+        }
+
         const supabase = createClient(supabaseUrl, serviceKey, {
             auth: {
                 persistSession: false,
@@ -21,84 +26,76 @@ export async function GET() {
             }
         });
 
-        // 1. Fetch all clubs
-        const { data: clubs, error: clubsErr } = await supabase.from("clubs").select("id, name");
-        if (clubsErr) throw clubsErr;
-
-        const log: string[] = [];
-
-        for (const club of clubs) {
-            // 2. Fetch players to check if club is active
-            const { data: clubPlayers, error: playErr } = await supabase
-                .from("players")
-                .select("id")
-                .eq("club_id", club.id);
-
-            if (playErr) {
-                log.push(`Failed to fetch players for ${club.name}: ${playErr.message}`);
-                continue;
-            }
-
-            if (!clubPlayers || clubPlayers.length === 0) {
-                continue; // Skip inactive/empty clubs
-            }
-
-            // 3. Check if training sessions exist
-            const { data: sessions, error: sessErr } = await supabase
-                .from("training_sessions")
-                .select("id")
-                .eq("club_id", club.id);
-
-            if (sessErr) {
-                log.push(`Failed to fetch sessions for ${club.name}: ${sessErr.message}`);
-                continue;
-            }
-
-            // 4. Recreate if missing
-            if (sessions.length === 0) {
-                const today = new Date();
-                const topics = ["Passing & Possession", "Defending Transitions", "Shooting & Finishing"];
-                const sessionsToInsert = [];
-
-                for (let i = 0; i < 3; i++) {
-                    const date = new Date();
-                    date.setDate(today.getDate() + ((i - 1) * 7)); // -7 days, today, +7 days
-                    
-                    const attendance = clubPlayers.map(p => ({
-                        playerId: p.id,
-                        status: Math.random() > 0.3 ? "Present" : Math.random() > 0.5 ? "Absent" : "Late",
-                        notes: ""
-                    }));
-
-                    sessionsToInsert.push({
-                        club_id: club.id,
-                        date: date.toISOString().split('T')[0],
-                        time: "20:00",
-                        location: "Market Road Pitches",
-                        squad: "All",
-                        topic: topics[i],
-                        lock_type: "Never",
-                        lock_time: null,
-                        event_token: Math.random().toString(36).substring(2, 15),
-                        attendance,
-                        notes: `Promotional drill session ${i+1}`
-                    });
-                }
-
-                const { error: insErr } = await supabase.from("training_sessions").insert(sessionsToInsert);
-                if (insErr) {
-                    log.push(`Failed to insert sessions for ${club.name}: ${insErr.message}`);
-                } else {
-                    log.push(`Restored 3 training sessions for ${club.name} (${club.id})`);
-                }
-            } else {
-                log.push(`Club ${club.name} already has ${sessions.length} sessions. Skipped.`);
-            }
+        const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+        if (authErr || !user) {
+            return NextResponse.json({ success: false, error: "Unauthorized: Invalid token" }, { status: 401 });
         }
 
-        return NextResponse.json({ success: true, log });
+        const { data: member } = await supabase
+            .from("club_members")
+            .select("club_id, role")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        const roleClean = (member?.role || "").toLowerCase();
+        if (!member?.club_id || (roleClean !== "manager" && roleClean !== "coach" && roleClean !== "super admin")) {
+            return NextResponse.json({ success: false, error: "Forbidden: Manager or Coach role required" }, { status: 403 });
+        }
+
+        const clubId = member.club_id;
+        const { data: clubPlayers } = await supabase
+            .from("players")
+            .select("id")
+            .eq("club_id", clubId);
+
+        if (!clubPlayers || clubPlayers.length === 0) {
+            return NextResponse.json({ success: true, log: ["No players in club yet. Skipped."] });
+        }
+
+        const { data: sessions } = await supabase
+            .from("training_sessions")
+            .select("id")
+            .eq("club_id", clubId);
+
+        if (sessions && sessions.length > 0) {
+            return NextResponse.json({ success: true, log: [`Club already has ${sessions.length} sessions. Skipped.`] });
+        }
+
+        const today = new Date();
+        const topics = ["Passing & Possession", "Defending Transitions", "Shooting & Finishing"];
+        const sessionsToInsert = [];
+
+        for (let i = 0; i < 3; i++) {
+            const date = new Date();
+            date.setDate(today.getDate() + ((i - 1) * 7));
+            const attendance = clubPlayers.map(p => ({
+                playerId: p.id,
+                status: "Present",
+                notes: ""
+            }));
+
+            sessionsToInsert.push({
+                club_id: clubId,
+                date: date.toISOString().split('T')[0],
+                time: "20:00",
+                location: "Training Ground",
+                squad: "All",
+                topic: topics[i],
+                lock_type: "Never",
+                lock_time: null,
+                event_token: Math.random().toString(36).substring(2, 15),
+                attendance,
+                notes: `Training session ${i + 1}`
+            });
+        }
+
+        const { error: insErr } = await supabase.from("training_sessions").insert(sessionsToInsert);
+        if (insErr) {
+            return NextResponse.json({ success: false, error: insErr.message }, { status: 500 });
+        }
+
+        return NextResponse.json({ success: true, log: [`Restored 3 training sessions for club ${clubId}`] });
     } catch (e: any) {
-        console.error("Restore training error:", e);
-        return NextResponse.json({ success: false, error: e.message || 'Unknown error' }, { status: 500 });
+        return NextResponse.json({ success: false, error: e.message }, { status: 500 });
     }
 }

@@ -5,7 +5,6 @@ import { sendEmail } from "@/lib/email-service";
 function getAdminClient() {
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!key) {
-        console.warn("SUPABASE_SERVICE_ROLE_KEY environment variable is missing on the server. Falling back to Anon Key.");
         return createClient(
             process.env.NEXT_PUBLIC_SUPABASE_URL!,
             process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -17,7 +16,6 @@ function getAdminClient() {
     );
 }
 
-// Generate a deterministic 6-character session code based on ID
 function getSessionCode(id: string): string {
     const cleanId = id.replace(/-/g, "");
     return ("CU" + cleanId.substring(0, 4)).toUpperCase();
@@ -26,6 +24,17 @@ function getSessionCode(id: string): string {
 export async function POST(request: Request) {
     const supabaseAdmin = getAdminClient();
     try {
+        const authHeader = request.headers.get("Authorization");
+        const token = authHeader?.split(" ")[1];
+        if (!token) {
+            return NextResponse.json({ success: false, error: "Unauthorized: Missing authentication token" }, { status: 401 });
+        }
+
+        const { data: { user }, error: authErr } = await supabaseAdmin.auth.getUser(token);
+        if (authErr || !user) {
+            return NextResponse.json({ success: false, error: "Unauthorized: Invalid session token" }, { status: 401 });
+        }
+
         const body = await request.json();
         const { clubId, recipientGroup, subject, message, eventId, eventType } = body;
 
@@ -33,10 +42,21 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: "Missing required fields" }, { status: 400 });
         }
 
+        // Verify caller belongs to the target clubId
+        const { data: callerMember } = await supabaseAdmin
+            .from("club_members")
+            .select("club_id, role")
+            .eq("user_id", user.id)
+            .eq("club_id", clubId)
+            .maybeSingle();
+
+        if (!callerMember) {
+            return NextResponse.json({ success: false, error: "Forbidden: You do not belong to this club" }, { status: 403 });
+        }
+
         // 1. Fetch targeted player/member records
         let recipients: any[] = [];
 
-        // Query all players in the club first
         const { data: rawPlayers, error: playersErr } = await supabaseAdmin
             .from("players")
             .select("*")
@@ -50,13 +70,11 @@ export async function POST(request: Request) {
             return true;
         });
 
-        // Query all users/staff in the club members table
-        const { data: staff, error: staffErr } = await supabaseAdmin
+        const { data: staff } = await supabaseAdmin
             .from("club_members")
             .select("*, app_users:user_id(username, name)")
             .eq("club_id", clubId);
 
-        // Filter based on recipientGroup
         if (recipientGroup === "Entire Club") {
             recipients = [...(players || [])];
         } else if (recipientGroup === "First Team") {
@@ -64,13 +82,13 @@ export async function POST(request: Request) {
         } else if (recipientGroup === "Reserves") {
             recipients = (players || []).filter(p => p.squad === "reserves" || p.squad === "Reserves");
         } else if (recipientGroup === "Specific Squad") {
-            recipients = [...(players || [])]; // fallback
+            recipients = [...(players || [])];
         } else if (recipientGroup === "Pending Invitations") {
             recipients = (players || []).filter(p => p.status === "Pending Invitation" || p.status === "Pending Activation" || !p.email);
         } else if (recipientGroup === "Outstanding Players") {
             if (eventId) {
                 if (eventType === "match") {
-                    const { data: match } = await supabaseAdmin.from("matches").select("notes").eq("id", eventId).single();
+                    const { data: match } = await supabaseAdmin.from("matches").select("notes").eq("id", eventId).eq("club_id", clubId).single();
                     const notes = match?.notes || "";
                     const matchRaw = notes.match(/\[AVAILABILITY:\s*(.*?)\s*\]/);
                     let respondedPlayerIds: string[] = [];
@@ -82,7 +100,7 @@ export async function POST(request: Request) {
                     }
                     recipients = (players || []).filter(p => !respondedPlayerIds.includes(p.id));
                 } else {
-                    const { data: session } = await supabaseAdmin.from("training_sessions").select("attendance").eq("id", eventId).single();
+                    const { data: session } = await supabaseAdmin.from("training_sessions").select("attendance").eq("id", eventId).eq("club_id", clubId).single();
                     const attendance = session?.attendance || [];
                     const respondedPlayerIds = attendance.map((a: any) => a.playerId);
                     recipients = (players || []).filter(p => !respondedPlayerIds.includes(p.id));
@@ -100,32 +118,28 @@ export async function POST(request: Request) {
             })).filter(s => !!s.email);
         }
 
-        // Remove recipients who do not have an email address
         const validRecipients = recipients.filter(r => !!r.email);
 
         if (validRecipients.length === 0) {
             return NextResponse.json({ success: false, error: "No players in this group have a registered email address." }, { status: 400 });
         }
 
-        // 2. Fetch event context if provided for merge tags
         let eventContext: any = null;
         if (eventId) {
             if (eventType === "match") {
-                const { data: match } = await supabaseAdmin.from("matches").select("*").eq("id", eventId).single();
+                const { data: match } = await supabaseAdmin.from("matches").select("*").eq("id", eventId).eq("club_id", clubId).single();
                 eventContext = match;
             } else {
-                const { data: session } = await supabaseAdmin.from("training_sessions").select("*").eq("id", eventId).single();
+                const { data: session } = await supabaseAdmin.from("training_sessions").select("*").eq("id", eventId).eq("club_id", clubId).single();
                 eventContext = session;
             }
         }
 
-        // 3. Loop and deliver emails
         let sentCount = 0;
         let failedCount = 0;
         const origin = request.headers.get("origin") || "https://www.clubflow.org.uk";
 
         for (const recipient of validRecipients) {
-            // Build merge fields replacements
             let personalSubject = subject;
             let personalMessage = message;
 
@@ -136,7 +150,6 @@ export async function POST(request: Request) {
             const tokenVal = eventContext?.event_token || eventContext?.id || "";
             const respondUrl = `${origin}/respond/${tokenVal}`;
 
-            // Replace standard merge tags
             personalSubject = personalSubject
                 .replace(/{{FirstName}}/g, name)
                 .replace(/{{TrainingDate}}/g, dateStr)
@@ -150,7 +163,6 @@ export async function POST(request: Request) {
                 .replace(/{{RsvpLink}}/g, respondUrl)
                 .replace(/{{JoinLink}}/g, `${origin}/join`);
 
-            // Send actual email
             const success = await sendEmail({
                 to: recipient.email,
                 subject: personalSubject,
@@ -164,7 +176,6 @@ export async function POST(request: Request) {
             }
         }
 
-        // 4. Log transaction to History
         const status = failedCount === 0 ? "Delivered" : sentCount > 0 ? "Delivered" : "Failed";
         await supabaseAdmin
             .from("email_history")
