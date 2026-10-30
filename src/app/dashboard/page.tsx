@@ -106,11 +106,13 @@ export default function DashboardPage() {
                 }));
 
         const loadStandings = async () => {
+            if (!clubId) {
+                setStandingsTable([]);
+                return;
+            }
             try {
-                const scopedKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
-                const raw =
-                    localStorage.getItem(scopedKey) ||
-                    localStorage.getItem("clubflow_league_table");
+                const scopedKey = `clubflow_league_table_${clubId}`;
+                const raw = localStorage.getItem(scopedKey);
                 if (raw) {
                     const parsed = JSON.parse(raw);
                     if (Array.isArray(parsed) && parsed.length > 0) {
@@ -183,11 +185,16 @@ export default function DashboardPage() {
 
         if (typeof window !== "undefined") {
             const today = new Date().toISOString().split("T")[0];
-            const saved = localStorage.getItem(`clubflow_dismissed_priorities_${today}`);
+            const priorityKey = clubId
+                ? `clubflow_dismissed_priorities_${clubId}_${today}`
+                : `clubflow_dismissed_priorities_${today}`;
+            const saved = localStorage.getItem(priorityKey);
             if (saved) {
                 try {
                     setDismissedPriorities(JSON.parse(saved));
                 } catch (e) {}
+            } else {
+                setDismissedPriorities([]);
             }
         }
 
@@ -377,9 +384,9 @@ export default function DashboardPage() {
                 if (Array.isArray(data.standings) && data.standings.length > 0) {
                     setStandingsTable(data.standings);
                     const tableJson = JSON.stringify(data.standings);
-                    const scopedKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
-                    localStorage.setItem(scopedKey, tableJson);
-                    localStorage.setItem("clubflow_league_table", tableJson);
+                    if (clubId) {
+                        localStorage.setItem(`clubflow_league_table_${clubId}`, tableJson);
+                    }
                     await updateSettings({
                         leaguePosition: data.position || settings.leaguePosition,
                         lastImportHistory: {
@@ -668,7 +675,10 @@ export default function DashboardPage() {
     const handleDismissPriority = (id: string) => {
         const updated = [...dismissedPriorities, id];
         setDismissedPriorities(updated);
-        localStorage.setItem(`clubflow_dismissed_priorities_${todayStr}`, JSON.stringify(updated));
+        const priorityKey = clubId
+            ? `clubflow_dismissed_priorities_${clubId}_${todayStr}`
+            : `clubflow_dismissed_priorities_${todayStr}`;
+        localStorage.setItem(priorityKey, JSON.stringify(updated));
     };
 
     const isLeagueConnected =

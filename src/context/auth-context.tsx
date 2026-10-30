@@ -21,9 +21,38 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const getCachedVal = (key: string, fallback: any) => {
+const DEVICE_UI_PREF_KEYS = new Set([
+    "clubflow-sidebar-expanded",
+    "clubflow_squad_display_layout",
+    "clubflow_calendar_collapsed"
+]);
+
+export function purgeUserAndClubStorage() {
+    if (typeof window === "undefined") return;
+    try {
+        sessionStorage.clear();
+        for (let i = localStorage.length - 1; i >= 0; i--) {
+            const key = localStorage.key(i);
+            if (
+                key &&
+                !DEVICE_UI_PREF_KEYS.has(key) &&
+                (key.startsWith("clubflow_") || key.startsWith("clubflow-") || key.startsWith("clubflow_cache_"))
+            ) {
+                localStorage.removeItem(key);
+            }
+        }
+    } catch (e) {
+        console.warn("Storage cleanup failed:", e);
+    }
+}
+
+const getCachedVal = (key: string, fallback: any, userId?: string | null) => {
     if (typeof window === 'undefined') return fallback;
     try {
+        if (userId) {
+            const scopedItem = localStorage.getItem(`clubflow_cache_${userId}_${key}`);
+            if (scopedItem) return JSON.parse(scopedItem);
+        }
         const item = localStorage.getItem(`clubflow_cache_${key}`);
         return item ? JSON.parse(item) : fallback;
     } catch (e) {
@@ -162,6 +191,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 if (typeof window !== 'undefined') {
                     try {
+                        // Scoped by userId + active pointer for synchronous supabase client proxy
+                        localStorage.setItem(`clubflow_cache_${userId}_clubId`, JSON.stringify(data.club_id));
+                        localStorage.setItem(`clubflow_cache_${userId}_role`, JSON.stringify(finalRole));
+                        localStorage.setItem(`clubflow_cache_${userId}_pagePermissions`, JSON.stringify(finalPerms));
+                        localStorage.setItem(`clubflow_cache_${userId}_displayName`, JSON.stringify(finalDisplayName));
                         localStorage.setItem("clubflow_cache_clubId", JSON.stringify(data.club_id));
                         localStorage.setItem("clubflow_cache_role", JSON.stringify(finalRole));
                         localStorage.setItem("clubflow_cache_pagePermissions", JSON.stringify(finalPerms));
@@ -177,6 +211,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setDisplayName(null);
                 if (typeof window !== 'undefined') {
                     try {
+                        localStorage.removeItem(`clubflow_cache_${userId}_clubId`);
+                        localStorage.removeItem(`clubflow_cache_${userId}_role`);
+                        localStorage.removeItem(`clubflow_cache_${userId}_pagePermissions`);
+                        localStorage.removeItem(`clubflow_cache_${userId}_displayName`);
                         localStorage.removeItem("clubflow_cache_clubId");
                         localStorage.removeItem("clubflow_cache_role");
                         localStorage.removeItem("clubflow_cache_pagePermissions");
@@ -199,10 +237,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         // Hydrate cached auth state on client mount (avoids SSR hydration mismatch)
         const cachedUser = getCachedVal('user', null);
-        const cachedClubId = getCachedVal('clubId', null);
-        const cachedRole = getCachedVal('role', null);
-        const cachedPerms = getCachedVal('pagePermissions', []);
-        const cachedDisplayName = getCachedVal('displayName', null);
+        const cachedUserId: string | null = cachedUser?.id ?? null;
+        const cachedClubId = getCachedVal('clubId', null, cachedUserId);
+        const cachedRole = getCachedVal('role', null, cachedUserId);
+        const cachedPerms = getCachedVal('pagePermissions', [], cachedUserId);
+        const cachedDisplayName = getCachedVal('displayName', null, cachedUserId);
 
         if (cachedUser) setUser(cachedUser);
         if (cachedClubId) {
@@ -228,15 +267,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         supabase.auth.getSession().then(({ data: { session } }) => {
             setSession(session);
-            setUser(session?.user ?? null);
-            if (session?.user) {
+            const activeUser = session?.user ?? null;
+
+            // If session belongs to a different user than what was cached in localStorage, purge stale cache first
+            if (activeUser && cachedUserId && activeUser.id !== cachedUserId) {
+                purgeUserAndClubStorage();
+                setClubId(null);
+                setGlobalClubId(null);
+                setRole(null);
+                setPagePermissions([]);
+                setDisplayName(null);
+            }
+
+            setUser(activeUser);
+            if (activeUser) {
                 if (typeof window !== 'undefined') {
                     try {
-                        localStorage.setItem("clubflow_cache_user", JSON.stringify(session.user));
+                        localStorage.setItem("clubflow_cache_user", JSON.stringify(activeUser));
                     } catch (e) {}
                 }
-                fetchClubMembership(session.user.id, session.user.email, session.access_token);
+                fetchClubMembership(activeUser.id, activeUser.email, session?.access_token);
             } else {
+                // Session expired or logged out — purge any leftover cached user/club state
+                setClubId(null);
+                setGlobalClubId(null);
+                setRole(null);
+                setPagePermissions([]);
+                setDisplayName(null);
+                purgeUserAndClubStorage();
                 setIsLoading(false);
                 if (!isPublicPage(pathnameRef.current)) {
                     router.push("/login");
@@ -267,18 +325,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setIsLoggingOut(false);
                 
                 // Clear any stored browser settings/states ONLY when switching between two different user accounts
-                if (accountSwitched && typeof window !== 'undefined') {
-                    try {
-                        sessionStorage.clear();
-                        for (let i = localStorage.length - 1; i >= 0; i--) {
-                            const key = localStorage.key(i);
-                            if (key && (key.startsWith('clubflow_') || key.startsWith('clubflow_cache_'))) {
-                                localStorage.removeItem(key);
-                            }
-                        }
-                    } catch (e) {
-                        console.warn("Storage cleanup failed:", e);
-                    }
+                if (accountSwitched) {
+                    purgeUserAndClubStorage();
+                    setClubId(null);
+                    setGlobalClubId(null);
+                    setRole(null);
+                    setPagePermissions([]);
+                    setDisplayName(null);
                 }
 
                 if (typeof window !== 'undefined') {
@@ -301,16 +354,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 setPagePermissions([]);
                 setDisplayName(null);
                 setIsLoading(false);
-                if (typeof window !== 'undefined') {
-                    try {
-                        for (let i = localStorage.length - 1; i >= 0; i--) {
-                            const key = localStorage.key(i);
-                            if (key && (key.startsWith('clubflow_') || key.startsWith('clubflow_cache_'))) {
-                                localStorage.removeItem(key);
-                            }
-                        }
-                    } catch (e) {}
-                }
+                purgeUserAndClubStorage();
                 if (!isPublicPage(pathnameRef.current)) {
                     router.push("/login");
                 }
@@ -333,19 +377,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } catch (e) {
             console.error("Supabase signOut error:", e);
         }
-        if (typeof window !== 'undefined') {
-            try {
-                sessionStorage.clear();
-                for (let i = localStorage.length - 1; i >= 0; i--) {
-                    const key = localStorage.key(i);
-                    if (key && (key.startsWith('clubflow_') || key.startsWith('clubflow_cache_'))) {
-                        localStorage.removeItem(key);
-                    }
-                }
-            } catch (e) {
-                console.warn("Storage cleanup on sign out failed:", e);
-            }
-        }
+        purgeUserAndClubStorage();
         router.push("/login");
     };
 

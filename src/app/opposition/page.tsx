@@ -261,14 +261,15 @@ export default function OppositionReportsPage() {
             );
         }
 
-        // 2. Load League Table rows (localStorage -> settings.lastImportHistory -> Supabase cache)
+        // 2. Load League Table rows (strictly scoped by clubId -> settings.lastImportHistory -> Supabase cache)
         let rows: any[] = [];
         try {
-            const storageKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
-            const localRaw = localStorage.getItem(storageKey) || localStorage.getItem("clubflow_league_table");
-            if (localRaw) {
-                const parsed = JSON.parse(localRaw);
-                if (Array.isArray(parsed) && parsed.length > 0) rows = parsed;
+            if (clubId) {
+                const localRaw = localStorage.getItem(`clubflow_league_table_${clubId}`);
+                if (localRaw) {
+                    const parsed = JSON.parse(localRaw);
+                    if (Array.isArray(parsed) && parsed.length > 0) rows = parsed;
+                }
             }
         } catch (e) {}
 

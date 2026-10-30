@@ -208,22 +208,26 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
 
     useEffect(() => {
         setIsMounted(true);
-        try {
-            const cached = localStorage.getItem("clubflow_cache_clubSettings");
-            if (cached) {
-                setSettings(JSON.parse(cached));
-                setIsLoaded(true);
-            }
-        } catch (e) {}
     }, []);
 
-    // Initial Fetch
+    // Hydrate cached settings for the active clubId and fetch fresh settings from Supabase
     useEffect(() => {
+        if (typeof window !== "undefined" && clubId) {
+            try {
+                const cached = localStorage.getItem(`clubflow_cache_clubSettings_${clubId}`);
+                if (cached) {
+                    setSettings(JSON.parse(cached));
+                    setIsLoaded(true);
+                }
+            } catch (e) {}
+        }
+
         if (authLoading) {
             return;
         }
 
         if (!user || !clubId) {
+            setSettings(defaultSettings);
             setIsLoaded(true);
             return;
         }
@@ -249,9 +253,9 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                     let parsedDefaultDuration = 90;
                     let parsedConfirmDefaults: MatchdayConfirmDefaults = {};
 
-                    if (typeof window !== "undefined") {
+                    if (typeof window !== "undefined" && clubId) {
                         try {
-                            const cachedStr = localStorage.getItem("clubflow_cache_clubSettings");
+                            const cachedStr = localStorage.getItem(`clubflow_cache_clubSettings_${clubId}`);
                             if (cachedStr) {
                                 const cachedObj = JSON.parse(cachedStr);
                                 if (Array.isArray(cachedObj.enabledMatchFormats) && cachedObj.enabledMatchFormats.length > 0) {
@@ -267,7 +271,7 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                                     parsedConfirmDefaults = { ...cachedObj.matchdayConfirmDefaults };
                                 }
                             }
-                            const standaloneConfirmStr = localStorage.getItem("clubflow_confirm_defaults");
+                            const standaloneConfirmStr = localStorage.getItem(`clubflow_confirm_defaults_${clubId}`);
                             if (standaloneConfirmStr) {
                                 const standaloneConfirm = JSON.parse(standaloneConfirmStr);
                                 if (standaloneConfirm && typeof standaloneConfirm === "object") {
@@ -348,9 +352,9 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
                         matchdayConfirmDefaults: parsedConfirmDefaults
                     };
                     setSettings(loadedSettings);
-                    if (typeof window !== 'undefined') {
+                    if (typeof window !== 'undefined' && clubId) {
                         try {
-                            localStorage.setItem("clubflow_cache_clubSettings", JSON.stringify(loadedSettings));
+                            localStorage.setItem(`clubflow_cache_clubSettings_${clubId}`, JSON.stringify(loadedSettings));
                         } catch (e) {}
                     }
                 }
@@ -366,6 +370,8 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
 
     const updateSettings = async (newSettings: Partial<ClubSettings>, pagePermissions?: string[]) => {
         if (newSettings.measurementUnit && typeof window !== "undefined") {
+            const unitKey = clubId ? `clubflow_measurement_unit_${clubId}` : "clubflow_measurement_unit";
+            localStorage.setItem(unitKey, newSettings.measurementUnit);
             localStorage.setItem("clubflow_measurement_unit", newSettings.measurementUnit);
         }
         let finalSecondaryColor = newSettings.secondaryColor ?? settings.secondaryColor;
@@ -381,9 +387,9 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             ...(newSettings.matchdayConfirmDefaults || {})
         };
 
-        if (typeof window !== "undefined" && newSettings.matchdayConfirmDefaults) {
+        if (typeof window !== "undefined" && newSettings.matchdayConfirmDefaults && clubId) {
             try {
-                localStorage.setItem("clubflow_confirm_defaults", JSON.stringify(nextConfirmDefaults));
+                localStorage.setItem(`clubflow_confirm_defaults_${clubId}`, JSON.stringify(nextConfirmDefaults));
             } catch {}
         }
 
@@ -518,9 +524,10 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
             matchdayConfirmDefaults: nextConfirmDefaults
         };
         setSettings(updated);
-        if (typeof window !== "undefined") {
+        const targetClubKey = existingId || clubId;
+        if (typeof window !== "undefined" && targetClubKey) {
             try {
-                localStorage.setItem("clubflow_cache_clubSettings", JSON.stringify(updated));
+                localStorage.setItem(`clubflow_cache_clubSettings_${targetClubKey}`, JSON.stringify(updated));
             } catch (e) {}
         }
 

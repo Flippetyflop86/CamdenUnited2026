@@ -48,6 +48,11 @@ export default function LoginPage() {
                 if (member) {
                     setGlobalClubId(member.club_id);
                     try {
+                        localStorage.setItem("clubflow_cache_user", JSON.stringify(data.session.user));
+                        localStorage.setItem(`clubflow_cache_${userId}_clubId`, JSON.stringify(member.club_id));
+                        localStorage.setItem(`clubflow_cache_${userId}_role`, JSON.stringify(member.role));
+                        localStorage.setItem(`clubflow_cache_${userId}_pagePermissions`, JSON.stringify(member.page_permissions || null));
+                        localStorage.setItem(`clubflow_cache_${userId}_displayName`, JSON.stringify(member.display_name || null));
                         localStorage.setItem("clubflow_cache_clubId", JSON.stringify(member.club_id));
                         localStorage.setItem("clubflow_cache_role", JSON.stringify(member.role));
                         localStorage.setItem("clubflow_cache_pagePermissions", JSON.stringify(member.page_permissions || null));

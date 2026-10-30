@@ -320,14 +320,15 @@ export default function MatchesPage() {
         const { data: dbTeams } = await supabase.from("league_teams").select("*");
         let standingsRows: any[] = [];
 
-        // 1. Check localStorage cache first
+        // 1. Check localStorage cache first (strictly scoped by clubId)
         try {
-            const storageKey = clubId ? `clubflow_league_table_${clubId}` : "clubflow_league_table";
-            const localRaw = localStorage.getItem(storageKey) || localStorage.getItem("clubflow_league_table");
-            if (localRaw) {
-                const parsed = JSON.parse(localRaw);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                    standingsRows = parsed;
+            if (clubId) {
+                const localRaw = localStorage.getItem(`clubflow_league_table_${clubId}`);
+                if (localRaw) {
+                    const parsed = JSON.parse(localRaw);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        standingsRows = parsed;
+                    }
                 }
             }
         } catch (e) {}
@@ -836,9 +837,9 @@ export default function MatchesPage() {
 
     const getSavedConfirmDefaults = () => {
         let localDefaults: Record<string, any> = {};
-        if (typeof window !== "undefined") {
+        if (typeof window !== "undefined" && clubId) {
             try {
-                const raw = localStorage.getItem("clubflow_confirm_defaults");
+                const raw = localStorage.getItem(`clubflow_confirm_defaults_${clubId}`);
                 if (raw) {
                     const parsed = JSON.parse(raw);
                     if (parsed && typeof parsed === "object") localDefaults = parsed;
@@ -971,9 +972,9 @@ export default function MatchesPage() {
             ...nextConfirmDetails
         };
 
-        if (typeof window !== "undefined") {
+        if (typeof window !== "undefined" && clubId) {
             try {
-                localStorage.setItem("clubflow_confirm_defaults", JSON.stringify(mergedClubDefaults));
+                localStorage.setItem(`clubflow_confirm_defaults_${clubId}`, JSON.stringify(mergedClubDefaults));
             } catch {}
         }
 
@@ -1069,9 +1070,9 @@ export default function MatchesPage() {
             pollIncludeMeetTime: includeMeetTime
         };
 
-        if (typeof window !== "undefined") {
+        if (typeof window !== "undefined" && clubId) {
             try {
-                localStorage.setItem("clubflow_confirm_defaults", JSON.stringify(mergedClubDefaults));
+                localStorage.setItem(`clubflow_confirm_defaults_${clubId}`, JSON.stringify(mergedClubDefaults));
             } catch {}
         }
 
