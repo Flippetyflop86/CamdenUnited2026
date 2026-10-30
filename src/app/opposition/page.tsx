@@ -74,6 +74,7 @@ interface PlayerProfileItem {
 interface ScoutingReport {
     id: string;
     name: string;
+    competition?: string;
     formation: string;
     inPossession: string;
     outOfPossession: string;
@@ -108,7 +109,7 @@ export default function OppositionReportsPage() {
     const [leagueRows, setLeagueRows] = useState<any[]>([]);
     const [teamSearch, setTeamSearch] = useState("");
     const [isGeneratingGraphic, setIsGeneratingGraphic] = useState(false);
-    const [showPitchSection, setShowPitchSection] = useState(false);
+    const [showPitchSection, setShowPitchSection] = useState(true);
     const [hasHandledQueryTeam, setHasHandledQueryTeam] = useState(false);
     const [mobileTab, setMobileTab] = useState<"all" | "threats" | "tactics" | "pitch" | "review">("all");
     const [showMobileDirectory, setShowMobileDirectory] = useState(false);
@@ -136,6 +137,7 @@ export default function OppositionReportsPage() {
     const createBlankReport = (prefillName = ""): ScoutingReport => ({
         id: "new",
         name: prefillName,
+        competition: "",
         formation: "4-2-3-1",
         inPossession: "",
         outOfPossession: "",
@@ -149,7 +151,7 @@ export default function OppositionReportsPage() {
         generalNotes: "",
         playerProfiles: [],
         lineup: [],
-        showPitch: false,
+        showPitch: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
     });
@@ -157,6 +159,7 @@ export default function OppositionReportsPage() {
     // Parse raw DB row into structured ScoutingReport (preserving any legacy notes)
     const parseDbReport = (row: any): ScoutingReport => {
         const rawNotes = row.notes;
+        let competition = "";
         let inPossession = "";
         let outOfPossession = "";
         let transition = "";
@@ -168,12 +171,13 @@ export default function OppositionReportsPage() {
         let postMatchReview = "";
         let generalNotes = "";
         let playerProfiles: PlayerProfileItem[] = [];
-        let showPitch = false;
+        let showPitch = true;
 
         if (rawNotes) {
             if (typeof rawNotes === "string") {
                 generalNotes = rawNotes;
             } else if (typeof rawNotes === "object") {
+                competition = rawNotes.competition || "";
                 inPossession = rawNotes.inPossession || rawNotes.buildUp || "";
                 outOfPossession = rawNotes.outOfPossession || "";
                 transition = rawNotes.transition || "";
@@ -185,16 +189,16 @@ export default function OppositionReportsPage() {
                 postMatchReview = rawNotes.postMatchReview || "";
                 generalNotes = rawNotes.generalNotes || rawNotes.text || "";
                 playerProfiles = Array.isArray(rawNotes.playerProfiles) ? rawNotes.playerProfiles : [];
-                showPitch = Boolean(rawNotes.showPitch);
+                showPitch = rawNotes.showPitch !== undefined ? Boolean(rawNotes.showPitch) : true;
             }
         }
 
         const lineup = Array.isArray(row.lineup) ? row.lineup : [];
-        const hasLineupNames = lineup.some((n: string) => n && n.trim().length > 0);
 
         return {
             id: row.id,
             name: row.name || "",
+            competition,
             formation: row.formation || "4-2-3-1",
             inPossession,
             outOfPossession,
@@ -208,7 +212,7 @@ export default function OppositionReportsPage() {
             generalNotes,
             playerProfiles,
             lineup,
-            showPitch: showPitch || hasLineupNames,
+            showPitch: true,
             createdAt: row.created_at || new Date().toISOString(),
             updatedAt: row.updated_at || new Date().toISOString()
         };
@@ -228,11 +232,12 @@ export default function OppositionReportsPage() {
 
         if (mapped.length > 0 && !selectedReport && !editedReport) {
             setSelectedReport(mapped[0]);
-            setShowPitchSection(mapped[0].showPitch);
+            setShowPitchSection(true);
             setIsEditing(false);
         } else if (mapped.length === 0 && !editedReport) {
             const blank = createBlankReport();
             setEditedReport(blank);
+            setShowPitchSection(true);
             setIsEditing(true);
         }
     };
@@ -424,19 +429,44 @@ export default function OppositionReportsPage() {
         return { past, upcoming, wins, draws, losses, gf, ga };
     }, [activeReport.name, matches]);
 
+    const activeFixture = useMemo(() => {
+        return h2hData.upcoming[0] || h2hData.past[0] || null;
+    }, [h2hData]);
+
+    const ourClubName = (settings.name || "Camden United").trim();
+    const oppClubName = (activeReport.name || "Opposition").trim();
+
+    const activeFixtureTitle = useMemo(() => {
+        if (!activeReport.name.trim()) return "Select an Opponent";
+        if (activeFixture) {
+            return activeFixture.isHome
+                ? `${ourClubName} vs ${oppClubName}`
+                : `${oppClubName} vs ${ourClubName}`;
+        }
+        return `${ourClubName} vs ${oppClubName}`;
+    }, [activeFixture, ourClubName, oppClubName, activeReport.name]);
+
+    const activeCompetitionLabel = useMemo(() => {
+        const customComp = (activeReport.competition || "").trim();
+        if (customComp) return customComp;
+        const matchComp = (activeFixture?.competition || "").trim();
+        if (matchComp) return matchComp;
+        return "League Fixture";
+    }, [activeReport.competition, activeFixture]);
+
     // Open or Start Report for any team name in 1 tap (#1 & #2)
     const handleOpenOrStartForTeam = (teamName: string) => {
         const existing = reports.find((r) => isMatchingTeam(r.name, teamName));
         if (existing) {
             setSelectedReport(existing);
             setEditedReport(null);
-            setShowPitchSection(existing.showPitch);
+            setShowPitchSection(true);
             setIsEditing(false);
         } else {
             const blank = createBlankReport(teamName);
             setSelectedReport(null);
             setEditedReport(blank);
-            setShowPitchSection(false);
+            setShowPitchSection(true);
             setIsEditing(true);
         }
     };
@@ -445,14 +475,14 @@ export default function OppositionReportsPage() {
         const blank = createBlankReport("");
         setSelectedReport(null);
         setEditedReport(blank);
-        setShowPitchSection(false);
+        setShowPitchSection(true);
         setIsEditing(true);
     };
 
     const handleSelectReport = (report: ScoutingReport) => {
         setSelectedReport(report);
         setEditedReport(null);
-        setShowPitchSection(report.showPitch);
+        setShowPitchSection(true);
         setIsEditing(false);
     };
 
@@ -526,11 +556,11 @@ export default function OppositionReportsPage() {
         if (selectedReport) {
             setIsEditing(false);
             setEditedReport(null);
-            setShowPitchSection(selectedReport.showPitch);
+            setShowPitchSection(true);
         } else if (reports.length > 0) {
             setSelectedReport(reports[0]);
             setEditedReport(null);
-            setShowPitchSection(reports[0].showPitch);
+            setShowPitchSection(true);
             setIsEditing(false);
         } else {
             handleStartNewReport();
@@ -571,6 +601,7 @@ export default function OppositionReportsPage() {
             name: editedReport.name.trim(),
             formation: editedReport.formation || "4-2-3-1",
             notes: {
+                competition: editedReport.competition || "",
                 inPossession: editedReport.inPossession,
                 outOfPossession: editedReport.outOfPossession,
                 transition: editedReport.transition,
@@ -714,7 +745,16 @@ export default function OppositionReportsPage() {
         return new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short", year: "2-digit" }).format(d);
     };
 
-    // #12: Ultra-HD 2x Retina (2160px wide) Shareable Scouting Graphic Generator
+    const activeFixtureDateStr = useMemo(() => {
+        if (!activeFixture?.date) return "";
+        return formatDateShort(activeFixture.date);
+    }, [activeFixture]);
+
+    const formationPositions = FORMATIONS[activeReport.formation] || FORMATIONS["4-2-3-1"] || [];
+    const activeOppFormat: MatchFormat = getFormatFromFormation(activeReport.formation);
+    const activeOppRomanLabel = FORMAT_ROMAN_LABEL[activeOppFormat] || "XI";
+
+    // #12: Ultra-HD 2x Retina (2160px wide) Shareable Scouting Graphic Generator (Dynamic Height — Never Cuts Off Sentences)
     const handleShareGraphic = async () => {
         const report = activeReport;
         if (!report.name.trim()) {
@@ -728,8 +768,148 @@ export default function OppositionReportsPage() {
             if (!ctx) return;
 
             const W = 2160;
-            const H = 2500;
             canvas.width = W;
+
+            // Helper: wrap text into full lines without ever truncating with "…"
+            const wrapTextToLines = (
+                text: string,
+                maxWidth: number,
+                font = "500 32px Inter, system-ui, sans-serif"
+            ): string[] => {
+                ctx.font = font;
+                const rawParagraphs = (text || "—").split(/\r?\n/);
+                const wrapped: string[] = [];
+
+                for (const rawLine of rawParagraphs) {
+                    const trimmed = rawLine.trim();
+                    if (!trimmed) {
+                        wrapped.push("");
+                        continue;
+                    }
+                    const words = trimmed.split(/\s+/);
+                    let line = "";
+                    for (let n = 0; n < words.length; n++) {
+                        const word = words[n];
+                        const testLine = line ? `${line} ${word}` : word;
+                        if (ctx.measureText(testLine).width > maxWidth && line) {
+                            wrapped.push(line);
+                            // If a single word is wider than maxWidth, break it across lines
+                            if (ctx.measureText(word).width > maxWidth) {
+                                let chunk = "";
+                                for (const ch of word) {
+                                    if (ctx.measureText(chunk + ch).width > maxWidth && chunk) {
+                                        wrapped.push(chunk);
+                                        chunk = ch;
+                                    } else {
+                                        chunk += ch;
+                                    }
+                                }
+                                line = chunk;
+                            } else {
+                                line = word;
+                            }
+                        } else {
+                            line = testLine;
+                        }
+                    }
+                    if (line) wrapped.push(line);
+                }
+                return wrapped.length > 0 ? wrapped : ["—"];
+            };
+
+            const drawLines = (
+                lines: string[],
+                x: number,
+                startY: number,
+                lineHeight: number,
+                color = "#e2e8f0",
+                font = "500 32px Inter, system-ui, sans-serif"
+            ) => {
+                ctx.font = font;
+                ctx.fillStyle = color;
+                let curY = startY;
+                for (const ln of lines) {
+                    if (ln) {
+                        ctx.fillText(ln, x, curY);
+                    }
+                    curY += lineHeight;
+                }
+                return curY;
+            };
+
+            // 1. Pre-build Danger Men + Profiled Pitch Players text and measure wrapped lines
+            const dangerCardX = 1265;
+            const dangerCardW = W - dangerCardX - 80;
+            const dangerLines: string[] = [];
+            if (report.dangerMenList && report.dangerMenList.length > 0) {
+                report.dangerMenList.forEach((dm) => {
+                    const tag = [dm.number ? `#${dm.number}` : "", dm.position, dm.name].filter(Boolean).join(" ");
+                    const footStr = dm.foot ? ` (${dm.foot})` : "";
+                    dangerLines.push(`• ${tag}${footStr}: ${dm.notes || "Key threat"}`);
+                });
+            }
+            if (report.dangerMen && report.dangerMen.trim()) {
+                dangerLines.push(report.dangerMen.trim());
+            }
+            formationPositions.forEach((pos, idx) => {
+                const pName = (report.lineup?.[idx] || "").trim();
+                const prof = (report.playerProfiles || []).find((p) => p.positionIndex === idx);
+                if (pName || prof?.role || prof?.traits) {
+                    const dispPos = getDisplayPosition(pos.label);
+                    const rolePart = prof?.role ? ` [${prof.role}]` : "";
+                    const traitsPart = prof?.traits ? ` — ${prof.traits}` : "";
+                    dangerLines.push(`• #${pos.number} ${dispPos} ${pName || ""}${rolePart}${traitsPart}`.trim());
+                }
+            });
+
+            const combinedDangerText =
+                dangerLines.length > 0
+                    ? dangerLines.join("\n")
+                    : "No specific individual player threats logged yet.";
+            const dangerFont = "600 28px Inter, system-ui, sans-serif";
+            const dangerLineH = 42;
+            const dangerWrappedLines = wrapTextToLines(combinedDangerText, dangerCardW - 80, dangerFont);
+            const row1H = Math.max(870, 145 + dangerWrappedLines.length * dangerLineH);
+
+            // 2. Pre-build 6 Tactical Cards and measure dynamic row heights so no sentence ever cuts off
+            const colW = (W - 200) / 2;
+            const cardFont = "500 30px Inter, system-ui, sans-serif";
+            const cardLineH = 44;
+            const gridCards = [
+                { title: "💪 THEIR STRENGTHS", text: report.strengths, accent: "#10b981", bg: "#0f221d" },
+                { title: "🎯 THEIR WEAKNESSES (AREAS TO EXPLOIT)", text: report.weaknesses, accent: "#f43f5e", bg: "#23121b" },
+                { title: "⚽ IN POSSESSION (BUILD-UP & SHAPE)", text: report.inPossession, accent: "#3b82f6", bg: "#111b2e" },
+                { title: "🛡️ OUT OF POSSESSION (PRESS & BLOCK)", text: report.outOfPossession, accent: "#a855f7", bg: "#1c152c" },
+                { title: "⚡ TRANSITION (COUNTER & RECOVERY)", text: report.transition, accent: "#f97316", bg: "#231812" },
+                { title: "🚩 SET PIECES (CORNERS, FREE KICKS, THROWS)", text: report.setPieces, accent: "#06b6d4", bg: "#0e2028" }
+            ].map((c) => ({
+                ...c,
+                lines: wrapTextToLines(c.text || "Not logged yet.", colW - 90, cardFont)
+            }));
+
+            const gridRowHeights = [0, 1, 2].map((r) => {
+                const leftLines = gridCards[r * 2].lines.length;
+                const rightLines = gridCards[r * 2 + 1].lines.length;
+                const maxLinesInRow = Math.max(leftLines, rightLines);
+                return Math.max(380, 155 + maxLinesInRow * cardLineH);
+            });
+
+            // 3. Pre-build Post-Match Review footer lines & height
+            const reviewFont = "500 30px Inter, system-ui, sans-serif";
+            const reviewLineH = 44;
+            const reviewWrappedLines = wrapTextToLines(
+                report.postMatchReview || report.generalNotes || "Prepared via Camden United Data Hub",
+                W - 260,
+                reviewFont
+            );
+            const footerH = Math.max(200, 140 + reviewWrappedLines.length * reviewLineH);
+
+            // 4. Compute total dynamic canvas height
+            const gridStartY = 395 + row1H + 40;
+            const totalGridH =
+                gridRowHeights[0] + 35 + gridRowHeights[1] + 35 + gridRowHeights[2];
+            const footerY = gridStartY + totalGridH + 40;
+            const H = footerY + footerH + 70;
             canvas.height = H;
 
             // Background Gradient
@@ -746,7 +926,7 @@ export default function OppositionReportsPage() {
             ctx.fillRect(0, 0, W, 18);
 
             // Helper for rounded rectangles
-            const roundRect = (x: number, y: number, w: number, h: number, r: number, fill: string, stroke?: string) => {
+            const roundRect = (x: number, y: number, w: number, h: number, r: number, fill: string, stroke?: string, lineWidth = 3) => {
                 ctx.beginPath();
                 ctx.moveTo(x + r, y);
                 ctx.arcTo(x + w, y, x + w, y + h, r);
@@ -758,69 +938,42 @@ export default function OppositionReportsPage() {
                 ctx.fill();
                 if (stroke) {
                     ctx.strokeStyle = stroke;
-                    ctx.lineWidth = 3;
+                    ctx.lineWidth = lineWidth;
                     ctx.stroke();
                 }
             };
 
-            // Wrap text helper
-            const drawWrappedText = (
-                text: string,
-                x: number,
-                y: number,
-                maxWidth: number,
-                lineHeight: number,
-                maxLines = 6,
-                color = "#e2e8f0",
-                font = "500 32px Inter, system-ui, sans-serif"
-            ) => {
-                ctx.font = font;
-                ctx.fillStyle = color;
-                const rawLines = (text || "—").split(/\r?\n/);
-                let drawnLines = 0;
-                let curY = y;
-
-                for (const rawLine of rawLines) {
-                    const words = rawLine.split(" ");
-                    let line = "";
-                    for (let n = 0; n < words.length; n++) {
-                        const testLine = line + words[n] + " ";
-                        const metrics = ctx.measureText(testLine);
-                        if (metrics.width > maxWidth && n > 0) {
-                            if (drawnLines < maxLines - 1) {
-                                ctx.fillText(line.trim(), x, curY);
-                                line = words[n] + " ";
-                                curY += lineHeight;
-                                drawnLines++;
-                            } else {
-                                ctx.fillText(line.trim() + "…", x, curY);
-                                return curY + lineHeight;
-                            }
-                        } else {
-                            line = testLine;
-                        }
-                    }
-                    if (drawnLines < maxLines) {
-                        ctx.fillText(line.trim(), x, curY);
-                        curY += lineHeight;
-                        drawnLines++;
-                    }
-                }
-                return curY;
-            };
-
-            // Header Block
+            // Header Block: Competition + Fixture Name
             roundRect(80, 70, W - 160, 290, 28, "#131c2e", "#1e293b");
+            const compTopLine = [
+                activeCompetitionLabel.toUpperCase(),
+                activeFixtureDateStr ? activeFixtureDateStr.toUpperCase() : "",
+                activeFixture ? (activeFixture.isHome ? "HOME FIXTURE" : "AWAY FIXTURE") : ""
+            ]
+                .filter(Boolean)
+                .join("  •  ");
+            let compFontSize = 30;
+            ctx.font = `800 ${compFontSize}px Inter, system-ui, sans-serif`;
+            while (ctx.measureText(compTopLine).width > W - 260 && compFontSize > 20) {
+                compFontSize -= 2;
+                ctx.font = `800 ${compFontSize}px Inter, system-ui, sans-serif`;
+            }
             ctx.fillStyle = brandColor;
-            ctx.font = "800 30px Inter, system-ui, sans-serif";
-            ctx.fillText(`${(settings.name || "CAMDEN UNITED").toUpperCase()} • OPPOSITION SCOUTING DOSSIER`, 130, 140);
+            ctx.fillText(compTopLine, 130, 140);
 
+            // Dynamic font sizing for Fixture Title so long club names fit cleanly
+            const fixtureHeading = activeFixtureTitle.toUpperCase();
+            let titleFontSize = 74;
+            ctx.font = `900 ${titleFontSize}px Inter, system-ui, sans-serif`;
+            while (ctx.measureText(fixtureHeading).width > W - 260 && titleFontSize > 36) {
+                titleFontSize -= 2;
+                ctx.font = `900 ${titleFontSize}px Inter, system-ui, sans-serif`;
+            }
             ctx.fillStyle = "#ffffff";
-            ctx.font = "900 84px Inter, system-ui, sans-serif";
-            ctx.fillText(report.name.toUpperCase(), 130, 240);
+            ctx.fillText(fixtureHeading, 130, 238);
 
-            // Sub-header pills: Formation + League Pos + H2H
-            const formationText = `SHAPE: ${report.formation || "4-2-3-1"}`;
+            // Sub-header pills: Opponent Shape + League Pos + H2H (auto-sized so it never cuts off)
+            const formationText = `OPPONENT SHAPE: ${report.formation || "4-2-3-1"} (${activeOppFormat})`;
             const leagueSummary = activeLeagueStats
                 ? `LEAGUE: #${activeLeagueStats.position} • ${activeLeagueStats.points} PTS • ${activeLeagueStats.won}W-${activeLeagueStats.drawn}D-${activeLeagueStats.lost}L • GD ${activeLeagueStats.goal_difference > 0 ? `+${activeLeagueStats.goal_difference}` : activeLeagueStats.goal_difference}`
                 : "NON-LEAGUE / CUP OPPONENT";
@@ -829,92 +982,203 @@ export default function OppositionReportsPage() {
                     ? `H2H: ${h2hData.wins}W - ${h2hData.draws}D - ${h2hData.losses}L (${h2hData.gf}:${h2hData.ga})`
                     : "FIRST MEETING";
 
+            const subHeaderLine = `${formationText}    |    ${leagueSummary}    |    ${h2hSummary}`;
+            let subFontSize = 30;
+            ctx.font = `700 ${subFontSize}px Inter, system-ui, sans-serif`;
+            while (ctx.measureText(subHeaderLine).width > W - 260 && subFontSize > 20) {
+                subFontSize -= 2;
+                ctx.font = `700 ${subFontSize}px Inter, system-ui, sans-serif`;
+            }
             ctx.fillStyle = "#94a3b8";
-            ctx.font = "700 32px Inter, system-ui, sans-serif";
-            ctx.fillText(`${formationText}    |    ${leagueSummary}    |    ${h2hSummary}`, 130, 315);
+            ctx.fillText(subHeaderLine, 130, 315);
 
-            // Section 1: DANGER MEN (Full Width Card)
-            roundRect(80, 400, W - 160, 340, 24, "#1a1423", "#f59e0b");
-            ctx.fillStyle = "#fbbf24";
-            ctx.font = "900 36px Inter, system-ui, sans-serif";
-            ctx.fillText("⚠️ DANGER MEN & KEY THREATS", 130, 465);
+            // =========================================================================
+            // ROW 1 (Y=395, H=row1H): TACTICAL PITCH IMAGE (LEFT) + DANGER MEN (RIGHT)
+            // =========================================================================
+            const pitchCardX = 80;
+            const pitchCardY = 395;
+            const pitchCardW = 1150;
+            const pitchCardH = row1H;
+            roundRect(pitchCardX, pitchCardY, pitchCardW, pitchCardH, 24, "#0c241b", "#10b981");
 
-            const dangerLines: string[] = [];
-            if (report.dangerMenList && report.dangerMenList.length > 0) {
-                report.dangerMenList.forEach((dm) => {
-                    const tag = [dm.number ? `#${dm.number}` : "", dm.position, dm.name].filter(Boolean).join(" ");
-                    const footStr = dm.foot ? ` (${dm.foot} foot)` : "";
-                    dangerLines.push(`• ${tag}${footStr}: ${dm.notes || "Key threat"}`);
-                });
+            ctx.fillStyle = "#34d399";
+            ctx.font = "900 32px Inter, system-ui, sans-serif";
+            ctx.fillText(
+                `⚽ OPPOSITION PITCH & LINEUP (${report.formation || "4-2-3-1"})`,
+                pitchCardX + 40,
+                pitchCardY + 58
+            );
+
+            // Pitch Canvas Area
+            const pX = pitchCardX + 36;
+            const pY = pitchCardY + 82;
+            const pW = pitchCardW - 72;
+            const pH = pitchCardH - 114;
+            roundRect(pX, pY, pW, pH, 18, "#047857", "#059669", 2);
+
+            // Alternating turf stripes inside pitch
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(pX + 4, pY + 4, pW - 8, pH - 8);
+            ctx.clip();
+            const stripeCount = 8;
+            const stripeH = pH / stripeCount;
+            for (let s = 0; s < stripeCount; s++) {
+                if (s % 2 === 1) {
+                    ctx.fillStyle = "rgba(6, 95, 70, 0.45)";
+                    ctx.fillRect(pX, pY + s * stripeH, pW, stripeH);
+                }
             }
-            if (report.dangerMen && report.dangerMen.trim()) {
-                dangerLines.push(report.dangerMen.trim());
-            }
-            const combinedDangerText = dangerLines.length > 0 ? dangerLines.join("\n") : "No specific individual threats logged yet.";
-            drawWrappedText(combinedDangerText, 130, 525, W - 260, 48, 4, "#fef3c7", "600 34px Inter, system-ui, sans-serif");
+            ctx.restore();
 
-            // 2x3 Grid for the 6 Tactical Sections
-            const colW = (W - 200) / 2;
-            const rowH = 440;
-            const gridCards = [
-                { title: "💪 THEIR STRENGTHS", text: report.strengths, accent: "#10b981", bg: "#0f221d" },
-                { title: "🎯 THEIR WEAKNESSES (AREAS TO EXPLOIT)", text: report.weaknesses, accent: "#f43f5e", bg: "#23121b" },
-                { title: "⚽ IN POSSESSION (BUILD-UP & SHAPE)", text: report.inPossession, accent: "#3b82f6", bg: "#111b2e" },
-                { title: "🛡️ OUT OF POSSESSION (PRESS & BLOCK)", text: report.outOfPossession, accent: "#a855f7", bg: "#1c152c" },
-                { title: "⚡ TRANSITION (COUNTER & RECOVERY)", text: report.transition, accent: "#f97316", bg: "#231812" },
-                { title: "🚩 SET PIECES (CORNERS, FREE KICKS, THROWS)", text: report.setPieces, accent: "#06b6d4", bg: "#0e2028" }
-            ];
+            // Pitch White Lines
+            const linePad = 24;
+            const inX = pX + linePad;
+            const inY = pY + linePad;
+            const inW = pW - linePad * 2;
+            const inH = pH - linePad * 2;
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.55)";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(inX, inY, inW, inH);
 
-            gridCards.forEach((card, idx) => {
-                const col = idx % 2;
-                const row = Math.floor(idx / 2);
-                const x = 80 + col * (colW + 40);
-                const y = 780 + row * (rowH + 35);
+            // Halfway line
+            ctx.beginPath();
+            ctx.moveTo(inX, inY + inH / 2);
+            ctx.lineTo(inX + inW, inY + inH / 2);
+            ctx.stroke();
 
-                roundRect(x, y, colW, rowH, 24, card.bg, card.accent);
-                ctx.fillStyle = card.accent;
-                ctx.font = "900 32px Inter, system-ui, sans-serif";
-                ctx.fillText(card.title, x + 45, y + 65);
+            // Center circle
+            ctx.beginPath();
+            ctx.arc(inX + inW / 2, inY + inH / 2, 68, 0, Math.PI * 2);
+            ctx.stroke();
 
-                drawWrappedText(
-                    card.text || "Not logged yet.",
-                    x + 45,
-                    y + 130,
-                    colW - 90,
-                    46,
-                    6,
-                    "#f1f5f9",
-                    "500 32px Inter, system-ui, sans-serif"
+            // Top & Bottom Penalty Boxes
+            const boxW = 320;
+            const boxH = 110;
+            ctx.strokeRect(inX + (inW - boxW) / 2, inY, boxW, boxH);
+            ctx.strokeRect(inX + (inW - boxW) / 2, inY + inH - boxH, boxW, boxH);
+
+            // Draw Opposition Players on the Pitch (with edge clamping so wide player names never cut off)
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            formationPositions.forEach((pos, idx) => {
+                const cx = inX + (inW * pos.x) / 100;
+                const cy = inY + (inH * pos.y) / 100;
+                const isTopHalf = pos.y < 50 && pos.label !== "GK";
+                const profile = (report.playerProfiles || []).find((p) => p.positionIndex === idx);
+                const playerName = (report.lineup?.[idx] || "").trim();
+                const displayPos = getDisplayPosition(pos.label);
+
+                // Player Shirt Token Circle
+                const radius = 26;
+                ctx.beginPath();
+                ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+                ctx.fillStyle = "#ffffff";
+                ctx.fill();
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = profile?.role ? "#f59e0b" : "#dc2626";
+                ctx.stroke();
+
+                ctx.fillStyle = "#0f172a";
+                ctx.font = "900 22px Inter, system-ui, sans-serif";
+                ctx.fillText(String(pos.number), cx, cy + 1);
+
+                // Player Name / Position Pill (clamped within pitch bounds)
+                const labelText = playerName || displayPos;
+                ctx.font = playerName
+                    ? "900 22px Inter, system-ui, sans-serif"
+                    : "800 19px Inter, system-ui, sans-serif";
+                const textW = ctx.measureText(labelText).width;
+                const pillW = Math.max(textW + 24, 56);
+                const pillH = 34;
+                const unclampedPillX = cx - pillW / 2;
+                const pillX = Math.max(pX + 10, Math.min(pX + pW - pillW - 10, unclampedPillX));
+                const pillY = isTopHalf ? cy - radius - pillH - 8 : cy + radius + 8;
+
+                roundRect(
+                    pillX,
+                    pillY,
+                    pillW,
+                    pillH,
+                    8,
+                    playerName ? "rgba(2, 6, 23, 0.94)" : "rgba(15, 23, 42, 0.82)",
+                    playerName ? "rgba(255, 255, 255, 0.35)" : "rgba(255, 255, 255, 0.18)",
+                    2
                 );
+                ctx.fillStyle = "#ffffff";
+                ctx.fillText(labelText, pillX + pillW / 2, pillY + pillH / 2 + 1);
             });
+            ctx.textAlign = "left";
+            ctx.textBaseline = "alphabetic";
 
-            // Footer / Post-Match Review Strip
-            roundRect(80, 2220, W - 160, 200, 22, "#131c2e", "#334155");
+            // Right Column: DANGER MEN & PLAYER PROFILES
+            const dangerCardY = 395;
+            const dangerCardH = row1H;
+            roundRect(dangerCardX, dangerCardY, dangerCardW, dangerCardH, 24, "#1a1423", "#f59e0b");
+            ctx.fillStyle = "#fbbf24";
+            ctx.font = "900 34px Inter, system-ui, sans-serif";
+            ctx.fillText("⚠️ DANGER MEN & KEY PLAYERS", dangerCardX + 40, dangerCardY + 60);
+
+            drawLines(
+                dangerWrappedLines,
+                dangerCardX + 40,
+                dangerCardY + 120,
+                dangerLineH,
+                "#fef3c7",
+                dangerFont
+            );
+
+            // 2x3 Grid for the 6 Tactical Sections (dynamically sized rows so nothing cuts off)
+            let currentRowY = gridStartY;
+            for (let row = 0; row < 3; row++) {
+                const rowH = gridRowHeights[row];
+                for (let col = 0; col < 2; col++) {
+                    const card = gridCards[row * 2 + col];
+                    const x = 80 + col * (colW + 40);
+                    const y = currentRowY;
+
+                    roundRect(x, y, colW, rowH, 24, card.bg, card.accent);
+                    ctx.fillStyle = card.accent;
+                    ctx.font = "900 32px Inter, system-ui, sans-serif";
+                    ctx.fillText(card.title, x + 45, y + 65);
+
+                    drawLines(
+                        card.lines,
+                        x + 45,
+                        y + 130,
+                        cardLineH,
+                        "#f1f5f9",
+                        cardFont
+                    );
+                }
+                currentRowY += rowH + 35;
+            }
+
+            // Footer / Post-Match Review Strip (dynamically sized)
+            roundRect(80, footerY, W - 160, footerH, 22, "#131c2e", "#334155");
             ctx.fillStyle = "#94a3b8";
             ctx.font = "800 28px Inter, system-ui, sans-serif";
-            ctx.fillText("📋 POST-MATCH REVIEW / NOTES FOR NEXT TIME", 130, 2275);
-            drawWrappedText(
-                report.postMatchReview || report.generalNotes || "Prepared via Camden United Data Hub",
+            ctx.fillText("📋 POST-MATCH REVIEW / NOTES FOR NEXT TIME", 130, footerY + 55);
+            drawLines(
+                reviewWrappedLines,
                 130,
-                2330,
-                W - 260,
-                44,
-                2,
+                footerY + 110,
+                reviewLineH,
                 "#e2e8f0",
-                "500 30px Inter, system-ui, sans-serif"
+                reviewFont
             );
 
             const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/png", 1.0));
             if (!blob) return;
 
             const safeName = report.name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
-            const fileName = `scouting-report-${safeName}.png`;
+            const fileName = `opposition-report-${safeName}.png`;
             const file = new File([blob], fileName, { type: "image/png" });
 
             if (navigator.canShare && navigator.canShare({ files: [file] })) {
                 await navigator.share({
-                    title: `${report.name} - Scouting Report`,
-                    text: `Opposition Scouting Report for ${report.name}`,
+                    title: `${activeFixtureTitle} - ${activeCompetitionLabel}`,
+                    text: `${activeFixtureTitle} (${activeCompetitionLabel})`,
                     files: [file]
                 });
             } else {
@@ -932,7 +1196,7 @@ export default function OppositionReportsPage() {
         }
     };
 
-    // Updated PDF Export with all 7 sections + League & H2H context
+    // Updated PDF Export with Fixture & Competition Header + Visual Tactical Pitch of Opposition Players
     const handleExportPDF = () => {
         const report = activeReport;
         if (!report.name.trim()) return;
@@ -950,32 +1214,77 @@ export default function OppositionReportsPage() {
             .filter(Boolean)
             .join("");
 
+        const pitchTokensHtml = formationPositions
+            .map((pos, idx) => {
+                const isTopHalf = pos.y < 50 && pos.label !== "GK";
+                const profile = (report.playerProfiles || []).find((p) => p.positionIndex === idx);
+                const playerName = (report.lineup?.[idx] || "").trim();
+                const displayPos = getDisplayPosition(pos.label);
+                const borderColor = profile?.role ? "#f59e0b" : "#dc2626";
+                const pillOffset = isTopHalf ? "bottom: 22px;" : "top: 22px;";
+                const pillHoriz =
+                    pos.x <= 16
+                        ? "left: -10px; transform: none;"
+                        : pos.x >= 84
+                            ? "right: -10px; transform: none;"
+                            : "left: 50%; transform: translateX(-50%);";
+                return `
+                    <div style="position:absolute; left:${pos.x}%; top:${pos.y}%; transform:translate(-50%, -50%); z-index:10;">
+                        <div style="width:30px; height:30px; border-radius:9999px; background:#ffffff; border:2.5px solid ${borderColor}; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; color:#0f172a; box-shadow:0 2px 6px rgba(0,0,0,0.35);">
+                            ${pos.number}
+                        </div>
+                        <div style="position:absolute; ${pillHoriz} ${pillOffset} white-space:nowrap; background:#020617; color:#ffffff; border:1px solid rgba(255,255,255,0.35); border-radius:6px; padding:2px 7px; font-size:11px; font-weight:800; box-shadow:0 2px 6px rgba(0,0,0,0.4);">
+                            ${playerName || displayPos}
+                        </div>
+                    </div>
+                `;
+            })
+            .join("");
+
+        const lineupRowsHtml = formationPositions
+            .map((pos, idx) => {
+                const profile = (report.playerProfiles || []).find((p) => p.positionIndex === idx);
+                const playerName = (report.lineup?.[idx] || "").trim() || "—";
+                const displayPos = getDisplayPosition(pos.label);
+                return `
+                    <div style="display:flex; align-items:center; gap:8px; padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; background:#f8fafc; font-size:12px;">
+                        <span style="width:22px; height:22px; border-radius:9999px; background:#dc2626; color:#ffffff; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:900; flex-shrink:0;">${pos.number}</span>
+                        <span style="font-weight:800; color:#475569; width:34px; flex-shrink:0;">${displayPos}</span>
+                        <span style="font-weight:800; color:#0f172a; flex:1; word-break:break-word;">${playerName}</span>
+                        ${profile?.role ? `<span style="font-size:10px; font-weight:700; color:#b45309; background:#fef3c7; padding:1px 6px; border-radius:4px;">${profile.role}</span>` : ""}
+                    </div>
+                `;
+            })
+            .join("");
+
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>
             <head>
-                <title>${report.name} - Opposition Scouting Report</title>
+                <title>${activeFixtureTitle} - ${activeCompetitionLabel}</title>
                 <style>
-                    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 32px; max-width: 920px; margin: 0 auto; color: #0f172a; }
-                    .header { border-bottom: 3px solid #dc2626; padding-bottom: 16px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: flex-end; }
-                    h1 { margin: 4px 0 0 0; font-size: 28px; }
-                    .sub { font-size: 12px; font-weight: 700; color: #dc2626; text-transform: uppercase; letter-spacing: 0.06em; }
-                    .stats-bar { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 13px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-                    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-                    .box { border: 1px solid #e2e8f0; border-left: 4px solid #dc2626; border-radius: 8px; padding: 14px; background: #ffffff; break-inside: avoid; }
+                    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 28px; max-width: 960px; margin: 0 auto; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    .header { border-bottom: 3px solid #dc2626; padding-bottom: 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+                    h1 { margin: 4px 0 0 0; font-size: 26px; font-weight: 900; word-break: break-word; }
+                    .sub { font-size: 12px; font-weight: 800; color: #dc2626; text-transform: uppercase; letter-spacing: 0.06em; }
+                    .stats-bar { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+                    .pitch-row { display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 14px; margin-bottom: 16px; break-inside: avoid; }
+                    .pitch-canvas { position: relative; width: 100%; height: 390px; background: #047857; border-radius: 10px; overflow: hidden; border: 2px solid #065f46; }
+                    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+                    .box { border: 1px solid #e2e8f0; border-left: 4px solid #dc2626; border-radius: 8px; padding: 12px; background: #ffffff; break-inside: avoid; }
                     .box-full { grid-column: 1 / -1; }
                     .box-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; margin-bottom: 6px; }
-                    .box-body { font-size: 13px; line-height: 1.5; white-space: pre-wrap; color: #1e293b; }
+                    .box-body { font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; color: #1e293b; }
                 </style>
             </head>
             <body>
                 <div class="header">
                     <div>
-                        <div class="sub">${settings.name || "Camden United"} • Opposition Scouting Report</div>
-                        <h1>${report.name}</h1>
+                        <div class="sub">${activeCompetitionLabel}${activeFixtureDateStr ? ` • ${activeFixtureDateStr}` : ""}${activeFixture ? (activeFixture.isHome ? " • Home" : " • Away") : ""}</div>
+                        <h1>${activeFixtureTitle}</h1>
                     </div>
-                    <div style="text-align:right; font-size:12px; color:#64748b;">
-                        <div><strong>Formation:</strong> ${report.formation}</div>
+                    <div style="text-align:right; font-size:12px; color:#64748b; flex-shrink:0;">
+                        <div><strong>Opponent Shape:</strong> ${report.formation} (${activeOppFormat})</div>
                         <div><strong>Updated:</strong> ${new Date(report.updatedAt).toLocaleDateString("en-GB")}</div>
                     </div>
                 </div>
@@ -990,6 +1299,25 @@ export default function OppositionReportsPage() {
                             ? `${h2hData.wins}W - ${h2hData.draws}D - ${h2hData.losses}L (Goals ${h2hData.gf}:${h2hData.ga})`
                             : "No previous meetings logged"
                     }</div>
+                </div>
+                <div class="pitch-row">
+                    <div>
+                        <div class="box-title" style="color:#047857; margin-bottom:6px;">⚽ Opposition Tactical Pitch (${report.formation})</div>
+                        <div class="pitch-canvas">
+                            <div style="position:absolute; inset:12px; border:2px solid rgba(255,255,255,0.55); border-radius:4px;"></div>
+                            <div style="position:absolute; left:12px; right:12px; top:50%; border-top:2px solid rgba(255,255,255,0.55);"></div>
+                            <div style="position:absolute; left:50%; top:50%; width:64px; height:64px; transform:translate(-50%, -50%); border:2px solid rgba(255,255,255,0.55); border-radius:9999px;"></div>
+                            <div style="position:absolute; left:50%; top:12px; width:130px; height:52px; transform:translateX(-50%); border:2px solid rgba(255,255,255,0.55); border-top:0;"></div>
+                            <div style="position:absolute; left:50%; bottom:12px; width:130px; height:52px; transform:translateX(-50%); border:2px solid rgba(255,255,255,0.55); border-bottom:0;"></div>
+                            ${pitchTokensHtml}
+                        </div>
+                    </div>
+                    <div>
+                        <div class="box-title" style="color:#0f172a; margin-bottom:6px;">👥 Opposition Players & Roles</div>
+                        <div style="display:grid; grid-template-columns:1fr; gap:4px;">
+                            ${lineupRowsHtml}
+                        </div>
+                    </div>
                 </div>
                 <div class="grid">
                     <div class="box box-full" style="border-left-color:#f59e0b; background:#fffbeb;">
@@ -1031,10 +1359,6 @@ export default function OppositionReportsPage() {
         `);
         printWindow.document.close();
     };
-
-    const formationPositions = FORMATIONS[activeReport.formation] || FORMATIONS["4-2-3-1"] || [];
-    const activeOppFormat: MatchFormat = getFormatFromFormation(activeReport.formation);
-    const activeOppRomanLabel = FORMAT_ROMAN_LABEL[activeOppFormat] || "XI";
     const enabledFormats: MatchFormat[] =
         Array.isArray(settings.enabledMatchFormats) && settings.enabledMatchFormats.length > 0
             ? (settings.enabledMatchFormats as MatchFormat[])
@@ -1333,21 +1657,38 @@ export default function OppositionReportsPage() {
                 <div className="rounded-2xl bg-surface-1 border border-border p-3.5 shadow-xs space-y-3">
                     {isEditing ? (
                         <div className="space-y-2.5">
-                            <div className="space-y-1">
-                                <Label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                                    Opposition Team Name
-                                </Label>
-                                <Input
-                                    list="opposition-known-teams"
-                                    value={editedReport?.name || ""}
-                                    onChange={(e) =>
-                                        setEditedReport((prev) =>
-                                            prev ? { ...prev, name: e.target.value } : null
-                                        )
-                                    }
-                                    placeholder="Type or pick opponent..."
-                                    className="h-10 text-sm font-black bg-surface-2 border-border"
-                                />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                        Opposition Team Name
+                                    </Label>
+                                    <Input
+                                        list="opposition-known-teams"
+                                        value={editedReport?.name || ""}
+                                        onChange={(e) =>
+                                            setEditedReport((prev) =>
+                                                prev ? { ...prev, name: e.target.value } : null
+                                            )
+                                        }
+                                        placeholder="Type or pick opponent..."
+                                        className="h-10 text-sm font-black bg-surface-2 border-border"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                        Competition
+                                    </Label>
+                                    <Input
+                                        value={editedReport?.competition || ""}
+                                        onChange={(e) =>
+                                            setEditedReport((prev) =>
+                                                prev ? { ...prev, competition: e.target.value } : null
+                                            )
+                                        }
+                                        placeholder={activeFixture?.competition || "e.g. League, Cup..."}
+                                        className="h-10 text-xs font-bold bg-surface-2 border-border"
+                                    />
+                                </div>
                             </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="space-y-1">
@@ -1401,8 +1742,9 @@ export default function OppositionReportsPage() {
                             <div className="flex items-start justify-between gap-2">
                                 <div className="min-w-0">
                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                        <span className="text-[9px] font-black uppercase tracking-wider text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20">
-                                            Scouting Dossier
+                                        <span className="text-[10px] font-black uppercase tracking-wider text-brand bg-brand/10 px-2 py-0.5 rounded border border-brand/20">
+                                            {activeCompetitionLabel}
+                                            {activeFixtureDateStr ? ` • ${activeFixtureDateStr}` : ""}
                                         </span>
                                         <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-surface-2 border border-border text-foreground">
                                             {activeReport.formation}
@@ -1411,8 +1753,8 @@ export default function OppositionReportsPage() {
                                             {formatDateShort(activeReport.updatedAt)}
                                         </span>
                                     </div>
-                                    <h2 className="text-xl font-black text-foreground tracking-tight truncate mt-1">
-                                        {activeReport.name || "Select an Opponent"}
+                                    <h2 className="text-xl font-black text-foreground tracking-tight break-words leading-tight mt-1">
+                                        {activeFixtureTitle}
                                     </h2>
                                 </div>
                                 {selectedReport && (
@@ -1536,7 +1878,7 @@ export default function OppositionReportsPage() {
                                             <span className="text-amber-500">{h2hData.draws}D</span> -{" "}
                                             <span className="text-rose-500">{h2hData.losses}L</span>
                                         </div>
-                                        <div className="text-[10px] text-muted-foreground truncate">
+                                        <div className="text-[10px] text-muted-foreground break-words">
                                             Last: {h2hData.past[0].result?.[0]} {h2hData.past[0].scoreline} (
                                             {formatDateShort(h2hData.past[0].date)})
                                         </div>
@@ -1659,13 +2001,14 @@ export default function OppositionReportsPage() {
                                                         }
                                                         className="h-8 text-xs font-semibold bg-surface-1"
                                                     />
-                                                    <Input
+                                                    <textarea
+                                                        rows={2}
                                                         placeholder="Threat notes (e.g. Cuts inside onto right foot, rapid in behind)..."
                                                         value={dm.notes}
                                                         onChange={(e) =>
                                                             handleUpdateDangerMan(dm.id, "notes", e.target.value)
                                                         }
-                                                        className="h-8 text-xs bg-surface-1"
+                                                        className="w-full rounded-md border border-border bg-surface-1 px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none resize-y"
                                                     />
                                                 </>
                                             ) : (
@@ -1685,7 +2028,7 @@ export default function OppositionReportsPage() {
                                                                     {dm.position}
                                                                 </span>
                                                             )}
-                                                            <span className="text-xs font-extrabold text-foreground">
+                                                            <span className="text-xs font-extrabold text-foreground break-words">
                                                                 {dm.name || "Key Threat"}
                                                             </span>
                                                         </div>
@@ -1710,7 +2053,7 @@ export default function OppositionReportsPage() {
                                                         </div>
                                                     </div>
                                                     {dm.notes && (
-                                                        <p className="text-xs text-muted-foreground leading-relaxed">
+                                                        <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words leading-relaxed">
                                                             {dm.notes}
                                                         </p>
                                                     )}
@@ -1735,7 +2078,7 @@ export default function OppositionReportsPage() {
                             ) : activeReport.dangerMen ? (
                                 <p
                                     onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text"
+                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text"
                                 >
                                     {activeReport.dangerMen}
                                 </p>
@@ -1769,7 +2112,7 @@ export default function OppositionReportsPage() {
                             ) : (
                                 <p
                                     onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
                                 >
                                     {activeReport.strengths || (
                                         <span className="text-muted-foreground italic">
@@ -1800,7 +2143,7 @@ export default function OppositionReportsPage() {
                             ) : (
                                 <p
                                     onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
                                 >
                                     {activeReport.weaknesses || (
                                         <span className="text-muted-foreground italic">
@@ -1836,7 +2179,7 @@ export default function OppositionReportsPage() {
                             ) : (
                                 <p
                                     onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
                                 >
                                     {activeReport.inPossession || (
                                         <span className="text-muted-foreground italic">
@@ -1867,7 +2210,7 @@ export default function OppositionReportsPage() {
                             ) : (
                                 <p
                                     onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
                                 >
                                     {activeReport.outOfPossession || (
                                         <span className="text-muted-foreground italic">
@@ -1898,7 +2241,7 @@ export default function OppositionReportsPage() {
                             ) : (
                                 <p
                                     onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
                                 >
                                     {activeReport.transition || (
                                         <span className="text-muted-foreground italic">
@@ -1929,7 +2272,7 @@ export default function OppositionReportsPage() {
                             ) : (
                                 <p
                                     onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
                                 >
                                     {activeReport.setPieces || (
                                         <span className="text-muted-foreground italic">
@@ -2007,6 +2350,12 @@ export default function OppositionReportsPage() {
                                     (p) => p.positionIndex === idx
                                 );
                                 const playerName = (activeReport.lineup?.[idx] || "").trim();
+                                const horizAlignCls =
+                                    pos.x <= 16
+                                        ? "-left-3 items-start"
+                                        : pos.x >= 84
+                                            ? "-right-3 items-end"
+                                            : "left-1/2 -translate-x-1/2 items-center";
                                 return (
                                     <div
                                         key={idx}
@@ -2024,12 +2373,12 @@ export default function OppositionReportsPage() {
                                             </span>
                                         </div>
                                         <div
-                                            className={`absolute -translate-x-1/2 z-30 flex flex-col items-center ${
+                                            className={`absolute z-30 flex flex-col ${horizAlignCls} ${
                                                 isTopHalf ? "bottom-5" : "top-5"
                                             }`}
                                         >
                                             {playerName ? (
-                                                <span className="text-[11px] font-black tracking-tight text-white bg-slate-950/95 border border-white/30 px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap truncate max-w-[96px]">
+                                                <span className="text-[11px] font-black tracking-tight text-white bg-slate-950/95 border border-white/30 px-2 py-0.5 rounded-md shadow-lg whitespace-nowrap">
                                                     {playerName}
                                                 </span>
                                             ) : (
@@ -2125,7 +2474,7 @@ export default function OppositionReportsPage() {
                             ) : (
                                 <p
                                     onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap leading-relaxed cursor-text py-1"
+                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
                                 >
                                     {activeReport.postMatchReview || activeReport.generalNotes || (
                                         <span className="text-muted-foreground italic">
@@ -2483,7 +2832,7 @@ export default function OppositionReportsPage() {
                             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                 <div className="flex-1 min-w-0">
                                     {isEditing ? (
-                                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_160px] gap-3">
+                                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_200px_160px] gap-3">
                                             <div className="space-y-1">
                                                 <Label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
                                                     Opposition Team Name
@@ -2498,6 +2847,21 @@ export default function OppositionReportsPage() {
                                                     }
                                                     placeholder="Select or type opponent (e.g. Stonewall, Hackney Wick)..."
                                                     className="h-10 text-base font-black bg-surface-2 border-border"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                                    Competition
+                                                </Label>
+                                                <Input
+                                                    value={editedReport?.competition || ""}
+                                                    onChange={(e) =>
+                                                        setEditedReport((prev) =>
+                                                            prev ? { ...prev, competition: e.target.value } : null
+                                                        )
+                                                    }
+                                                    placeholder={activeFixture?.competition || "e.g. League, Cup..."}
+                                                    className="h-10 text-xs font-bold bg-surface-2 border-border"
                                                 />
                                             </div>
                                             <div className="space-y-1">
@@ -2530,8 +2894,9 @@ export default function OppositionReportsPage() {
                                     ) : (
                                         <div className="space-y-1">
                                             <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-brand bg-brand/10 px-2 py-0.5 rounded border border-brand/20">
-                                                    Opposition Dossier
+                                                <span className="text-[11px] font-extrabold uppercase tracking-wider text-brand bg-brand/10 px-2.5 py-0.5 rounded border border-brand/20">
+                                                    {activeCompetitionLabel}
+                                                    {activeFixtureDateStr ? ` • ${activeFixtureDateStr}` : ""}
                                                 </span>
                                                 <Badge variant="outline" className="text-[11px] font-extrabold">
                                                     Shape: {activeReport.formation} ({activeOppFormat})
@@ -2540,8 +2905,8 @@ export default function OppositionReportsPage() {
                                                     Updated {formatDateShort(activeReport.updatedAt)}
                                                 </span>
                                             </div>
-                                            <h1 className="text-2xl md:text-3xl font-black text-foreground tracking-tight truncate">
-                                                {activeReport.name || "Select an Opponent"}
+                                            <h1 className="text-2xl md:text-3xl font-black text-foreground tracking-tight break-words leading-tight">
+                                                {activeFixtureTitle}
                                             </h1>
                                         </div>
                                     )}
@@ -2728,7 +3093,7 @@ export default function OppositionReportsPage() {
                                                             </span>
                                                         </div>
                                                         {m.goalscorers && (
-                                                            <span className="text-[10px] text-muted-foreground truncate max-w-[160px]">
+                                                            <span className="text-[10px] text-muted-foreground break-words">
                                                                 ⚽ {m.goalscorers}
                                                             </span>
                                                         )}
@@ -2834,13 +3199,14 @@ export default function OppositionReportsPage() {
                                                             <Trash2 className="h-3.5 w-3.5" />
                                                         </button>
                                                     </div>
-                                                    <Input
+                                                    <textarea
+                                                        rows={2}
                                                         placeholder="Threat notes (e.g. Rapid in behind, cuts inside onto left foot)..."
                                                         value={dm.notes}
                                                         onChange={(e) =>
                                                             handleUpdateDangerMan(dm.id, "notes", e.target.value)
                                                         }
-                                                        className="h-8 text-xs bg-surface-1"
+                                                        className="w-full rounded-md border border-border bg-surface-1 px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none resize-y"
                                                     />
                                                 </>
                                             ) : (
@@ -2853,7 +3219,7 @@ export default function OppositionReportsPage() {
                                                     </div>
                                                     <div className="min-w-0 flex-1">
                                                         <div className="flex items-center gap-1.5 flex-wrap">
-                                                            <span className="text-xs font-extrabold text-foreground">
+                                                            <span className="text-xs font-extrabold text-foreground break-words">
                                                                 {dm.name || `Opposition ${dm.position || "Player"}`}
                                                             </span>
                                                             {dm.position && (
@@ -2867,7 +3233,7 @@ export default function OppositionReportsPage() {
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                                        <p className="text-xs text-muted-foreground whitespace-pre-wrap break-words leading-relaxed mt-0.5">
                                                             {dm.notes || "Key threat"}
                                                         </p>
                                                     </div>
@@ -2907,7 +3273,7 @@ export default function OppositionReportsPage() {
                             ) : activeReport.dangerMen ? (
                                 <p
                                     onClick={handleEditReport}
-                                    className="text-xs md:text-sm text-foreground whitespace-pre-wrap bg-surface-2/60 hover:bg-surface-2 rounded-xl p-3 border border-border cursor-text transition-colors"
+                                    className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed bg-surface-2/60 hover:bg-surface-2 rounded-xl p-3 border border-border cursor-text transition-colors"
                                 >
                                     {activeReport.dangerMen}
                                 </p>
@@ -2960,7 +3326,7 @@ export default function OppositionReportsPage() {
                                 ) : (
                                     <p
                                         onClick={handleEditReport}
-                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
                                     >
                                         {activeReport.strengths || (
                                             <span className="text-muted-foreground italic">
@@ -3004,7 +3370,7 @@ export default function OppositionReportsPage() {
                                 ) : (
                                     <p
                                         onClick={handleEditReport}
-                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
                                     >
                                         {activeReport.weaknesses || (
                                             <span className="text-muted-foreground italic">
@@ -3048,7 +3414,7 @@ export default function OppositionReportsPage() {
                                 ) : (
                                     <p
                                         onClick={handleEditReport}
-                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
                                     >
                                         {activeReport.inPossession || (
                                             <span className="text-muted-foreground italic">
@@ -3092,7 +3458,7 @@ export default function OppositionReportsPage() {
                                 ) : (
                                     <p
                                         onClick={handleEditReport}
-                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
                                     >
                                         {activeReport.outOfPossession || (
                                             <span className="text-muted-foreground italic">
@@ -3136,7 +3502,7 @@ export default function OppositionReportsPage() {
                                 ) : (
                                     <p
                                         onClick={handleEditReport}
-                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
                                     >
                                         {activeReport.transition || (
                                             <span className="text-muted-foreground italic">
@@ -3180,7 +3546,7 @@ export default function OppositionReportsPage() {
                                 ) : (
                                     <p
                                         onClick={handleEditReport}
-                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
+                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
                                     >
                                         {activeReport.setPieces || (
                                             <span className="text-muted-foreground italic">
@@ -3245,7 +3611,7 @@ export default function OppositionReportsPage() {
                             ) : (
                                 <p
                                     onClick={handleEditReport}
-                                    className="text-xs md:text-sm text-foreground whitespace-pre-wrap min-h-[48px] cursor-text rounded-xl p-2.5 -m-2.5 hover:bg-surface-2/60 transition-colors"
+                                    className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[48px] cursor-text rounded-xl p-2.5 -m-2.5 hover:bg-surface-2/60 transition-colors"
                                 >
                                     {activeReport.postMatchReview || activeReport.generalNotes || (
                                         <span className="text-muted-foreground italic">
@@ -3340,6 +3706,12 @@ export default function OppositionReportsPage() {
                                             (p) => p.positionIndex === idx
                                         );
                                         const playerName = (activeReport.lineup?.[idx] || "").trim();
+                                        const horizAlignCls =
+                                            pos.x <= 16
+                                                ? "-left-4 items-start"
+                                                : pos.x >= 84
+                                                    ? "-right-4 items-end"
+                                                    : "left-1/2 -translate-x-1/2 items-center";
                                         return (
                                             <div
                                                 key={idx}
@@ -3357,7 +3729,7 @@ export default function OppositionReportsPage() {
                                                     </span>
                                                 </div>
                                                 <div
-                                                    className={`absolute -translate-x-1/2 z-30 flex flex-col items-center ${
+                                                    className={`absolute z-30 flex flex-col ${horizAlignCls} ${
                                                         isTopHalf ? "bottom-6" : "top-6"
                                                     }`}
                                                 >
