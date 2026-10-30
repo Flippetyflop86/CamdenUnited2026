@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Menu, LayoutDashboard, Users, Activity, CreditCard, Search, Plus, UserPlus, Calendar } from "lucide-react";
+import { Menu, LayoutDashboard, Users, Activity, CreditCard, Search, Plus, UserPlus, Calendar, Target, ShieldHalf } from "lucide-react";
 import Link from "next/link";
 import { useClub } from "@/context/club-context";
 import { cn } from "@/lib/utils";
@@ -77,8 +77,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         );
     }
 
+    const hideMobileFab = cleanPath === "/opposition" || cleanPath === "/matchday-xi";
+
     return (
-        <div className="flex h-screen w-full bg-background overflow-hidden text-foreground">
+        <div className="flex h-[100dvh] w-full bg-background overflow-hidden text-foreground">
             {/* Mobile Header */}
             <header className="fixed top-0 left-0 right-0 h-16 bg-slate-900 flex items-center px-4 justify-between z-40 md:hidden">
                 <div className="flex items-center gap-3 overflow-hidden">
@@ -134,7 +136,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 <Sidebar onClose={() => setIsMobileMenuOpen(false)} />
             </aside>
 
-            <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-10 mt-16 md:mt-0 pb-20 md:pb-8 relative scrollbar-thin">
+            <main className="flex-1 overflow-y-auto p-3.5 sm:p-4 md:p-8 lg:p-10 mt-16 md:mt-0 pb-24 md:pb-8 relative scrollbar-thin">
                 <PageGuard>
                     <PageContainer>
                         {children}
@@ -142,90 +144,102 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </PageGuard>
             </main>
 
-            {/* Universal Add Button (FAB) - Mobile Only */}
-            <div className="fixed bottom-20 right-6 z-50 flex md:hidden flex-col items-end gap-3">
-                {isFabOpen && (
-                    <div className="flex flex-col items-end gap-2.5 mb-2 animate-in slide-in-from-bottom-5 duration-200">
-                        {/* Add Match */}
-                        <Link 
-                            href="/matches?add=true" 
-                            onClick={() => setIsFabOpen(false)}
-                            className="flex items-center gap-2 bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
-                        >
-                            <Calendar className="h-4 w-4 text-red-500" />
-                            <span>Schedule Match</span>
-                        </Link>
-                        {/* Add Training */}
-                        <Link 
-                            href="/training?add=true" 
-                            onClick={() => setIsFabOpen(false)}
-                            className="flex items-center gap-2 bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
-                        >
-                            <Activity className="h-4 w-4 text-red-500" />
-                            <span>Schedule Training</span>
-                        </Link>
-                        {/* Add Player */}
-                        <Link 
-                            href="/squad?add=true" 
-                            onClick={() => setIsFabOpen(false)}
-                            className="flex items-center gap-2 bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
-                        >
-                            <UserPlus className="h-4 w-4 text-red-500" />
-                            <span>Add Player</span>
-                        </Link>
-                    </div>
-                )}
-                <button
-                    onClick={() => setIsFabOpen(!isFabOpen)}
-                    className="h-14 w-14 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center shadow-xl transition-transform duration-200 active:scale-95"
-                    style={{ transform: isFabOpen ? "rotate(45deg)" : "none" }}
-                    aria-label="Universal Add Actions"
-                >
-                    <Plus className="h-6 w-6" />
-                </button>
-            </div>
+            {/* Universal Add Button (FAB) - Mobile Only (Hidden on Opposition & Matchday XI so it never covers Save/Pitch controls) */}
+            {!hideMobileFab && (
+                <div className="fixed bottom-20 right-5 z-40 flex md:hidden flex-col items-end gap-3">
+                    {isFabOpen && (
+                        <div className="flex flex-col items-end gap-2.5 mb-2 animate-in slide-in-from-bottom-5 duration-200">
+                            {/* Add Match */}
+                            <Link 
+                                href="/matches?add=true" 
+                                onClick={() => setIsFabOpen(false)}
+                                className="flex items-center gap-2 bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
+                            >
+                                <Calendar className="h-4 w-4 text-red-500" />
+                                <span>Schedule Match</span>
+                            </Link>
+                            {/* Add Training */}
+                            <Link 
+                                href="/training?add=true" 
+                                onClick={() => setIsFabOpen(false)}
+                                className="flex items-center gap-2 bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
+                            >
+                                <Activity className="h-4 w-4 text-red-500" />
+                                <span>Schedule Training</span>
+                            </Link>
+                            {/* Add Player */}
+                            <Link 
+                                href="/squad?add=true" 
+                                onClick={() => setIsFabOpen(false)}
+                                className="flex items-center gap-2 bg-slate-900 text-white hover:bg-slate-800 px-4 py-2 rounded-xl shadow-lg border border-slate-700/50 text-xs font-bold transition-all"
+                            >
+                                <UserPlus className="h-4 w-4 text-red-500" />
+                                <span>Add Player</span>
+                            </Link>
+                        </div>
+                    )}
+                    <button
+                        onClick={() => setIsFabOpen(!isFabOpen)}
+                        className="h-12 w-12 rounded-full bg-primary hover:bg-primary/90 text-primary-foreground flex items-center justify-center shadow-xl transition-transform duration-200 active:scale-95"
+                        style={{ transform: isFabOpen ? "rotate(45deg)" : "none" }}
+                        aria-label="Universal Add Actions"
+                    >
+                        <Plus className="h-5 w-5" />
+                    </button>
+                </div>
+            )}
 
             {/* Mobile Bottom Navigation Bar */}
-            <nav className="fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 flex items-center justify-around z-40 md:hidden pb-safe">
+            <nav className="fixed bottom-0 left-0 right-0 h-16 bg-slate-900 border-t border-slate-800 grid grid-cols-5 items-center z-40 md:hidden pb-safe">
                 <Link
                     href="/dashboard"
                     className={cn(
-                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium w-16 h-full transition-colors",
+                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium h-full transition-colors",
                         pathname === "/dashboard" ? "text-red-500 font-semibold" : "text-slate-400 hover:text-white"
                     )}
                 >
-                    <LayoutDashboard className="h-5 w-5" />
-                    <span>Dashboard</span>
+                    <LayoutDashboard className="h-4 w-4" />
+                    <span>Home</span>
                 </Link>
                 <Link
                     href="/squad"
                     className={cn(
-                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium w-16 h-full transition-colors",
+                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium h-full transition-colors",
                         pathname === "/squad" || pathname?.startsWith("/squad/") ? "text-red-500 font-semibold" : "text-slate-400 hover:text-white"
                     )}
                 >
-                    <Users className="h-5 w-5" />
+                    <Users className="h-4 w-4" />
                     <span>Squad</span>
+                </Link>
+                <Link
+                    href="/matchday-xi"
+                    className={cn(
+                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium h-full transition-colors",
+                        pathname === "/matchday-xi" ? "text-red-500 font-semibold" : "text-slate-400 hover:text-white"
+                    )}
+                >
+                    <ShieldHalf className="h-4 w-4" />
+                    <span>Match XI</span>
                 </Link>
                 <Link
                     href="/matches"
                     className={cn(
-                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium w-16 h-full transition-colors",
+                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium h-full transition-colors",
                         pathname === "/matches" || pathname?.startsWith("/matches/") ? "text-red-500 font-semibold" : "text-slate-400 hover:text-white"
                     )}
                 >
-                    <Activity className="h-5 w-5" />
+                    <Calendar className="h-4 w-4" />
                     <span>Fixtures</span>
                 </Link>
                 <Link
-                    href="/dashboard/billing"
+                    href="/opposition"
                     className={cn(
-                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium w-16 h-full transition-colors",
-                        pathname === "/dashboard/billing" ? "text-red-500 font-semibold" : "text-slate-400 hover:text-white"
+                        "flex flex-col items-center justify-center gap-1 text-[10px] font-medium h-full transition-colors",
+                        pathname === "/opposition" ? "text-red-500 font-semibold" : "text-slate-400 hover:text-white"
                     )}
                 >
-                    <CreditCard className="h-5 w-5" />
-                    <span>Billing</span>
+                    <Target className="h-4 w-4" />
+                    <span>Opposition</span>
                 </Link>
             </nav>
         </div>

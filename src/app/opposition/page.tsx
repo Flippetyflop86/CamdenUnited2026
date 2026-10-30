@@ -1393,10 +1393,11 @@ export default function OppositionReportsPage() {
             <!DOCTYPE html>
             <html>
             <head>
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>${activeFixtureTitle} - ${activeCompetitionLabel}</title>
                 <style>
-                    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 28px; max-width: 960px; margin: 0 auto; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                    .header { border-bottom: 3px solid #dc2626; padding-bottom: 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; }
+                    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 28px; max-width: 960px; margin: 0 auto; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
+                    .header { border-bottom: 3px solid #dc2626; padding-bottom: 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
                     h1 { margin: 4px 0 0 0; font-size: 26px; font-weight: 900; word-break: break-word; }
                     .sub { font-size: 12px; font-weight: 800; color: #dc2626; text-transform: uppercase; letter-spacing: 0.06em; }
                     .stats-bar { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
@@ -1407,6 +1408,13 @@ export default function OppositionReportsPage() {
                     .box-full { grid-column: 1 / -1; }
                     .box-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; margin-bottom: 6px; }
                     .box-body { font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; color: #1e293b; }
+                    @media screen and (max-width: 680px) {
+                        body { padding: 14px; }
+                        h1 { font-size: 20px; }
+                        .pitch-row { grid-template-columns: 1fr; }
+                        .pitch-canvas { height: 350px; }
+                        .grid { grid-template-columns: 1fr; }
+                    }
                 </style>
             </head>
             <body>
@@ -1743,7 +1751,7 @@ export default function OppositionReportsPage() {
                                     placeholder="Filter saved reports or league teams..."
                                     value={teamSearch}
                                     onChange={(e) => setTeamSearch(e.target.value)}
-                                    className="pl-8 h-8 text-xs bg-surface-2 border-border"
+                                    className="pl-8 h-9 text-base sm:text-xs bg-surface-2 border-border"
                                 />
                             </div>
                             <div className="grid grid-cols-1 gap-1 max-h-52 overflow-y-auto pr-1">
@@ -1803,7 +1811,7 @@ export default function OppositionReportsPage() {
                                             )
                                         }
                                         placeholder="Type or pick opponent..."
-                                        className="h-10 text-sm font-black bg-surface-2 border-border"
+                                        className="h-10 text-base sm:text-sm font-black bg-surface-2 border-border"
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -1818,7 +1826,7 @@ export default function OppositionReportsPage() {
                                             )
                                         }
                                         placeholder={activeFixture?.competition || "e.g. League, Cup..."}
-                                        className="h-10 text-xs font-bold bg-surface-2 border-border"
+                                        className="h-10 text-base sm:text-xs font-bold bg-surface-2 border-border"
                                     />
                                 </div>
                             </div>
@@ -1834,7 +1842,7 @@ export default function OppositionReportsPage() {
                                                 prev ? { ...prev, formation: e.target.value } : null
                                             )
                                         }
-                                        className="w-full h-9 px-2.5 rounded-lg border border-border bg-surface-2 text-xs font-bold text-foreground"
+                                        className="w-full h-9 px-2.5 rounded-lg border border-border bg-surface-2 text-base sm:text-xs font-bold text-foreground"
                                     >
                                         {(["11v11", "9v9", "7v7", "5v5"] as const)
                                             .filter((fmt) => enabledFormats.includes(fmt) || fmt === activeOppFormat)
@@ -2096,7 +2104,7 @@ export default function OppositionReportsPage() {
                                                             onChange={(e) =>
                                                                 handleUpdateDangerMan(dm.id, "number", e.target.value)
                                                             }
-                                                            className="h-8 text-xs font-bold text-center bg-surface-1 px-1"
+                                                            className="h-9 text-base sm:text-xs font-bold text-center bg-surface-1 px-1"
                                                         />
                                                         <Input
                                                             placeholder="ST/LW"
@@ -2104,14 +2112,14 @@ export default function OppositionReportsPage() {
                                                             onChange={(e) =>
                                                                 handleUpdateDangerMan(dm.id, "position", e.target.value)
                                                             }
-                                                            className="h-8 text-xs font-bold bg-surface-1 px-2"
+                                                            className="h-9 text-base sm:text-xs font-bold bg-surface-1 px-2"
                                                         />
                                                         <select
                                                             value={dm.foot || "Right"}
                                                             onChange={(e) =>
                                                                 handleUpdateDangerMan(dm.id, "foot", e.target.value)
                                                             }
-                                                            className="h-8 rounded-md border border-border bg-surface-1 px-2 text-xs font-semibold text-foreground"
+                                                            className="h-9 rounded-md border border-border bg-surface-1 px-2 text-base sm:text-xs font-semibold text-foreground"
                                                         >
                                                             <option value="Right">Right Foot</option>
                                                             <option value="Left">Left Foot</option>
@@ -2120,9 +2128,9 @@ export default function OppositionReportsPage() {
                                                         <button
                                                             type="button"
                                                             onClick={() => handleRemoveDangerMan(dm.id)}
-                                                            className="h-8 w-8 rounded-md flex items-center justify-center text-rose-500 hover:bg-rose-500/10"
+                                                            className="h-9 w-9 rounded-md flex items-center justify-center text-rose-500 hover:bg-rose-500/10"
                                                         >
-                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                            <Trash2 className="h-4 w-4" />
                                                         </button>
                                                     </div>
                                                     <Input
@@ -2131,7 +2139,7 @@ export default function OppositionReportsPage() {
                                                         onChange={(e) =>
                                                             handleUpdateDangerMan(dm.id, "name", e.target.value)
                                                         }
-                                                        className="h-8 text-xs font-semibold bg-surface-1"
+                                                        className="h-9 text-base sm:text-xs font-semibold bg-surface-1"
                                                     />
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                                         <Input
@@ -2140,7 +2148,7 @@ export default function OppositionReportsPage() {
                                                             onChange={(e) =>
                                                                 handleUpdateDangerMan(dm.id, "strengths", e.target.value)
                                                             }
-                                                            className="h-8 text-xs bg-emerald-500/5 border-emerald-500/30"
+                                                            className="h-9 text-base sm:text-xs bg-emerald-500/5 border-emerald-500/30"
                                                         />
                                                         <Input
                                                             placeholder="🎯 Weaknesses / Exploit (e.g. Press 1st touch)..."
@@ -2148,7 +2156,7 @@ export default function OppositionReportsPage() {
                                                             onChange={(e) =>
                                                                 handleUpdateDangerMan(dm.id, "weaknesses", e.target.value)
                                                             }
-                                                            className="h-8 text-xs bg-rose-500/5 border-rose-500/30"
+                                                            className="h-9 text-base sm:text-xs bg-rose-500/5 border-rose-500/30"
                                                         />
                                                     </div>
                                                     <textarea
@@ -2158,7 +2166,7 @@ export default function OppositionReportsPage() {
                                                         onChange={(e) =>
                                                             handleUpdateDangerMan(dm.id, "notes", e.target.value)
                                                         }
-                                                        className="w-full rounded-md border border-border bg-surface-1 px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none resize-y"
+                                                        className="w-full rounded-md border border-border bg-surface-1 px-2.5 py-1.5 text-base sm:text-xs text-foreground placeholder:text-muted-foreground outline-none resize-y"
                                                     />
                                                 </>
                                             ) : (
@@ -2237,7 +2245,7 @@ export default function OppositionReportsPage() {
                                         )
                                     }
                                     placeholder="Quick player notes — write 'Player Name - note' on each line to auto-format into player callout cards..."
-                                    className="w-full min-h-[75px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground placeholder:text-muted-foreground outline-none"
+                                    className="w-full min-h-[75px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground placeholder:text-muted-foreground outline-none"
                                 />
                             ) : activeReport.dangerMen ? (
                                 <div
@@ -2292,7 +2300,7 @@ export default function OppositionReportsPage() {
                                         )
                                     }
                                     placeholder="What are they good at? (e.g. Physical midfield, fast wingers, dangerous on corners)..."
-                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
                                 />
                             ) : (
                                 <p
@@ -2323,7 +2331,7 @@ export default function OppositionReportsPage() {
                                         )
                                     }
                                     placeholder="Where can we exploit them? (e.g. Slow CBs against balls in behind, GK struggles under high crosses)..."
-                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
                                 />
                             ) : (
                                 <p
@@ -2359,7 +2367,7 @@ export default function OppositionReportsPage() {
                                         )
                                     }
                                     placeholder="How do they build up and attack? (e.g. Play short to #6 or go direct to #9?)..."
-                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
                                 />
                             ) : (
                                 <p
@@ -2390,7 +2398,7 @@ export default function OppositionReportsPage() {
                                         )
                                     }
                                     placeholder="How do they defend? (e.g. High line with aggressive press, or compact mid/low block?)..."
-                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
                                 />
                             ) : (
                                 <p
@@ -2421,7 +2429,7 @@ export default function OppositionReportsPage() {
                                         )
                                     }
                                     placeholder="What happens when the ball turns over? (e.g. Early ball over the top to wingers; slow to track back)..."
-                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
                                 />
                             ) : (
                                 <p
@@ -2452,7 +2460,7 @@ export default function OppositionReportsPage() {
                                         )
                                     }
                                     placeholder="Inswinging corners to near post? Long throw specialist? Zonal or man-marking?..."
-                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
                                 />
                             ) : (
                                 <p
@@ -2514,7 +2522,7 @@ export default function OppositionReportsPage() {
                         </div>
 
                         {/* Pitch Canvas */}
-                        <div className="relative w-full bg-emerald-700" style={{ paddingBottom: "85%" }}>
+                        <div className="relative w-full bg-emerald-700" style={{ paddingBottom: "88%" }}>
                             <div className="absolute inset-0 opacity-40">
                                 <div className="absolute inset-3 border-2 border-white/60 rounded-sm"></div>
                                 <div className="absolute left-3 right-3 top-1/2 border-t-2 border-white/60"></div>
@@ -2538,11 +2546,13 @@ export default function OppositionReportsPage() {
                                 const hasProfileData = Boolean(
                                     profile?.role || profile?.strengths || profile?.weaknesses || profile?.traits
                                 );
+                                // Clamp wide x positions slightly inward on narrow mobile screens so name pills stay cleanly inside the touchlines
+                                const mobileClampedX = Math.min(82, Math.max(18, pos.x));
                                 return (
                                     <div
                                         key={idx}
                                         className="absolute z-20 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center gap-0.5 cursor-pointer"
-                                        style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
+                                        style={{ left: `${mobileClampedX}%`, top: `${pos.y}%` }}
                                         onClick={() => handleOpenPositionProfile(idx)}
                                     >
                                         <div
@@ -2596,7 +2606,7 @@ export default function OppositionReportsPage() {
                                                 onChange={(e) => handleUpdateLineupName(idx, e.target.value)}
                                                 onClick={(e) => e.stopPropagation()}
                                                 placeholder="Add player name..."
-                                                className="flex-1 text-xs font-bold bg-surface-1 border border-border rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:border-brand"
+                                                className="flex-1 text-base sm:text-xs font-bold bg-surface-1 border border-border rounded-lg px-2.5 py-1.5 text-foreground outline-none focus:border-brand"
                                             />
                                             {profile?.role && (
                                                 <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 shrink-0">
@@ -2669,7 +2679,7 @@ export default function OppositionReportsPage() {
                                         )
                                     }
                                     placeholder="Log what worked after full-time so you have it ready for the reverse fixture..."
-                                    className="w-full min-h-[85px] rounded-xl border border-border bg-surface-2 p-2.5 text-xs text-foreground outline-none"
+                                    className="w-full min-h-[85px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
                                 />
                             ) : (
                                 <p
@@ -2733,7 +2743,7 @@ export default function OppositionReportsPage() {
 
                 {/* 11. FLOATING MOBILE SAVE BAR WHEN EDITING */}
                 {isEditing && (
-                    <div className="fixed bottom-16 left-3 right-3 z-40 rounded-2xl bg-surface-1/95 backdrop-blur-md border border-brand/40 p-2.5 shadow-2xl flex items-center justify-between gap-2">
+                    <div className="fixed bottom-[4.25rem] left-3 right-3 z-50 rounded-2xl bg-surface-1/95 backdrop-blur-md border border-brand/40 p-2.5 shadow-2xl flex items-center justify-between gap-2">
                         <span className="text-[11px] font-extrabold text-foreground truncate pl-1">
                             Editing: {editedReport?.name || "New Report"}
                         </span>
@@ -4090,7 +4100,7 @@ export default function OppositionReportsPage() {
                 open={selectedProfileIndex !== null}
                 onOpenChange={(open) => !open && setSelectedProfileIndex(null)}
             >
-                <DialogContent className="max-w-md bg-surface-1 border-border text-foreground rounded-2xl p-6 max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-md w-[calc(100vw-1.5rem)] bg-surface-1 border-border text-foreground rounded-2xl p-4 sm:p-6 max-h-[85dvh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle className="text-base font-bold">
                             {activeReport.name || "Opposition"} #{formationPositions[selectedProfileIndex || 0]?.number} ({formationPositions[selectedProfileIndex || 0]?.label})
@@ -4282,7 +4292,7 @@ export default function OppositionReportsPage() {
                             };
 
                             return (
-                                <div className="space-y-3.5 mt-2">
+                                <div className="space-y-3 mt-1">
                                     <div>
                                         <Label className="text-xs font-bold text-muted-foreground uppercase">
                                             Player Name
@@ -4300,7 +4310,7 @@ export default function OppositionReportsPage() {
                                                 }
                                             }}
                                             placeholder={`e.g. Opposition #${selectedPos?.number || 1} (${displayPos || "Player"})`}
-                                            className="mt-1 bg-surface-2 border-border"
+                                            className="mt-1 bg-surface-2 border-border text-base sm:text-sm"
                                         />
                                         {name && formatPitchPlayerName(name) !== name && (
                                             <p className="text-[10px] text-muted-foreground mt-1">
@@ -4309,7 +4319,7 @@ export default function OppositionReportsPage() {
                                         )}
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                         <div>
                                             <Label className="text-xs font-bold text-muted-foreground uppercase">
                                                 {displayPos} Tactical Role
@@ -4321,7 +4331,7 @@ export default function OppositionReportsPage() {
                                                         role: e.target.value
                                                     })
                                                 }
-                                                className="w-full mt-1 px-3 py-2 border border-border rounded-md text-xs bg-surface-2 text-foreground"
+                                                className="w-full mt-1 px-3 py-2 border border-border rounded-md text-base sm:text-xs bg-surface-2 text-foreground"
                                             >
                                                 <option value="">Select {displayPos} Role...</option>
                                                 {currentProfile.role &&
@@ -4348,7 +4358,7 @@ export default function OppositionReportsPage() {
                                                         foot: e.target.value
                                                     })
                                                 }
-                                                className="w-full mt-1 px-3 py-2 border border-border rounded-md text-xs bg-surface-2 text-foreground"
+                                                className="w-full mt-1 px-3 py-2 border border-border rounded-md text-base sm:text-xs bg-surface-2 text-foreground"
                                             >
                                                 <option value="Right">Right</option>
                                                 <option value="Left">Left</option>
@@ -4370,7 +4380,7 @@ export default function OppositionReportsPage() {
                                                 })
                                             }
                                             placeholder="e.g. Rapid in behind, strong 1v1, good range of passing..."
-                                            className="h-8 text-xs bg-surface-1 border-emerald-500/30"
+                                            className="h-9 text-base sm:text-xs bg-surface-1 border-emerald-500/30"
                                         />
                                         <div className="flex flex-wrap gap-1 pt-0.5">
                                             {quickStrengthPresets.map((preset) => {
@@ -4382,7 +4392,7 @@ export default function OppositionReportsPage() {
                                                         key={preset}
                                                         type="button"
                                                         onClick={() => togglePresetPhrase("strengths", preset)}
-                                                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-colors ${
+                                                        className={`px-2 py-1 rounded-md text-[10px] font-bold border transition-colors ${
                                                             active
                                                                 ? "bg-emerald-500 text-slate-950 border-emerald-500"
                                                                 : "bg-surface-2 text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/15"
@@ -4408,7 +4418,7 @@ export default function OppositionReportsPage() {
                                                 })
                                             }
                                             placeholder="e.g. Press 1st touch, show onto weak foot, slow turning..."
-                                            className="h-8 text-xs bg-surface-1 border-rose-500/30"
+                                            className="h-9 text-base sm:text-xs bg-surface-1 border-rose-500/30"
                                         />
                                         <div className="flex flex-wrap gap-1 pt-0.5">
                                             {quickWeaknessPresets.map((preset) => {
@@ -4420,7 +4430,7 @@ export default function OppositionReportsPage() {
                                                         key={preset}
                                                         type="button"
                                                         onClick={() => togglePresetPhrase("weaknesses", preset)}
-                                                        className={`px-2 py-0.5 rounded-md text-[10px] font-bold border transition-colors ${
+                                                        className={`px-2 py-1 rounded-md text-[10px] font-bold border transition-colors ${
                                                             active
                                                                 ? "bg-rose-500 text-white border-rose-500"
                                                                 : "bg-surface-2 text-rose-400 border-rose-500/25 hover:bg-rose-500/15"
@@ -4445,17 +4455,17 @@ export default function OppositionReportsPage() {
                                                 })
                                             }
                                             placeholder={traitsPlaceholder}
-                                            className="w-full mt-1 h-16 p-2 text-xs border border-border bg-surface-2 text-foreground rounded-md resize-none"
+                                            className="w-full mt-1 h-16 p-2 text-base sm:text-xs border border-border bg-surface-2 text-foreground rounded-md resize-none"
                                         />
                                     </div>
 
-                                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                                    <div className="sticky bottom-0 bg-surface-1 flex items-center justify-end gap-2 pt-2.5 pb-0.5 border-t border-border">
                                         <Button
                                             type="button"
                                             variant="outline"
                                             size="sm"
                                             onClick={() => setSelectedProfileIndex(null)}
-                                            className="h-8 px-3 rounded-xl border-border bg-surface-2 text-xs font-bold"
+                                            className="h-9 px-3.5 rounded-xl border-border bg-surface-2 text-xs font-bold"
                                         >
                                             Close
                                         </Button>
@@ -4463,7 +4473,7 @@ export default function OppositionReportsPage() {
                                             type="button"
                                             size="sm"
                                             onClick={handleSavePositionProfileModal}
-                                            className="h-8 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-xs"
+                                            className="h-9 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-xs"
                                         >
                                             <Save className="h-3.5 w-3.5 mr-1.5" />
                                             Save Player
