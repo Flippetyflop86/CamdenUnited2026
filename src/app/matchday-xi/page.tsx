@@ -270,14 +270,15 @@ export default function MatchdayXIPage() {
         fetchMatches();
         fetchSeasonStats();
 
-        // Subscription for realtime updates (optional but good for multi-user)
-        const channel = supabase.channel('public:matchday_xis')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'matchday_xis' }, () => {
+        // Subscription for realtime updates (scoped to active club)
+        const clubFilter = clubId ? `club_id=eq.${clubId}` : undefined;
+        const channel = supabase.channel(`public:matchday_xis:${clubId || 'default'}`)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'matchday_xis', ...(clubFilter ? { filter: clubFilter } : {}) }, () => {
                 if (!selectedMatchIdRef.current && matchesRef.current.length === 0) {
                     fetchLineupOnly();
                 }
             })
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, () => fetchPlayers())
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'players', ...(clubFilter ? { filter: clubFilter } : {}) }, () => fetchPlayers())
             .subscribe();
 
         return () => { supabase.removeChannel(channel); };
@@ -297,7 +298,17 @@ export default function MatchdayXIPage() {
 
     const fetchSeasonStats = async () => {
         try {
-            const { data } = await supabase.from('match_player_stats').select('player_id, goals, assists, minutes_played');
+            const { data: clubPlayers } = await supabase.from('players').select('id');
+            const playerIds = (clubPlayers || []).map((p: any) => p.id).filter(Boolean);
+            if (playerIds.length === 0) {
+                setSeasonStatsMap({});
+                return;
+            }
+            const { data } = await supabase
+                .from('match_player_stats')
+                .select('player_id, goals, assists, minutes_played')
+                .in('player_id', playerIds)
+                .limit(5000);
             if (data) {
                 const map: Record<string, { apps: number; goals: number; assists: number }> = {};
                 data.forEach((row: any) => {

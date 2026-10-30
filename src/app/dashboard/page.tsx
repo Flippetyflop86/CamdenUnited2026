@@ -198,11 +198,11 @@ export default function DashboardPage() {
             }
         }
 
+        const clubFilter = clubId ? `club_id=eq.${clubId}` : undefined;
         const channels = [
-            supabase.channel('dashboard:matches').on('postgres_changes', { event: '*', schema: 'public', table: 'matches' }, fetchMatches),
-            supabase.channel('dashboard:players').on('postgres_changes', { event: '*', schema: 'public', table: 'players' }, fetchSquad),
-            supabase.channel('dashboard:match_stats').on('postgres_changes', { event: '*', schema: 'public', table: 'match_player_stats' }, fetchMatchPlayerStats),
-            supabase.channel('dashboard:training').on('postgres_changes', { event: '*', schema: 'public', table: 'training_sessions' }, fetchTrainingSessions)
+            supabase.channel(`dashboard:matches:${clubId || 'default'}`).on('postgres_changes', { event: '*', schema: 'public', table: 'matches', ...(clubFilter ? { filter: clubFilter } : {}) }, fetchMatches),
+            supabase.channel(`dashboard:players:${clubId || 'default'}`).on('postgres_changes', { event: '*', schema: 'public', table: 'players', ...(clubFilter ? { filter: clubFilter } : {}) }, fetchSquad),
+            supabase.channel(`dashboard:training:${clubId || 'default'}`).on('postgres_changes', { event: '*', schema: 'public', table: 'training_sessions', ...(clubFilter ? { filter: clubFilter } : {}) }, fetchTrainingSessions)
         ];
 
         channels.forEach(channel => channel.subscribe());
@@ -210,7 +210,7 @@ export default function DashboardPage() {
         return () => {
             channels.forEach(channel => supabase.removeChannel(channel));
         };
-    }, []);
+    }, [clubId]);
 
     useEffect(() => {
         if (!nextMatch) return;
@@ -245,7 +245,17 @@ export default function DashboardPage() {
     };
 
     const fetchMatchPlayerStats = async () => {
-        const { data } = await supabase.from('match_player_stats').select('*');
+        const { data: clubPlayers } = await supabase.from('players').select('id');
+        const playerIds = (clubPlayers || []).map((p: any) => p.id).filter(Boolean);
+        if (playerIds.length === 0) {
+            setMatchPlayerStats([]);
+            return;
+        }
+        const { data } = await supabase
+            .from('match_player_stats')
+            .select('*')
+            .in('player_id', playerIds)
+            .limit(5000);
         if (data) setMatchPlayerStats(data);
     };
 

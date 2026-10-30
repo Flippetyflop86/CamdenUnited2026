@@ -31,6 +31,9 @@ export function setGlobalClubId(clubId: string | null) {
 const CLUSTERED_TABLES = [
     'players',
     'matches',
+    'fixtures',
+    'league_teams',
+    'squad_depths',
     'training_sessions',
     'finance_transactions',
     'sponsors',
@@ -46,7 +49,10 @@ const CLUSTERED_TABLES = [
     'club_invitations',
     'app_users',
     'club_payments',
-    'player_payment_requests'
+    'player_payment_requests',
+    'activity_logs',
+    'email_history',
+    'email_templates'
 ];
 
 // Helper to determine if we are in browser context

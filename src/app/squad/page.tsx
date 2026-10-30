@@ -385,19 +385,19 @@ export default function SquadPage() {
     // 1. Initial load: Supabase
     useEffect(() => {
         fetchData();
+        const clubFilter = clubId ? `club_id=eq.${clubId}` : undefined;
         const channel = supabase
-            .channel("public:players")
-            .on("postgres_changes", { event: "*", schema: "public", table: "players" }, () => fetchData())
+            .channel(`public:players:${clubId || "default"}`)
+            .on("postgres_changes", { event: "*", schema: "public", table: "players", ...(clubFilter ? { filter: clubFilter } : {}) }, () => fetchData())
             .subscribe();
         return () => { supabase.removeChannel(channel); };
     }, [seasonFilter, includeFriendlies, clubId, isAuthLoading]);
 
     async function fetchData(retryCount = 0) {
         try {
-            const [playersRes, matchesRes, statsRes] = await Promise.all([
+            const [playersRes, matchesRes] = await Promise.all([
                 supabase.from("players").select("*"),
-                supabase.from("matches").select("id, date, competition, result, scoreline, notes, yellow_cards, red_cards"),
-                supabase.from("match_player_stats").select("*")
+                supabase.from("matches").select("id, date, competition, result, scoreline, notes, yellow_cards, red_cards")
             ]);
 
             if (playersRes.error) {
@@ -409,6 +409,10 @@ export default function SquadPage() {
             }
             const dbPlayers = playersRes.data || [];
             const matches = matchesRes.data || [];
+            const playerIds = dbPlayers.map((p: any) => p.id).filter(Boolean);
+            const statsRes = playerIds.length > 0
+                ? await supabase.from("match_player_stats").select("*").in("player_id", playerIds).limit(5000)
+                : { data: [] };
             const stats = statsRes.data || [];
 
             const matchSeasons = new Map<string, string>();
