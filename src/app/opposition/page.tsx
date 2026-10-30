@@ -457,7 +457,7 @@ export default function OppositionReportsPage() {
     };
 
     const handleEditReport = () => {
-        const base = selectedReport || editedReport || createBlankReport();
+        const base = (isEditing && editedReport) ? editedReport : (selectedReport || editedReport || createBlankReport());
         setEditedReport({
             ...base,
             dangerMenList: [...(base.dangerMenList || [])],
@@ -465,6 +465,61 @@ export default function OppositionReportsPage() {
             lineup: [...(base.lineup || [])]
         });
         setIsEditing(true);
+    };
+
+    const handleOpenPositionProfile = (idx: number) => {
+        if (!isEditing || !editedReport) {
+            const base = selectedReport || editedReport || createBlankReport();
+            setEditedReport({
+                ...base,
+                dangerMenList: [...(base.dangerMenList || [])],
+                playerProfiles: [...(base.playerProfiles || [])],
+                lineup: [...(base.lineup || [])]
+            });
+            setIsEditing(true);
+        }
+        setSelectedProfileIndex(idx);
+    };
+
+    const handleUpdateLineupName = (idx: number, value: string) => {
+        const base = (isEditing && editedReport) ? editedReport : (selectedReport || editedReport || createBlankReport());
+        const nextLineup = [...(base.lineup || [])];
+        while (nextLineup.length <= idx) nextLineup.push("");
+        nextLineup[idx] = value;
+        setEditedReport({
+            ...base,
+            dangerMenList: [...(base.dangerMenList || [])],
+            playerProfiles: [...(base.playerProfiles || [])],
+            lineup: nextLineup
+        });
+        if (!isEditing) setIsEditing(true);
+    };
+
+    const handleUpdatePositionProfile = (idx: number, updates: Partial<PlayerProfileItem>) => {
+        const base = (isEditing && editedReport) ? editedReport : (selectedReport || editedReport || createBlankReport());
+        const profiles = [...(base.playerProfiles || [])];
+        const existingIdx = profiles.findIndex((p) => p.positionIndex === idx);
+        const currentProfile: PlayerProfileItem = existingIdx > -1
+            ? profiles[existingIdx]
+            : { positionIndex: idx, role: "", foot: "Right", traits: "" };
+        const updatedProfile: PlayerProfileItem = { ...currentProfile, ...updates, positionIndex: idx };
+        if (existingIdx > -1) profiles[existingIdx] = updatedProfile;
+        else profiles.push(updatedProfile);
+        setEditedReport({
+            ...base,
+            dangerMenList: [...(base.dangerMenList || [])],
+            playerProfiles: profiles,
+            lineup: [...(base.lineup || [])]
+        });
+        if (!isEditing) setIsEditing(true);
+    };
+
+    const handleSavePositionProfileModal = async () => {
+        const current = editedReport || selectedReport;
+        setSelectedProfileIndex(null);
+        if (current && current.name && current.name.trim()) {
+            await handleSaveReport();
+        }
     };
 
     const handleCancelEdit = () => {
@@ -1957,7 +2012,7 @@ export default function OppositionReportsPage() {
                                         key={idx}
                                         className="absolute z-20 cursor-pointer"
                                         style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-                                        onClick={() => setSelectedProfileIndex(idx)}
+                                        onClick={() => handleOpenPositionProfile(idx)}
                                     >
                                         <div
                                             className={`absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 bg-white border-2 rounded-full flex items-center justify-center shadow-lg ${
@@ -1991,8 +2046,8 @@ export default function OppositionReportsPage() {
                                 return (
                                     <div
                                         key={idx}
-                                        onClick={() => setSelectedProfileIndex(idx)}
-                                        className="flex items-center gap-2 p-2 rounded-xl bg-surface-2/70 border border-border"
+                                        onClick={() => handleOpenPositionProfile(idx)}
+                                        className="flex items-center gap-2 p-2 rounded-xl bg-surface-2/70 border border-border cursor-pointer"
                                     >
                                         <div className="w-6 h-6 rounded-full bg-brand text-brand-foreground flex items-center justify-center shrink-0 text-[10px] font-black">
                                             {pos.number}
@@ -2000,26 +2055,14 @@ export default function OppositionReportsPage() {
                                         <span className="text-[11px] font-extrabold text-muted-foreground w-9 shrink-0">
                                             {getDisplayPosition(pos.label)}
                                         </span>
-                                        {isEditing ? (
-                                            <input
-                                                type="text"
-                                                value={editedReport?.lineup?.[idx] || ""}
-                                                onChange={(e) => {
-                                                    if (!editedReport) return;
-                                                    const nextLineup = [...(editedReport.lineup || [])];
-                                                    while (nextLineup.length <= idx) nextLineup.push("");
-                                                    nextLineup[idx] = e.target.value;
-                                                    setEditedReport({ ...editedReport, lineup: nextLineup });
-                                                }}
-                                                onClick={(e) => e.stopPropagation()}
-                                                placeholder="Player name / note..."
-                                                className="flex-1 text-xs bg-surface-1 border border-border rounded-lg px-2 py-1 text-foreground outline-none"
-                                            />
-                                        ) : (
-                                            <span className="flex-1 text-xs font-semibold text-foreground truncate">
-                                                {activeReport.lineup?.[idx] || "—"}
-                                            </span>
-                                        )}
+                                        <input
+                                            type="text"
+                                            value={activeReport.lineup?.[idx] || ""}
+                                            onChange={(e) => handleUpdateLineupName(idx, e.target.value)}
+                                            onClick={(e) => e.stopPropagation()}
+                                            placeholder="Add player name..."
+                                            className="flex-1 text-xs bg-surface-1 border border-border rounded-lg px-2 py-1 text-foreground outline-none focus:border-brand"
+                                        />
                                         {profile?.role && (
                                             <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 shrink-0">
                                                 {profile.role}
@@ -3296,7 +3339,7 @@ export default function OppositionReportsPage() {
                                                 key={idx}
                                                 className="absolute z-20 cursor-pointer group"
                                                 style={{ left: `${pos.x}%`, top: `${pos.y}%` }}
-                                                onClick={() => setSelectedProfileIndex(idx)}
+                                                onClick={() => handleOpenPositionProfile(idx)}
                                             >
                                                 <div
                                                     className={`absolute -translate-x-1/2 -translate-y-1/2 w-7 h-7 sm:w-8 sm:h-8 bg-white border-2 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform ${
@@ -3331,7 +3374,7 @@ export default function OppositionReportsPage() {
                                             return (
                                                 <div
                                                     key={idx}
-                                                    onClick={() => setSelectedProfileIndex(idx)}
+                                                    onClick={() => handleOpenPositionProfile(idx)}
                                                     className="flex items-center gap-2.5 p-2 rounded-lg bg-surface-2/60 border border-border hover:border-brand/40 cursor-pointer"
                                                 >
                                                     <div className="w-6 h-6 rounded-full bg-brand text-brand-foreground flex items-center justify-center shrink-0 text-[10px] font-black">
@@ -3340,26 +3383,14 @@ export default function OppositionReportsPage() {
                                                     <span className="text-xs font-bold text-muted-foreground w-10 shrink-0">
                                                         {getDisplayPosition(pos.label)}
                                                     </span>
-                                                    {isEditing ? (
-                                                        <input
-                                                            type="text"
-                                                            value={editedReport?.lineup?.[idx] || ""}
-                                                            onChange={(e) => {
-                                                                if (!editedReport) return;
-                                                                const nextLineup = [...(editedReport.lineup || [])];
-                                                                while (nextLineup.length <= idx) nextLineup.push("");
-                                                                nextLineup[idx] = e.target.value;
-                                                                setEditedReport({ ...editedReport, lineup: nextLineup });
-                                                            }}
-                                                            onClick={(e) => e.stopPropagation()}
-                                                            placeholder="Player name / note..."
-                                                            className="flex-1 text-xs bg-surface-1 border border-border rounded px-2 py-1 text-foreground outline-none"
-                                                        />
-                                                    ) : (
-                                                        <span className="flex-1 text-xs font-semibold text-foreground truncate">
-                                                            {activeReport.lineup?.[idx] || "—"}
-                                                        </span>
-                                                    )}
+                                                    <input
+                                                        type="text"
+                                                        value={activeReport.lineup?.[idx] || ""}
+                                                        onChange={(e) => handleUpdateLineupName(idx, e.target.value)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        placeholder="Add player name..."
+                                                        className="flex-1 text-xs bg-surface-1 border border-border rounded px-2 py-1 text-foreground outline-none focus:border-brand"
+                                                    />
                                                     {profile?.role && (
                                                         <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-500 shrink-0">
                                                             {profile.role}
@@ -3432,14 +3463,16 @@ export default function OppositionReportsPage() {
                                             Player Name
                                         </Label>
                                         <Input
+                                            autoFocus
                                             value={name}
-                                            disabled={!isEditing}
-                                            onChange={(e) => {
-                                                if (!isEditing || !editedReport) return;
-                                                const newLineup = [...(editedReport.lineup || [])];
-                                                while (newLineup.length <= selectedProfileIndex) newLineup.push("");
-                                                newLineup[selectedProfileIndex] = e.target.value;
-                                                setEditedReport({ ...editedReport, lineup: newLineup });
+                                            onChange={(e) =>
+                                                handleUpdateLineupName(selectedProfileIndex, e.target.value)
+                                            }
+                                            onKeyDown={(e) => {
+                                                if (e.key === "Enter") {
+                                                    e.preventDefault();
+                                                    handleSavePositionProfileModal();
+                                                }
                                             }}
                                             placeholder="e.g. Opposition #9"
                                             className="mt-1 bg-surface-2 border-border"
@@ -3453,18 +3486,11 @@ export default function OppositionReportsPage() {
                                             </Label>
                                             <select
                                                 value={currentProfile.role}
-                                                disabled={!isEditing}
-                                                onChange={(e) => {
-                                                    if (!isEditing || !editedReport) return;
-                                                    const profiles = [...(editedReport.playerProfiles || [])];
-                                                    const idx = profiles.findIndex(
-                                                        (p) => p.positionIndex === selectedProfileIndex
-                                                    );
-                                                    const updated = { ...currentProfile, role: e.target.value };
-                                                    if (idx > -1) profiles[idx] = updated;
-                                                    else profiles.push(updated);
-                                                    setEditedReport({ ...editedReport, playerProfiles: profiles });
-                                                }}
+                                                onChange={(e) =>
+                                                    handleUpdatePositionProfile(selectedProfileIndex, {
+                                                        role: e.target.value
+                                                    })
+                                                }
                                                 className="w-full mt-1 px-3 py-2 border border-border rounded-md text-xs bg-surface-2 text-foreground"
                                             >
                                                 <option value="">Select Role...</option>
@@ -3486,18 +3512,11 @@ export default function OppositionReportsPage() {
                                             </Label>
                                             <select
                                                 value={currentProfile.foot}
-                                                disabled={!isEditing}
-                                                onChange={(e) => {
-                                                    if (!isEditing || !editedReport) return;
-                                                    const profiles = [...(editedReport.playerProfiles || [])];
-                                                    const idx = profiles.findIndex(
-                                                        (p) => p.positionIndex === selectedProfileIndex
-                                                    );
-                                                    const updated = { ...currentProfile, foot: e.target.value };
-                                                    if (idx > -1) profiles[idx] = updated;
-                                                    else profiles.push(updated);
-                                                    setEditedReport({ ...editedReport, playerProfiles: profiles });
-                                                }}
+                                                onChange={(e) =>
+                                                    handleUpdatePositionProfile(selectedProfileIndex, {
+                                                        foot: e.target.value
+                                                    })
+                                                }
                                                 className="w-full mt-1 px-3 py-2 border border-border rounded-md text-xs bg-surface-2 text-foreground"
                                             >
                                                 <option value="Right">Right</option>
@@ -3513,21 +3532,35 @@ export default function OppositionReportsPage() {
                                         </Label>
                                         <textarea
                                             value={currentProfile.traits}
-                                            disabled={!isEditing}
-                                            onChange={(e) => {
-                                                if (!isEditing || !editedReport) return;
-                                                const profiles = [...(editedReport.playerProfiles || [])];
-                                                const idx = profiles.findIndex(
-                                                    (p) => p.positionIndex === selectedProfileIndex
-                                                );
-                                                const updated = { ...currentProfile, traits: e.target.value };
-                                                if (idx > -1) profiles[idx] = updated;
-                                                else profiles.push(updated);
-                                                setEditedReport({ ...editedReport, playerProfiles: profiles });
-                                            }}
+                                            onChange={(e) =>
+                                                handleUpdatePositionProfile(selectedProfileIndex, {
+                                                    traits: e.target.value
+                                                })
+                                            }
                                             placeholder="e.g. Fast in behind, weak left foot..."
                                             className="w-full mt-1 h-20 p-2 text-xs border border-border bg-surface-2 text-foreground rounded-md resize-none"
                                         />
+                                    </div>
+
+                                    <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() => setSelectedProfileIndex(null)}
+                                            className="h-8 px-3 rounded-xl border-border bg-surface-2 text-xs font-bold"
+                                        >
+                                            Close
+                                        </Button>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={handleSavePositionProfileModal}
+                                            className="h-8 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold shadow-xs"
+                                        >
+                                            <Save className="h-3.5 w-3.5 mr-1.5" />
+                                            Save Player
+                                        </Button>
                                     </div>
                                 </div>
                             );
