@@ -9,18 +9,37 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.warn('Supabase URL or Anon Key is missing. Check your .env.local file.');
 }
 
-// Create the client with a non-blocking lock implementation to prevent browser navigator.locks AbortErrors and deadlocks
-const rawClient = createClient(
-    supabaseUrl || 'https://placeholder.supabase.co',
-    supabaseAnonKey || 'placeholder',
-    {
-        auth: {
-            lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => {
-                return await fn();
+const isBrowserEnv = typeof window !== 'undefined';
+
+// Create a stateless server-side Supabase admin client for API routes
+export function getServerSupabase() {
+    const key = (!isBrowserEnv && process.env.SUPABASE_SERVICE_ROLE_KEY) || supabaseAnonKey || 'placeholder';
+    return createClient(
+        supabaseUrl || 'https://placeholder.supabase.co',
+        key,
+        {
+            auth: {
+                persistSession: false,
+                autoRefreshToken: false,
             }
         }
-    }
-);
+    );
+}
+
+// Create the client with a non-blocking lock implementation in the browser, or stateless Service Role key on the server
+const rawClient = isBrowserEnv
+    ? createClient(
+          supabaseUrl || 'https://placeholder.supabase.co',
+          supabaseAnonKey || 'placeholder',
+          {
+              auth: {
+                  lock: async (_name: string, _acquireTimeout: number, fn: () => Promise<any>) => {
+                      return await fn();
+                  }
+              }
+          }
+      )
+    : getServerSupabase();
 
 let activeClubId: string | null = null;
 

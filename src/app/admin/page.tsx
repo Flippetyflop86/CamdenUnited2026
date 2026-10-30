@@ -894,7 +894,7 @@ export default function AdminPage() {
                                     id="clubName"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
-                                    placeholder="e.g. Camden United FC"
+                                    placeholder="e.g. ClubFlow United FC"
                                 />
                             </div>
 

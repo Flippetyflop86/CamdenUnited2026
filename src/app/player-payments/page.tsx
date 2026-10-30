@@ -204,7 +204,7 @@ export default function PlayerPaymentsPage() {
             } else {
                 setPayoutAccount(prev => ({
                     ...prev,
-                    accountName: `${settings.name || "Camden United"} Club Account`,
+                    accountName: `${settings.name || "ClubFlow"} Club Account`,
                 }));
             }
         } catch (err) {
@@ -1598,7 +1598,7 @@ export default function PlayerPaymentsPage() {
                         <div className="space-y-1.5">
                             <Label className="text-xs font-semibold">2. Payment Account Name (Shown on Player Requests)</Label>
                             <Input
-                                placeholder="e.g. Camden United Club Account"
+                                placeholder="e.g. ClubFlow United Club Account"
                                 value={payoutAccount.accountName}
                                 onChange={e =>
                                     setPayoutAccount({ ...payoutAccount, accountName: e.target.value })

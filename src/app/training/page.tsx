@@ -916,7 +916,7 @@ export default function TrainingPage() {
             ctx.fillStyle = "rgba(255,255,255,0.85)";
             ctx.font = "800 24px Inter, system-ui, sans-serif";
             ctx.textAlign = "left";
-            ctx.fillText((settings.name || "CAMDEN UNITED").toUpperCase(), textStartX, 116);
+            ctx.fillText((settings.name || "CLUBFLOW").toUpperCase(), textStartX, 116);
 
             ctx.fillStyle = "#ffffff";
             ctx.font = "900 58px Inter, system-ui, sans-serif";
@@ -1065,7 +1065,7 @@ export default function TrainingPage() {
             ctx.textAlign = "left";
             ctx.fillStyle = "rgba(255,255,255,0.65)";
             ctx.font = "600 20px Inter, system-ui, sans-serif";
-            ctx.fillText(`Powered by ClubFlow • ${settings.name || "Camden United"}`, 88, height - 42);
+            ctx.fillText(`Powered by ClubFlow • ${settings.name || "ClubFlow"}`, 88, height - 42);
         };
 
         if (settings.logo) {
@@ -1156,7 +1156,7 @@ export default function TrainingPage() {
                 </style>
             </head>
             <body>
-                <div class="header-title">CAMDEN UNITED FOOTBALL CLUB</div>
+                <div class="header-title">${(settings.name || "CLUBFLOW").toUpperCase()}</div>
                 <div class="header-subtitle">PLAYER DEVELOPMENT & ATTENDANCE REPORT</div>
                 <div class="header-meta"><b>Season:</b> ${displaySeasonLabel}</div>
                 <div class="header-meta"><b>Report Generated:</b> ${new Date().toLocaleDateString("en-GB")} at ${new Date().toLocaleTimeString("en-GB", { hour: '2-digit', minute: '2-digit' })}</div>
@@ -1230,7 +1230,7 @@ export default function TrainingPage() {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `camden_united_training_report_${new Date().toISOString().split('T')[0]}.xls`);
+        link.setAttribute("download", `clubflow_training_report_${new Date().toISOString().split('T')[0]}.xls`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);

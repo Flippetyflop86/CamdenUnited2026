@@ -339,7 +339,7 @@ export default function OppositionReportsPage() {
     // Combined Directory of Known Opponents from League Table + Fixtures (#2)
     const knownOpponentsDirectory = useMemo(() => {
         const map = new Map<string, { name: string; position?: number; points?: number; form?: string }>();
-        const ourName = settings.name || "Camden United";
+        const ourName = settings.name || "ClubFlow";
 
         leagueRows.forEach((r: any) => {
             const tName = (r.team_name || r.name || "").trim();
@@ -438,7 +438,7 @@ export default function OppositionReportsPage() {
         return h2hData.upcoming[0] || h2hData.past[0] || null;
     }, [h2hData]);
 
-    const ourClubName = (settings.name || "Camden United").trim();
+    const ourClubName = (settings.name || "ClubFlow").trim();
     const oppClubName = (activeReport.name || "Opposition").trim();
 
     const activeFixtureTitle = useMemo(() => {
@@ -994,7 +994,7 @@ export default function OppositionReportsPage() {
             const reviewFont = "500 30px Inter, system-ui, sans-serif";
             const reviewLineH = 44;
             const reviewWrappedLines = wrapTextToLines(
-                report.postMatchReview || report.generalNotes || "Prepared via Camden United Data Hub",
+                report.postMatchReview || report.generalNotes || "Prepared via ClubFlow",
                 W - 260,
                 reviewFont
             );

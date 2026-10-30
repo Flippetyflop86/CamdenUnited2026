@@ -65,7 +65,7 @@ export default function PlayerFixturesList() {
                                             }`}>
                                                 {match.is_home ? "Home" : "Away"}
                                             </span>
-                                            <p className="text-sm font-bold text-white">Camden United vs {match.opponent}</p>
+                                            <p className="text-sm font-bold text-white">vs {match.opponent}</p>
                                         </div>
 
                                         <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-400">

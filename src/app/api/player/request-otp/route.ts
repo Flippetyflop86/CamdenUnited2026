@@ -42,16 +42,30 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: "Player has no registered email. Please contact your coach." }, { status: 400 });
         }
 
+        // Rate limit: enforce a 60-second cooldown between OTP requests for the same player
+        if (player.verification_expires_at) {
+            const msRemaining = new Date(player.verification_expires_at).getTime() - Date.now();
+            // Since OTPs expire after 10 minutes (600,000ms), > 9 minutes remaining means it was requested < 60s ago
+            if (msRemaining > 9 * 60 * 1000) {
+                const waitSec = Math.ceil((msRemaining - 9 * 60 * 1000) / 1000);
+                return NextResponse.json(
+                    { success: false, error: `Please wait ${waitSec}s before requesting another verification code.` },
+                    { status: 429 }
+                );
+            }
+        }
+
         // 2. Generate 6-digit code
         const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
         const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 minutes
 
-        // 3. Save OTP details to database
+        // 3. Save OTP details to database and reset attempt counter
         const { error: updateError } = await supabaseAdmin
             .from("players")
             .update({
                 verification_code: otpCode,
-                verification_expires_at: expiresAt
+                verification_expires_at: expiresAt,
+                pin_attempts: 0
             })
             .eq("id", playerId);
 

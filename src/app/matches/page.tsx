@@ -1424,7 +1424,7 @@ export default function MatchesPage() {
             [
                 ...leagueTeams.map(t => (t.name || t.team_name || "").trim()),
                 ...matches.map(m => (m.opponent || "").trim())
-            ].filter(name => name && name.toLowerCase() !== (settings.name || "camden united").toLowerCase() && !/^premier division$/i.test(name))
+            ].filter(name => name && name.toLowerCase() !== (settings.name || "clubflow").toLowerCase() && !/^premier division$/i.test(name))
         )
     ).sort((a, b) => a.localeCompare(b));
 
@@ -1467,7 +1467,7 @@ export default function MatchesPage() {
     const MatchCard = ({ match, isPast, isNextUp }: { match: Match; isPast?: boolean; isNextUp?: boolean }) => {
         const [showLineup, setShowLineup] = useState(false);
         const teamInfo = leagueTeams.find(t => isMatchingLeagueTeam(t.name || t.team_name || "", match.opponent || ""));
-        const ourClubInfo = leagueTeams.find(t => t.is_our_club || isMatchingLeagueTeam(t.name || t.team_name || "", settings.name || "Camden United"));
+        const ourClubInfo = leagueTeams.find(t => t.is_our_club || isMatchingLeagueTeam(t.name || t.team_name || "", settings.name || "ClubFlow"));
         const isLeagueComp = getCompetitionType(match.competition) === "league";
         const oppPos = isLeagueComp ? (teamInfo?.position || null) : null;
         const ourPos = isLeagueComp ? (ourClubInfo?.position || settings.leaguePosition || null) : null;
@@ -2476,7 +2476,7 @@ export default function MatchesPage() {
                                             <div className="space-y-0.5">
                                                 <Label className="text-[10px] font-bold text-slate-505">Instagram</Label>
                                                 <Input
-                                                    placeholder="e.g. camden_utd"
+                                                    placeholder="e.g. clubflow_fc"
                                                     value={opponentInstagram}
                                                     onChange={e => setOpponentInstagram(e.target.value)}
                                                     className="h-8 text-[11px]"
@@ -3166,7 +3166,7 @@ export default function MatchesPage() {
             {/* Quick Result, Goals & Assists Modal (#16, #17, #18, #20) */}
             <QuickResultScorersModal
                 match={quickResultMatch}
-                clubName={settings.name || "Camden United"}
+                clubName={settings.name || "ClubFlow"}
                 isOpen={quickResultMatch !== null}
                 onClose={() => setQuickResultMatch(null)}
                 onSaved={fetchMatches}

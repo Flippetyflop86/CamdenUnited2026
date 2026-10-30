@@ -110,7 +110,7 @@ export default function LeagueTablePage() {
 
     const isOurClubName = (teamName?: string): boolean => {
         if (!teamName) return false;
-        const clubLower = (settings.name || "Camden United").toLowerCase().trim();
+        const clubLower = (settings.name || "ClubFlow").toLowerCase().trim();
         const clubCore = clubLower.replace(/\bfc\b/g, "").trim();
         const candidate = String(teamName).toLowerCase().trim();
         if (candidate === clubLower) return true;
@@ -549,7 +549,7 @@ export default function LeagueTablePage() {
             const res = await fetch('/api/sync-league', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: targetUrl, clubName: settings.name || "Camden United", clubId })
+                body: JSON.stringify({ url: targetUrl, clubName: settings.name || "ClubFlow", clubId })
             });
             const data = await res.json();
             if (data.success && Array.isArray(data.teams) && data.teams.length > 0) {
@@ -804,7 +804,7 @@ export default function LeagueTablePage() {
 
             ctx.fillStyle = "rgba(255,255,255,0.92)";
             ctx.font = "800 25px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-            ctx.fillText((settings.name || "CAMDEN UNITED").toUpperCase(), textStartX, 116);
+            ctx.fillText((settings.name || "CLUBFLOW").toUpperCase(), textStartX, 116);
 
             ctx.fillStyle = "#ffffff";
             ctx.font = "900 68px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
@@ -940,7 +940,7 @@ export default function LeagueTablePage() {
             ctx.textAlign = "left";
             ctx.fillStyle = "rgba(255,255,255,0.82)";
             ctx.font = "700 21px system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif";
-            ctx.fillText(`Powered by ClubFlow • ${settings.name || "Camden United"}`, 88, height - 42);
+            ctx.fillText(`Powered by ClubFlow • ${settings.name || "ClubFlow"}`, 88, height - 42);
 
             ctx.restore();
         };
@@ -2510,7 +2510,7 @@ export default function LeagueTablePage() {
                     <Textarea
                         id="universal-league-input"
                         placeholder={
-                            "Paste your league link (Mitoo, FA Full-Time, Pitchero) OR paste your league table rows once:\n\nhttps://fulltime.thefa.com/...\nor\n1   Camden United   11   8   2   0   45   8   +37   26"
+                            "Paste your league link (Mitoo, FA Full-Time, Pitchero) OR paste your league table rows once:\n\nhttps://fulltime.thefa.com/...\nor\n1   ClubFlow United   11   8   2   0   45   8   +37   26"
                         }
                         value={universalInput}
                         onChange={(e) => setUniversalInput(e.target.value)}

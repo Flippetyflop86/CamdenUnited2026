@@ -66,7 +66,7 @@ export default function CalendarPage() {
         <div className="space-y-6 pb-12">
             <PageHeader 
                 title="Football Calendar" 
-                description="The central operational timeline for Camden United."
+                description="The central operational timeline for your club."
             />
 
             <PageSection>

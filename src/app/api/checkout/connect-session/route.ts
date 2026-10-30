@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServerSupabase } from '@/lib/supabase';
 import { calculateClubFlowFee, parsePaymentDescription } from '@/lib/clubflow-pay';
 import Stripe from 'stripe';
 
@@ -12,6 +12,7 @@ const getStripe = () => {
 };
 
 export async function POST(request: Request) {
+    const supabase = getServerSupabase();
     try {
         const { paymentId } = await request.json();
         if (!paymentId) {

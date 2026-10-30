@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { getServerSupabase } from '@/lib/supabase';
 import Stripe from 'stripe';
 
 let stripeInstance: Stripe | null = null;
@@ -11,6 +11,7 @@ const getStripe = () => {
 };
 
 export async function POST(request: Request) {
+    const supabase = getServerSupabase();
     try {
         const token = request.headers.get('Authorization')?.split(' ')[1];
         if (!token) {

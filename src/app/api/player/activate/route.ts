@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getServerSupabase } from "@/lib/supabase";
 import crypto from "crypto";
 
 export async function POST(request: Request) {
+    const supabase = getServerSupabase();
     try {
         const body = await request.json();
         const { token, pin } = body;

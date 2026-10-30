@@ -752,7 +752,7 @@ export default function DashboardPage() {
         if (!nextMatch) return;
         const oppPos = getTeamLeaguePos(nextMatch.opponent);
         const text = [
-            `⚽ *NEXT MATCH — ${(settings.name || "CAMDEN UNITED").toUpperCase()}*`,
+            `⚽ *NEXT MATCH — ${(settings.name || "CLUBFLOW").toUpperCase()}*`,
             `🆚 *Opposition:* ${nextMatch.opponent}${oppPos ? ` (#${oppPos})` : ""} (${nextMatch.isHome ? "HOME" : "AWAY"})`,
             `🏆 *Competition:* ${nextMatch.competition || "League"}`,
             `📅 *Date:* ${formatDate(nextMatch.date)}`,
@@ -772,7 +772,7 @@ export default function DashboardPage() {
     const copyTrainingForWhatsApp = async () => {
         if (!nextTrainingSession) return;
         const text = [
-            `🏃 *NEXT TRAINING — ${(settings.name || "CAMDEN UNITED").toUpperCase()}*`,
+            `🏃 *NEXT TRAINING — ${(settings.name || "CLUBFLOW").toUpperCase()}*`,
             `🎯 *Focus:* ${nextTrainingSession.focus || nextTrainingSession.topic || "Team Training Session"}`,
             `📅 *Date:* ${formatDate(nextTrainingSession.date)}`,
             `⏰ *Time:* ${nextTrainingSession.time || "TBC"}`,
@@ -907,7 +907,7 @@ export default function DashboardPage() {
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <h1 className="text-lg md:text-2xl font-black text-foreground tracking-tight truncate">
-                                        {settings.name || "Camden United"}
+                                        {settings.name || "ClubFlow"}
                                     </h1>
                                     <Link
                                         href="/league"

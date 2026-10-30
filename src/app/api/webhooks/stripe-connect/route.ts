@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { supabase } from '@/lib/supabase';
+import { getServerSupabase } from '@/lib/supabase';
 import Stripe from 'stripe';
 
 let stripeInstance: Stripe | null = null;
@@ -14,6 +14,7 @@ const getStripe = () => {
 const getWebhookSecret = () => process.env.STRIPE_CONNECT_WEBHOOK_SECRET || '';
 
 export async function POST(request: Request) {
+    const supabase = getServerSupabase();
     try {
         const rawBody = await request.text();
         const headersList = await headers();

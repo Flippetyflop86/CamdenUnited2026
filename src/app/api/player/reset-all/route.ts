@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { getServerSupabase } from "@/lib/supabase";
 
 export async function POST(request: Request) {
+    const supabase = getServerSupabase();
     try {
         const authHeader = request.headers.get("Authorization");
         const token = authHeader?.split(" ")[1];

@@ -235,7 +235,7 @@ export default function BillingPage() {
                         <p className="mt-2 text-indigo-700 font-semibold">★ Cancellations are immediate with zero hidden fees.</p>
                     </CardContent>
                     <CardFooter className="pt-2 border-t border-slate-200/50 text-[10px] text-slate-400">
-                        Camden United Football Club Member Registry
+                        ClubFlow Member Registry
                     </CardFooter>
                 </Card>
             </div>

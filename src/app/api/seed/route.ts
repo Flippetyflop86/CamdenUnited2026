@@ -82,12 +82,31 @@ export async function POST(request: Request) {
         }
 
         const clubId = member.club_id;
+        const body = await request.json().catch(() => ({}));
+        const confirmWipe = Boolean(body?.confirmWipe);
+
+        // Safety check: refuse to wipe a live club that already has players or matches unless confirmWipe: true is explicitly passed
+        const [{ count: existingPlayers }, { count: existingMatches }] = await Promise.all([
+            supabase.from("players").select("id", { count: "exact", head: true }).eq("club_id", clubId),
+            supabase.from("matches").select("id", { count: "exact", head: true }).eq("club_id", clubId)
+        ]);
+
+        if (((existingPlayers || 0) > 0 || (existingMatches || 0) > 0) && !confirmWipe) {
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: "Safety protection: This club already has existing players or matches. Pass confirmWipe: true to overwrite existing club data with demo data."
+                },
+                { status: 409 }
+            );
+        }
+
         const results = {
             players: 0,
             matches: 0,
         };
 
-        // Wipe existing data for this club first to remove real Camden United data
+        // Wipe existing data for this club only when confirmed or when club is empty
         await supabase.from("players").delete().eq("club_id", clubId);
         await supabase.from("matches").delete().eq("club_id", clubId);
         await supabase.from("training_sessions").delete().eq("club_id", clubId);

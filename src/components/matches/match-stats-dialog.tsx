@@ -408,7 +408,7 @@ export function MatchStatsDialog({ matchId, matchDate, opponent, variant = 'icon
             const res = await fetch('/api/sync-match-stats', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: syncUrl, matchId, clubName: "Camden United" }) // You can pass settings.clubName here too
+                body: JSON.stringify({ url: syncUrl, matchId, clubName: "ClubFlow" })
             });
             const data = await res.json();
             

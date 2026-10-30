@@ -16,6 +16,7 @@ export default function SessionCodeResponderPage() {
 
     // Load states
     const [loading, setLoading] = useState(true);
+    const [clubName, setClubName] = useState<string>("ClubFlow");
     const [event, setEvent] = useState<any | null>(null);
     const [eventType, setEventType] = useState<"match" | "training" | null>(null);
     const [players, setPlayers] = useState<any[]>([]);
@@ -43,6 +44,7 @@ export default function SessionCodeResponderPage() {
                 return;
             }
 
+            if (data.clubName) setClubName(data.clubName);
             setEvent(data.event);
             setEventType(data.eventType);
             setPlayers(data.players);
@@ -169,7 +171,7 @@ export default function SessionCodeResponderPage() {
                             <span className="font-black text-white text-xs">⚽</span>
                         </div>
                         <div>
-                            <h1 className="font-extrabold text-slate-900 tracking-tight">Camden United</h1>
+                            <h1 className="font-extrabold text-slate-900 tracking-tight">{clubName}</h1>
                             <p className="text-xs text-slate-500 font-semibold">RSVP Portal</p>
                         </div>
                     </div>
@@ -417,7 +419,7 @@ export default function SessionCodeResponderPage() {
                                             autoFocus
                                             value={enteredCode}
                                             onChange={(e) => setEnteredCode(e.target.value.toUpperCase().trim())}
-                                            placeholder="e.g. CUA5DC"
+                                            placeholder="e.g. CFA5DC"
                                             className="bg-slate-50 border-slate-200 text-slate-900 font-mono text-center tracking-widest text-lg h-11 focus-visible:ring-red-500 uppercase font-bold"
                                         />
                                     </div>

@@ -82,7 +82,7 @@ export function NextMatchHero({
         : undefined;
 
     const ourClubStats = leagueTeams.find(
-        (t) => t.is_our_club || isMatchingTeam(t.team_name || t.name || "", settings.name || "Camden United")
+        (t) => t.is_our_club || isMatchingTeam(t.team_name || t.name || "", settings.name || "ClubFlow")
     );
     const ourPos = ourClubStats?.position || settings.leaguePosition || null;
     const oppPos = opponentStats?.position || null;

@@ -96,8 +96,8 @@ export async function GET(request: Request) {
             return NextResponse.json({ success: false, error: "Invalid or expired availability link." }, { status: 404 });
         }
 
-        // 2. Fetch squad players for this club
-        const [playersRes, recruitsRes] = await Promise.all([
+        // 2. Fetch squad players, trialists, and club branding for this club
+        const [playersRes, recruitsRes, clubRes] = await Promise.all([
             supabaseAdmin
                 .from("players")
                 .select("id, first_name, last_name, position, squad, pin_hash, is_in_training_squad, notes")
@@ -106,21 +106,41 @@ export async function GET(request: Request) {
                 .from("recruits")
                 .select("id, name, primary_position, on_trial, club_id")
                 .eq("club_id", event.club_id)
-                .eq("on_trial", true)
+                .eq("on_trial", true),
+            supabaseAdmin
+                .from("clubs")
+                .select("name, primary_color, logo_url")
+                .eq("id", event.club_id)
+                .maybeSingle()
         ]);
 
         const squadData = playersRes.data || [];
         const recruitsData = recruitsRes.data || [];
+        const clubName = clubRes.data?.name || "ClubFlow";
 
-        // Filter squad to active First Team players only for both matches and training
-        const eligible = squadData.filter((player: any) => {
+        // Filter out players who have left the club
+        const activePlayers = squadData.filter((player: any) => {
             if (player.notes && /\[LEFT_STATUS:[^\]]+\]/.test(player.notes) && !player.notes.includes("[LEFT_STATUS:Active]")) {
                 return false;
             }
+            return true;
+        });
+
+        // Match the event's squad dynamically (e.g. First Team, Reserves, U23s, U18s)
+        const targetSquadClean = (event.squad || "").toLowerCase().replace(/[\s-_]+/g, "");
+        let eligible = activePlayers.filter((player: any) => {
+            if (!targetSquadClean || targetSquadClean === "all" || targetSquadClean === "allsquads" || targetSquadClean === "squad") {
+                return true;
+            }
             const playerSquad = player.squad || "";
             const cleanSquad = playerSquad.toLowerCase().replace(/[\s-_]+/g, "");
-            return cleanSquad.includes("firstteam") || cleanSquad.includes("first team") || playerSquad === "" || playerSquad === null;
+            return cleanSquad.includes(targetSquadClean) || targetSquadClean.includes(cleanSquad) || playerSquad === "" || playerSquad === null;
         });
+
+        // Fallback: if no players matched the specific squad string, include all active club players so the RSVP list is never empty
+        if (eligible.length === 0) {
+            eligible = activePlayers;
+        }
 
         // Sort by position order
         eligible.sort((a, b) => (positionOrder[a.position] || 99) - (positionOrder[b.position] || 99));
@@ -169,6 +189,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json({
             success: true,
+            clubName,
             event: sanitizedEvent,
             eventType,
             players: allCombinedPlayers
@@ -226,8 +247,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: "Player not found." }, { status: 404 });
         }
 
-        // 2. Verify Session Code
-        let expectedCode = "";
+        // 2. Verify Session Code (supports "CF" ClubFlow prefix as well as legacy "CU" invites)
+        let codeSuffix = "";
         if (eventType === "match") {
             const { data: match } = await supabaseAdmin
                 .from("matches")
@@ -235,7 +256,7 @@ export async function POST(request: Request) {
                 .eq("id", eventId)
                 .single();
             if (match) {
-                expectedCode = ("CU" + (match.event_token || match.id).replace(/-/g, "").substring(0, 4)).toUpperCase();
+                codeSuffix = (match.event_token || match.id).replace(/-/g, "").substring(0, 4).toUpperCase();
             }
         } else {
             const { data: session } = await supabaseAdmin
@@ -244,11 +265,12 @@ export async function POST(request: Request) {
                 .eq("id", eventId)
                 .single();
             if (session) {
-                expectedCode = ("CU" + (session.event_token || session.id).replace(/-/g, "").substring(0, 4)).toUpperCase();
+                codeSuffix = (session.event_token || session.id).replace(/-/g, "").substring(0, 4).toUpperCase();
             }
         }
 
-        if ((code || "").trim().toUpperCase() !== expectedCode) {
+        const enteredClean = (code || "").trim().toUpperCase();
+        if (!codeSuffix || (enteredClean !== `CF${codeSuffix}` && enteredClean !== `CU${codeSuffix}`)) {
             return NextResponse.json({ success: false, error: "Incorrect session code. Please verify the code in the WhatsApp invite." }, { status: 401 });
         }
 

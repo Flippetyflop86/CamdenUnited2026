@@ -48,7 +48,7 @@ export function FootballDataImportCentre({
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         rawText: inputText,
-                        clubName: clubName || "Camden United",
+                        clubName: clubName || "ClubFlow",
                         defaultKickOff: "15:00",
                         knownOpponents
                     })
@@ -58,7 +58,7 @@ export function FootballDataImportCentre({
                     setPreviewData(data.parsed);
                     setIsPreviewOpen(true);
                 } else if (data.success && (!data.parsed || data.parsed.length === 0)) {
-                    alert("No fixtures could be recognized from the pasted text. Try including a date and opponent name on each line (e.g. '15/08/2026 15:00 Camden United vs Hackney Wick').");
+                    alert("No fixtures could be recognized from the pasted text. Try including a date and opponent name on each line (e.g. '15/08/2026 15:00 ClubFlow United vs Hackney Wick').");
                 } else {
                     alert(data.error || "Failed to parse schedule");
                 }
@@ -66,7 +66,7 @@ export function FootballDataImportCentre({
                 const res = await fetch('/api/sync-fixtures', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ url: inputText, clubName: clubName || "Camden United" })
+                    body: JSON.stringify({ url: inputText, clubName: clubName || "ClubFlow" })
                 });
                 const data = await res.json();
                 const rawList = data.fixtures || data.matches;
@@ -308,7 +308,7 @@ export function FootballDataImportCentre({
                             Highlight and copy rows directly from <strong>FA Full-Time / Mitoo</strong>, WhatsApp, or an email and paste below. League &amp; Cup competitions are detected automatically, and you can review every row before saving.
                         </p>
                         <Textarea
-                            placeholder={"Example:\n15/08/2026 14:00  Camden United vs Hackney Wick\n22/08/2026 14:00  Athletic Newham vs Camden United"}
+                            placeholder={"Example:\n15/08/2026 14:00  ClubFlow United vs Hackney Wick\n22/08/2026 14:00  Athletic Newham vs ClubFlow United"}
                             value={inputText}
                             onChange={(e) => setInputText(e.target.value)}
                             className="bg-surface-2 border-border min-h-[140px] font-mono text-xs"

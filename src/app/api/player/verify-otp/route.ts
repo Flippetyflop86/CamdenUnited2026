@@ -38,13 +38,49 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: "Player not found" }, { status: 404 });
         }
 
-        // 2. Validate OTP value and expiration
-        if (!player.verification_code || player.verification_code !== otpCode) {
-            return NextResponse.json({ success: false, error: "Incorrect verification code" }, { status: 400 });
+        // 2. Validate OTP value, expiration, and attempt limits (max 5 tries per code)
+        if (!player.verification_code) {
+            return NextResponse.json({ success: false, error: "No active verification code. Please request a new code." }, { status: 400 });
         }
 
         if (player.verification_expires_at && new Date() > new Date(player.verification_expires_at)) {
-            return NextResponse.json({ success: false, error: "Verification code has expired (10m limit)" }, { status: 400 });
+            await supabaseAdmin
+                .from("players")
+                .update({ verification_code: null, verification_expires_at: null, pin_attempts: 0 })
+                .eq("id", playerId);
+            return NextResponse.json({ success: false, error: "Verification code has expired (10m limit). Please request a new code." }, { status: 400 });
+        }
+
+        const currentAttempts = Number(player.pin_attempts || 0);
+        if (currentAttempts >= 5) {
+            await supabaseAdmin
+                .from("players")
+                .update({ verification_code: null, verification_expires_at: null, pin_attempts: 0 })
+                .eq("id", playerId);
+            return NextResponse.json({ success: false, error: "Too many failed attempts. Please request a new verification code." }, { status: 429 });
+        }
+
+        if (player.verification_code !== String(otpCode).trim()) {
+            const nextAttempts = currentAttempts + 1;
+            const shouldInvalidate = nextAttempts >= 5;
+            await supabaseAdmin
+                .from("players")
+                .update(
+                    shouldInvalidate
+                        ? { verification_code: null, verification_expires_at: null, pin_attempts: 0 }
+                        : { pin_attempts: nextAttempts }
+                )
+                .eq("id", playerId);
+
+            return NextResponse.json(
+                {
+                    success: false,
+                    error: shouldInvalidate
+                        ? "Too many incorrect attempts. Code has been invalidated — please request a new code."
+                        : `Incorrect verification code (${5 - nextAttempts} attempt${5 - nextAttempts === 1 ? "" : "s"} remaining)`
+                },
+                { status: shouldInvalidate ? 429 : 400 }
+            );
         }
 
         // 3. Process verification action
