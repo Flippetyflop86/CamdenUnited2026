@@ -281,20 +281,34 @@ export default function LeagueTablePage() {
         return copy.map((r, idx) => ({ ...r, position: idx + 1 }));
     };
 
+    const parseCompletedMatchScores = (m: any): { ourGoals: number; oppGoals: number } | null => {
+        if (!m?.scoreline || typeof m.scoreline !== 'string') return null;
+        const parts = m.scoreline.trim().split(/\s*[-:]\s*/);
+        if (parts.length !== 2) return null;
+        const homeScore = parseInt(parts[0], 10);
+        const awayScore = parseInt(parts[1], 10);
+        if (isNaN(homeScore) || isNaN(awayScore)) return null;
+        if (m.result === 'Pending') return null;
+        return {
+            ourGoals: m.is_home ? homeScore : awayScore,
+            oppGoals: m.is_home ? awayScore : homeScore
+        };
+    };
+
     // Fetch upcoming fixture for Feature #2 (Next Opponent Spotlight)
     const loadNextOpponent = async (tableRows?: LeagueRow[] | null) => {
         try {
             const todayStr = new Date().toISOString().split('T')[0];
             let query = supabase
-                .from('fixtures')
-                .select('id, opponent, date, is_home, status, competition, home_score, away_score')
+                .from('matches')
+                .select('id, opponent, date, is_home, result, competition, scoreline')
                 .gte('date', todayStr)
                 .order('date', { ascending: true });
             if (clubId) query = query.eq('club_id', clubId);
             const { data } = await query;
             if (!data || data.length === 0) return;
 
-            const upcoming = data.filter(f => f.status !== 'completed' && (f.home_score === null || f.away_score === null));
+            const upcoming = data.filter(f => !parseCompletedMatchScores(f));
             if (upcoming.length === 0) return;
 
             const activeRows = tableRows || currentTable || [];
@@ -316,14 +330,13 @@ export default function LeagueTablePage() {
     const snapshotBaselineFixtures = async () => {
         try {
             let query = supabase
-                .from('fixtures')
-                .select('id, status, competition, home_score, away_score')
-                .eq('status', 'completed');
+                .from('matches')
+                .select('id, result, competition, scoreline');
             if (clubId) query = query.eq('club_id', clubId);
             const { data } = await query;
             if (data) {
                 const ids = data
-                    .filter(f => f.home_score !== null && f.away_score !== null)
+                    .filter(f => parseCompletedMatchScores(f) !== null)
                     .map(f => String(f.id));
                 localStorage.setItem(appliedFixturesKey, JSON.stringify(ids));
             }
@@ -334,16 +347,17 @@ export default function LeagueTablePage() {
         if (!baseTable || baseTable.length === 0) return baseTable;
         try {
             let query = supabase
-                .from('fixtures')
-                .select('id, opponent, date, is_home, home_score, away_score, status, competition')
-                .eq('status', 'completed')
+                .from('matches')
+                .select('id, opponent, date, is_home, scoreline, result, competition')
                 .order('date', { ascending: true });
             if (clubId) query = query.eq('club_id', clubId);
-            const { data: completed } = await query;
-            if (!completed || completed.length === 0) return baseTable;
+            const { data: allMatches } = await query;
+            if (!allMatches || allMatches.length === 0) return baseTable;
+
+            const completed = allMatches.filter(f => parseCompletedMatchScores(f) !== null);
+            if (completed.length === 0) return baseTable;
 
             const leagueCompleted = completed.filter(f => {
-                if (f.home_score === null || f.away_score === null) return false;
                 const comp = (f.competition || "League").toLowerCase();
                 return !comp.includes("cup") && !comp.includes("trophy") && !comp.includes("shield") && !comp.includes("friendly");
             });
@@ -357,18 +371,15 @@ export default function LeagueTablePage() {
             const ourIdx = updatedRows.findIndex(r => r.is_our_club || isOurClubName(r.team_name));
             if (ourIdx !== -1 && (!updatedRows[ourIdx].form || updatedRows[ourIdx].form!.length === 0) && leagueCompleted.length > 0) {
                 const ourForm: FormResult[] = leagueCompleted.slice(-5).map(m => {
-                    const ourGoals = m.is_home ? Number(m.home_score) : Number(m.away_score);
-                    const oppGoals = m.is_home ? Number(m.away_score) : Number(m.home_score);
-                    return ourGoals > oppGoals ? 'W' : ourGoals === oppGoals ? 'D' : 'L';
+                    const scores = parseCompletedMatchScores(m)!;
+                    return scores.ourGoals > scores.oppGoals ? 'W' : scores.ourGoals === scores.oppGoals ? 'D' : 'L';
                 });
                 updatedRows[ourIdx].form = ourForm;
             }
 
             const savedIdsRaw = localStorage.getItem(appliedFixturesKey);
             if (!savedIdsRaw) {
-                const initialIds = completed
-                    .filter(f => f.home_score !== null && f.away_score !== null)
-                    .map(f => String(f.id));
+                const initialIds = completed.map(f => String(f.id));
                 localStorage.setItem(appliedFixturesKey, JSON.stringify(initialIds));
                 return updatedRows;
             }
@@ -379,7 +390,8 @@ export default function LeagueTablePage() {
             for (const match of completed) {
                 const matchId = String(match.id);
                 if (appliedSet.has(matchId)) continue;
-                if (match.home_score === null || match.away_score === null) continue;
+                const parsedScores = parseCompletedMatchScores(match);
+                if (!parsedScores) continue;
 
                 const comp = (match.competition || "League").toLowerCase();
                 if (comp.includes("cup") || comp.includes("trophy") || comp.includes("shield") || comp.includes("friendly")) {
@@ -387,9 +399,7 @@ export default function LeagueTablePage() {
                     continue;
                 }
 
-                const ourGoals = match.is_home ? Number(match.home_score) : Number(match.away_score);
-                const oppGoals = match.is_home ? Number(match.away_score) : Number(match.home_score);
-
+                const { ourGoals, oppGoals } = parsedScores;
                 const oppIdx = updatedRows.findIndex(r => !r.is_our_club && isMatchingTeamName(r.team_name, match.opponent || ""));
 
                 if (ourIdx !== -1) {
@@ -555,6 +565,18 @@ export default function LeagueTablePage() {
             if (data.success && Array.isArray(data.teams) && data.teams.length > 0) {
                 const resolved = data.resolvedUrl || targetUrl;
                 setUrlInput(resolved);
+
+                // Never overwrite a newer locally-reconciled table with an older static fallback
+                const incomingTotalPlayed = data.teams.reduce((sum: number, r: any) => sum + Number(r.played || 0), 0);
+                const currentTotalPlayed = (currentTable || []).reduce((sum, r) => sum + Number(r.played || 0), 0);
+                if (data.isFallback && currentTable && currentTable.length > 0 && incomingTotalPlayed < currentTotalPlayed) {
+                    const reconciled = await applyNewMatchResultsToTable(currentTable);
+                    setCurrentTable(reconciled);
+                    setLastSyncedAt(new Date().toISOString());
+                    setShowImporter(false);
+                    return true;
+                }
+
                 await persistStandingsDirectly(data.teams, resolved);
                 setShowImporter(false);
                 return true;
@@ -637,7 +659,7 @@ export default function LeagueTablePage() {
             if (savedAt) {
                 setLastSyncedAt(savedAt);
                 const ageMs = Date.now() - new Date(savedAt).getTime();
-                if (ageMs < 6 * 60 * 60 * 1000) {
+                if (ageMs < 15 * 60 * 1000) {
                     isCacheFresh = true;
                 }
             }
@@ -659,6 +681,14 @@ export default function LeagueTablePage() {
             }
         } catch (e) {
             console.warn("Failed to load cached league table:", e);
+        }
+
+        // Force an immediate re-sync if a cached MDX2026 Division 64 table is still showing the pre-31 Oct 11-game snapshot
+        if (loadedRows && /DivisionID=64/i.test(activeUrl)) {
+            const camdenRow = loadedRows.find(r => r.team_name.toLowerCase().includes("camden united"));
+            if (camdenRow && camdenRow.played < 12) {
+                isCacheFresh = false;
+            }
         }
 
         if (loadedRows) {
@@ -701,7 +731,7 @@ export default function LeagueTablePage() {
             }
         }
 
-        // Sync if cache is older than 6h OR if cached table predates the new Form feature
+        // Sync if cache is older than 15m OR if cached table predates the latest fixtures
         if (activeUrl && !hasAutoSyncedRef.current && (!hasValidCachedTable || !isCacheFresh || !hasFormPopulated)) {
             hasAutoSyncedRef.current = true;
             autoSyncFromUrl(activeUrl, true);
