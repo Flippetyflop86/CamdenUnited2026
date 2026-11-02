@@ -238,7 +238,6 @@ export default function LeagueTablePage() {
                     for (let i = 0; i < wDiff; i++) form.push('W');
                     for (let i = 0; i < dDiff; i++) form.push('D');
                     for (let i = 0; i < lDiff; i++) form.push('L');
-                    form = form.slice(-5);
                 }
 
                 prevMap[key] = {
@@ -253,7 +252,7 @@ export default function LeagueTablePage() {
                 return {
                     ...r,
                     previous_position: prev?.position ?? r.previous_position ?? r.position,
-                    form: form.slice(-5)
+                    form
                 };
             });
 
@@ -416,7 +415,7 @@ export default function LeagueTablePage() {
                         row.lost += 1;
                     }
                     row.goal_difference = (row.goals_for || 0) - (row.goals_against || 0);
-                    row.form = [...(row.form || []), resChar].slice(-5);
+                    row.form = [...(row.form || []), resChar];
                     modified = true;
                 }
 
@@ -436,7 +435,7 @@ export default function LeagueTablePage() {
                         row.lost += 1;
                     }
                     row.goal_difference = (row.goals_for || 0) - (row.goals_against || 0);
-                    row.form = [...(row.form || []), oppResChar].slice(-5);
+                    row.form = [...(row.form || []), oppResChar];
                     modified = true;
                 }
 
@@ -682,9 +681,10 @@ export default function LeagueTablePage() {
         }
 
         // Force an immediate re-sync if a cached MDX2026 Division 64 table is still showing the pre-31 Oct 11-game snapshot
+        // or if cached form arrays were truncated to 5 games when teams have played more than 5 games
         if (loadedRows && /DivisionID=64/i.test(activeUrl)) {
             const camdenRow = loadedRows.find(r => r.team_name.toLowerCase().includes("camden united"));
-            if (camdenRow && camdenRow.played < 12) {
+            if (camdenRow && (camdenRow.played < 12 || (camdenRow.form && camdenRow.form.length <= 5))) {
                 isCacheFresh = false;
             }
         }
@@ -1917,19 +1917,23 @@ export default function LeagueTablePage() {
                                             : "";
 
                                         const posDiff = (row.previous_position ?? row.position) - row.position;
-                                        const formItems = Array.isArray(row.form) ? row.form.slice(-5) : [];
+                                        const fullForm = Array.isArray(row.form) ? row.form : [];
+                                        const formItems = fullForm.slice(-5);
                                         const rowPpg = row.played > 0 ? (row.points / row.played).toFixed(2) : "0.00";
 
                                         let trailingWins = 0;
-                                        for (let i = formItems.length - 1; i >= 0; i--) {
-                                            if (formItems[i] === 'W') trailingWins++;
+                                        for (let i = fullForm.length - 1; i >= 0; i--) {
+                                            if (fullForm[i] === 'W') trailingWins++;
                                             else break;
                                         }
+                                        if (row.played > 0 && row.won === row.played && row.drawn === 0 && row.lost === 0) {
+                                            trailingWins = Math.max(trailingWins, row.won);
+                                        }
                                         const isUnbeatenSeason = row.played >= 3 && row.lost === 0;
-                                        const streakLabel = isUnbeatenSeason
-                                            ? `🔥 ${row.played} Unbeaten`
-                                            : trailingWins >= 4
-                                                ? `🔥 ${trailingWins}W Streak`
+                                        const streakLabel = trailingWins >= 4
+                                            ? `🔥 ${trailingWins}W Streak`
+                                            : isUnbeatenSeason
+                                                ? `🔥 ${row.played} Unbeaten`
                                                 : null;
 
                                         const gdColorClass =
@@ -2210,20 +2214,24 @@ export default function LeagueTablePage() {
                                                 : "";
 
                                             const posDiff = (row.previous_position ?? row.position) - row.position;
-                                            const formItems = Array.isArray(row.form) ? row.form.slice(-5) : [];
+                                            const fullForm = Array.isArray(row.form) ? row.form : [];
+                                            const formItems = fullForm.slice(-5);
                                             const rowPpg = row.played > 0 ? (row.points / row.played).toFixed(2) : "0.00";
 
-                                            // Feature #8: Unbeaten or Winning Streak Detection
+                                            // Feature #8: Unbeaten or Winning Streak Detection (full season, 5+ / 14+ games)
                                             let trailingWins = 0;
-                                            for (let i = formItems.length - 1; i >= 0; i--) {
-                                                if (formItems[i] === 'W') trailingWins++;
+                                            for (let i = fullForm.length - 1; i >= 0; i--) {
+                                                if (fullForm[i] === 'W') trailingWins++;
                                                 else break;
                                             }
+                                            if (row.played > 0 && row.won === row.played && row.drawn === 0 && row.lost === 0) {
+                                                trailingWins = Math.max(trailingWins, row.won);
+                                            }
                                             const isUnbeatenSeason = row.played >= 3 && row.lost === 0;
-                                            const streakLabel = isUnbeatenSeason
-                                                ? `🔥 ${row.played} Unbeaten`
-                                                : trailingWins >= 4
-                                                    ? `🔥 ${trailingWins}W Streak`
+                                            const streakLabel = trailingWins >= 4
+                                                ? `🔥 ${trailingWins}W Streak`
+                                                : isUnbeatenSeason
+                                                    ? `🔥 ${row.played} Unbeaten`
                                                     : null;
 
                                             // Feature #2: Colour-coded Goal Difference

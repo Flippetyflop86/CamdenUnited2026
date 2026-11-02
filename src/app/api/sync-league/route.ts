@@ -47,22 +47,22 @@ const MITOO_MDX2026_DIVISIONS: Record<string, { leagueName: string; rows: RawSta
     "64": {
         leagueName: "Middlesex County Football League - Premier Division",
         rows: [
-            { team_name: "Camden United", played: 12, won: 9, drawn: 2, lost: 1, goals_for: 49, goals_against: 10, goal_difference: 39, points: 29, form: ['W', 'W', 'W', 'D', 'W'] },
-            { team_name: "FH Whistlers", played: 12, won: 9, drawn: 1, lost: 2, goals_for: 46, goals_against: 24, goal_difference: 22, points: 28, form: ['W', 'W', 'W', 'W', 'W'] },
-            { team_name: "Wood Lane", played: 10, won: 7, drawn: 2, lost: 1, goals_for: 40, goals_against: 20, goal_difference: 20, points: 23, form: ['W', 'W', 'W', 'W', 'W'] },
-            { team_name: "Sporting Duet M 1st XI", played: 11, won: 7, drawn: 1, lost: 3, goals_for: 30, goals_against: 19, goal_difference: 11, points: 22, form: ['L', 'W', 'W', 'W', 'W'] },
-            { team_name: "Harrow United", played: 11, won: 6, drawn: 3, lost: 2, goals_for: 30, goals_against: 16, goal_difference: 14, points: 21, form: ['D', 'L', 'W', 'D', 'W'] },
-            { team_name: "Kodak (Harrow)", played: 11, won: 6, drawn: 0, lost: 5, goals_for: 19, goals_against: 21, goal_difference: -2, points: 18, form: ['L', 'W', 'W', 'L', 'L'] },
-            { team_name: "Hayes & Hillingdon", played: 8, won: 5, drawn: 2, lost: 1, goals_for: 21, goals_against: 7, goal_difference: 14, points: 17, form: ['W', 'D', 'D', 'W', 'W'] },
-            { team_name: "Stonewall", played: 11, won: 4, drawn: 2, lost: 5, goals_for: 20, goals_against: 24, goal_difference: -4, points: 14, form: ['D', 'L', 'L', 'L', 'L'] },
-            { team_name: "Hayes & Yeading B Team", played: 13, won: 4, drawn: 2, lost: 7, goals_for: 27, goals_against: 47, goal_difference: -20, points: 14, form: ['W', 'L', 'L', 'W', 'W'] },
-            { team_name: "Larkspur Rovers", played: 11, won: 3, drawn: 4, lost: 4, goals_for: 18, goals_against: 17, goal_difference: 1, points: 13, form: ['D', 'L', 'L', 'L', 'W'] },
-            { team_name: "Camden & Islington United", played: 9, won: 3, drawn: 2, lost: 4, goals_for: 15, goals_against: 17, goal_difference: -2, points: 11, form: ['W', 'L', 'L', 'L', 'W'] },
-            { team_name: "Kensington Dragons", played: 9, won: 3, drawn: 0, lost: 6, goals_for: 18, goals_against: 22, goal_difference: -4, points: 9, form: ['W', 'W', 'L', 'L', 'L'] },
-            { team_name: "Apollo London", played: 13, won: 3, drawn: 0, lost: 10, goals_for: 16, goals_against: 30, goal_difference: -14, points: 9, form: ['W', 'L', 'L', 'W', 'L'] },
-            { team_name: "Explorers", played: 7, won: 2, drawn: 0, lost: 5, goals_for: 13, goals_against: 24, goal_difference: -11, points: 6, form: ['L', 'L', 'L', 'W', 'L'] },
-            { team_name: "LBS Lions", played: 10, won: 1, drawn: 2, lost: 7, goals_for: 12, goals_against: 33, goal_difference: -21, points: 5, form: ['L', 'L', 'L', 'L', 'L'] },
-            { team_name: "Indian Gymkhana Club", played: 10, won: 0, drawn: 1, lost: 9, goals_for: 7, goals_against: 50, goal_difference: -43, points: 1, form: ['L', 'L', 'L', 'L', 'L'] },
+            { team_name: "Camden United", played: 12, won: 9, drawn: 2, lost: 1, goals_for: 49, goals_against: 10, goal_difference: 39, points: 29, form: ['W', 'W', 'L', 'D', 'W', 'W', 'W', 'W', 'W', 'W', 'D', 'W'] },
+            { team_name: "FH Whistlers", played: 12, won: 9, drawn: 1, lost: 2, goals_for: 46, goals_against: 24, goal_difference: 22, points: 28, form: ['W', 'L', 'W', 'W', 'D', 'L', 'W', 'W', 'W', 'W', 'W', 'W'] },
+            { team_name: "Wood Lane", played: 10, won: 7, drawn: 2, lost: 1, goals_for: 40, goals_against: 20, goal_difference: 20, points: 23, form: ['L', 'D', 'W', 'D', 'W', 'W', 'W', 'W', 'W', 'W'] },
+            { team_name: "Sporting Duet M 1st XI", played: 11, won: 7, drawn: 1, lost: 3, goals_for: 30, goals_against: 19, goal_difference: 11, points: 22, form: ['L', 'W', 'D', 'W', 'W', 'L', 'L', 'W', 'W', 'W', 'W'] },
+            { team_name: "Harrow United", played: 11, won: 6, drawn: 3, lost: 2, goals_for: 30, goals_against: 16, goal_difference: 14, points: 21, form: ['W', 'W', 'D', 'L', 'W', 'W', 'D', 'L', 'W', 'D', 'W'] },
+            { team_name: "Kodak (Harrow)", played: 11, won: 6, drawn: 0, lost: 5, goals_for: 19, goals_against: 21, goal_difference: -2, points: 18, form: ['L', 'W', 'W', 'W', 'L', 'W', 'L', 'W', 'W', 'L', 'L'] },
+            { team_name: "Hayes & Hillingdon", played: 8, won: 5, drawn: 2, lost: 1, goals_for: 21, goals_against: 7, goal_difference: 14, points: 17, form: ['L', 'W', 'W', 'W', 'D', 'D', 'W', 'W'] },
+            { team_name: "Stonewall", played: 11, won: 4, drawn: 2, lost: 5, goals_for: 20, goals_against: 24, goal_difference: -4, points: 14, form: ['W', 'L', 'W', 'W', 'D', 'W', 'D', 'L', 'L', 'L', 'L'] },
+            { team_name: "Hayes & Yeading B Team", played: 13, won: 4, drawn: 2, lost: 7, goals_for: 27, goals_against: 47, goal_difference: -20, points: 14, form: ['L', 'L', 'L', 'D', 'L', 'L', 'W', 'D', 'W', 'L', 'L', 'W', 'W'] },
+            { team_name: "Larkspur Rovers", played: 11, won: 3, drawn: 4, lost: 4, goals_for: 18, goals_against: 17, goal_difference: 1, points: 13, form: ['W', 'L', 'D', 'W', 'D', 'D', 'D', 'L', 'L', 'L', 'W'] },
+            { team_name: "Camden & Islington United", played: 9, won: 3, drawn: 2, lost: 4, goals_for: 15, goals_against: 17, goal_difference: -2, points: 11, form: ['W', 'D', 'L', 'D', 'W', 'L', 'L', 'L', 'W'] },
+            { team_name: "Kensington Dragons", played: 9, won: 3, drawn: 0, lost: 6, goals_for: 18, goals_against: 22, goal_difference: -4, points: 9, form: ['L', 'L', 'W', 'L', 'W', 'W', 'L', 'L', 'L'] },
+            { team_name: "Apollo London", played: 13, won: 3, drawn: 0, lost: 10, goals_for: 16, goals_against: 30, goal_difference: -14, points: 9, form: ['W', 'L', 'L', 'L', 'L', 'L', 'L', 'L', 'W', 'L', 'L', 'W', 'L'] },
+            { team_name: "Explorers", played: 7, won: 2, drawn: 0, lost: 5, goals_for: 13, goals_against: 24, goal_difference: -11, points: 6, form: ['W', 'L', 'L', 'L', 'L', 'W', 'L'] },
+            { team_name: "LBS Lions", played: 10, won: 1, drawn: 2, lost: 7, goals_for: 12, goals_against: 33, goal_difference: -21, points: 5, form: ['L', 'L', 'D', 'W', 'D', 'L', 'L', 'L', 'L', 'L'] },
+            { team_name: "Indian Gymkhana Club", played: 10, won: 0, drawn: 1, lost: 9, goals_for: 7, goals_against: 50, goal_difference: -43, points: 1, form: ['L', 'L', 'L', 'L', 'D', 'L', 'L', 'L', 'L', 'L'] },
         ]
     },
     "100": {
@@ -74,10 +74,10 @@ const MITOO_MDX2026_DIVISIONS: Record<string, { leagueName: string; rows: RawSta
             { team_name: "Camden & Islington United LFS Mens", played: 5, won: 2, drawn: 1, lost: 2, goals_for: 8, goals_against: 11, goal_difference: -3, points: 7, form: ['D', 'W', 'W', 'L', 'L'] },
             { team_name: "Athenians", played: 3, won: 2, drawn: 0, lost: 1, goals_for: 12, goals_against: 8, goal_difference: 4, points: 6, form: ['W', 'W', 'L'] },
             { team_name: "Westminster & Kensington", played: 3, won: 2, drawn: 0, lost: 1, goals_for: 8, goals_against: 8, goal_difference: 0, points: 6, form: ['L', 'W', 'W'] },
-            { team_name: "Bloomsbury", played: 6, won: 1, drawn: 2, lost: 3, goals_for: 14, goals_against: 17, goal_difference: -3, points: 5, form: ['D', 'W', 'D', 'L', 'L'] },
+            { team_name: "Bloomsbury", played: 6, won: 1, drawn: 2, lost: 3, goals_for: 14, goals_against: 17, goal_difference: -3, points: 5, form: ['L', 'D', 'W', 'D', 'L', 'L'] },
             { team_name: "Stonewall Reserves", played: 4, won: 1, drawn: 0, lost: 3, goals_for: 10, goals_against: 7, goal_difference: 3, points: 3, form: ['W', 'L', 'L', 'L'] },
             { team_name: "FC Starz", played: 4, won: 1, drawn: 0, lost: 3, goals_for: 8, goals_against: 11, goal_difference: -3, points: 3, form: ['L', 'L', 'L', 'W'] },
-            { team_name: "Rose", played: 7, won: 1, drawn: 0, lost: 6, goals_for: 11, goals_against: 30, goal_difference: -19, points: 3, form: ['L', 'L', 'W', 'L', 'L'] },
+            { team_name: "Rose", played: 7, won: 1, drawn: 0, lost: 6, goals_for: 11, goals_against: 30, goal_difference: -19, points: 3, form: ['L', 'L', 'L', 'L', 'W', 'L', 'L'] },
         ]
     },
     "101": {
@@ -99,7 +99,7 @@ const MITOO_MDX2026_DIVISIONS: Record<string, { leagueName: string; rows: RawSta
     "102": {
         leagueName: "Middlesex County Football League - Saturday Division One Central",
         rows: [
-            { team_name: "Harrow Bhoys", played: 6, won: 5, drawn: 0, lost: 1, goals_for: 25, goals_against: 11, goal_difference: 14, points: 15, form: ['W', 'W', 'W', 'L', 'W'] },
+            { team_name: "Harrow Bhoys", played: 6, won: 5, drawn: 0, lost: 1, goals_for: 25, goals_against: 11, goal_difference: 14, points: 15, form: ['W', 'W', 'W', 'W', 'L', 'W'] },
             { team_name: "R F Elite", played: 5, won: 3, drawn: 1, lost: 1, goals_for: 15, goals_against: 9, goal_difference: 6, points: 10, form: ['D', 'W', 'L', 'W', 'W'] },
             { team_name: "Hammersmith & Kensington Town", played: 3, won: 3, drawn: 0, lost: 0, goals_for: 14, goals_against: 3, goal_difference: 11, points: 9, form: ['W', 'W', 'W'] },
             { team_name: "London Albion City", played: 4, won: 3, drawn: 0, lost: 1, goals_for: 11, goals_against: 4, goal_difference: 7, points: 9, form: ['L', 'W', 'W', 'W'] },
@@ -116,25 +116,25 @@ const MITOO_MDX2026_DIVISIONS: Record<string, { leagueName: string; rows: RawSta
     "103": {
         leagueName: "Middlesex County Football League - The Russell Grant Division 2",
         rows: [
-            { team_name: "Old Isleworthians", played: 6, won: 5, drawn: 0, lost: 1, goals_for: 34, goals_against: 5, goal_difference: 29, points: 15, form: ['W', 'W', 'L', 'W', 'W'] },
-            { team_name: "FH Whistlers Originals", played: 5, won: 5, drawn: 0, lost: 0, goals_for: 16, goals_against: 4, goal_difference: 12, points: 15, form: ['W', 'W', 'W', 'W'] },
-            { team_name: "Hounslow Lions", played: 6, won: 5, drawn: 0, lost: 1, goals_for: 18, goals_against: 9, goal_difference: 9, points: 15, form: ['W', 'W', 'L', 'W', 'W'] },
-            { team_name: "CB Hounslow & Abbots 'A'", played: 7, won: 3, drawn: 2, lost: 2, goals_for: 28, goals_against: 21, goal_difference: 7, points: 11, form: ['L', 'W', 'W', 'D', 'W'] },
-            { team_name: "AFC Heathrow", played: 7, won: 3, drawn: 1, lost: 3, goals_for: 24, goals_against: 13, goal_difference: 11, points: 10, form: ['W', 'W', 'W', 'D', 'L'] },
-            { team_name: "London Tigers", played: 6, won: 3, drawn: 0, lost: 3, goals_for: 22, goals_against: 11, goal_difference: 11, points: 9, form: ['L', 'W', 'W', 'L', 'L'] },
-            { team_name: "London Athletic", played: 8, won: 2, drawn: 1, lost: 5, goals_for: 11, goals_against: 28, goal_difference: -17, points: 7, form: ['L', 'L', 'W', 'L', 'L'] },
+            { team_name: "Old Isleworthians", played: 6, won: 5, drawn: 0, lost: 1, goals_for: 34, goals_against: 5, goal_difference: 29, points: 15, form: ['W', 'W', 'W', 'L', 'W', 'W'] },
+            { team_name: "FH Whistlers Originals", played: 5, won: 5, drawn: 0, lost: 0, goals_for: 16, goals_against: 4, goal_difference: 12, points: 15, form: ['W', 'W', 'W', 'W', 'W'] },
+            { team_name: "Hounslow Lions", played: 6, won: 5, drawn: 0, lost: 1, goals_for: 18, goals_against: 9, goal_difference: 9, points: 15, form: ['W', 'W', 'W', 'L', 'W', 'W'] },
+            { team_name: "CB Hounslow & Abbots 'A'", played: 7, won: 3, drawn: 2, lost: 2, goals_for: 28, goals_against: 21, goal_difference: 7, points: 11, form: ['L', 'D', 'L', 'W', 'W', 'D', 'W'] },
+            { team_name: "AFC Heathrow", played: 7, won: 3, drawn: 1, lost: 3, goals_for: 24, goals_against: 13, goal_difference: 11, points: 10, form: ['L', 'L', 'W', 'W', 'W', 'D', 'L'] },
+            { team_name: "London Tigers", played: 6, won: 3, drawn: 0, lost: 3, goals_for: 22, goals_against: 11, goal_difference: 11, points: 9, form: ['W', 'L', 'W', 'W', 'L', 'L'] },
+            { team_name: "London Athletic", played: 8, won: 2, drawn: 1, lost: 5, goals_for: 11, goals_against: 28, goal_difference: -17, points: 7, form: ['D', 'L', 'L', 'W', 'L', 'L'] },
             { team_name: "Southall Athletic", played: 5, won: 2, drawn: 0, lost: 3, goals_for: 15, goals_against: 15, goal_difference: 0, points: 6, form: ['L', 'W', 'L', 'L'] },
-            { team_name: "Greenford Town", played: 7, won: 2, drawn: 0, lost: 5, goals_for: 11, goals_against: 16, goal_difference: -5, points: 6, form: ['L', 'L', 'L', 'W', 'W'] },
-            { team_name: "Acton Ealing Whistlers", played: 7, won: 0, drawn: 0, lost: 7, goals_for: 1, goals_against: 58, goal_difference: -57, points: 0, form: ['L', 'L', 'L', 'L', 'L'] },
+            { team_name: "Greenford Town", played: 7, won: 2, drawn: 0, lost: 5, goals_for: 11, goals_against: 16, goal_difference: -5, points: 6, form: ['L', 'L', 'L', 'L', 'W', 'W'] },
+            { team_name: "Acton Ealing Whistlers", played: 7, won: 0, drawn: 0, lost: 7, goals_for: 1, goals_against: 58, goal_difference: -57, points: 0, form: ['L', 'L', 'L', 'L', 'L', 'L'] },
         ]
     },
     "95": {
         leagueName: "Middlesex County Football League - The Jeff Nardin Division",
         rows: [
-            { team_name: "Feltham", played: 7, won: 5, drawn: 0, lost: 2, goals_for: 16, goals_against: 14, goal_difference: 2, points: 15, form: ['L', 'W', 'W', 'W', 'W'] },
+            { team_name: "Feltham", played: 7, won: 5, drawn: 0, lost: 2, goals_for: 16, goals_against: 14, goal_difference: 2, points: 15, form: ['L', 'W', 'L', 'W', 'W', 'W', 'W'] },
             { team_name: "Kensington Dragons Blues", played: 5, won: 4, drawn: 1, lost: 0, goals_for: 23, goals_against: 8, goal_difference: 15, points: 13, form: ['W', 'W', 'D', 'W', 'W'] },
-            { team_name: "Kodak (Harrow) 3rds", played: 7, won: 4, drawn: 1, lost: 2, goals_for: 18, goals_against: 12, goal_difference: 6, points: 13, form: ['W', 'W', 'D', 'W', 'L'] },
-            { team_name: "Feltham Town", played: 6, won: 4, drawn: 0, lost: 2, goals_for: 21, goals_against: 9, goal_difference: 12, points: 12, form: ['L', 'L', 'W', 'W', 'W'] },
+            { team_name: "Kodak (Harrow) 3rds", played: 7, won: 4, drawn: 1, lost: 2, goals_for: 18, goals_against: 12, goal_difference: 6, points: 13, form: ['L', 'W', 'W', 'W', 'D', 'W', 'L'] },
+            { team_name: "Feltham Town", played: 6, won: 4, drawn: 0, lost: 2, goals_for: 21, goals_against: 9, goal_difference: 12, points: 12, form: ['W', 'L', 'L', 'W', 'W', 'W'] },
             { team_name: "OHM Sports", played: 5, won: 3, drawn: 0, lost: 1, goals_for: 15, goals_against: 4, goal_difference: 11, points: 9, form: ['L', 'W', 'W', 'W'] },
             { team_name: "CB Hounslow & Abbots 3rds", played: 5, won: 1, drawn: 0, lost: 4, goals_for: 9, goals_against: 15, goal_difference: -6, points: 6, form: ['L', 'L', 'W', 'L', 'L'] },
             { team_name: "Chiswick Wanderers", played: 7, won: 2, drawn: 0, lost: 3, goals_for: 12, goals_against: 22, goal_difference: -10, points: 6, form: ['W', 'W', 'L', 'L', 'L'] },
@@ -294,7 +294,7 @@ function parseMarkdownStandings(markdown: string, clubName: string) {
 
         teams.forEach(t => {
             if (formMap[t.team_name]?.length > 0) {
-                t.form = formMap[t.team_name].slice(-5);
+                t.form = formMap[t.team_name];
             }
         });
     }
@@ -305,7 +305,7 @@ function parseMarkdownStandings(markdown: string, clubName: string) {
     return { teams, position, foundName, leagueName };
 }
 
-// Fetch recent monthly results on Mitoo to build each team's Last 5 Form (W/D/L)
+// Fetch season monthly results on Mitoo to build each team's full season form & streak history
 async function enrichMitooForm(fetchUrl: string, teams: any[]) {
     try {
         const urlObj = new URL(fetchUrl);
@@ -319,13 +319,13 @@ async function enrichMitooForm(fetchUrl: string, teams: any[]) {
         const formMap: Record<string, ('W' | 'D' | 'L')[]> = {};
         teamNames.forEach(t => { formMap[t] = []; });
 
-        // Season months from August (8) up to current month (plus wrap-around for Jan-May)
+        // Fetch all season months from August (8) up to current month so full streaks (6, 7, 14+) are captured
         const nowMonth = new Date().getMonth() + 1;
         const seasonOrder = [8, 9, 10, 11, 12, 1, 2, 3, 4, 5];
         const idx = seasonOrder.indexOf(nowMonth);
         const monthsToFetch = idx >= 0
-            ? seasonOrder.slice(Math.max(0, idx - 2), idx + 1)
-            : [8, 9, 10];
+            ? seasonOrder.slice(0, idx + 1)
+            : [8, 9, 10, 11];
 
         const pages = await Promise.all(
             monthsToFetch.map(async (m) => {
@@ -380,7 +380,7 @@ async function enrichMitooForm(fetchUrl: string, teams: any[]) {
 
         teams.forEach(t => {
             if (formMap[t.team_name] && formMap[t.team_name].length > 0) {
-                t.form = formMap[t.team_name].slice(-5);
+                t.form = formMap[t.team_name];
             }
         });
     } catch (e) {
