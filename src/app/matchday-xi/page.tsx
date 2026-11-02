@@ -52,7 +52,7 @@ import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
-import { calculateMeetTime, resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
+import { calculateMeetTime, resolveFixtureKickoffTime, resolveFullMatchAddress } from "@/lib/whatsapp-utils";
 import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, computeMatchOutcome, extractLineupFromRawNotes, computeLineupParticipation } from "@/lib/match-stats-sync";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
@@ -565,7 +565,15 @@ export default function MatchdayXIPage() {
         fetchCurrentMatchStats(selectedMatchId);
 
         const notesMeetTime = extractMeetTimeFromNotes(currentMatch.notes);
-        const notesLocation = extractLocationFromNotes(currentMatch.notes);
+        const notesLocation = resolveFullMatchAddress({
+            isHome: Boolean(currentMatch.isHome),
+            opponent: currentMatch.opponent,
+            location: extractLocationFromNotes(currentMatch.notes),
+            rawNotes: currentMatch.notes,
+            homeGround: settings.homeGround,
+            defaultStadiumAddress: settings.matchdayConfirmDefaults?.stadiumAddress,
+            clubName: settings.name
+        });
         const savedClubOffset = settings.matchdayConfirmDefaults?.meetTimeOffset
             ? Math.abs(parseInt(settings.matchdayConfirmDefaults.meetTimeOffset))
             : 0;
@@ -587,9 +595,16 @@ export default function MatchdayXIPage() {
                 : defaultOffset;
             const rawParsedMeet = (parsed.meetTime && parsed.meetTime.trim()) ? parsed.meetTime.trim() : "";
             const resolvedMeetTime = notesMeetTime || rawParsedMeet || calculateMeetTime(resolvedKo, -normalizedOffset);
-            const resolvedVenue = (parsed.venueNotes && parsed.venueNotes.trim())
-                ? parsed.venueNotes.trim()
-                : notesLocation;
+            const resolvedVenue = resolveFullMatchAddress({
+                isHome: Boolean(currentMatch.isHome),
+                opponent: currentMatch.opponent,
+                venueNotes: parsed.venueNotes,
+                location: notesLocation,
+                rawNotes: currentMatch.notes,
+                homeGround: settings.homeGround,
+                defaultStadiumAddress: settings.matchdayConfirmDefaults?.stadiumAddress,
+                clubName: settings.name
+            });
 
             // Default to 11v11 unless the parsed or squad format is enabled in club settings
             const rawParsedFormation = parsed.formation && FORMATIONS[parsed.formation]
@@ -3015,15 +3030,22 @@ export default function MatchdayXIPage() {
             ? new Date(nextMatch.date).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })
             : new Date().toLocaleDateString('en-GB');
         const meetTime = getFormattedMeetTime();
-        const venueStr = lineup.venueNotes?.trim()
-            ? lineup.venueNotes.trim()
-            : (nextMatch ? (nextMatch.isHome ? (settings.homeGround || "Home") : "Away") : "");
+        const venueStr = resolveFullMatchAddress({
+            isHome: Boolean(nextMatch?.isHome ?? true),
+            opponent: nextMatch?.opponent,
+            venueNotes: lineup.venueNotes,
+            rawNotes: nextMatch?.notes,
+            homeGround: settings.homeGround,
+            defaultStadiumAddress: settings.matchdayConfirmDefaults?.stadiumAddress,
+            clubName: settings.name
+        });
 
         let msg = `⚽ *${settings.name.toUpperCase()} — ${isParentMode ? "MATCHDAY SQUAD & PARENTS INFO" : `MATCHDAY SQUAD (${activeFmt})`}* ⚽\n`;
         if (nextMatch) {
             msg += `*${nextMatch.isHome ? '🏠 Home' : '🚌 Away'} vs ${nextMatch.opponent}*\n`;
             msg += `🏆 ${nextMatch.competition || 'Match'} | 📅 ${dateFormatted}\n`;
             msg += `⏰ KO: ${nextMatch.time || 'TBD'} (📍 Meet: ${meetTime}${venueStr ? ` @ ${venueStr}` : ''})\n`;
+            msg += `🏟️ Venue (${nextMatch.isHome ? 'Home' : 'Away'}): ${venueStr}\n`;
         }
         msg += `📋 Format: *${activeFmt}* (${lineup.formation} • ${matchDur} mins)\n`;
         if (lineup.footwearNotes?.trim()) {
@@ -3107,23 +3129,31 @@ export default function MatchdayXIPage() {
 
     const handleCopyPollToWhatsApp = () => {
         if (!lineup) return;
-        
+        const fullVenueAddress = resolveFullMatchAddress({
+            isHome: Boolean(nextMatch?.isHome ?? true),
+            opponent: nextMatch?.opponent,
+            venueNotes: lineup.venueNotes,
+            rawNotes: nextMatch?.notes,
+            homeGround: settings.homeGround,
+            defaultStadiumAddress: settings.matchdayConfirmDefaults?.stadiumAddress,
+            clubName: settings.name
+        });
+
         let msgTemplate = `⚽ *MATCHDAY AVAILABILITY POLL* ⚽\n\n`;
         if (nextMatch) {
             msgTemplate += `*${nextMatch.isHome ? '🏠 Home' : '🚌 Away'} vs {opponent}*\n`;
             msgTemplate += `🏆 {competition}\n`;
             msgTemplate += `📅 {date}\n`;
             msgTemplate += `⏰ Kick-off: {time}\n`;
-            msgTemplate += `📍 Meet Time: {meet_time}\n`;
-            if (lineup.venueNotes?.trim()) {
-                msgTemplate += `🏟️ Venue / Pitch: ${lineup.venueNotes.trim()}\n`;
-            }
+            msgTemplate += `📍 Meet Time: {meet_time} @ {venue_address}\n`;
+            msgTemplate += `🏟️ Venue (${nextMatch.isHome ? 'Home' : 'Away'}): {venue_address}\n`;
             if (lineup.footwearNotes?.trim()) {
                 msgTemplate += `👟 Surface / Footwear: ${lineup.footwearNotes.trim()}\n`;
             }
             msgTemplate += `\n`;
         } else {
-            msgTemplate += `*Upcoming Match TBD*\n\n`;
+            msgTemplate += `*Upcoming Match TBD*\n`;
+            msgTemplate += `🏟️ Venue: ${fullVenueAddress}\n\n`;
         }
         msgTemplate += `🔴 Please confirm your availability for this match as soon as possible! Let's go!`;
 
@@ -3138,7 +3168,8 @@ export default function MatchdayXIPage() {
             .replace(/{competition}/g, nextMatch ? (nextMatch.competition || "Match") : "Match")
             .replace(/{date}/g, dateFormatted)
             .replace(/{time}/g, nextMatch ? nextMatch.time : "TBD")
-            .replace(/{meet_time}/g, meetTime);
+            .replace(/{meet_time}/g, meetTime)
+            .replace(/{venue_address}/g, fullVenueAddress);
 
         navigator.clipboard.writeText(formattedMsg).then(() => {
             showToast("Availability Poll copied & opening WhatsApp");

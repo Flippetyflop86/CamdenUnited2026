@@ -33,7 +33,7 @@ import { useAuth } from "@/context/auth-context";
 import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer } from "@/lib/utils";
 import { parseStatTextString } from "@/lib/match-stats-sync";
-import { resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
+import { resolveFixtureKickoffTime, resolveFullMatchAddress } from "@/lib/whatsapp-utils";
 
 type StandingsRow = {
     position: number;
@@ -265,7 +265,16 @@ export default function DashboardPage() {
             const loadedMatches = data.map((m: any) => {
                 const rawNotes = m.notes || "";
                 const locationMatch = rawNotes.match(/\[Location: (.*?)\]/);
-                const location = locationMatch ? locationMatch[1] : "";
+                const rawLocation = locationMatch ? locationMatch[1] : "";
+                const location = resolveFullMatchAddress({
+                    isHome: Boolean(m.is_home),
+                    opponent: m.opponent,
+                    location: rawLocation,
+                    rawNotes,
+                    homeGround: settings.homeGround,
+                    defaultStadiumAddress: settings.matchdayConfirmDefaults?.stadiumAddress,
+                    clubName: settings.name
+                });
 
                 const surfaceMatch = rawNotes.match(/\[Surface: (.*?)\]/);
                 const surface = surfaceMatch ? surfaceMatch[1] : "4G";
@@ -750,14 +759,23 @@ export default function DashboardPage() {
     // 1-Tap WhatsApp Copy Helpers (Addition #6)
     const copyMatchForWhatsApp = async () => {
         if (!nextMatch) return;
-        const oppPos = getTeamLeaguePos(nextMatch.opponent);
+        const fullVenueAddress = resolveFullMatchAddress({
+            isHome: Boolean(nextMatch.isHome),
+            opponent: nextMatch.opponent,
+            location: nextMatch.location,
+            rawNotes: nextMatch.rawNotes,
+            homeGround: settings.homeGround,
+            defaultStadiumAddress: settings.matchdayConfirmDefaults?.stadiumAddress,
+            clubName: settings.name
+        });
+        const venueType = nextMatch.isHome ? "Home" : "Away";
         const text = [
             `⚽ *NEXT MATCH — ${(settings.name || "CLUBFLOW").toUpperCase()}*`,
-            `🆚 *Opposition:* ${nextMatch.opponent}${oppPos ? ` (#${oppPos})` : ""} (${nextMatch.isHome ? "HOME" : "AWAY"})`,
+            `🆚 *Opposition:* ${nextMatch.opponent} (${nextMatch.isHome ? "HOME" : "AWAY"})`,
             `🏆 *Competition:* ${nextMatch.competition || "League"}`,
             `📅 *Date:* ${formatDate(nextMatch.date)}`,
             `⏰ *Kick-Off:* ${nextMatch.time || "TBC"}`,
-            nextMatch.location ? `📍 *Venue:* ${nextMatch.location} (${nextMatch.surface || "4G"})` : `📍 *Surface:* ${nextMatch.surface || "4G"}`,
+            `📍 *Venue (${venueType}):* ${fullVenueAddress} (${nextMatch.surface || "4G"})`,
             ``,
             `Please confirm your availability asap! 💪`
         ].join("\n");

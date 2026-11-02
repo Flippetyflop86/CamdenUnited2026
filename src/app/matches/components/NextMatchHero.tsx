@@ -6,7 +6,7 @@ import { Calendar, Clock, MapPin, Share2, Users, FileText, Settings, Trash2, Tro
 import Link from "next/link";
 import { Match } from "@/types";
 import { useClub } from "@/context/club-context";
-import { resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
+import { resolveFixtureKickoffTime, resolveFullMatchAddress } from "@/lib/whatsapp-utils";
 
 interface NextMatchHeroProps {
     match: Match | null;
@@ -42,8 +42,16 @@ export function NextMatchHero({
     const homeTeam = isHome ? settings.name : match.opponent;
     const awayTeam = !isHome ? settings.name : match.opponent;
 
-    // Fix "Away - Away (4G)" duplicate location display (#8)
-    const rawLoc = (match.location || "").trim();
+    // Fix "Away - Away (4G)" duplicate location display (#8) and resolve full venue address
+    const rawLoc = resolveFullMatchAddress({
+        isHome: Boolean(isHome),
+        opponent: match.opponent,
+        location: match.location,
+        rawNotes: (match as any).rawNotes || match.notes,
+        homeGround: settings.homeGround,
+        defaultStadiumAddress: settings.matchdayConfirmDefaults?.stadiumAddress,
+        clubName: settings.name
+    });
     const sideLabel = isHome ? "Home" : "Away";
     let displayLocation = sideLabel;
     if (rawLoc) {
@@ -358,6 +366,16 @@ export function NextMatchHero({
                                 Log Result / Scorers
                             </Button>
                         )}
+
+                        <Button
+                            size="sm"
+                            variant="secondary"
+                            className="bg-surface-2 hover:bg-surface-2/80 text-foreground border border-border font-semibold"
+                            onClick={() => onShareMatch(match)}
+                        >
+                            <Share2 className="h-3.5 w-3.5 mr-1.5 text-emerald-500" />
+                            WhatsApp Poll
+                        </Button>
 
                         <Button
                             size="sm"

@@ -567,8 +567,16 @@ export default function LeagueTablePage() {
                 const incomingTotalPlayed = data.teams.reduce((sum: number, r: any) => sum + Number(r.played || 0), 0);
                 const currentTotalPlayed = (currentTable || []).reduce((sum, r) => sum + Number(r.played || 0), 0);
                 if (data.isFallback && currentTable && currentTable.length > 0 && incomingTotalPlayed < currentTotalPlayed) {
-                    const reconciled = await applyNewMatchResultsToTable(currentTable);
+                    const mergedFormTable = currentTable.map(row => {
+                        const matchIncoming = data.teams.find((t: any) => isMatchingTeamName(t.team_name, row.team_name));
+                        if (matchIncoming && Array.isArray(matchIncoming.form) && matchIncoming.form.length > (row.form?.length || 0)) {
+                            return { ...row, form: matchIncoming.form };
+                        }
+                        return row;
+                    });
+                    const reconciled = await applyNewMatchResultsToTable(mergedFormTable);
                     setCurrentTable(reconciled);
+                    localStorage.setItem(storageKey, JSON.stringify(reconciled));
                     setLastSyncedAt(new Date().toISOString());
                     setShowImporter(false);
                     return true;
@@ -682,20 +690,29 @@ export default function LeagueTablePage() {
 
         // Force an immediate re-sync if a cached MDX2026 Division 64 table is still showing the pre-31 Oct 11-game snapshot
         // or if cached form arrays were truncated to 5 games when teams have played more than 5 games
-        if (loadedRows && /DivisionID=64/i.test(activeUrl)) {
-            const camdenRow = loadedRows.find(r => r.team_name.toLowerCase().includes("camden united"));
-            if (camdenRow && (camdenRow.played < 12 || (camdenRow.form && camdenRow.form.length <= 5))) {
+        if (loadedRows) {
+            if (loadedRows.some(r => r.played > 5 && (!r.form || r.form.length <= 5))) {
                 isCacheFresh = false;
             }
+            if (/DivisionID=64/i.test(activeUrl)) {
+                const camdenRow = loadedRows.find(r => r.team_name.toLowerCase().includes("camden united"));
+                if (camdenRow && camdenRow.played < 12) {
+                    isCacheFresh = false;
+                }
+            }
         }
+
+        const willAutoSyncNow = Boolean(activeUrl && !hasAutoSyncedRef.current && (!hasValidCachedTable || !isCacheFresh || !hasFormPopulated));
 
         if (loadedRows) {
             setCurrentTable(loadedRows);
             loadNextOpponent(loadedRows);
-            applyNewMatchResultsToTable(loadedRows).then(updated => {
-                setCurrentTable(updated);
-                loadNextOpponent(updated);
-            });
+            if (!willAutoSyncNow) {
+                applyNewMatchResultsToTable(loadedRows).then(updated => {
+                    setCurrentTable(updated);
+                    loadNextOpponent(updated);
+                });
+            }
         } else {
             loadNextOpponent(null);
             if (clubId) {
@@ -1152,7 +1169,7 @@ export default function LeagueTablePage() {
                 goals_against,
                 goal_difference,
                 points,
-                form: extractedForm.slice(-5),
+                form: extractedForm,
                 is_our_club: isOurClubName(teamName)
             });
         }
@@ -1929,12 +1946,9 @@ export default function LeagueTablePage() {
                                         if (row.played > 0 && row.won === row.played && row.drawn === 0 && row.lost === 0) {
                                             trailingWins = Math.max(trailingWins, row.won);
                                         }
-                                        const isUnbeatenSeason = row.played >= 3 && row.lost === 0;
                                         const streakLabel = trailingWins >= 4
                                             ? `🔥 ${trailingWins}W Streak`
-                                            : isUnbeatenSeason
-                                                ? `🔥 ${row.played} Unbeaten`
-                                                : null;
+                                            : null;
 
                                         const gdColorClass =
                                             row.goal_difference > 0
@@ -2227,12 +2241,9 @@ export default function LeagueTablePage() {
                                             if (row.played > 0 && row.won === row.played && row.drawn === 0 && row.lost === 0) {
                                                 trailingWins = Math.max(trailingWins, row.won);
                                             }
-                                            const isUnbeatenSeason = row.played >= 3 && row.lost === 0;
                                             const streakLabel = trailingWins >= 4
                                                 ? `🔥 ${trailingWins}W Streak`
-                                                : isUnbeatenSeason
-                                                    ? `🔥 ${row.played} Unbeaten`
-                                                    : null;
+                                                : null;
 
                                             // Feature #2: Colour-coded Goal Difference
                                             const gdColorClass =

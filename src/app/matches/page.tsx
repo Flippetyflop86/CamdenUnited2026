@@ -19,7 +19,7 @@ import { useAuth } from "@/context/auth-context";
 import { RefreshCw } from "lucide-react";
 import { MatchStatsDialog } from "@/components/matches/match-stats-dialog";
 import { FORMATIONS } from "@/lib/formations";
-import { calculateMeetTime, generateWhatsAppMessage, getDefaultKickoffTime, resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
+import { calculateMeetTime, generateWhatsAppMessage, getDefaultKickoffTime, resolveFixtureKickoffTime, resolveFullMatchAddress } from "@/lib/whatsapp-utils";
 import { FootballDataImportCentre } from "./components/FootballDataImportCentre";
 import { NextMatchHero } from "./components/NextMatchHero";
 import { UpcomingFixtures } from "./components/UpcomingFixtures";
@@ -442,9 +442,18 @@ export default function MatchesPage() {
 
             const locationMatch = notesToScan ? notesToScan.match(/\[Location:\s*([^\]]*)\]/i) : null;
             const rawLocFromTag = locationMatch ? locationMatch[1].trim() : "";
-            const location = (parsedLineup?.venueNotes && parsedLineup.venueNotes.trim())
-                ? parsedLineup.venueNotes.trim()
-                : (rawLocFromTag || parsedConfirmDetails.stadiumAddress || "");
+            const location = resolveFullMatchAddress({
+                isHome: Boolean(m.is_home),
+                opponent: m.opponent,
+                location: rawLocFromTag,
+                venueNotes: parsedLineup?.venueNotes,
+                stadiumAddress: parsedConfirmDetails.stadiumAddress,
+                pollMeetLocation: parsedConfirmDetails.pollMeetLocation,
+                rawNotes: notesToScan,
+                homeGround: settings.homeGround,
+                defaultStadiumAddress: settings.matchdayConfirmDefaults?.stadiumAddress,
+                clubName: settings.name
+            });
 
             const surfaceMatch = notesToScan ? notesToScan.match(/\[Surface:\s*([^\]]*)\]/i) : null;
             const surface = surfaceMatch ? surfaceMatch[1].trim() : "4G";
@@ -928,12 +937,23 @@ export default function MatchesPage() {
         const mc = (match as any).confirmDetails || {};
         const resolvedOffset = mc.meetTimeOffset ?? cd.meetTimeOffset ?? "-60";
         const resolvedExactMeet = mc.meetTimeExact || (match as any).meetTime || calculateMeetTime(match.time, parseInt(resolvedOffset));
-        const matchLoc = (match.location && match.location !== "Home" && match.location !== "Away") ? match.location : undefined;
+        const resolvedAddress = resolveFullMatchAddress({
+            isHome: Boolean(match.isHome),
+            opponent: match.opponent,
+            location: match.location,
+            venueNotes: (match as any).lineup?.venueNotes,
+            stadiumAddress: mc.stadiumAddress,
+            pollMeetLocation: mc.pollMeetLocation,
+            rawNotes: (match as any).rawNotes || match.notes,
+            homeGround: settings.homeGround,
+            defaultStadiumAddress: cd.stadiumAddress,
+            clubName: settings.name
+        });
 
         confirmDirtyRef.current = false;
         setConfirmSaveStatus("idle");
         setSelectedConfirmMatch(match);
-        setConfirmStadiumAddress(mc.stadiumAddress ?? matchLoc ?? cd.stadiumAddress ?? settings.homeGround ?? "");
+        setConfirmStadiumAddress(resolvedAddress);
         setConfirmSurfaceType(mc.surfaceType ?? cd.surfaceType ?? "3G Pitch");
         setConfirmRefFee(mc.refFee ?? cd.refFee ?? "45");
         setConfirmPaymentMethod(mc.paymentMethod ?? cd.paymentMethod ?? "Bank Transfer");
@@ -1021,8 +1041,18 @@ export default function MatchesPage() {
         const mc = (match as any).confirmDetails || {};
         const defaultOffset = mc.meetTimeOffset ?? cd.meetTimeOffset ?? (match.isHome ? "-60" : "-75");
         const computedMeetTime = mc.meetTimeExact || (match as any).meetTime || calculateMeetTime(match.time, parseInt(defaultOffset));
-        const matchLoc = (match.location && match.location !== "Home" && match.location !== "Away") ? match.location : undefined;
-        const computedMeetLocation = mc.pollMeetLocation ?? matchLoc ?? (match.isHome ? (cd.stadiumAddress || settings.homeGround || "") : "");
+        const computedMeetLocation = resolveFullMatchAddress({
+            isHome: Boolean(match.isHome),
+            opponent: match.opponent,
+            location: match.location,
+            venueNotes: (match as any).lineup?.venueNotes,
+            stadiumAddress: mc.stadiumAddress,
+            pollMeetLocation: mc.pollMeetLocation,
+            rawNotes: (match as any).rawNotes || match.notes,
+            homeGround: settings.homeGround,
+            defaultStadiumAddress: cd.stadiumAddress,
+            clubName: settings.name
+        });
 
         pollDirtyRef.current = false;
         setPollSaveStatus("idle");
@@ -1061,7 +1091,7 @@ export default function MatchesPage() {
 
         const mergedClubDefaults = {
             ...getSavedConfirmDefaults(),
-            pollMeetLocation: meetLocation,
+            ...(activeShareMatch.isHome ? { pollMeetLocation: meetLocation } : {}),
             pollAdditionalNotes: additionalNotes,
             pollIncludeOpponent: includeOpponent,
             pollIncludeCompetition: includeCompetition,
@@ -1116,13 +1146,26 @@ export default function MatchesPage() {
     const getGeneratedPollText = () => {
         if (!activeShareMatch) return "";
 
+        const resolvedFullAddress = resolveFullMatchAddress({
+            isHome: Boolean(activeShareMatch.isHome),
+            opponent: activeShareMatch.opponent,
+            location: meetLocation || activeShareMatch.location,
+            venueNotes: (activeShareMatch as any).lineup?.venueNotes,
+            stadiumAddress: (activeShareMatch as any).confirmDetails?.stadiumAddress,
+            pollMeetLocation: meetLocation || (activeShareMatch as any).confirmDetails?.pollMeetLocation,
+            rawNotes: (activeShareMatch as any).rawNotes || activeShareMatch.notes,
+            homeGround: settings.homeGround,
+            defaultStadiumAddress: settings.matchdayConfirmDefaults?.stadiumAddress,
+            clubName: settings.name
+        });
+
         let parts: string[] = [];
         parts.push("\u26BD MATCH AVAILABILITY");
 
         if (includeOpponent) {
             const homeTeam = activeShareMatch.isHome ? settings.name : activeShareMatch.opponent;
             const awayTeam = activeShareMatch.isHome ? activeShareMatch.opponent : settings.name;
-            parts.push(`\ud83c\udfc6 ${homeTeam} vs ${awayTeam}`);
+            parts.push(`\ud83c\udfc6 ${homeTeam} vs ${awayTeam} (${activeShareMatch.isHome ? "HOME" : "AWAY"})`);
         }
 
         let details: string[] = [];
@@ -1134,13 +1177,13 @@ export default function MatchesPage() {
         }
 
         if (includeMeetTime && meetTime) {
-            const locStr = meetLocation ? ` @ ${meetLocation}` : "";
+            const locStr = resolvedFullAddress ? ` @ ${resolvedFullAddress}` : "";
             details.push(`\u23F0 Meet: ${meetTime}${locStr}`);
         }
 
-        if (includeVenue && activeShareMatch.location) {
+        if (includeVenue && resolvedFullAddress) {
             const venueType = activeShareMatch.isHome ? "Home" : "Away";
-            details.push(`\ud83c\udfdf Venue (${venueType}): ${activeShareMatch.location}`);
+            details.push(`\ud83c\udfdf Venue (${venueType}): ${resolvedFullAddress}`);
         }
 
         if (includeCompetition && activeShareMatch.competition) {
@@ -1827,11 +1870,11 @@ export default function MatchesPage() {
                         {!isPast && (
                             <button
                                 type="button"
-                                onClick={() => (match.isHome ? handleOpenConfirmDetails(match) : handleOpenShare(match))}
+                                onClick={() => handleOpenShare(match)}
                                 className="h-8 rounded-lg text-[11px] font-bold bg-surface-1 text-foreground border border-border flex items-center justify-center gap-1"
                             >
-                                <Share2 className="h-3 w-3 text-sky-400 shrink-0" />
-                                <span>{match.isHome ? "Confirm" : "Poll"}</span>
+                                <MessageCircle className="h-3 w-3 text-emerald-500 shrink-0" />
+                                <span>Poll</span>
                             </button>
                         )}
                     </div>
@@ -1912,6 +1955,17 @@ export default function MatchesPage() {
                         >
                             <Coins className="h-4 w-4" />
                         </Button>
+                        {!isPast && (
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-500/10"
+                                onClick={() => handleOpenShare(match)}
+                                title="Generate WhatsApp Availability Poll"
+                            >
+                                <MessageCircle className="h-4 w-4" />
+                            </Button>
+                        )}
                         {!isPast && match.isHome && (
                             <Button
                                 variant="ghost"
