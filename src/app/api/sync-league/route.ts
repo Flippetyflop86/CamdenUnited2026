@@ -330,11 +330,26 @@ async function enrichMitooForm(fetchUrl: string, teams: any[]) {
         const pages = await Promise.all(
             monthsToFetch.map(async (m) => {
                 const mUrl = `https://mitoofootball.com/FixtResMonth.cfm?TblName=${encodeURIComponent(tblName)}&DivisionID=${encodeURIComponent(divisionId)}&LeagueCode=${encodeURIComponent(leagueCode)}&MonthNo=${m}`;
-                const res = await fetch(mUrl, {
-                    headers: BROWSER_HEADERS,
-                    cache: 'no-store'
-                });
-                return res.ok ? res.text() : '';
+                try {
+                    const res = await fetch(mUrl, {
+                        headers: BROWSER_HEADERS,
+                        cache: 'no-store'
+                    });
+                    if (res.ok) {
+                        const text = await res.text();
+                        if (!/<title>\s*(Just a moment|Attention Required)/i.test(text)) {
+                            return text;
+                        }
+                    }
+                } catch {}
+                if (process.env.SCRAPER_API_KEY) {
+                    try {
+                        const scraperUrl = `https://api.scraperapi.com/?api_key=${encodeURIComponent(process.env.SCRAPER_API_KEY)}&url=${encodeURIComponent(mUrl)}&country_code=gb`;
+                        const proxyRes = await fetch(scraperUrl, { cache: 'no-store' });
+                        if (proxyRes.ok) return proxyRes.text();
+                    } catch {}
+                }
+                return '';
             })
         );
 

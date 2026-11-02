@@ -9,7 +9,6 @@ import {
     ExternalLink,
     AlertCircle,
     Trophy,
-    Image as ImageIcon,
     CheckCircle2,
     Sparkles,
     Share2,
@@ -58,7 +57,6 @@ export default function LeagueTablePage() {
     const [universalInput, setUniversalInput] = useState("");
     const [urlInput, setUrlInput] = useState("");
     const [faLrCode, setFaLrCode] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const hiddenFaContainerRef = useRef<HTMLDivElement>(null);
 
     const [isExtracting, setIsExtracting] = useState(false);
@@ -1215,67 +1213,6 @@ export default function LeagueTablePage() {
             title: "Couldn't recognise that input",
             message: "Paste your league website link (e.g. Mitoo or FA Full-Time) or copy and paste the rows from your league table."
         });
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file && file.type.startsWith('image/')) {
-            loadImage(file);
-        }
-    };
-
-    const handlePaste = (e: React.ClipboardEvent) => {
-        const items = e.clipboardData.items;
-        for (let i = 0; i < items.length; i++) {
-            if (items[i].type.startsWith('image/')) {
-                const file = items[i].getAsFile();
-                if (file) loadImage(file);
-                break;
-            }
-        }
-    };
-
-    const processScreenshot = async (base64Image: string) => {
-        setIsExtracting(true);
-        setExtractionError(null);
-        setExtractionStatus("Reading league screenshot...");
-
-        try {
-            const res = await fetch('/api/parse-league', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ image: base64Image, clubName: settings.name, clubId })
-            });
-
-            const data = await res.json();
-            if (!data.success || !Array.isArray(data.teams) || data.teams.length === 0) {
-                setExtractionError({
-                    title: "Extraction failed",
-                    message: data.error || "Could not read the screenshot clearly. Try pasting the league link or table text instead."
-                });
-            } else {
-                await persistStandingsDirectly(data.teams);
-                setShowImporter(false);
-            }
-        } catch (error) {
-            setExtractionError({
-                title: "Network error",
-                message: "Could not reach the extraction service."
-            });
-        } finally {
-            setIsExtracting(false);
-            setExtractionStatus("");
-        }
-    };
-
-    const loadImage = (file: File) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-            if (e.target?.result) {
-                processScreenshot(e.target.result as string);
-            }
-        };
-        reader.readAsDataURL(file);
     };
 
     const handleRowChange = (index: number, field: keyof LeagueRow, value: any) => {
@@ -2478,20 +2415,12 @@ export default function LeagueTablePage() {
         );
     }
 
-    // One-Step "Paste Your League Once" Setup View
+    // One-Step League Setup View
     return (
         <div
             className="h-full flex flex-col gap-5 md:gap-6 max-w-2xl mx-auto py-4 md:py-12 pb-20 md:pb-12"
-            onPaste={handlePaste}
         >
             <div ref={hiddenFaContainerRef} className="hidden" aria-hidden="true" />
-            <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-            />
 
             <div className="text-center mb-1 md:mb-2">
                 <div className="mx-auto h-14 w-14 md:h-16 md:w-16 bg-brand/10 rounded-full flex items-center justify-center mb-3 md:mb-4">
@@ -2499,7 +2428,7 @@ export default function LeagueTablePage() {
                 </div>
                 <h2 className="text-2xl md:text-3xl font-bold text-foreground tracking-tight">Set Up Your League Once</h2>
                 <p className="text-muted-foreground mt-2 text-xs sm:text-base max-w-lg mx-auto">
-                    Paste your league website link or copy-paste your league table once below. ClubFlow will automatically keep your standings and league position updated from then on.
+                    Paste your league website link below. ClubFlow will automatically keep your standings and league position updated from then on.
                 </p>
                 {currentTable && currentTable.length > 0 && (
                     <Button variant="ghost" size="sm" onClick={() => setShowImporter(false)} className="mt-2 text-xs text-muted-foreground">
@@ -2523,32 +2452,22 @@ export default function LeagueTablePage() {
                     <div className="flex items-center justify-between gap-2 flex-wrap">
                         <Label htmlFor="universal-league-input" className="text-sm font-semibold flex items-center gap-1.5">
                             <Sparkles className="h-4 w-4 text-brand" />
-                            League Website Link or League Table
+                            League Website Link
                         </Label>
-                        <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="h-7 text-xs"
-                            disabled={isExtracting}
-                        >
-                            <ImageIcon className="h-3.5 w-3.5 mr-1.5" /> Or Upload Screenshot
-                        </Button>
                     </div>
 
                     <Textarea
                         id="universal-league-input"
                         placeholder={
-                            "Paste your league link (Mitoo, FA Full-Time, Pitchero) OR paste your league table rows once:\n\nhttps://fulltime.thefa.com/...\nor\n1   ClubFlow United   11   8   2   0   45   8   +37   26"
+                            "Paste your league link (Football Mitoo, FA Full-Time, Pitchero):\n\nhttps://mitoofootball.com/LeagueTab.cfm?..."
                         }
                         value={universalInput}
                         onChange={(e) => setUniversalInput(e.target.value)}
-                        className="min-h-[150px] bg-background font-mono text-xs"
+                        className="min-h-[120px] bg-background font-mono text-xs"
                     />
 
                     <p className="text-xs text-muted-foreground">
-                        Works with any league (FA Full-Time, Football Mitoo, Pitchero, or copied standings). Once connected, ClubFlow automatically updates your table and points as matches are played.
+                        Works with Football Mitoo, FA Full-Time, Pitchero, or copied standings. Once connected, ClubFlow automatically updates your table and points as matches are played.
                     </p>
 
                     <Button
