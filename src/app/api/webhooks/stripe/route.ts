@@ -50,16 +50,22 @@ export async function POST(request: Request) {
                 const session = event.data.object as Stripe.Checkout.Session;
                 const metadata = session.metadata;
 
-                // 1) Handle Spond-style Player Fine / Payment Request checkout
-                if (metadata && metadata.payment_id) {
-                    await supabaseAdmin
-                        .from('player_payment_requests')
-                        .update({
-                            status: 'Paid',
-                            paid_at: new Date().toISOString(),
-                            stripe_checkout_session_id: session.id,
-                        })
-                        .eq('id', metadata.payment_id);
+                // 1) Handle Player Fine / Payment Request checkout (single or bundled basket)
+                if (metadata && (metadata.payment_ids || metadata.payment_id)) {
+                    const ids = (metadata.payment_ids || metadata.payment_id || '')
+                        .split(',')
+                        .map((x: string) => x.trim())
+                        .filter(Boolean);
+                    if (ids.length > 0) {
+                        await supabaseAdmin
+                            .from('player_payment_requests')
+                            .update({
+                                status: 'Paid',
+                                paid_at: new Date().toISOString(),
+                                stripe_checkout_session_id: session.id,
+                            })
+                            .in('id', ids);
+                    }
                 }
 
                 // 2) Handle Club SaaS Subscription checkout

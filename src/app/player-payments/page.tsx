@@ -47,6 +47,7 @@ import {
     Clock,
     Smartphone,
     Building2,
+    Share2,
 } from "lucide-react";
 
 interface PaymentRequest {
@@ -112,6 +113,7 @@ export default function PlayerPaymentsPage() {
     const [loading, setLoading] = useState(true);
     const [connectAccount, setConnectAccount] = useState<string | null>(null);
     const [onboardingComplete, setOnboardingComplete] = useState(false);
+    const [connectBanner, setConnectBanner] = useState<"success" | "refresh" | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
     const [payments, setPayments] = useState<PaymentRequest[]>([]);
 
@@ -119,6 +121,7 @@ export default function PlayerPaymentsPage() {
     const [activeView, setActiveView] = useState<"issue" | "tariff" | "leaderboard" | "account">("issue");
     const [statusFilter, setStatusFilter] = useState<"ALL" | "Unpaid" | "Paid">("ALL");
     const [ledgerSearch, setLedgerSearch] = useState("");
+    const [playerPickerSearch, setPlayerPickerSearch] = useState("");
     const [activeSquadOnly, setActiveSquadOnly] = useState(true);
 
     // Club Payout Account Configuration
@@ -163,12 +166,50 @@ export default function PlayerPaymentsPage() {
 
     // Copy & Onboarding UI state
     const [copiedId, setCopiedId] = useState<string | null>(null);
+    const [copiedPlayerLinkId, setCopiedPlayerLinkId] = useState<string | null>(null);
     const [copiedPortalLink, setCopiedPortalLink] = useState(false);
+    const [copiedGroupSheet, setCopiedGroupSheet] = useState(false);
     const [onboardingLoading, setOnboardingLoading] = useState(false);
     const [syncingStripe, setSyncingStripe] = useState(false);
 
     const storageKey = clubId ? `clubflow-standard-fines-${clubId}` : "clubflow-standard-fines-default";
     const accountStorageKey = clubId ? `clubflow-payout-account-${clubId}` : "clubflow-payout-account-default";
+
+    // Sync Fine Tariff & Payout Account Config to Supabase so all devices stay in sync
+    const persistConfigToSupabase = async (
+        nextRules: StandardFineRule[],
+        nextAcct: ClubPayoutAccountConfig
+    ) => {
+        if (!clubId) return;
+        try {
+            const payload = JSON.stringify({
+                fineRules: nextRules,
+                payoutAccount: nextAcct,
+                updatedAt: new Date().toISOString(),
+            });
+            const { data: existingDoc } = await supabase
+                .from("documents")
+                .select("id")
+                .eq("club_id", clubId)
+                .eq("category", "CLUB_FINES_CONFIG")
+                .maybeSingle();
+
+            if (existingDoc?.id) {
+                await supabase
+                    .from("documents")
+                    .update({ url: payload, name: "ClubFlow Pay Config" })
+                    .eq("id", existingDoc.id);
+            } else {
+                await supabase.from("documents").insert({
+                    club_id: clubId,
+                    name: "ClubFlow Pay Config",
+                    type: "JSON",
+                    category: "CLUB_FINES_CONFIG",
+                    url: payload,
+                });
+            }
+        } catch {}
+    };
 
     useEffect(() => {
         try {
@@ -219,6 +260,7 @@ export default function PlayerPaymentsPage() {
         } catch (err) {
             console.error("Failed to save fine tariff:", err);
         }
+        persistConfigToSupabase(nextRules, payoutAccount);
     };
 
     const savePayoutAccountConfig = (nextConfig: ClubPayoutAccountConfig) => {
@@ -229,6 +271,7 @@ export default function PlayerPaymentsPage() {
         } catch (err) {
             console.error("Failed to save payout account config:", err);
         }
+        persistConfigToSupabase(fineRules, nextConfig);
         setIsEditingAccountModal(false);
     };
 
@@ -237,12 +280,47 @@ export default function PlayerPaymentsPage() {
             setLoading(false);
             return;
         }
-        loadData();
+        const searchParams = new URLSearchParams(window.location.search);
+        const connectParam = searchParams.get("connect");
+        if (connectParam === "success") {
+            setConnectBanner("success");
+        } else if (connectParam === "refresh") {
+            setConnectBanner("refresh");
+        }
+        loadData(connectParam === "success" || connectParam === "refresh");
     }, [clubId]);
 
-    const loadData = async () => {
+    const loadData = async (forceVerifyConnect = false) => {
         setLoading(true);
         try {
+            // Load remote fine tariff & payout config from Supabase if available
+            const { data: remoteCfg } = await supabase
+                .from("documents")
+                .select("url")
+                .eq("club_id", clubId)
+                .eq("category", "CLUB_FINES_CONFIG")
+                .maybeSingle();
+
+            if (remoteCfg?.url) {
+                try {
+                    const parsedRemote = JSON.parse(remoteCfg.url);
+                    if (Array.isArray(parsedRemote.fineRules) && parsedRemote.fineRules.length > 0) {
+                        setFineRules(parsedRemote.fineRules);
+                        localStorage.setItem(storageKey, JSON.stringify(parsedRemote.fineRules));
+                    }
+                    if (parsedRemote.payoutAccount) {
+                        setPayoutAccount(prev => ({
+                            ...prev,
+                            ...parsedRemote.payoutAccount,
+                        }));
+                        localStorage.setItem(
+                            accountStorageKey,
+                            JSON.stringify(parsedRemote.payoutAccount)
+                        );
+                    }
+                } catch {}
+            }
+
             const { data: clubData } = await supabase
                 .from("clubs")
                 .select("stripe_connect_account_id, stripe_connect_onboarding_completed")
@@ -253,7 +331,10 @@ export default function PlayerPaymentsPage() {
                 setConnectAccount(clubData.stripe_connect_account_id);
                 setOnboardingComplete(clubData.stripe_connect_onboarding_completed || false);
 
-                if (clubData.stripe_connect_account_id && !clubData.stripe_connect_onboarding_completed) {
+                if (
+                    clubData.stripe_connect_account_id &&
+                    (!clubData.stripe_connect_onboarding_completed || forceVerifyConnect)
+                ) {
                     fetch("/api/checkout/verify-payment", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -296,6 +377,15 @@ export default function PlayerPaymentsPage() {
     const handleSyncWithStripe = async () => {
         setSyncingStripe(true);
         try {
+            if (clubId) {
+                const res = await fetch("/api/checkout/verify-payment", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ clubId }),
+                }).then(r => r.json()).catch(() => null);
+                if (res?.onboardingComplete) setOnboardingComplete(true);
+            }
+
             const unpaidWithSession = payments.filter(
                 p => p.status === "Unpaid" && p.stripe_checkout_session_id
             );
@@ -316,6 +406,16 @@ export default function PlayerPaymentsPage() {
         return players.filter(p => !activeSquadOnly || !isFormerPlayer(p.notes));
     }, [players, activeSquadOnly]);
 
+    const filteredPickerPlayers = useMemo(() => {
+        if (!playerPickerSearch.trim()) return eligiblePlayers;
+        const q = playerPickerSearch.toLowerCase();
+        return eligiblePlayers.filter(
+            p =>
+                `${p.first_name} ${p.last_name}`.toLowerCase().includes(q) ||
+                (p.position || "").toLowerCase().includes(q)
+        );
+    }, [eligiblePlayers, playerPickerSearch]);
+
     const handleSelectRule = (rule: StandardFineRule) => {
         setSelectedRuleId(rule.id);
         setBasePrice(String(rule.amount));
@@ -328,10 +428,19 @@ export default function PlayerPaymentsPage() {
         );
     };
 
+    const handleSelectAllFilteredPlayers = () => {
+        const ids = filteredPickerPlayers.map(p => p.id);
+        const allSelected = ids.length > 0 && ids.every(id => selectedPlayerIds.includes(id));
+        if (allSelected) {
+            setSelectedPlayerIds(prev => prev.filter(id => !ids.includes(id)));
+        } else {
+            setSelectedPlayerIds(prev => Array.from(new Set([...prev, ...ids])));
+        }
+    };
+
     const handleConnectStripe = async (opts?: { resetAccount?: boolean; action?: "onboarding" | "dashboard" }) => {
         setOnboardingLoading(true);
         try {
-            // Persist current payoutAccount locally first so nothing is lost when redirecting to Stripe
             try {
                 localStorage.setItem(accountStorageKey, JSON.stringify(payoutAccount));
             } catch {}
@@ -431,6 +540,35 @@ export default function PlayerPaymentsPage() {
         }
     };
 
+    const handleMarkAsPaidManual = async (payment: PaymentRequest) => {
+        const paidAt = new Date().toISOString();
+        setPayments(prev =>
+            prev.map(p => (p.id === payment.id ? { ...p, status: "Paid", paid_at: paidAt } : p))
+        );
+        try {
+            const { error } = await supabase
+                .from("player_payment_requests")
+                .update({ status: "Paid", paid_at: paidAt })
+                .eq("id", payment.id);
+            if (error) throw error;
+
+            const meta = parsePaymentDescription(payment.description);
+            await supabase.from("finance_transactions").insert([
+                {
+                    club_id: clubId,
+                    date: paidAt.split("T")[0],
+                    description: `${meta.cleanDescription} (Marked Paid)`,
+                    amount: Number(payment.amount),
+                    type: "Income",
+                    category: "Player Fees",
+                },
+            ]);
+        } catch (err) {
+            console.error("Failed to mark payment request as paid:", err);
+            loadData();
+        }
+    };
+
     const handleDeleteFine = async (id: string) => {
         if (!confirm("Cancel and delete this payment request?")) return;
         setPayments(prev => prev.filter(p => p.id !== id));
@@ -448,9 +586,11 @@ export default function PlayerPaymentsPage() {
         return `${origin}/pay/${paymentId}`;
     };
 
-    const getClubPlayerPortalLink = () => {
+    const getClubPlayerPortalLink = (playerId?: string) => {
         const origin = typeof window !== "undefined" ? window.location.origin : "https://clubflow.org.uk";
-        return `${origin}/pay/club/${clubId}`;
+        return playerId
+            ? `${origin}/pay/club/${clubId}?player=${playerId}`
+            : `${origin}/pay/club/${clubId}`;
     };
 
     const handleCopyLink = (paymentId: string) => {
@@ -460,10 +600,50 @@ export default function PlayerPaymentsPage() {
         setTimeout(() => setCopiedId(null), 2000);
     };
 
+    const handleCopyPlayerPortalLink = (playerId: string) => {
+        navigator.clipboard.writeText(getClubPlayerPortalLink(playerId));
+        setCopiedPlayerLinkId(playerId);
+        setTimeout(() => setCopiedPlayerLinkId(null), 2000);
+    };
+
     const handleCopyPortalLink = () => {
         navigator.clipboard.writeText(getClubPlayerPortalLink());
         setCopiedPortalLink(true);
         setTimeout(() => setCopiedPortalLink(false), 2000);
+    };
+
+    const handleCopyWhatsAppGroupSheet = () => {
+        const unpaidList = payments.filter(p => p.status === "Unpaid");
+        const portalUrl = getClubPlayerPortalLink();
+        const byPlayer = new Map<string, { name: string; items: string[]; total: number }>();
+
+        for (const p of unpaidList) {
+            const pl = players.find(x => x.id === p.player_id);
+            const name = pl ? `${pl.first_name} ${pl.last_name}` : "Squad Member";
+            const meta = parsePaymentDescription(p.description);
+            const entry = byPlayer.get(p.player_id) || { name, items: [], total: 0 };
+            entry.items.push(`${meta.cleanDescription} (£${Number(p.amount).toFixed(2)})`);
+            entry.total += Number(p.amount || 0);
+            byPlayer.set(p.player_id, entry);
+        }
+
+        const lines = Array.from(byPlayer.values())
+            .sort((a, b) => b.total - a.total)
+            .map((row, idx) => `${idx + 1}. *${row.name}* — *£${row.total.toFixed(2)}*\n   └ ${row.items.join(", ")}`);
+
+        const totalPot = unpaidList.reduce((s, p) => s + Number(p.amount || 0), 0);
+        const message =
+            lines.length > 0
+                ? `⚽ *${settings.name || "Club"} — Outstanding Fines & Payments*\n\n${lines.join(
+                      "\n"
+                  )}\n\n💰 *Total Outstanding:* £${totalPot.toFixed(
+                      2
+                  )}\n\n👇 *Tap below to pick your name & pay in 1 tap (Apple Pay / Google Pay / Card):*\n🔗 ${portalUrl}`
+                : `⚽ *${settings.name || "Club"} — ClubFlow Pay Link*\n\n👇 *Tap below to pay match subs, fines, or club fees (Apple Pay / Google Pay / Card):*\n🔗 ${portalUrl}`;
+
+        navigator.clipboard.writeText(message);
+        setCopiedGroupSheet(true);
+        setTimeout(() => setCopiedGroupSheet(false), 2500);
     };
 
     const handleSendWhatsApp = (payment: PaymentRequest) => {
@@ -480,7 +660,17 @@ export default function PlayerPaymentsPage() {
             meta.feeCoverage === "player"
                 ? ` (+£${breakdown.transactionFee.toFixed(2)} transaction fee)`
                 : ""
-        }${dueStr}\n🏦 *Payment Account:* ${meta.payoutAccountLabel || formattedPayoutAccountLabel}\n\nPay directly via Stripe (Apple Pay / Card) here:\n🔗 ${url}`;
+        }${dueStr}\n🏦 *Payment Account:* ${meta.payoutAccountLabel || formattedPayoutAccountLabel}\n\nPay directly via Apple Pay, Google Pay, or Card here:\n🔗 ${url}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
+    };
+
+    const handleChasePlayerOnWhatsApp = (player: Player, unpaidAmount: number, unpaidCount: number) => {
+        const playerUrl = getClubPlayerPortalLink(player.id);
+        const text = `⚽ *${settings.name || "Club"} — Fines & Payments Reminder*\n\nHi ${player.first_name}, you currently have *${unpaidCount} unpaid fine${
+            unpaidCount === 1 ? "" : "s"
+        }* totalling *£${unpaidAmount.toFixed(
+            2
+        )}*.\n\nPay all in 1 tap via Apple Pay, Google Pay, or Card here:\n🔗 ${playerUrl}`;
         window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank");
     };
 
@@ -549,6 +739,7 @@ export default function PlayerPaymentsPage() {
     const kpis = useMemo(() => {
         const unpaidList = payments.filter(p => p.status === "Unpaid");
         const paidList = payments.filter(p => p.status === "Paid");
+        const todayStr = new Date().toISOString().split("T")[0];
 
         const unpaidClubTotal = unpaidList.reduce((sum, p) => {
             const meta = parsePaymentDescription(p.description);
@@ -560,23 +751,23 @@ export default function PlayerPaymentsPage() {
             return sum + calculateClubFlowFee(Number(p.amount || 0), meta.feeCoverage).clubNetReceived;
         }, 0);
 
-        const clubFlowRevenueEarned = paidList.reduce((sum, p) => {
+        const overdueList = unpaidList.filter(p => {
             const meta = parsePaymentDescription(p.description);
-            return sum + calculateClubFlowFee(Number(p.amount || 0), meta.feeCoverage).transactionFee;
-        }, 0);
+            return meta.dueDate && meta.dueDate < todayStr;
+        });
 
-        const projectedClubFlowRevenue = payments.reduce((sum, p) => {
-            const meta = parsePaymentDescription(p.description);
-            return sum + calculateClubFlowFee(Number(p.amount || 0), meta.feeCoverage).transactionFee;
-        }, 0);
+        const overdueTotal = overdueList.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+        const totalCount = unpaidList.length + paidList.length;
+        const collectionRate = totalCount > 0 ? Math.round((paidList.length / totalCount) * 100) : 100;
 
         return {
             unpaidCount: unpaidList.length,
             paidCount: paidList.length,
             unpaidClubTotal,
             paidClubTotal,
-            clubFlowRevenueEarned,
-            projectedClubFlowRevenue,
+            overdueCount: overdueList.length,
+            overdueTotal,
+            collectionRate,
         };
     }, [payments]);
 
@@ -634,8 +825,8 @@ export default function PlayerPaymentsPage() {
         return Array.from(map.values())
             .filter(item => item.totalFinesCount > 0)
             .sort((a, b) => {
-                if (b.totalAmount !== a.totalAmount) return b.totalAmount - a.totalAmount;
-                return b.unpaidAmount - a.unpaidAmount;
+                if (b.unpaidAmount !== a.unpaidAmount) return b.unpaidAmount - a.unpaidAmount;
+                return b.totalAmount - a.totalAmount;
             });
     }, [players, payments, activeSquadOnly]);
 
@@ -661,6 +852,26 @@ export default function PlayerPaymentsPage() {
 
     return (
         <div className="space-y-6 max-w-6xl mx-auto">
+            {/* Stripe Connect Onboarding Return Banner */}
+            {connectBanner === "success" && (
+                <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/40 p-4 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                        <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0" />
+                        <div>
+                            <h4 className="text-sm font-bold text-foreground">
+                                Stripe Payout Account Connected!
+                            </h4>
+                            <p className="text-xs text-muted-foreground">
+                                Your club bank account is linked. Player payments via Apple Pay, Google Pay, and Card will deposit directly into your bank account.
+                            </p>
+                        </div>
+                    </div>
+                    <Button variant="ghost" size="sm" onClick={() => setConnectBanner(null)} className="text-xs">
+                        Dismiss
+                    </Button>
+                </div>
+            )}
+
             {/* Page Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -669,23 +880,33 @@ export default function PlayerPaymentsPage() {
                             ClubFlow Pay — Fines &amp; Player Payments
                         </h1>
                         <Badge className="bg-brand/15 text-brand border border-brand/30 text-[11px] font-bold">
-                            Powered by Stripe Connect
+                            Direct to Club Bank Account
                         </Badge>
                     </div>
                     <p className="text-muted-foreground text-sm mt-1">
-                        Create player payment requests with a due date and base price, link your club bank account with Stripe, and track player Stripe payments in real time.
+                        Issue fines in seconds, share your 1-tap Player Payment Link in WhatsApp, and receive funds directly into your club bank account.
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     <Button
                         variant="outline"
                         size="sm"
+                        onClick={handleCopyWhatsAppGroupSheet}
+                        className="text-xs font-bold gap-1.5 bg-emerald-500/10 border-emerald-500/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20"
+                        title="Copy a ready-to-paste WhatsApp group message listing all unpaid fines + the 1-tap payment link"
+                    >
+                        <Share2 className="h-3.5 w-3.5" />
+                        {copiedGroupSheet ? "✓ WhatsApp Fines Sheet Copied!" : "Copy WhatsApp Fines Sheet"}
+                    </Button>
+                    <Button
+                        variant="outline"
+                        size="sm"
                         onClick={handleCopyPortalLink}
                         className="text-xs font-semibold gap-1.5 border-brand/40 text-brand hover:bg-brand/10"
-                        title="Share this portal link with your squad so players can open the app, pick their name, and pay their fines via Stripe"
+                        title="Share this portal link with your squad so players can pick their name once and pay fines or match subs in 1 tap"
                     >
                         <Smartphone className="h-3.5 w-3.5" />
-                        {copiedPortalLink ? "✓ Player App Link Copied" : "Copy Player App Link"}
+                        {copiedPortalLink ? "✓ Player Pay Link Copied" : "Copy Player Pay Link"}
                     </Button>
                     <Button
                         variant="outline"
@@ -695,7 +916,7 @@ export default function PlayerPaymentsPage() {
                         className="gap-1.5 text-xs font-semibold"
                     >
                         <RefreshCw className={`h-3.5 w-3.5 ${syncingStripe ? "animate-spin" : ""}`} />
-                        {syncingStripe ? "Syncing Stripe..." : "Sync Stripe Status"}
+                        {syncingStripe ? "Syncing..." : "Sync Stripe"}
                     </Button>
                 </div>
             </div>
@@ -706,13 +927,13 @@ export default function PlayerPaymentsPage() {
                     <CardContent className="p-4 flex items-center justify-between">
                         <div>
                             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                                Settled via Stripe
+                                Collected for Club
                             </p>
                             <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">
                                 £{kpis.paidClubTotal.toFixed(2)}
                             </p>
                             <p className="text-[11px] text-muted-foreground mt-0.5">
-                                {kpis.paidCount} paid request{kpis.paidCount === 1 ? "" : "s"} to club account
+                                {kpis.paidCount} settled payment{kpis.paidCount === 1 ? "" : "s"}
                             </p>
                         </div>
                         <div className="h-11 w-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-600 dark:text-emerald-400">
@@ -731,7 +952,7 @@ export default function PlayerPaymentsPage() {
                                 £{kpis.unpaidClubTotal.toFixed(2)}
                             </p>
                             <p className="text-[11px] text-muted-foreground mt-0.5">
-                                {kpis.unpaidCount} open payment request{kpis.unpaidCount === 1 ? "" : "s"}
+                                {kpis.unpaidCount} open request{kpis.unpaidCount === 1 ? "" : "s"}
                             </p>
                         </div>
                         <div className="h-11 w-11 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400">
@@ -744,7 +965,29 @@ export default function PlayerPaymentsPage() {
                     <CardContent className="p-4 flex items-center justify-between">
                         <div>
                             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                                Payment Account
+                                Overdue &amp; Collection Rate
+                            </p>
+                            <p className="text-2xl font-black text-foreground mt-1">
+                                {kpis.collectionRate}%{" "}
+                                <span className="text-xs font-semibold text-muted-foreground">settled</span>
+                            </p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">
+                                {kpis.overdueCount > 0
+                                    ? `${kpis.overdueCount} overdue (£${kpis.overdueTotal.toFixed(2)})`
+                                    : "0 overdue fines"}
+                            </p>
+                        </div>
+                        <div className="h-11 w-11 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
+                            <Clock className="h-5 w-5" />
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card className="border-border bg-card shadow-xs">
+                    <CardContent className="p-4 flex items-center justify-between">
+                        <div>
+                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                                Club Bank Account
                             </p>
                             <p className="text-sm font-bold text-foreground mt-1 truncate max-w-[165px]">
                                 {formattedPayoutAccountLabel}
@@ -754,30 +997,11 @@ export default function PlayerPaymentsPage() {
                                 onClick={() => setIsEditingAccountModal(true)}
                                 className="text-[11px] text-brand font-semibold hover:underline mt-0.5"
                             >
-                                Configure Bank / Stripe →
+                                {onboardingComplete ? "✓ Stripe Connected →" : "Setup Direct Payouts →"}
                             </button>
                         </div>
                         <div className="h-11 w-11 rounded-xl bg-brand/15 border border-brand/30 flex items-center justify-center text-brand">
                             <Building2 className="h-5 w-5" />
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card className="border-border bg-card shadow-xs">
-                    <CardContent className="p-4 flex items-center justify-between">
-                        <div>
-                            <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                                ClubFlow Fee Revenue
-                            </p>
-                            <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400 mt-1">
-                                £{kpis.clubFlowRevenueEarned.toFixed(2)}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">
-                                £{kpis.projectedClubFlowRevenue.toFixed(2)} across all requests
-                            </p>
-                        </div>
-                        <div className="h-11 w-11 rounded-xl bg-indigo-500/15 border border-indigo-500/30 flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                            <Sparkles className="h-5 w-5" />
                         </div>
                     </CardContent>
                 </Card>
@@ -807,14 +1031,14 @@ export default function PlayerPaymentsPage() {
                                     </Badge>
                                 ) : (
                                     <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30 text-[10px]">
-                                        Stripe Onboarding Required for Direct Payouts
+                                        1-Time Bank Link Needed for Direct Payouts
                                     </Badge>
                                 )}
                             </div>
                             <p className="text-xs text-muted-foreground mt-0.5">
                                 {onboardingComplete
-                                    ? "Players pay directly via Stripe (Apple Pay, Google Pay, or Card). The Base Price goes straight to your club bank account and the nominal transaction fee goes to ClubFlow."
-                                    : "Link your club bank details via Stripe Connect so player fine payments are deposited directly into your club account."}
+                                    ? "Players pay in 1 tap via Apple Pay, Google Pay, or Card. Funds are deposited automatically into your UK club bank account."
+                                    : "Link your club Sort Code & Account Number once via Stripe Express (pre-filled for grassroots clubs) so player payments go straight to your bank."}
                             </p>
                         </div>
                     </div>
@@ -825,7 +1049,7 @@ export default function PlayerPaymentsPage() {
                             onClick={() => setIsEditingAccountModal(true)}
                             className="text-xs font-semibold"
                         >
-                            Edit Account Details
+                            Bank &amp; Stripe Setup
                         </Button>
                         {isManager && (
                             <Button
@@ -838,8 +1062,8 @@ export default function PlayerPaymentsPage() {
                                 {onboardingLoading
                                     ? "Opening Stripe..."
                                     : onboardingComplete
-                                    ? "Manage Stripe Payouts"
-                                    : "Link Bank with Stripe (Express)"}
+                                    ? "Open Stripe Payouts"
+                                    : "Link Club Bank Account"}
                             </Button>
                         )}
                     </div>
@@ -859,7 +1083,7 @@ export default function PlayerPaymentsPage() {
                         }`}
                     >
                         <Coins className="h-4 w-4" />
-                        Create Payment Request &amp; Tracker ({payments.length})
+                        Issue Fines &amp; Payment Tracker ({payments.length})
                     </button>
                     <button
                         type="button"
@@ -908,10 +1132,10 @@ export default function PlayerPaymentsPage() {
                     <Card className="lg:col-span-5 border-border h-fit">
                         <CardHeader className="pb-3 border-b border-border bg-surface-1/50">
                             <CardTitle className="text-base font-bold flex items-center gap-2">
-                                <Plus className="h-4 w-4 text-brand" /> Create Payment Request
+                                <Plus className="h-4 w-4 text-brand" /> Issue Fine / Payment Request
                             </CardTitle>
                             <CardDescription className="text-xs">
-                                Pick a standard club fine or custom reason, set the due date and base price, and request payment via Stripe.
+                                Pick a standard club fine or custom fee, select one or more players, and issue instantly.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="pt-4">
@@ -957,24 +1181,48 @@ export default function PlayerPaymentsPage() {
                                     </div>
                                 </div>
 
-                                {/* Step 2: Select Player(s) */}
+                                {/* Step 2: Select Player(s) with Search & Select All */}
                                 <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
+                                    <div className="flex items-center justify-between gap-2">
                                         <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                                             2. Select Player(s) ({selectedPlayerIds.length} selected)
                                         </Label>
-                                        {selectedPlayerIds.length > 0 && (
+                                        <div className="flex items-center gap-2">
                                             <button
                                                 type="button"
-                                                onClick={() => setSelectedPlayerIds([])}
-                                                className="text-[11px] text-muted-foreground hover:text-foreground underline"
+                                                onClick={handleSelectAllFilteredPlayers}
+                                                className="text-[11px] font-semibold text-brand hover:underline"
                                             >
-                                                Clear
+                                                {filteredPickerPlayers.length > 0 &&
+                                                filteredPickerPlayers.every(p => selectedPlayerIds.includes(p.id))
+                                                    ? "Unselect All"
+                                                    : "Select All Squad"}
                                             </button>
-                                        )}
+                                            {selectedPlayerIds.length > 0 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSelectedPlayerIds([])}
+                                                    className="text-[11px] text-muted-foreground hover:text-foreground underline"
+                                                >
+                                                    Clear
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
+
+                                    <div className="relative">
+                                        <Search className="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-2.5" />
+                                        <Input
+                                            type="text"
+                                            placeholder="Filter players by name or position..."
+                                            value={playerPickerSearch}
+                                            onChange={e => setPlayerPickerSearch(e.target.value)}
+                                            className="h-8 pl-8 text-xs"
+                                        />
+                                    </div>
+
                                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 max-h-44 overflow-y-auto p-2 rounded-xl border border-border bg-surface-1/40">
-                                        {eligiblePlayers.map(p => {
+                                        {filteredPickerPlayers.map(p => {
                                             const checked = selectedPlayerIds.includes(p.id);
                                             return (
                                                 <button
@@ -1000,7 +1248,7 @@ export default function PlayerPaymentsPage() {
                                 {/* Step 3: What the fine is for, Base Price, and Due Date */}
                                 <div className="space-y-3 pt-1">
                                     <div className="space-y-1.5">
-                                        <Label className="text-xs font-semibold">What the fine is for</Label>
+                                        <Label className="text-xs font-semibold">What the fine / request is for</Label>
                                         <Input
                                             type="text"
                                             value={description}
@@ -1042,7 +1290,7 @@ export default function PlayerPaymentsPage() {
                                         <Label className="text-xs font-semibold">Match / Context Note (Optional)</Label>
                                         <Input
                                             type="text"
-                                            placeholder="e.g. vs Hackney Wick (20 mins late)"
+                                            placeholder="e.g. Saturday League Match (20 mins late)"
                                             value={customContextNote}
                                             onChange={e => setCustomContextNote(e.target.value)}
                                             className="h-9 text-xs"
@@ -1108,7 +1356,7 @@ export default function PlayerPaymentsPage() {
                                     </div>
                                     <div className="flex items-center justify-between text-muted-foreground">
                                         <span>
-                                            ClubFlow Transaction Fee (
+                                            Processing Fee (
                                             {feeCoverage === "player" ? "Covered by Player" : "Deducted from Base"}):
                                         </span>
                                         <span className="font-medium text-indigo-600 dark:text-indigo-400">
@@ -1137,7 +1385,7 @@ export default function PlayerPaymentsPage() {
                                     {creating
                                         ? "Creating Request..."
                                         : selectedPlayerIds.length > 1
-                                        ? `Create ${selectedPlayerIds.length} Payment Requests (£${(Number(basePrice || 0) * selectedPlayerIds.length).toFixed(2)} Base Total)`
+                                        ? `Issue to ${selectedPlayerIds.length} Players (£${(Number(basePrice || 0) * selectedPlayerIds.length).toFixed(2)} Total)`
                                         : "Create Payment Request"}
                                 </Button>
                             </form>
@@ -1150,10 +1398,10 @@ export default function PlayerPaymentsPage() {
                             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                 <div>
                                     <CardTitle className="text-base font-bold">
-                                        Stripe Payment Request Tracker
+                                        Fines &amp; Payment Request Tracker
                                     </CardTitle>
                                     <CardDescription className="text-xs">
-                                        Share checkout links or the Player App link. Payments settle automatically via Stripe.
+                                        Send individual links, share the WhatsApp Fines Sheet, or mark cash payments as Paid.
                                     </CardDescription>
                                 </div>
                                 <div className="flex items-center gap-1.5">
@@ -1168,7 +1416,11 @@ export default function PlayerPaymentsPage() {
                                                     : "bg-background text-muted-foreground border-border hover:text-foreground"
                                             }`}
                                         >
-                                            {st === "ALL" ? `All (${payments.length})` : st}
+                                            {st === "ALL"
+                                                ? `All (${payments.length})`
+                                                : st === "Unpaid"
+                                                ? `Unpaid (${kpis.unpaidCount})`
+                                                : `Paid (${kpis.paidCount})`}
                                         </button>
                                     ))}
                                 </div>
@@ -1227,10 +1479,10 @@ export default function PlayerPaymentsPage() {
                                                             }
                                                         >
                                                             {isPaid
-                                                                ? "✓ Paid via Stripe"
+                                                                ? "✓ Paid"
                                                                 : isOverdue
-                                                                ? "Overdue • Awaiting Stripe"
-                                                                : "Awaiting Stripe Payment"}
+                                                                ? "Overdue • Unpaid"
+                                                                : "Awaiting Payment"}
                                                         </Badge>
                                                     </div>
                                                     <p className="text-xs font-semibold text-foreground/90">
@@ -1245,8 +1497,7 @@ export default function PlayerPaymentsPage() {
                                                             Player Pays:{" "}
                                                             <strong className="text-foreground">
                                                                 £{breakdown.playerTotalPayable.toFixed(2)}
-                                                            </strong>{" "}
-                                                            (£{breakdown.transactionFee.toFixed(2)} fee)
+                                                            </strong>
                                                         </span>
                                                         {meta.dueDate && (
                                                             <>
@@ -1265,8 +1516,8 @@ export default function PlayerPaymentsPage() {
                                                     </p>
                                                 </div>
 
-                                                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                                                    <div className="text-right mr-1">
+                                                <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0 flex-wrap justify-end">
+                                                    <div className="text-right mr-1.5">
                                                         <span className="text-base font-black text-foreground block">
                                                             £{breakdown.clubNetReceived.toFixed(2)}
                                                         </span>
@@ -1282,31 +1533,31 @@ export default function PlayerPaymentsPage() {
                                                                 variant="outline"
                                                                 className="h-8 px-2.5 text-xs gap-1"
                                                                 onClick={() => handleCopyLink(pay.id)}
-                                                                title="Copy player Stripe checkout link"
+                                                                title="Copy direct Stripe payment link for this fine"
                                                             >
                                                                 {copiedId === pay.id ? (
                                                                     <Check className="h-3.5 w-3.5 text-emerald-500" />
                                                                 ) : (
                                                                     <Copy className="h-3.5 w-3.5" />
                                                                 )}
-                                                                {copiedId === pay.id ? "Copied" : "Pay Link"}
+                                                                {copiedId === pay.id ? "Copied" : "Link"}
                                                             </Button>
                                                             <Button
                                                                 size="sm"
                                                                 className="h-8 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-semibold"
                                                                 onClick={() => handleSendWhatsApp(pay)}
-                                                                title="Send ClubFlow Pay request to player"
+                                                                title="Send WhatsApp payment link to player"
                                                             >
-                                                                <Send className="h-3 w-3" /> Send Request
+                                                                <Send className="h-3 w-3" /> WhatsApp
                                                             </Button>
                                                             <Button
                                                                 size="sm"
                                                                 variant="outline"
-                                                                className="h-8 px-2 text-xs"
-                                                                onClick={() => window.open(getPaymentLink(pay.id), "_blank")}
-                                                                title="Open player Stripe checkout page"
+                                                                className="h-8 px-2.5 text-xs gap-1 border-emerald-500/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/10 font-semibold"
+                                                                onClick={() => handleMarkAsPaidManual(pay)}
+                                                                title="Mark as Paid (Cash or Manual Bank Transfer)"
                                                             >
-                                                                <ExternalLink className="h-3.5 w-3.5" />
+                                                                <CheckCircle2 className="h-3.5 w-3.5" /> Mark Paid
                                                             </Button>
                                                         </>
                                                     )}
@@ -1338,7 +1589,7 @@ export default function PlayerPaymentsPage() {
                         <div>
                             <CardTitle className="text-lg font-bold">Club Standard Fine List</CardTitle>
                             <CardDescription className="text-xs">
-                                Configure your club&apos;s standard base prices for yellow cards, lateness, kit offences, and matchday rules.
+                                Configure your club&apos;s standard base prices for yellow cards, lateness, kit offences, and matchday rules. Saved automatically across all your devices.
                             </CardDescription>
                         </div>
                         <div className="flex items-center gap-2">
@@ -1421,13 +1672,24 @@ export default function PlayerPaymentsPage() {
             {/* VIEW 3: SQUAD FINES LEADERBOARD */}
             {activeView === "leaderboard" && (
                 <Card className="border-border overflow-hidden">
-                    <CardHeader className="border-b border-border bg-surface-1/50">
-                        <CardTitle className="text-lg font-bold flex items-center gap-2">
-                            <Trophy className="h-5 w-5 text-amber-500" /> Player Fines Leaderboard
-                        </CardTitle>
-                        <CardDescription className="text-xs">
-                            Track which players have settled their payment requests via Stripe and who still has unpaid fines.
-                        </CardDescription>
+                    <CardHeader className="border-b border-border bg-surface-1/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                            <CardTitle className="text-lg font-bold flex items-center gap-2">
+                                <Trophy className="h-5 w-5 text-amber-500" /> Player Fines Leaderboard
+                            </CardTitle>
+                            <CardDescription className="text-xs">
+                                Copy any player&apos;s personal 1-tap payment link or chase their outstanding balance on WhatsApp.
+                            </CardDescription>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCopyWhatsAppGroupSheet}
+                            className="text-xs font-bold gap-1.5"
+                        >
+                            <Share2 className="h-3.5 w-3.5" />
+                            {copiedGroupSheet ? "✓ Copied Group Summary" : "Copy Group WhatsApp Summary"}
+                        </Button>
                     </CardHeader>
                     <CardContent className="p-0">
                         {playerLeaderboard.length === 0 ? (
@@ -1439,21 +1701,21 @@ export default function PlayerPaymentsPage() {
                                 <table className="w-full text-sm text-left">
                                     <thead className="bg-surface-1 text-muted-foreground uppercase text-xs font-bold border-b border-border">
                                         <tr>
-                                            <th className="px-5 py-3.5">#</th>
-                                            <th className="px-5 py-3.5">Player</th>
-                                            <th className="px-4 py-3.5 text-center">Requests Issued</th>
-                                            <th className="px-4 py-3.5 text-center">Paid via Stripe</th>
-                                            <th className="px-4 py-3.5 text-center">Outstanding</th>
-                                            <th className="px-5 py-3.5 text-right">Total Base Fined</th>
+                                            <th className="px-4 py-3.5">#</th>
+                                            <th className="px-4 py-3.5">Player</th>
+                                            <th className="px-3 py-3.5 text-center">Issued</th>
+                                            <th className="px-3 py-3.5 text-center">Paid</th>
+                                            <th className="px-3 py-3.5 text-center">Outstanding</th>
+                                            <th className="px-4 py-3.5 text-right">Quick Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border">
                                         {playerLeaderboard.map((row, idx) => (
                                             <tr key={row.player.id} className="hover:bg-surface-1/50 transition-colors">
-                                                <td className="px-5 py-3.5 font-black text-muted-foreground">
+                                                <td className="px-4 py-3.5 font-black text-muted-foreground">
                                                     {idx + 1}
                                                 </td>
-                                                <td className="px-5 py-3.5 font-bold text-foreground">
+                                                <td className="px-4 py-3.5 font-bold text-foreground">
                                                     {row.player.first_name} {row.player.last_name}
                                                     {row.player.position && (
                                                         <span className="ml-2 text-[11px] font-semibold text-muted-foreground">
@@ -1461,13 +1723,13 @@ export default function PlayerPaymentsPage() {
                                                         </span>
                                                     )}
                                                 </td>
-                                                <td className="px-4 py-3.5 text-center font-semibold">
-                                                    {row.totalFinesCount}
+                                                <td className="px-3 py-3.5 text-center font-semibold">
+                                                    {row.totalFinesCount} (£{row.totalAmount.toFixed(2)})
                                                 </td>
-                                                <td className="px-4 py-3.5 text-center font-bold text-emerald-600 dark:text-emerald-400">
+                                                <td className="px-3 py-3.5 text-center font-bold text-emerald-600 dark:text-emerald-400">
                                                     £{row.paidAmount.toFixed(2)}
                                                 </td>
-                                                <td className="px-4 py-3.5 text-center">
+                                                <td className="px-3 py-3.5 text-center">
                                                     {row.unpaidAmount > 0 ? (
                                                         <Badge className="bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/35 font-bold">
                                                             £{row.unpaidAmount.toFixed(2)} ({row.unpaidCount} due)
@@ -1476,8 +1738,38 @@ export default function PlayerPaymentsPage() {
                                                         <span className="text-xs text-muted-foreground">All settled ✓</span>
                                                     )}
                                                 </td>
-                                                <td className="px-5 py-3.5 text-right font-black text-foreground">
-                                                    £{row.totalAmount.toFixed(2)}
+                                                <td className="px-4 py-3.5 text-right">
+                                                    <div className="inline-flex items-center gap-1.5">
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            className="h-7 px-2.5 text-xs gap-1"
+                                                            onClick={() => handleCopyPlayerPortalLink(row.player.id)}
+                                                            title="Copy personal payment link pre-selected to this player"
+                                                        >
+                                                            {copiedPlayerLinkId === row.player.id ? (
+                                                                <Check className="h-3 w-3 text-emerald-500" />
+                                                            ) : (
+                                                                <Copy className="h-3 w-3" />
+                                                            )}
+                                                            {copiedPlayerLinkId === row.player.id ? "Copied" : "Player Link"}
+                                                        </Button>
+                                                        {row.unpaidAmount > 0 && (
+                                                            <Button
+                                                                size="sm"
+                                                                className="h-7 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-700 text-white gap-1 font-semibold"
+                                                                onClick={() =>
+                                                                    handleChasePlayerOnWhatsApp(
+                                                                        row.player,
+                                                                        row.unpaidAmount,
+                                                                        row.unpaidCount
+                                                                    )
+                                                                }
+                                                            >
+                                                                <Send className="h-3 w-3" /> Chase
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))}
