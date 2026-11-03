@@ -36,6 +36,9 @@ import {
     Check,
     Users,
     Download,
+    ArrowUpDown,
+    ArrowUp,
+    ArrowDown,
 } from "lucide-react";
 import {
     Dialog,
@@ -63,6 +66,8 @@ import {
     getPositionUnitOrder,
     getTacticalPositionOrder,
 } from "@/lib/recruitment-utils";
+
+type RecruitSortField = "position" | "rating" | "name" | "age" | "stage" | "club" | "commute" | "recent";
 
 interface SquadComparisonPlayer {
     id: string;
@@ -97,7 +102,24 @@ export default function RecruitmentPage() {
     const [roleFilter, setRoleFilter] = useState<string>("ALL");
     const [commuteFilter, setCommuteFilter] = useState<string>("ALL");
     const [onlyTrialists, setOnlyTrialists] = useState<boolean>(false);
-    const [sortBy, setSortBy] = useState<"position" | "rating" | "name" | "age" | "recent">("position");
+    const [sortBy, setSortBy] = useState<RecruitSortField>("position");
+    const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+    const handleSortSelect = (field: RecruitSortField, explicitDir?: "asc" | "desc") => {
+        if (explicitDir) {
+            setSortBy(field);
+            setSortDirection(explicitDir);
+            return;
+        }
+        if (sortBy === field) {
+            setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+        } else {
+            setSortBy(field);
+            const defaultDir =
+                field === "rating" || field === "recent" || field === "stage" ? "desc" : "asc";
+            setSortDirection(defaultDir);
+        }
+    };
 
     // Add / Edit Modal State
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -569,29 +591,65 @@ export default function RecruitmentPage() {
                 return true;
             })
             .sort((a, b) => {
+                const dir = sortDirection === "asc" ? 1 : -1;
+
                 if (sortBy === "position") {
                     const unitDiff =
                         getPositionUnitOrder(a.primaryPosition) - getPositionUnitOrder(b.primaryPosition);
-                    if (unitDiff !== 0) return unitDiff;
+                    if (unitDiff !== 0) return unitDiff * dir;
                     const posDiff =
                         getTacticalPositionOrder(a.primaryPosition) - getTacticalPositionOrder(b.primaryPosition);
-                    if (posDiff !== 0) return posDiff;
+                    if (posDiff !== 0) return posDiff * dir;
                     const ratingDiff = (b.starRating || 3) - (a.starRating || 3);
                     if (ratingDiff !== 0) return ratingDiff;
                     return a.name.localeCompare(b.name);
                 }
                 if (sortBy === "rating") {
-                    const diff = (b.starRating || 3) - (a.starRating || 3);
-                    if (diff !== 0) return diff;
+                    const diff = (a.starRating || 3) - (b.starRating || 3);
+                    if (diff !== 0) return diff * dir;
                     return a.name.localeCompare(b.name);
                 }
                 if (sortBy === "name") {
-                    return a.name.localeCompare(b.name);
+                    return a.name.localeCompare(b.name) * dir;
                 }
                 if (sortBy === "age") {
-                    return (a.age || 99) - (b.age || 99);
+                    const diff = (a.age || 99) - (b.age || 99);
+                    if (diff !== 0) return diff * dir;
+                    return a.name.localeCompare(b.name);
                 }
-                return new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime();
+                if (sortBy === "stage") {
+                    const stageOrderA = PIPELINE_STAGES.indexOf(
+                        a.pipelineStage || (a.onTrial ? "On Trial" : "Scouted")
+                    );
+                    const stageOrderB = PIPELINE_STAGES.indexOf(
+                        b.pipelineStage || (b.onTrial ? "On Trial" : "Scouted")
+                    );
+                    const diff = stageOrderA - stageOrderB;
+                    if (diff !== 0) return diff * dir;
+                    return a.name.localeCompare(b.name);
+                }
+                if (sortBy === "club") {
+                    const clubA = a.status === "Unattached" ? "Free Agent" : a.currentClub || "ZZZ";
+                    const clubB = b.status === "Unattached" ? "Free Agent" : b.currentClub || "ZZZ";
+                    const diff = clubA.localeCompare(clubB);
+                    if (diff !== 0) return diff * dir;
+                    return a.name.localeCompare(b.name);
+                }
+                if (sortBy === "commute") {
+                    const commuteOrder: Record<string, number> = {
+                        "Easy / Local": 1,
+                        Moderate: 2,
+                        "Long Commute": 3,
+                    };
+                    const cA = commuteOrder[a.commutePracticality || "Easy / Local"] || 1;
+                    const cB = commuteOrder[b.commutePracticality || "Easy / Local"] || 1;
+                    const diff = cA - cB;
+                    if (diff !== 0) return diff * dir;
+                    return a.name.localeCompare(b.name);
+                }
+                const timeDiff =
+                    new Date(a.updatedAt || 0).getTime() - new Date(b.updatedAt || 0).getTime();
+                return timeDiff * dir;
             });
     }, [
         recruits,
@@ -605,6 +663,7 @@ export default function RecruitmentPage() {
         commuteFilter,
         onlyTrialists,
         sortBy,
+        sortDirection,
     ]);
 
     const activeFilterCount = useMemo(() => {
@@ -649,6 +708,36 @@ export default function RecruitmentPage() {
         recruits.forEach((r) => {
             const st = r.pipelineStage || (r.onTrial ? "On Trial" : "Scouted");
             counts[st] = (counts[st] || 0) + 1;
+        });
+        return counts;
+    }, [recruits]);
+
+    const positionCounts = useMemo(() => {
+        const counts: Record<string, number> = {
+            ALL: recruits.length,
+            GK: 0,
+            DEF: 0,
+            MID: 0,
+            FWD: 0,
+        };
+        ALL_RECRUIT_POSITIONS.forEach((p) => {
+            if (counts[p] === undefined) counts[p] = 0;
+        });
+        recruits.forEach((r) => {
+            const prim = (r.primaryPosition || "").toUpperCase().trim();
+            const sec = (r.secondaryPosition || "").toUpperCase().trim();
+            const unit = getPositionUnitOrder(prim);
+            if (unit === 1) counts.GK = (counts.GK || 0) + 1;
+            else if (unit === 2) counts.DEF = (counts.DEF || 0) + 1;
+            else if (unit === 3) counts.MID = (counts.MID || 0) + 1;
+            else counts.FWD = (counts.FWD || 0) + 1;
+
+            if (prim && prim !== "GK" && prim !== "DEF" && prim !== "MID" && prim !== "FWD") {
+                counts[prim] = (counts[prim] || 0) + 1;
+            }
+            if (sec && sec !== prim && sec !== "GK" && sec !== "DEF" && sec !== "MID" && sec !== "FWD") {
+                counts[sec] = (counts[sec] || 0) + 1;
+            }
         });
         return counts;
     }, [recruits]);
@@ -1103,30 +1192,94 @@ export default function RecruitmentPage() {
                     })}
                 </div>
 
-                {/* 4. Mobile 5-Segment Position Selector Bar */}
-                <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-surface-1 border border-border">
-                    {(
-                        [
-                            { id: "ALL", label: "All" },
-                            { id: "GK", label: "GK" },
-                            { id: "DEF", label: "DEF" },
-                            { id: "MID", label: "MID" },
-                            { id: "FWD", label: "FWD" },
-                        ] as const
-                    ).map((posTab) => (
-                        <button
-                            key={posTab.id}
-                            type="button"
-                            onClick={() => setPositionFilter(posTab.id)}
-                            className={`py-1.5 rounded-lg text-xs font-extrabold transition-colors ${
-                                positionFilter === posTab.id
-                                    ? "bg-red-600 text-white shadow-xs"
-                                    : "text-muted-foreground hover:text-foreground"
-                            }`}
-                        >
-                            {posTab.label}
-                        </button>
-                    ))}
+                {/* 4. Mobile 5-Segment Position Selector Bar + Exact Position & Quick-Sort Strip */}
+                <div className="space-y-1.5">
+                    <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-surface-1 border border-border">
+                        {(
+                            [
+                                { id: "ALL", label: "All" },
+                                { id: "GK", label: "GK" },
+                                { id: "DEF", label: "DEF" },
+                                { id: "MID", label: "MID" },
+                                { id: "FWD", label: "FWD" },
+                            ] as const
+                        ).map((posTab) => (
+                            <button
+                                key={posTab.id}
+                                type="button"
+                                onClick={() => setPositionFilter(posTab.id)}
+                                className={`py-1.5 rounded-lg text-xs font-extrabold transition-colors ${
+                                    positionFilter === posTab.id
+                                        ? "bg-red-600 text-white shadow-xs"
+                                        : "text-muted-foreground hover:text-foreground"
+                                }`}
+                            >
+                                {posTab.label} ({positionCounts[posTab.id] || 0})
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Exact Sub-Position Chips (Mobile Swipeable) */}
+                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
+                        {["RB", "CB", "LB", "CDM", "CM", "CAM", "RW", "LW", "CF", "ST"].map((exactPos) => {
+                            const isSelected = positionFilter === exactPos;
+                            return (
+                                <button
+                                    key={exactPos}
+                                    type="button"
+                                    onClick={() => setPositionFilter(isSelected ? "ALL" : exactPos)}
+                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border whitespace-nowrap shrink-0 transition-colors ${
+                                        isSelected
+                                            ? "bg-brand text-white border-brand shadow-xs"
+                                            : "bg-surface-1 text-muted-foreground border-border hover:text-foreground"
+                                    }`}
+                                >
+                                    {exactPos}
+                                    {positionCounts[exactPos] ? ` (${positionCounts[exactPos]})` : ""}
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    {/* Mobile Quick-Click Sort Strip */}
+                    <div className="flex items-center gap-1 overflow-x-auto no-scrollbar pb-0.5">
+                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground px-1 shrink-0">
+                            Sort:
+                        </span>
+                        {(
+                            [
+                                { id: "position", label: "Position" },
+                                { id: "rating", label: "★ Rating" },
+                                { id: "name", label: "Name" },
+                                { id: "age", label: "Age" },
+                                { id: "stage", label: "Stage" },
+                                { id: "club", label: "Club" },
+                                { id: "commute", label: "Commute" },
+                            ] as { id: RecruitSortField; label: string }[]
+                        ).map((sOpt) => {
+                            const isActive = sortBy === sOpt.id;
+                            return (
+                                <button
+                                    key={sOpt.id}
+                                    type="button"
+                                    onClick={() => handleSortSelect(sOpt.id)}
+                                    className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border whitespace-nowrap shrink-0 flex items-center gap-1 transition-colors ${
+                                        isActive
+                                            ? "bg-red-600/15 text-red-400 border-red-500/40"
+                                            : "bg-surface-1 text-muted-foreground border-border hover:text-foreground"
+                                    }`}
+                                >
+                                    <span>{sOpt.label}</span>
+                                    {isActive &&
+                                        (sortDirection === "asc" ? (
+                                            <ArrowUp className="h-3 w-3" />
+                                        ) : (
+                                            <ArrowDown className="h-3 w-3" />
+                                        ))}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
 
                 {/* 5. Mobile Search + Filter Drawer Toggle + Speed-Dial / Cards Switcher */}
@@ -1227,14 +1380,17 @@ export default function RecruitmentPage() {
                             </select>
                             <select
                                 value={sortBy}
-                                onChange={(e) => setSortBy(e.target.value as any)}
+                                onChange={(e) => handleSortSelect(e.target.value as RecruitSortField)}
                                 className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold"
                             >
                                 <option value="position">Sort: Position Order</option>
                                 <option value="rating">Sort: Highest ★</option>
-                                <option value="recent">Sort: Recent</option>
                                 <option value="name">Sort: A–Z</option>
-                                <option value="age">Sort: Youngest</option>
+                                <option value="age">Sort: Age</option>
+                                <option value="stage">Sort: Pipeline Stage</option>
+                                <option value="club">Sort: Club / Status</option>
+                                <option value="commute">Sort: Commute</option>
+                                <option value="recent">Sort: Recent</option>
                             </select>
                             <div className="flex items-center gap-1.5">
                                 <button
@@ -1597,16 +1753,36 @@ export default function RecruitmentPage() {
                             <div className="flex items-center gap-2 shrink-0">
                                 <select
                                     value={sortBy}
-                                    onChange={(e) => setSortBy(e.target.value as any)}
+                                    onChange={(e) => handleSortSelect(e.target.value as RecruitSortField)}
                                     className="h-9 rounded-lg border border-border bg-surface-2 px-2.5 text-xs font-bold text-foreground"
                                     title="Sort targets by"
                                 >
                                     <option value="position">Sort: Position Order (GK → ST)</option>
                                     <option value="rating">Sort: Highest ★ Rating</option>
-                                    <option value="recent">Sort: Recently Updated</option>
                                     <option value="name">Sort: Name (A–Z)</option>
-                                    <option value="age">Sort: Youngest First</option>
+                                    <option value="age">Sort: Age</option>
+                                    <option value="stage">Sort: Pipeline Stage</option>
+                                    <option value="club">Sort: Club / Status</option>
+                                    <option value="commute">Sort: Commute</option>
+                                    <option value="recent">Sort: Recently Updated</option>
                                 </select>
+                                <button
+                                    type="button"
+                                    onClick={() => setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"))}
+                                    className="h-9 px-2.5 rounded-lg border border-border bg-surface-2 text-xs font-bold text-foreground hover:bg-surface-1 flex items-center gap-1"
+                                    title={`Toggle sort direction (currently ${
+                                        sortDirection === "asc" ? "Ascending" : "Descending"
+                                    })`}
+                                >
+                                    {sortDirection === "asc" ? (
+                                        <ArrowUp className="h-3.5 w-3.5 text-brand" />
+                                    ) : (
+                                        <ArrowDown className="h-3.5 w-3.5 text-brand" />
+                                    )}
+                                    <span className="uppercase text-[10px]">
+                                        {sortDirection === "asc" ? "Asc" : "Desc"}
+                                    </span>
+                                </button>
 
                                 <div className="inline-flex rounded-lg border border-border bg-surface-2 p-0.5">
                                     <button
@@ -1738,6 +1914,124 @@ export default function RecruitmentPage() {
                             </div>
                         </div>
 
+                        {/* Clickable Position Filter Chips & Quick-Sort Bar */}
+                        <div className="pt-2 border-t border-border/60 flex flex-col xl:flex-row xl:items-center justify-between gap-2.5">
+                            {/* Quick-Click Position Pills */}
+                            <div className="flex items-center gap-1 flex-wrap">
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mr-1">
+                                    Position:
+                                </span>
+                                {(
+                                    [
+                                        { id: "ALL", label: "All", activeCls: "bg-brand text-white border-brand" },
+                                        {
+                                            id: "GK",
+                                            label: "GK",
+                                            activeCls: "bg-amber-500 text-slate-950 border-amber-400",
+                                        },
+                                        {
+                                            id: "DEF",
+                                            label: "DEF",
+                                            activeCls: "bg-sky-500 text-slate-950 border-sky-400",
+                                        },
+                                        {
+                                            id: "MID",
+                                            label: "MID",
+                                            activeCls: "bg-emerald-500 text-slate-950 border-emerald-400",
+                                        },
+                                        {
+                                            id: "FWD",
+                                            label: "FWD",
+                                            activeCls: "bg-rose-500 text-white border-rose-400",
+                                        },
+                                    ] as const
+                                ).map((u) => {
+                                    const isSel = positionFilter === u.id;
+                                    return (
+                                        <button
+                                            key={u.id}
+                                            type="button"
+                                            onClick={() =>
+                                                setPositionFilter(isSel && u.id !== "ALL" ? "ALL" : u.id)
+                                            }
+                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border transition-all ${
+                                                isSel
+                                                    ? `${u.activeCls} shadow-xs`
+                                                    : "bg-surface-2 text-muted-foreground border-border hover:text-foreground"
+                                            }`}
+                                        >
+                                            {u.label} ({positionCounts[u.id] || 0})
+                                        </button>
+                                    );
+                                })}
+
+                                <span className="text-border mx-0.5">|</span>
+
+                                {["RB", "CB", "LB", "CDM", "CM", "CAM", "RW", "LW", "CF", "ST"].map((exactPos) => {
+                                    const isSel = positionFilter === exactPos;
+                                    return (
+                                        <button
+                                            key={exactPos}
+                                            type="button"
+                                            onClick={() => setPositionFilter(isSel ? "ALL" : exactPos)}
+                                            className={`px-2 py-1 rounded-md text-[10px] font-bold border transition-all ${
+                                                isSel
+                                                    ? "bg-brand/20 text-brand border-brand/50"
+                                                    : "bg-surface-2/70 text-muted-foreground border-border hover:text-foreground"
+                                            }`}
+                                            title={`Filter by ${exactPos}`}
+                                        >
+                                            {exactPos}
+                                            {positionCounts[exactPos] ? ` (${positionCounts[exactPos]})` : ""}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Quick-Click Sort Pills */}
+                            <div className="flex items-center gap-1 flex-wrap">
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground mr-1">
+                                    Click to Sort:
+                                </span>
+                                {(
+                                    [
+                                        { id: "position", label: "Position" },
+                                        { id: "rating", label: "★ Rating" },
+                                        { id: "name", label: "Player" },
+                                        { id: "age", label: "Age" },
+                                        { id: "stage", label: "Stage" },
+                                        { id: "club", label: "Club" },
+                                        { id: "commute", label: "Commute" },
+                                    ] as { id: RecruitSortField; label: string }[]
+                                ).map((sOpt) => {
+                                    const isActive = sortBy === sOpt.id;
+                                    return (
+                                        <button
+                                            key={sOpt.id}
+                                            type="button"
+                                            onClick={() => handleSortSelect(sOpt.id)}
+                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border flex items-center gap-1 transition-all ${
+                                                isActive
+                                                    ? "bg-brand/15 text-brand border-brand/40 shadow-xs"
+                                                    : "bg-surface-2 text-muted-foreground border-border hover:text-foreground"
+                                            }`}
+                                        >
+                                            <span>{sOpt.label}</span>
+                                            {isActive ? (
+                                                sortDirection === "asc" ? (
+                                                    <ArrowUp className="h-3 w-3" />
+                                                ) : (
+                                                    <ArrowDown className="h-3 w-3" />
+                                                )
+                                            ) : (
+                                                <ArrowUpDown className="h-2.5 w-2.5 opacity-40" />
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
                         <div className="flex items-center justify-between text-[11px] text-muted-foreground pt-0.5">
                             <span>
                                 Showing <strong className="text-foreground">{filteredRecruits.length}</strong> of{" "}
@@ -1778,14 +2072,134 @@ export default function RecruitmentPage() {
                     <div className="overflow-x-auto">
                         <table className="w-full text-left border-collapse text-xs">
                             <thead>
-                                <tr className="border-b border-border bg-surface-2/80 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                <tr className="border-b border-border bg-surface-2/80 text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground select-none">
                                     <th className="p-3 w-8 text-center">Cmp</th>
-                                    <th className="p-3">Player</th>
-                                    <th className="p-3">Pos &amp; Foot</th>
-                                    <th className="p-3">Scout Rating</th>
-                                    <th className="p-3">Pipeline Stage</th>
-                                    <th className="p-3">Club &amp; Pedigree</th>
-                                    <th className="p-3">Location / Commute</th>
+                                    <th className="p-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSortSelect("name")}
+                                            className={`inline-flex items-center gap-1 uppercase tracking-wider font-extrabold hover:text-foreground transition-colors ${
+                                                sortBy === "name" ? "text-brand" : ""
+                                            }`}
+                                            title="Click to sort by Player Name"
+                                        >
+                                            <span>Player</span>
+                                            {sortBy === "name" ? (
+                                                sortDirection === "asc" ? (
+                                                    <ArrowUp className="h-3 w-3" />
+                                                ) : (
+                                                    <ArrowDown className="h-3 w-3" />
+                                                )
+                                            ) : (
+                                                <ArrowUpDown className="h-3 w-3 opacity-40" />
+                                            )}
+                                        </button>
+                                    </th>
+                                    <th className="p-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSortSelect("position")}
+                                            className={`inline-flex items-center gap-1 uppercase tracking-wider font-extrabold hover:text-foreground transition-colors ${
+                                                sortBy === "position" ? "text-brand" : ""
+                                            }`}
+                                            title="Click to sort by Position Order (GK → DEF → MID → FWD)"
+                                        >
+                                            <span>Pos &amp; Foot</span>
+                                            {sortBy === "position" ? (
+                                                sortDirection === "asc" ? (
+                                                    <ArrowUp className="h-3 w-3" />
+                                                ) : (
+                                                    <ArrowDown className="h-3 w-3" />
+                                                )
+                                            ) : (
+                                                <ArrowUpDown className="h-3 w-3 opacity-40" />
+                                            )}
+                                        </button>
+                                    </th>
+                                    <th className="p-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSortSelect("rating")}
+                                            className={`inline-flex items-center gap-1 uppercase tracking-wider font-extrabold hover:text-foreground transition-colors ${
+                                                sortBy === "rating" ? "text-brand" : ""
+                                            }`}
+                                            title="Click to sort by Scout Rating"
+                                        >
+                                            <span>Scout Rating</span>
+                                            {sortBy === "rating" ? (
+                                                sortDirection === "asc" ? (
+                                                    <ArrowUp className="h-3 w-3" />
+                                                ) : (
+                                                    <ArrowDown className="h-3 w-3" />
+                                                )
+                                            ) : (
+                                                <ArrowUpDown className="h-3 w-3 opacity-40" />
+                                            )}
+                                        </button>
+                                    </th>
+                                    <th className="p-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSortSelect("stage")}
+                                            className={`inline-flex items-center gap-1 uppercase tracking-wider font-extrabold hover:text-foreground transition-colors ${
+                                                sortBy === "stage" ? "text-brand" : ""
+                                            }`}
+                                            title="Click to sort by Pipeline Stage"
+                                        >
+                                            <span>Pipeline Stage</span>
+                                            {sortBy === "stage" ? (
+                                                sortDirection === "asc" ? (
+                                                    <ArrowUp className="h-3 w-3" />
+                                                ) : (
+                                                    <ArrowDown className="h-3 w-3" />
+                                                )
+                                            ) : (
+                                                <ArrowUpDown className="h-3 w-3 opacity-40" />
+                                            )}
+                                        </button>
+                                    </th>
+                                    <th className="p-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSortSelect("club")}
+                                            className={`inline-flex items-center gap-1 uppercase tracking-wider font-extrabold hover:text-foreground transition-colors ${
+                                                sortBy === "club" ? "text-brand" : ""
+                                            }`}
+                                            title="Click to sort by Club / Free Agent Status"
+                                        >
+                                            <span>Club &amp; Pedigree</span>
+                                            {sortBy === "club" ? (
+                                                sortDirection === "asc" ? (
+                                                    <ArrowUp className="h-3 w-3" />
+                                                ) : (
+                                                    <ArrowDown className="h-3 w-3" />
+                                                )
+                                            ) : (
+                                                <ArrowUpDown className="h-3 w-3 opacity-40" />
+                                            )}
+                                        </button>
+                                    </th>
+                                    <th className="p-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleSortSelect("commute")}
+                                            className={`inline-flex items-center gap-1 uppercase tracking-wider font-extrabold hover:text-foreground transition-colors ${
+                                                sortBy === "commute" ? "text-brand" : ""
+                                            }`}
+                                            title="Click to sort by Location / Commute Practicality"
+                                        >
+                                            <span>Location / Commute</span>
+                                            {sortBy === "commute" ? (
+                                                sortDirection === "asc" ? (
+                                                    <ArrowUp className="h-3 w-3" />
+                                                ) : (
+                                                    <ArrowDown className="h-3 w-3" />
+                                                )
+                                            ) : (
+                                                <ArrowUpDown className="h-3 w-3 opacity-40" />
+                                            )}
+                                        </button>
+                                    </th>
                                     <th className="p-3">Direct Contact</th>
                                     <th className="p-3 text-right">Actions</th>
                                 </tr>
@@ -1801,6 +2215,15 @@ export default function RecruitmentPage() {
                                     filteredRecruits.map((recruit) => {
                                         const waUrl = formatWhatsAppUrl(recruit.phone || "", recruit.name, settings.name);
                                         const isCompared = compareIds.includes(recruit.id);
+                                        const unitOrder = getPositionUnitOrder(recruit.primaryPosition);
+                                        const posBadgeClass =
+                                            unitOrder === 1
+                                                ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
+                                                : unitOrder === 2
+                                                ? "bg-sky-500/15 text-sky-400 border-sky-500/30"
+                                                : unitOrder === 3
+                                                ? "bg-emerald-500/15 text-emerald-400 border-emerald-500/30"
+                                                : "bg-rose-500/15 text-rose-400 border-rose-500/30";
                                         return (
                                             <tr
                                                 key={recruit.id}
@@ -1834,9 +2257,20 @@ export default function RecruitmentPage() {
                                                 </td>
                                                 <td className="p-3">
                                                     <div className="flex items-center gap-1 flex-wrap">
-                                                        <Badge variant="outline" className="font-bold text-[10px] px-1.5 py-0">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setPositionFilter(
+                                                                    positionFilter === recruit.primaryPosition
+                                                                        ? "ALL"
+                                                                        : recruit.primaryPosition
+                                                                )
+                                                            }
+                                                            title={`Click to filter by ${recruit.primaryPosition}`}
+                                                            className={`font-extrabold text-[10px] px-2 py-0.5 rounded-md border transition-opacity hover:opacity-80 ${posBadgeClass}`}
+                                                        >
                                                             {recruit.primaryPosition}
-                                                        </Badge>
+                                                        </button>
                                                         {recruit.secondaryPosition && (
                                                             <span className="text-[10px] text-muted-foreground">
                                                                 ({recruit.secondaryPosition})
