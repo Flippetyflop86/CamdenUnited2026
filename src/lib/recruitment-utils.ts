@@ -39,19 +39,19 @@ export const RECRUIT_ROLES: Recruit["scoutedRole"][] = [
 
 export const ALL_RECRUIT_POSITIONS = [
     "GK",
-    "DEF",
-    "CB",
     "RB",
+    "CB",
     "LB",
-    "MID",
+    "DEF",
     "CDM",
     "CM",
     "CAM",
-    "FWD",
+    "MID",
     "RW",
     "LW",
     "CF",
     "ST",
+    "FWD",
 ];
 
 interface BlackBookMeta {
@@ -234,26 +234,58 @@ export function formatWhatsAppUrl(phone: string, playerName?: string, clubName?:
         : `https://wa.me/${digits}`;
 }
 
-function getPositionUnitOrder(pos?: string): number {
-    const p = (pos || "").toUpperCase();
+const TACTICAL_POSITION_ORDER: Record<string, number> = {
+    GK: 1,
+    RB: 2,
+    RWB: 3,
+    RCB: 4,
+    CB: 5,
+    LCB: 6,
+    LB: 7,
+    LWB: 8,
+    DEF: 9,
+    CDM: 10,
+    DM: 11,
+    CM: 12,
+    RM: 13,
+    LM: 14,
+    CAM: 15,
+    AM: 16,
+    MID: 17,
+    RW: 18,
+    LW: 19,
+    CF: 20,
+    ST: 21,
+    FWD: 22,
+};
+
+export function getPositionUnitOrder(pos?: string): number {
+    const p = (pos || "").toUpperCase().trim();
     if (p === "GK") return 1;
     if (["DEF", "CB", "LCB", "RCB", "RB", "LB", "RWB", "LWB"].includes(p)) return 2;
-    if (["MID", "CDM", "CM", "CAM", "RM", "LM"].includes(p)) return 3;
+    if (["MID", "CDM", "DM", "CM", "CAM", "AM", "RM", "LM"].includes(p)) return 3;
     return 4;
 }
 
-function getPositionUnitLabel(pos?: string): "Goalkeeper" | "Defender" | "Midfielder" | "Forward" {
-    const order = getPositionUnitOrder(pos);
-    if (order === 1) return "Goalkeeper";
-    if (order === 2) return "Defender";
-    if (order === 3) return "Midfielder";
-    return "Forward";
+export function getTacticalPositionOrder(pos?: string): number {
+    const p = (pos || "").toUpperCase().trim();
+    return TACTICAL_POSITION_ORDER[p] ?? 99;
 }
 
-function sortRecruitsForExport(recruits: Recruit[]): Recruit[] {
+function getPositionUnitLabel(pos?: string): "Goalkeepers" | "Defenders" | "Midfielders" | "Forwards" {
+    const order = getPositionUnitOrder(pos);
+    if (order === 1) return "Goalkeepers";
+    if (order === 2) return "Defenders";
+    if (order === 3) return "Midfielders";
+    return "Forwards";
+}
+
+export function sortRecruitsByPosition(recruits: Recruit[]): Recruit[] {
     return [...recruits].sort((a, b) => {
         const unitDiff = getPositionUnitOrder(a.primaryPosition) - getPositionUnitOrder(b.primaryPosition);
         if (unitDiff !== 0) return unitDiff;
+        const posDiff = getTacticalPositionOrder(a.primaryPosition) - getTacticalPositionOrder(b.primaryPosition);
+        if (posDiff !== 0) return posDiff;
         const ratingDiff = (b.starRating || 3) - (a.starRating || 3);
         if (ratingDiff !== 0) return ratingDiff;
         return (a.name || "").localeCompare(b.name || "");
@@ -261,7 +293,7 @@ function sortRecruitsForExport(recruits: Recruit[]): Recruit[] {
 }
 
 export function exportRecruitsToCSV(recruits: Recruit[], clubName: string) {
-    const sorted = sortRecruitsForExport(recruits);
+    const sorted = sortRecruitsByPosition(recruits);
     const rows = sorted.map((r, index) => {
         const rating = r.starRating || 3;
         const stars = "★".repeat(rating) + "☆".repeat(Math.max(0, 5 - rating));
@@ -271,28 +303,23 @@ export function exportRecruitsToCSV(recruits: Recruit[], clubName: string) {
 
         return {
             "#": index + 1,
-            "Unit": getPositionUnitLabel(r.primaryPosition),
-            "Player Name": r.name,
             "Primary Position": r.primaryPosition,
+            "Player Name": r.name,
             "Secondary Position": r.secondaryPosition || "—",
             "Age": r.age || "—",
             "Preferred Foot": r.preferredFoot || "Right",
             "Star Rating": `${stars} (${rating}/5)`,
             "Scouted Role": r.scoutedRole,
             "Pipeline Stage": stage,
-            "Status": isFreeAgent ? "Free Agent (Unattached)" : "Attached",
             "Current Club": isFreeAgent ? "Free Agent" : r.currentClub || "—",
             "Highest Level / Step": r.highestLevel || "—",
             "Previous Clubs": r.previousClubs || "—",
-            "On Trial": r.onTrial || stage === "On Trial" ? "Yes" : "No",
             "Location": r.location || "—",
             "Commute Practicality": r.commutePracticality || "Easy / Local",
             "Phone / WhatsApp": phoneFormatted,
             "Instagram": r.instagram || "—",
-            "Email": r.email || "—",
             "Club Connection": r.clubConnection || "—",
             "Scouting Notes": (r.notes || "").replace(/\r?\n+/g, " | ") || "—",
-            "Last Updated": r.updatedAt ? new Date(r.updatedAt).toLocaleDateString("en-GB") : "",
         };
     });
 
@@ -319,114 +346,122 @@ export function exportRecruitsToExcelXLS(recruits: Recruit[], clubName: string) 
             .replace(/>/g, "&gt;")
             .replace(/"/g, "&quot;");
 
-    const sorted = sortRecruitsForExport(recruits);
+    const sorted = sortRecruitsByPosition(recruits);
 
-    const getPositionColors = (pos?: string) => {
+    // Harmonious, easy-on-the-eye palette for the 4 positional units
+    const getUnitPalette = (pos?: string) => {
         const unit = getPositionUnitOrder(pos);
-        if (unit === 1) return { bg: "#FEF3C7", text: "#92400E", border: "#F59E0B" }; // GK Amber
-        if (unit === 2) return { bg: "#E0F2FE", text: "#075985", border: "#0EA5E9" }; // DEF Sky
-        if (unit === 3) return { bg: "#D1FAE5", text: "#065F46", border: "#10B981" }; // MID Emerald
-        return { bg: "#FFE4E6", text: "#9F1239", border: "#F43F5E" }; // FWD Rose
-    };
-
-    const getRatingColors = (rating: number) => {
-        if (rating >= 5) return { bg: "#FEF3C7", text: "#B45309", border: "#F59E0B" }; // 5★ Gold
-        if (rating === 4) return { bg: "#ECFDF5", text: "#047857", border: "#34D399" }; // 4★ Emerald
-        if (rating === 3) return { bg: "#EFF6FF", text: "#1D4ED8", border: "#60A5FA" }; // 3★ Blue
-        return { bg: "#F1F5F9", text: "#475569", border: "#CBD5E1" }; // 1-2★ Slate
-    };
-
-    const getRoleColors = (role?: string) => {
-        switch (role) {
-            case "Star Player":
-                return { bg: "#FEF3C7", text: "#92400E", border: "#F59E0B" };
-            case "1st Team Player":
-                return { bg: "#DCFCE7", text: "#166534", border: "#4ADE80" };
-            case "Rotation Player":
-                return { bg: "#E0F2FE", text: "#075985", border: "#38BDF8" };
-            case "Prospect":
-                return { bg: "#F3E8FF", text: "#6B21A8", border: "#C084FC" };
-            default:
-                return { bg: "#F1F5F9", text: "#334155", border: "#CBD5E1" };
+        if (unit === 1) {
+            // Goalkeepers — Soft Warm Gold / Amber
+            return {
+                badgeBg: "#FEF3C7",
+                badgeText: "#92400E",
+                accentBorder: "#F59E0B",
+                sectionBg: "#FFFBEB",
+                sectionText: "#92400E",
+                rowEven: "#FFFFFF",
+                rowOdd: "#FFFDF7",
+            };
         }
+        if (unit === 2) {
+            // Defenders — Soft Ice Sky Blue
+            return {
+                badgeBg: "#E0F2FE",
+                badgeText: "#0369A1",
+                accentBorder: "#0EA5E9",
+                sectionBg: "#F0F9FF",
+                sectionText: "#075985",
+                rowEven: "#FFFFFF",
+                rowOdd: "#F8FCFF",
+            };
+        }
+        if (unit === 3) {
+            // Midfielders — Soft Mint Emerald
+            return {
+                badgeBg: "#D1FAE5",
+                badgeText: "#065F46",
+                accentBorder: "#10B981",
+                sectionBg: "#ECFDF5",
+                sectionText: "#065F46",
+                rowEven: "#FFFFFF",
+                rowOdd: "#F7FEFA",
+            };
+        }
+        // Forwards — Soft Blush Rose
+        return {
+            badgeBg: "#FFE4E6",
+            badgeText: "#9F1239",
+            accentBorder: "#F43F5E",
+            sectionBg: "#FFF1F2",
+            sectionText: "#9F1239",
+            rowEven: "#FFFFFF",
+            rowOdd: "#FFF9FA",
+        };
     };
 
-    const getPipelineColors = (stage?: string) => {
+    const getStagePill = (stage?: string) => {
         switch (stage) {
             case "Signed":
-                return { bg: "#DCFCE7", text: "#166534", border: "#22C55E" };
+                return { bg: "#DCFCE7", text: "#166534" };
             case "On Trial":
-                return { bg: "#FEF3C7", text: "#92400E", border: "#F59E0B" };
+                return { bg: "#FEF3C7", text: "#92400E" };
             case "Invited to Training":
-                return { bg: "#E0E7FF", text: "#3730A3", border: "#818CF8" };
+                return { bg: "#E0E7FF", text: "#3730A3" };
             case "Approach In (7-Day)":
-                return { bg: "#F3E8FF", text: "#6B21A8", border: "#A855F7" };
+                return { bg: "#F3E8FF", text: "#6B21A8" };
             case "Contacted":
-                return { bg: "#E0F2FE", text: "#075985", border: "#38BDF8" };
+                return { bg: "#E0F2FE", text: "#075985" };
             case "Keep Warm":
-                return { bg: "#FFEDD5", text: "#9A3412", border: "#FB923C" };
+                return { bg: "#FFEDD5", text: "#9A3412" };
             default:
-                return { bg: "#F1F5F9", text: "#334155", border: "#94A3B8" };
+                return { bg: "#F1F5F9", text: "#475569" };
         }
     };
 
-    const getCommuteColors = (commute?: string) => {
-        if (commute === "Long Commute") return { bg: "#FFE4E6", text: "#9F1239", border: "#FDA4AF" };
-        if (commute === "Moderate") return { bg: "#FEF3C7", text: "#92400E", border: "#FCD34D" };
-        return { bg: "#DCFCE7", text: "#166534", border: "#86EFAC" };
+    const getCommuteTextStyle = (commute?: string) => {
+        if (commute === "Long Commute") return { text: "#BE123C", weight: "600" };
+        if (commute === "Moderate") return { text: "#B45309", weight: "600" };
+        return { text: "#047857", weight: "600" };
     };
 
-    const getFootColors = (foot?: string) => {
-        if (foot === "Left") return { bg: "#F3E8FF", text: "#6B21A8" };
-        if (foot === "Both") return { bg: "#DCFCE7", text: "#166534" };
-        return { bg: "#F8FAFC", text: "#334155" };
-    };
-
-    // Group headers & column widths
     const colWidths = [
-        42,  // #
-        195, // Player Name
-        95,  // Primary Pos
-        95,  // Secondary Pos
-        58,  // Age
+        44,  // #
+        90,  // Primary Position
+        205, // Player Name
+        90,  // Secondary Position
+        56,  // Age
         95,  // Preferred Foot
-        125, // Star Rating
-        140, // Scouted Role
+        120, // Star Rating
+        135, // Scouted Role
         150, // Pipeline Stage
-        115, // Status
-        165, // Current Club
-        155, // Highest Level / Step
-        190, // Previous Clubs
-        80,  // On Trial
+        170, // Current Club
+        150, // Highest Level / Step
+        185, // Previous Clubs
         140, // Location
-        135, // Commute Practicality
+        130, // Commute Practicality
         140, // Phone / WhatsApp
-        130, // Instagram
-        180, // Email
+        125, // Instagram
         165, // Club Connection
-        320, // Scouting Notes
+        340, // Scouting Notes
     ];
 
     const headers = [
         "#",
+        "Primary Position",
         "Player Name",
-        "Primary Pos",
-        "Secondary Pos",
+        "Secondary Position",
         "Age",
         "Preferred Foot",
         "Star Rating",
         "Scouted Role",
         "Pipeline Stage",
-        "Status",
         "Current Club",
         "Highest Level / Step",
         "Previous Clubs",
-        "On Trial",
         "Location",
         "Commute Practicality",
         "Phone / WhatsApp",
         "Instagram",
-        "Email",
         "Club Connection",
         "Scouting Notes",
     ];
@@ -441,74 +476,74 @@ export function exportRecruitsToExcelXLS(recruits: Recruit[], clubName: string) 
     const fwdCount = sorted.filter((r) => getPositionUnitOrder(r.primaryPosition) === 4).length;
 
     let lastUnitOrder = 0;
+    let unitRowCounter = 0;
+
     const rowsHtml = sorted
         .map((r, idx) => {
             const unitOrder = getPositionUnitOrder(r.primaryPosition);
             const unitLabel = getPositionUnitLabel(r.primaryPosition);
-            let sectionBannerRow = "";
+            const palette = getUnitPalette(r.primaryPosition);
+
+            let sectionHeaderHtml = "";
             if (unitOrder !== lastUnitOrder) {
                 lastUnitOrder = unitOrder;
-                const unitColor = getPositionColors(r.primaryPosition);
+                unitRowCounter = 0;
                 const unitCount = sorted.filter((x) => getPositionUnitOrder(x.primaryPosition) === unitOrder).length;
-                sectionBannerRow = `
-                    <tr>
-                        <td colspan="${headers.length}" style="background-color:${unitColor.bg}; color:${unitColor.text}; font-weight:bold; font-size:10.5pt; padding:8px 12px; border-top:2px solid ${unitColor.border}; border-bottom:1px solid ${unitColor.border}; letter-spacing:0.5px;">
-                            &#9632; ${escapeHtml(unitLabel.toUpperCase())}S (${unitCount})
+                sectionHeaderHtml = `
+                    <tr style="height:30px;">
+                        <td colspan="${headers.length}" style="background-color:${palette.sectionBg}; color:${palette.sectionText}; font-weight:bold; font-size:9.5pt; padding:6px 14px; border-top:2px solid ${palette.accentBorder}; border-bottom:1px solid ${palette.accentBorder}; letter-spacing:0.6px;">
+                            &#9679;&nbsp; ${escapeHtml(unitLabel.toUpperCase())} (${unitCount})
                         </td>
                     </tr>
                 `;
             }
 
-            const zebraBg = idx % 2 === 0 ? "#FFFFFF" : "#F8FAFC";
+            const rowBg = unitRowCounter % 2 === 0 ? palette.rowEven : palette.rowOdd;
+            unitRowCounter++;
+
             const rating = r.starRating || 3;
             const stars = "★".repeat(rating) + "☆".repeat(Math.max(0, 5 - rating));
             const stage = r.pipelineStage || (r.onTrial ? "On Trial" : "Scouted");
-            const isTrial = Boolean(r.onTrial || stage === "On Trial");
             const isFreeAgent = r.status === "Unattached";
+            const stagePill = getStagePill(stage);
+            const commuteStyle = getCommuteTextStyle(r.commutePracticality);
 
-            const posColor = getPositionColors(r.primaryPosition);
-            const ratingColor = getRatingColors(rating);
-            const roleColor = getRoleColors(r.scoutedRole);
-            const stageColor = getPipelineColors(stage);
-            const commuteColor = getCommuteColors(r.commutePracticality);
-            const footColor = getFootColors(r.preferredFoot || "Right");
+            const starTextColor = rating >= 5 ? "#B45309" : rating === 4 ? "#D97706" : "#64748B";
+            const roleTextColor =
+                r.scoutedRole === "Star Player"
+                    ? "#92400E"
+                    : r.scoutedRole === "1st Team Player"
+                    ? "#0F172A"
+                    : "#475569";
+            const roleFontWeight =
+                r.scoutedRole === "Star Player" || r.scoutedRole === "1st Team Player" ? "bold" : "normal";
 
-            const statusBg = isFreeAgent ? "#DCFCE7" : "#F1F5F9";
-            const statusText = isFreeAgent ? "#166534" : "#334155";
+            const cellBase = `border-top:1px solid #E2E8F0; border-bottom:1px solid #E2E8F0; border-left:1px solid #F1F5F9; border-right:1px solid #F1F5F9; padding:9px 12px; vertical-align:middle; font-size:10pt; background-color:${rowBg};`;
 
-            const trialBg = isTrial ? "#FEF3C7" : zebraBg;
-            const trialText = isTrial ? "#92400E" : "#94A3B8";
-
-            const baseCell = `border:1px solid #E2E8F0; padding:8px 10px; vertical-align:middle; font-size:10pt;`;
-
-            return `${sectionBannerRow}<tr style="height:32px;">
-                <td style="${baseCell} background-color:${zebraBg}; color:#64748B; text-align:center; font-weight:bold;">${idx + 1}</td>
-                <td style="${baseCell} background-color:${zebraBg}; color:#0F172A; font-weight:bold; font-size:10.5pt;">${escapeHtml(r.name)}</td>
-                <td style="${baseCell} background-color:${posColor.bg}; color:${posColor.text}; font-weight:bold; text-align:center; border-left:3px solid ${posColor.border};">${escapeHtml(r.primaryPosition)}</td>
-                <td style="${baseCell} background-color:${zebraBg}; color:#475569; text-align:center; font-weight:600;">${escapeHtml(r.secondaryPosition || "—")}</td>
-                <td style="${baseCell} background-color:${zebraBg}; color:#0F172A; text-align:center; font-weight:600;">${escapeHtml(r.age || "—")}</td>
-                <td style="${baseCell} background-color:${footColor.bg}; color:${footColor.text}; text-align:center; font-weight:600;">${escapeHtml(r.preferredFoot || "Right")}</td>
-                <td style="${baseCell} background-color:${ratingColor.bg}; color:${ratingColor.text}; font-weight:bold; text-align:center;">${stars} (${rating}/5)</td>
-                <td style="${baseCell} background-color:${roleColor.bg}; color:${roleColor.text}; font-weight:bold; text-align:center;">${escapeHtml(r.scoutedRole)}</td>
-                <td style="${baseCell} background-color:${stageColor.bg}; color:${stageColor.text}; font-weight:bold; text-align:center;">${escapeHtml(stage)}</td>
-                <td style="${baseCell} background-color:${statusBg}; color:${statusText}; font-weight:bold; text-align:center;">${isFreeAgent ? "Free Agent" : "Attached"}</td>
-                <td style="${baseCell} background-color:${zebraBg}; color:${isFreeAgent ? "#15803D" : "#0F172A"}; font-weight:${isFreeAgent ? "bold" : "normal"};">${escapeHtml(isFreeAgent ? "Free Agent" : r.currentClub || "—")}</td>
-                <td style="${baseCell} background-color:${zebraBg}; color:#1E293B; font-weight:600;">${escapeHtml(r.highestLevel || "—")}</td>
-                <td style="${baseCell} background-color:${zebraBg}; color:#475569;">${escapeHtml(r.previousClubs || "—")}</td>
-                <td style="${baseCell} background-color:${trialBg}; color:${trialText}; font-weight:bold; text-align:center;">${isTrial ? "YES" : "No"}</td>
-                <td style="${baseCell} background-color:${zebraBg}; color:#334155;">${escapeHtml(r.location || "—")}</td>
-                <td style="${baseCell} background-color:${commuteColor.bg}; color:${commuteColor.text}; font-weight:bold; text-align:center;">${escapeHtml(r.commutePracticality || "Easy / Local")}</td>
-                <td style="${baseCell} background-color:${zebraBg}; color:#0F172A; font-weight:600; mso-number-format:'\\@';">${escapeHtml(r.phone || "—")}</td>
-                <td style="${baseCell} background-color:${zebraBg}; color:#0284C7;">${escapeHtml(r.instagram || "—")}</td>
-                <td style="${baseCell} background-color:${zebraBg}; color:#475569;">${escapeHtml(r.email || "—")}</td>
-                <td style="${baseCell} background-color:${zebraBg}; color:#7C3AED; font-weight:600;">${escapeHtml(r.clubConnection || "—")}</td>
-                <td style="${baseCell} background-color:${zebraBg}; color:#334155; white-space:normal;">${escapeHtml(r.notes || "—")}</td>
+            return `${sectionHeaderHtml}<tr style="height:36px;">
+                <td style="${cellBase} color:#94A3B8; text-align:center; font-size:9pt; border-left:3px solid ${palette.accentBorder};">${idx + 1}</td>
+                <td style="${cellBase} background-color:${palette.badgeBg}; color:${palette.badgeText}; font-weight:bold; text-align:center; font-size:9.5pt;">${escapeHtml(r.primaryPosition)}</td>
+                <td style="${cellBase} color:#0F172A; font-weight:bold; font-size:10.5pt;">${escapeHtml(r.name)}</td>
+                <td style="${cellBase} color:#64748B; text-align:center; font-size:9.5pt;">${escapeHtml(r.secondaryPosition || "—")}</td>
+                <td style="${cellBase} color:#334155; text-align:center;">${escapeHtml(r.age || "—")}</td>
+                <td style="${cellBase} color:#334155; text-align:center;">${escapeHtml(r.preferredFoot || "Right")}</td>
+                <td style="${cellBase} color:${starTextColor}; font-weight:bold; text-align:center; letter-spacing:0.5px;">${stars} <span style="color:#64748B; font-weight:normal; font-size:9pt;">(${rating}/5)</span></td>
+                <td style="${cellBase} color:${roleTextColor}; font-weight:${roleFontWeight}; text-align:center;">${escapeHtml(r.scoutedRole)}</td>
+                <td style="${cellBase} background-color:${stagePill.bg}; color:${stagePill.text}; font-weight:bold; text-align:center; font-size:9.5pt;">${escapeHtml(stage)}</td>
+                <td style="${cellBase} color:${isFreeAgent ? "#047857" : "#0F172A"}; font-weight:${isFreeAgent ? "bold" : "normal"};">${escapeHtml(isFreeAgent ? "Free Agent" : r.currentClub || "—")}</td>
+                <td style="${cellBase} color:#334155; font-weight:600;">${escapeHtml(r.highestLevel || "—")}</td>
+                <td style="${cellBase} color:#64748B;">${escapeHtml(r.previousClubs || "—")}</td>
+                <td style="${cellBase} color:#334155;">${escapeHtml(r.location || "—")}</td>
+                <td style="${cellBase} color:${commuteStyle.text}; font-weight:${commuteStyle.weight}; text-align:center; font-size:9.5pt;">${escapeHtml(r.commutePracticality || "Easy / Local")}</td>
+                <td style="${cellBase} color:#0F172A; font-weight:600; mso-number-format:'\\@';">${escapeHtml(r.phone || "—")}</td>
+                <td style="${cellBase} color:#0284C7;">${escapeHtml(r.instagram || "—")}</td>
+                <td style="${cellBase} color:#475569;">${escapeHtml(r.clubConnection || "—")}</td>
+                <td style="${cellBase} color:#334155; white-space:normal;">${escapeHtml(r.notes || "—")}</td>
             </tr>`;
         })
         .join("");
 
     const exportDateFormatted = new Date().toLocaleDateString("en-GB", {
-        weekday: "short",
         day: "numeric",
         month: "short",
         year: "numeric",
@@ -528,8 +563,8 @@ export function exportRecruitsToExcelXLS(recruits: Recruit[], clubName: string) 
                                 <x:DisplayGridlines/>
                                 <x:FreezePanes/>
                                 <x:FrozenNoSplit/>
-                                <x:SplitHorizontal>5</x:SplitHorizontal>
-                                <x:TopRowBottomPane>5</x:TopRowBottomPane>
+                                <x:SplitHorizontal>3</x:SplitHorizontal>
+                                <x:TopRowBottomPane>3</x:TopRowBottomPane>
                                 <x:ActivePane>2</x:ActivePane>
                             </x:WorksheetOptions>
                         </x:ExcelWorksheet>
@@ -538,64 +573,35 @@ export function exportRecruitsToExcelXLS(recruits: Recruit[], clubName: string) 
             </xml>
             <![endif]-->
         </head>
-        <body style="font-family:'Segoe UI', Calibri, Arial, sans-serif; background-color:#F8FAFC; margin:0; padding:12px;">
+        <body style="font-family:'Segoe UI', Calibri, Arial, sans-serif; background-color:#FFFFFF; margin:0; padding:0;">
             <table border="1" style="border-collapse:collapse; font-family:'Segoe UI', Calibri, Arial, sans-serif; font-size:10pt; border:1px solid #CBD5E1;">
                 <colgroup>
                     ${colWidths.map((w) => `<col width="${w}" style="width:${w}px;" />`).join("")}
                 </colgroup>
                 <thead>
-                    <!-- Row 1: Executive Title Banner -->
-                    <tr style="height:40px;">
-                        <th colspan="${headers.length}" style="background-color:#0F172A; color:#FFFFFF; font-size:15pt; font-weight:bold; text-align:left; padding:10px 14px; border:1px solid #0F172A; letter-spacing:0.5px;">
-                            &#9917; ${escapeHtml((clubName || "CLUBFLOW").toUpperCase())} — PLAYER RECRUITMENT &amp; SCOUTING BLACK BOOK
+                    <!-- Row 1: Clean Dark Slate Executive Title Banner -->
+                    <tr style="height:42px;">
+                        <th colspan="${headers.length}" style="background-color:#0F172A; color:#F8FAFC; font-size:14pt; font-weight:bold; text-align:left; padding:10px 16px; border:1px solid #0F172A; letter-spacing:0.4px;">
+                            ${escapeHtml((clubName || "CLUBFLOW").toUpperCase())} &mdash; PLAYER RECRUITMENT SHORTLIST
                         </th>
                     </tr>
-                    <!-- Row 2: Summary KPI & Color Legend Strip -->
+                    <!-- Row 2: Calm Subtitle & Summary Strip -->
                     <tr style="height:28px;">
-                        <th colspan="${headers.length}" style="background-color:#1E293B; color:#E2E8F0; font-size:9.5pt; font-weight:600; text-align:left; padding:6px 14px; border:1px solid #1E293B;">
-                            Exported: ${escapeHtml(exportDateFormatted)} &nbsp;&bull;&nbsp;
-                            Total Targets: <span style="color:#38BDF8; font-weight:bold;">${totalTargets}</span> &nbsp;&bull;&nbsp;
-                            5&#9733; Targets: <span style="color:#FBBF24; font-weight:bold;">${star5Count}</span> &nbsp;&bull;&nbsp;
-                            On Trial: <span style="color:#FCD34D; font-weight:bold;">${trialCount}</span> &nbsp;&bull;&nbsp;
-                            Free Agents: <span style="color:#4ADE80; font-weight:bold;">${freeAgentCount}</span> &nbsp;&bull;&nbsp;
-                            Units: [GK: ${gkCount} | DEF: ${defCount} | MID: ${midCount} | FWD: ${fwdCount}]
+                        <th colspan="${headers.length}" style="background-color:#1E293B; color:#CBD5E1; font-size:9.5pt; font-weight:normal; text-align:left; padding:6px 16px; border:1px solid #1E293B;">
+                            Sorted by Position Order (GK &rarr; DEF &rarr; MID &rarr; FWD) &nbsp;&bull;&nbsp;
+                            Exported ${escapeHtml(exportDateFormatted)} &nbsp;&bull;&nbsp;
+                            <b style="color:#FFFFFF;">${totalTargets} Targets</b> (GK: ${gkCount}, DEF: ${defCount}, MID: ${midCount}, FWD: ${fwdCount}) &nbsp;&bull;&nbsp;
+                            5&#9733; Targets: <b style="color:#FDE68A;">${star5Count}</b> &nbsp;&bull;&nbsp;
+                            On Trial: <b style="color:#FDE68A;">${trialCount}</b> &nbsp;&bull;&nbsp;
+                            Free Agents: <b style="color:#A7F3D0;">${freeAgentCount}</b>
                         </th>
                     </tr>
-                    <!-- Row 3: Color System Legend Row -->
-                    <tr style="height:24px;">
-                        <td colspan="2" style="background-color:#F1F5F9; color:#475569; font-weight:bold; font-size:8.5pt; padding:4px 10px; border:1px solid #CBD5E1;">POSITION COLOUR KEY:</td>
-                        <td colspan="2" style="background-color:#FEF3C7; color:#92400E; font-weight:bold; font-size:8.5pt; text-align:center; border:1px solid #CBD5E1;">GK (Goalkeepers)</td>
-                        <td colspan="2" style="background-color:#E0F2FE; color:#075985; font-weight:bold; font-size:8.5pt; text-align:center; border:1px solid #CBD5E1;">DEF (Defenders)</td>
-                        <td colspan="2" style="background-color:#D1FAE5; color:#065F46; font-weight:bold; font-size:8.5pt; text-align:center; border:1px solid #CBD5E1;">MID (Midfielders)</td>
-                        <td colspan="2" style="background-color:#FFE4E6; color:#9F1239; font-weight:bold; font-size:8.5pt; text-align:center; border:1px solid #CBD5E1;">FWD (Forwards)</td>
-                        <td colspan="11" style="background-color:#F8FAFC; color:#64748B; font-size:8.5pt; padding:4px 10px; border:1px solid #CBD5E1;">
-                            Tip: You can edit this sheet and re-upload it directly via &ldquo;Import Excel/CSV&rdquo; on the Recruitment page.
-                        </td>
-                    </tr>
-                    <!-- Row 4: Category Group Super-Headers -->
-                    <tr style="height:26px;">
-                        <th colspan="6" style="background-color:#1E293B; color:#93C5FD; font-size:8.5pt; font-weight:bold; text-align:center; padding:5px 8px; border:1px solid #334155; text-transform:uppercase; letter-spacing:0.8px;">
-                            1. Player Profile &amp; Position
-                        </th>
-                        <th colspan="3" style="background-color:#1E3A8A; color:#FDE68A; font-size:8.5pt; font-weight:bold; text-align:center; padding:5px 8px; border:1px solid #334155; text-transform:uppercase; letter-spacing:0.8px;">
-                            2. Scouting Grade &amp; Pipeline
-                        </th>
-                        <th colspan="5" style="background-color:#064E3B; color:#A7F3D0; font-size:8.5pt; font-weight:bold; text-align:center; padding:5px 8px; border:1px solid #334155; text-transform:uppercase; letter-spacing:0.8px;">
-                            3. Club Status &amp; Playing Pedigree
-                        </th>
-                        <th colspan="5" style="background-color:#312E81; color:#DDD6FE; font-size:8.5pt; font-weight:bold; text-align:center; padding:5px 8px; border:1px solid #334155; text-transform:uppercase; letter-spacing:0.8px;">
-                            4. Location, Commute &amp; Direct Contact
-                        </th>
-                        <th colspan="2" style="background-color:#3B0764; color:#F5D0FE; font-size:8.5pt; font-weight:bold; text-align:center; padding:5px 8px; border:1px solid #334155; text-transform:uppercase; letter-spacing:0.8px;">
-                            5. Intelligence &amp; Notes
-                        </th>
-                    </tr>
-                    <!-- Row 5: Main Column Headers -->
-                    <tr style="height:32px; background-color:#0F172A; color:#FFFFFF; font-weight:bold;">
+                    <!-- Row 3: Column Headers -->
+                    <tr style="height:34px; background-color:#334155; color:#FFFFFF; font-weight:bold;">
                         ${headers
                             .map(
                                 (h) =>
-                                    `<th x:autofilter="all" style="border:1px solid #334155; padding:8px 10px; background-color:#0F172A; color:#FFFFFF; font-size:9.5pt; text-align:center; white-space:nowrap;">${escapeHtml(
+                                    `<th style="border:1px solid #475569; padding:8px 12px; background-color:#334155; color:#F8FAFC; font-size:9.5pt; text-align:center; white-space:nowrap;">${escapeHtml(
                                         h
                                     )}</th>`
                             )

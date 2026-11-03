@@ -60,6 +60,8 @@ import {
     exportRecruitsToExcelXLS,
     downloadBlankRecruitTemplateCSV,
     parseBulkRecruitImportText,
+    getPositionUnitOrder,
+    getTacticalPositionOrder,
 } from "@/lib/recruitment-utils";
 
 interface SquadComparisonPlayer {
@@ -95,7 +97,7 @@ export default function RecruitmentPage() {
     const [roleFilter, setRoleFilter] = useState<string>("ALL");
     const [commuteFilter, setCommuteFilter] = useState<string>("ALL");
     const [onlyTrialists, setOnlyTrialists] = useState<boolean>(false);
-    const [sortBy, setSortBy] = useState<"rating" | "name" | "age" | "recent">("rating");
+    const [sortBy, setSortBy] = useState<"position" | "rating" | "name" | "age" | "recent">("position");
 
     // Add / Edit Modal State
     const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -567,6 +569,17 @@ export default function RecruitmentPage() {
                 return true;
             })
             .sort((a, b) => {
+                if (sortBy === "position") {
+                    const unitDiff =
+                        getPositionUnitOrder(a.primaryPosition) - getPositionUnitOrder(b.primaryPosition);
+                    if (unitDiff !== 0) return unitDiff;
+                    const posDiff =
+                        getTacticalPositionOrder(a.primaryPosition) - getTacticalPositionOrder(b.primaryPosition);
+                    if (posDiff !== 0) return posDiff;
+                    const ratingDiff = (b.starRating || 3) - (a.starRating || 3);
+                    if (ratingDiff !== 0) return ratingDiff;
+                    return a.name.localeCompare(b.name);
+                }
                 if (sortBy === "rating") {
                     const diff = (b.starRating || 3) - (a.starRating || 3);
                     if (diff !== 0) return diff;
@@ -1217,6 +1230,7 @@ export default function RecruitmentPage() {
                                 onChange={(e) => setSortBy(e.target.value as any)}
                                 className="h-8 rounded-lg border border-border bg-surface-2 px-2 text-xs font-semibold"
                             >
+                                <option value="position">Sort: Position Order</option>
                                 <option value="rating">Sort: Highest ★</option>
                                 <option value="recent">Sort: Recent</option>
                                 <option value="name">Sort: A–Z</option>
@@ -1587,6 +1601,7 @@ export default function RecruitmentPage() {
                                     className="h-9 rounded-lg border border-border bg-surface-2 px-2.5 text-xs font-bold text-foreground"
                                     title="Sort targets by"
                                 >
+                                    <option value="position">Sort: Position Order (GK → ST)</option>
                                     <option value="rating">Sort: Highest ★ Rating</option>
                                     <option value="recent">Sort: Recently Updated</option>
                                     <option value="name">Sort: Name (A–Z)</option>
