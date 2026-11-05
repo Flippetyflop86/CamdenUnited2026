@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
@@ -45,7 +45,13 @@ import {
     Eye,
     EyeOff,
     ClipboardCheck,
-    UserPlus
+    UserPlus,
+    Mic,
+    MicOff,
+    Pause,
+    Play,
+    Wand2,
+    Square
 } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
@@ -75,6 +81,26 @@ interface PlayerProfileItem {
     traits: string;
 }
 
+type VoiceNoteTargetSection =
+    | "smart"
+    | "voiceLog"
+    | "dangerMen"
+    | "strengths"
+    | "weaknesses"
+    | "inPossession"
+    | "outOfPossession"
+    | "transition"
+    | "setPieces"
+    | "postMatchReview";
+
+interface VoiceNoteItem {
+    id: string;
+    text: string;
+    targetSection: VoiceNoteTargetSection;
+    durationSec: number;
+    createdAt: string;
+}
+
 interface ScoutingReport {
     id: string;
     name: string;
@@ -91,6 +117,7 @@ interface ScoutingReport {
     postMatchReview: string;
     generalNotes: string;
     playerProfiles: PlayerProfileItem[];
+    voiceNotes: VoiceNoteItem[];
     lineup: string[];
     showPitch: boolean;
     createdAt: string;
@@ -154,6 +181,7 @@ export default function OppositionReportsPage() {
         postMatchReview: "",
         generalNotes: "",
         playerProfiles: [],
+        voiceNotes: [],
         lineup: [],
         showPitch: true,
         createdAt: new Date().toISOString(),
@@ -175,6 +203,7 @@ export default function OppositionReportsPage() {
         let postMatchReview = "";
         let generalNotes = "";
         let playerProfiles: PlayerProfileItem[] = [];
+        let voiceNotes: VoiceNoteItem[] = [];
         let showPitch = true;
 
         if (rawNotes) {
@@ -193,6 +222,7 @@ export default function OppositionReportsPage() {
                 postMatchReview = rawNotes.postMatchReview || "";
                 generalNotes = rawNotes.generalNotes || rawNotes.text || "";
                 playerProfiles = Array.isArray(rawNotes.playerProfiles) ? rawNotes.playerProfiles : [];
+                voiceNotes = Array.isArray(rawNotes.voiceNotes) ? rawNotes.voiceNotes : [];
                 showPitch = rawNotes.showPitch !== undefined ? Boolean(rawNotes.showPitch) : true;
             }
         }
@@ -215,6 +245,7 @@ export default function OppositionReportsPage() {
             postMatchReview,
             generalNotes,
             playerProfiles,
+            voiceNotes,
             lineup,
             showPitch: true,
             createdAt: row.created_at || new Date().toISOString(),
@@ -594,37 +625,38 @@ export default function OppositionReportsPage() {
         }
     };
 
-    const handleSaveReport = async () => {
-        if (!editedReport) return;
-        if (!editedReport.name.trim()) {
-            alert("Please enter the opposition team name.");
-            return;
+    const persistReportSnapshot = async (reportToSave: ScoutingReport, exitEditMode = false) => {
+        if (!reportToSave.name.trim()) {
+            alert("Please enter or select the opposition team name first.");
+            return null;
         }
 
-        const isNew = editedReport.id === "new" || !editedReport.id.includes("-");
+        const isNew = reportToSave.id === "new" || !reportToSave.id.includes("-");
         const payload = {
-            name: editedReport.name.trim(),
-            formation: editedReport.formation || "4-2-3-1",
+            name: reportToSave.name.trim(),
+            formation: reportToSave.formation || "4-2-3-1",
             notes: {
-                competition: editedReport.competition || "",
-                inPossession: editedReport.inPossession,
-                outOfPossession: editedReport.outOfPossession,
-                transition: editedReport.transition,
-                setPieces: editedReport.setPieces,
-                strengths: editedReport.strengths,
-                weaknesses: editedReport.weaknesses,
-                dangerMen: editedReport.dangerMen,
-                dangerMenList: editedReport.dangerMenList || [],
-                postMatchReview: editedReport.postMatchReview,
-                generalNotes: editedReport.generalNotes,
-                playerProfiles: editedReport.playerProfiles || [],
+                competition: reportToSave.competition || "",
+                inPossession: reportToSave.inPossession,
+                outOfPossession: reportToSave.outOfPossession,
+                transition: reportToSave.transition,
+                setPieces: reportToSave.setPieces,
+                strengths: reportToSave.strengths,
+                weaknesses: reportToSave.weaknesses,
+                dangerMen: reportToSave.dangerMen,
+                dangerMenList: reportToSave.dangerMenList || [],
+                postMatchReview: reportToSave.postMatchReview,
+                generalNotes: reportToSave.generalNotes,
+                playerProfiles: reportToSave.playerProfiles || [],
+                voiceNotes: reportToSave.voiceNotes || [],
                 showPitch: showPitchSection
             },
-            lineup: editedReport.lineup || [],
+            lineup: reportToSave.lineup || [],
             updated_at: new Date().toISOString()
         };
 
         try {
+            let saved: ScoutingReport;
             if (isNew) {
                 const { data, error } = await supabase
                     .from("opposition_teams")
@@ -632,31 +664,881 @@ export default function OppositionReportsPage() {
                     .select()
                     .single();
                 if (error) throw error;
-                if (data) {
-                    const saved = parseDbReport(data);
-                    setSelectedReport(saved);
-                    setReports((prev) => [saved, ...prev]);
-                }
+                saved = data
+                    ? parseDbReport(data)
+                    : { ...reportToSave, showPitch: showPitchSection, updatedAt: new Date().toISOString() };
+                setSelectedReport(saved);
+                setReports((prev) => [saved, ...prev]);
             } else {
                 const { data, error } = await supabase
                     .from("opposition_teams")
                     .update(payload)
-                    .eq("id", editedReport.id)
+                    .eq("id", reportToSave.id)
                     .select()
                     .single();
                 if (error) throw error;
-                const saved = data
+                saved = data
                     ? parseDbReport(data)
-                    : { ...editedReport, showPitch: showPitchSection, updatedAt: new Date().toISOString() };
+                    : { ...reportToSave, showPitch: showPitchSection, updatedAt: new Date().toISOString() };
                 setSelectedReport(saved);
                 setReports((prev) => prev.map((r) => (r.id === saved.id ? saved : r)));
             }
 
-            setIsEditing(false);
-            setEditedReport(null);
+            if (exitEditMode) {
+                setIsEditing(false);
+                setEditedReport(null);
+            } else if (isEditing) {
+                setEditedReport(saved);
+            }
+            return saved;
         } catch (err: any) {
             alert("Error saving scouting report: " + err.message);
+            return null;
         }
+    };
+
+    const handleSaveReport = async () => {
+        if (!editedReport) return;
+        await persistReportSnapshot(editedReport, true);
+    };
+
+    // =========================================================================
+    // CONTINUOUS LONG-FORM LIVE VOICE-TO-TEXT SCOUTING ENGINE
+    // Supports multi-minute coaching monologues with natural pauses, Pause/Resume,
+    // live elapsed timer, and Smart Multi-Section Auto-Routing.
+    // =========================================================================
+    const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+    const [isVoicePaused, setIsVoicePaused] = useState(false);
+    const [voiceTranscript, setVoiceTranscript] = useState("");
+    const [voiceInterimText, setVoiceInterimText] = useState("");
+    const [voiceTargetSection, setVoiceTargetSection] = useState<VoiceNoteTargetSection>("smart");
+    const [voiceElapsedSec, setVoiceElapsedSec] = useState(0);
+    const [isSavingVoiceNote, setIsSavingVoiceNote] = useState(false);
+    const [voiceStatusToast, setVoiceStatusToast] = useState<string | null>(null);
+    const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+
+    const speechRecRef = useRef<any>(null);
+    const keepListeningRef = useRef<boolean>(false);
+    const voiceTimerRef = useRef<any>(null);
+
+    const formatVoiceTimer = (totalSec: number) => {
+        const mins = Math.floor(totalSec / 60);
+        const secs = totalSec % 60;
+        return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    };
+    const formatVoiceDuration = formatVoiceTimer;
+
+    const voiceSectionMeta: Record<
+        VoiceNoteTargetSection,
+        { label: string; shortLabel: string; badgeCls: string }
+    > = {
+        smart: {
+            label: "✨ Smart Auto-Sort (Multi-Section + Voice Log)",
+            shortLabel: "✨ Smart Auto-Sort",
+            badgeCls: "bg-brand/15 text-brand border-brand/35"
+        },
+        voiceLog: {
+            label: "📌 Voice Log Only",
+            shortLabel: "📌 Voice Log",
+            badgeCls: "bg-slate-500/15 text-slate-300 border-slate-500/35"
+        },
+        dangerMen: {
+            label: "⚠️ Danger Men & Key Threats",
+            shortLabel: "⚠️ Danger Men",
+            badgeCls: "bg-amber-500/15 text-amber-400 border-amber-500/35"
+        },
+        strengths: {
+            label: "💪 Their Strengths",
+            shortLabel: "💪 Strengths",
+            badgeCls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/35"
+        },
+        weaknesses: {
+            label: "🎯 Their Weaknesses",
+            shortLabel: "🎯 Weaknesses",
+            badgeCls: "bg-rose-500/15 text-rose-400 border-rose-500/35"
+        },
+        inPossession: {
+            label: "🟢 In Possession (Build-Up)",
+            shortLabel: "🟢 In Possession",
+            badgeCls: "bg-blue-500/15 text-blue-400 border-blue-500/35"
+        },
+        outOfPossession: {
+            label: "🟣 Out of Possession (Press / Block)",
+            shortLabel: "🟣 Out of Poss",
+            badgeCls: "bg-purple-500/15 text-purple-400 border-purple-500/35"
+        },
+        transition: {
+            label: "⚡ Transitions",
+            shortLabel: "⚡ Transitions",
+            badgeCls: "bg-orange-500/15 text-orange-400 border-orange-500/35"
+        },
+        setPieces: {
+            label: "🚩 Set Pieces",
+            shortLabel: "🚩 Set Pieces",
+            badgeCls: "bg-cyan-500/15 text-cyan-400 border-cyan-500/35"
+        },
+        postMatchReview: {
+            label: "📋 Post-Match Review",
+            shortLabel: "📋 Review",
+            badgeCls: "bg-indigo-500/15 text-indigo-400 border-indigo-500/35"
+        }
+    };
+
+    const startSpeechEngine = () => {
+        if (typeof window === "undefined") return;
+        const SpeechRecognitionCtor =
+            (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRecognitionCtor) {
+            alert(
+                "Live Speech-to-Text is supported in Chrome, Safari, and Edge. You can still type or use your phone keyboard's microphone button directly in the box."
+            );
+            return;
+        }
+
+        if (speechRecRef.current) {
+            try {
+                speechRecRef.current.onend = null;
+                speechRecRef.current.stop();
+            } catch {}
+        }
+
+        const recognition = new SpeechRecognitionCtor();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = "en-GB";
+
+        recognition.onresult = (event: any) => {
+            let finalChunk = "";
+            let interimChunk = "";
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const res = event.results[i];
+                if (res.isFinal) {
+                    finalChunk += res[0].transcript + " ";
+                } else {
+                    interimChunk += res[0].transcript;
+                }
+            }
+            if (finalChunk.trim()) {
+                const cleaned = finalChunk.trim();
+                const capitalized = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+                const withPunct = /[.!?]$/.test(capitalized) ? capitalized : `${capitalized}.`;
+                setVoiceTranscript((prev) => (prev.trim() ? `${prev.trim()} ${withPunct}` : withPunct));
+            }
+            setVoiceInterimText(interimChunk);
+        };
+
+        recognition.onerror = (event: any) => {
+            // Ignore 'no-speech' timeouts during long monologues so continuous mode keeps listening across natural pauses
+            if (event?.error === "not-allowed" || event?.error === "service-not-allowed") {
+                keepListeningRef.current = false;
+                setIsVoiceRecording(false);
+                setIsVoicePaused(false);
+                alert("Microphone access was blocked. Please allow microphone permissions in your browser.");
+            }
+        };
+
+        recognition.onend = () => {
+            setVoiceInterimText("");
+            // Auto-restart if the coach is still recording and simply paused to watch the match
+            if (keepListeningRef.current) {
+                setTimeout(() => {
+                    if (keepListeningRef.current) {
+                        try {
+                            recognition.start();
+                        } catch {
+                            startSpeechEngine();
+                        }
+                    }
+                }, 150);
+            }
+        };
+
+        speechRecRef.current = recognition;
+        try {
+            recognition.start();
+        } catch {}
+    };
+
+    const handleStartVoiceRecording = (sectionOverride?: VoiceNoteTargetSection) => {
+        if (sectionOverride) setVoiceTargetSection(sectionOverride);
+        setShowVoiceRecorder(true);
+        keepListeningRef.current = true;
+        setIsVoiceRecording(true);
+        setIsVoicePaused(false);
+        setVoiceStatusToast(null);
+        startSpeechEngine();
+    };
+
+    const handlePauseVoiceRecording = () => {
+        keepListeningRef.current = false;
+        setIsVoicePaused(true);
+        setVoiceInterimText("");
+        if (speechRecRef.current) {
+            try {
+                speechRecRef.current.onend = null;
+                speechRecRef.current.stop();
+            } catch {}
+        }
+    };
+
+    const handleResumeVoiceRecording = () => {
+        keepListeningRef.current = true;
+        setIsVoicePaused(false);
+        startSpeechEngine();
+    };
+
+    const handleStopVoiceRecording = () => {
+        keepListeningRef.current = false;
+        setIsVoiceRecording(false);
+        setIsVoicePaused(false);
+        setVoiceInterimText("");
+        if (speechRecRef.current) {
+            try {
+                speechRecRef.current.onend = null;
+                speechRecRef.current.stop();
+            } catch {}
+        }
+    };
+
+    // Elapsed second counter while actively recording (and not paused)
+    useEffect(() => {
+        if (isVoiceRecording && !isVoicePaused) {
+            voiceTimerRef.current = setInterval(() => {
+                setVoiceElapsedSec((prev) => prev + 1);
+            }, 1000);
+        } else if (voiceTimerRef.current) {
+            clearInterval(voiceTimerRef.current);
+            voiceTimerRef.current = null;
+        }
+        return () => {
+            if (voiceTimerRef.current) clearInterval(voiceTimerRef.current);
+        };
+    }, [isVoiceRecording, isVoicePaused]);
+
+    // Cleanup speech engine on unmount
+    useEffect(() => {
+        return () => {
+            keepListeningRef.current = false;
+            if (speechRecRef.current) {
+                try {
+                    speechRecRef.current.onend = null;
+                    speechRecRef.current.stop();
+                } catch {}
+            }
+        };
+    }, []);
+
+    const appendLineToField = (existing: string, addition: string): string => {
+        const cleanExisting = (existing || "").trim();
+        const cleanAdd = addition.trim();
+        if (!cleanAdd) return cleanExisting;
+        const bulletAdd = cleanAdd.startsWith("•") || cleanAdd.startsWith("-") ? cleanAdd : `• ${cleanAdd}`;
+        return cleanExisting ? `${cleanExisting}\n${bulletAdd}` : bulletAdd;
+    };
+
+    const routeTextIntoReportSections = (
+        base: ScoutingReport,
+        rawText: string,
+        target: VoiceNoteTargetSection
+    ): { updated: ScoutingReport; routedLabels: string[] } => {
+        const next: ScoutingReport = {
+            ...base,
+            dangerMenList: [...(base.dangerMenList || [])],
+            playerProfiles: [...(base.playerProfiles || [])],
+            voiceNotes: [...(base.voiceNotes || [])],
+            lineup: [...(base.lineup || [])]
+        };
+        const routedLabels: string[] = [];
+        const text = rawText.trim();
+        if (!text) return { updated: next, routedLabels };
+
+        if (target !== "smart") {
+            if (target === "voiceLog") {
+                routedLabels.push("Voice Log");
+            } else if (target === "dangerMen") {
+                next.dangerMen = appendLineToField(next.dangerMen, text);
+                routedLabels.push("Danger Men");
+            } else if (target === "strengths") {
+                next.strengths = appendLineToField(next.strengths, text);
+                routedLabels.push("Strengths");
+            } else if (target === "weaknesses") {
+                next.weaknesses = appendLineToField(next.weaknesses, text);
+                routedLabels.push("Weaknesses");
+            } else if (target === "inPossession") {
+                next.inPossession = appendLineToField(next.inPossession, text);
+                routedLabels.push("In Possession");
+            } else if (target === "outOfPossession") {
+                next.outOfPossession = appendLineToField(next.outOfPossession, text);
+                routedLabels.push("Out of Possession");
+            } else if (target === "transition") {
+                next.transition = appendLineToField(next.transition, text);
+                routedLabels.push("Transitions");
+            } else if (target === "setPieces") {
+                next.setPieces = appendLineToField(next.setPieces, text);
+                routedLabels.push("Set Pieces");
+            } else if (target === "postMatchReview") {
+                next.postMatchReview = appendLineToField(next.postMatchReview, text);
+                routedLabels.push("Post-Match Review");
+            }
+            return { updated: next, routedLabels };
+        }
+
+        // Smart Auto-Sort: break long-form monologue into sentences and route to matching tactical cards
+        const sentences = text
+            .split(/(?<=[.!?])\s+|\r?\n+/)
+            .map((s) => s.trim())
+            .filter(Boolean);
+
+        let matchedAny = false;
+
+        for (const sentence of sentences) {
+            let matchedSentence = false;
+            if (
+                /\b(corner|corners|free kick|free-kick|throw-in|long throw|set piece|set-piece|near post|back post|delivery|dead ball)\b/i.test(
+                    sentence
+                )
+            ) {
+                next.setPieces = appendLineToField(next.setPieces, sentence);
+                if (!routedLabels.includes("Set Pieces")) routedLabels.push("Set Pieces");
+                matchedSentence = true;
+            }
+            if (
+                /\b(transition|counter|counter-attack|turnover|break fast|break quickly|on the break|track back|recovery run)\b/i.test(
+                    sentence
+                )
+            ) {
+                next.transition = appendLineToField(next.transition, sentence);
+                if (!routedLabels.includes("Transitions")) routedLabels.push("Transitions");
+                matchedSentence = true;
+            }
+            if (
+                /\b(out of possession|defend|defending|high line|low block|mid block|mid-block|press|pressing|man-to-man|compact)\b/i.test(
+                    sentence
+                )
+            ) {
+                next.outOfPossession = appendLineToField(next.outOfPossession, sentence);
+                if (!routedLabels.includes("Out of Possession")) routedLabels.push("Out of Possession");
+                matchedSentence = true;
+            }
+            if (
+                /\b(in possession|build up|build-up|play out|playing out|goal kick|pivot|overload|overlap|rotate|shape|possession)\b/i.test(
+                    sentence
+                )
+            ) {
+                next.inPossession = appendLineToField(next.inPossession, sentence);
+                if (!routedLabels.includes("In Possession")) routedLabels.push("In Possession");
+                matchedSentence = true;
+            }
+            if (
+                /\b(weak|weakness|struggle|struggles|slow|exploit|target|hurt them|vulnerable|mistake|error|bad touch|poor|tired|space in behind|leaves space|can't defend|doesn't track)\b/i.test(
+                    sentence
+                )
+            ) {
+                next.weaknesses = appendLineToField(next.weaknesses, sentence);
+                if (!routedLabels.includes("Weaknesses")) routedLabels.push("Weaknesses");
+                matchedSentence = true;
+            }
+            if (
+                /\b(strong|strength|dangerous|quality|athletic|physical|technical|good on the ball|sharp|clinical|dominant|pace|rapid)\b/i.test(
+                    sentence
+                )
+            ) {
+                next.strengths = appendLineToField(next.strengths, sentence);
+                if (!routedLabels.includes("Strengths")) routedLabels.push("Strengths");
+                matchedSentence = true;
+            }
+            if (
+                /(#[0-9]{1,2}\b|\bnumber\s+[0-9]{1,2}\b|\bno\.?\s*[0-9]{1,2}\b|\bshirt\s+[0-9]{1,2}\b)/i.test(
+                    sentence
+                )
+            ) {
+                next.dangerMen = appendLineToField(next.dangerMen, sentence);
+                if (!routedLabels.includes("Danger Men")) routedLabels.push("Danger Men");
+                matchedSentence = true;
+            }
+            if (matchedSentence) matchedAny = true;
+        }
+
+        if (!matchedAny) {
+            next.postMatchReview = appendLineToField(next.postMatchReview, text);
+            routedLabels.push("Post-Match Review");
+        }
+
+        return { updated: next, routedLabels };
+    };
+
+    const handleSaveVoiceNote = async () => {
+        const combinedText = `${voiceTranscript} ${voiceInterimText}`.trim();
+        if (!combinedText) return;
+
+        handleStopVoiceRecording();
+        setIsSavingVoiceNote(true);
+        try {
+            const base = isEditing && editedReport ? editedReport : selectedReport || createBlankReport();
+            const newVoiceItem: VoiceNoteItem = {
+                id: Math.random().toString(36).substring(2, 10),
+                text: combinedText,
+                targetSection: voiceTargetSection,
+                durationSec: voiceElapsedSec,
+                createdAt: new Date().toISOString()
+            };
+
+            const { updated, routedLabels } = routeTextIntoReportSections(
+                base,
+                combinedText,
+                voiceTargetSection
+            );
+            updated.voiceNotes = [newVoiceItem, ...(updated.voiceNotes || [])];
+
+            const saved = await persistReportSnapshot(updated, false);
+            if (saved) {
+                setVoiceTranscript("");
+                setVoiceInterimText("");
+                setVoiceElapsedSec(0);
+                setVoiceStatusToast(
+                    routedLabels.length > 0
+                        ? `Saved to Voice Log & routed to: ${routedLabels.join(", ")}`
+                        : "Saved to Voice Scouting Log"
+                );
+                setTimeout(() => setVoiceStatusToast(null), 5000);
+            }
+        } finally {
+            setIsSavingVoiceNote(false);
+        }
+    };
+
+    const handleRouteSavedVoiceNote = async (
+        note: VoiceNoteItem,
+        section: Exclude<VoiceNoteTargetSection, "smart" | "voiceLog">
+    ) => {
+        const base = isEditing && editedReport ? editedReport : selectedReport || createBlankReport();
+        const { updated, routedLabels } = routeTextIntoReportSections(base, note.text, section);
+        updated.voiceNotes = (updated.voiceNotes || []).map((vn) =>
+            vn.id === note.id ? { ...vn, targetSection: section } : vn
+        );
+        const saved = await persistReportSnapshot(updated, false);
+        if (saved && routedLabels.length > 0) {
+            setVoiceStatusToast(`Copied voice note into ${routedLabels.join(", ")}`);
+            setTimeout(() => setVoiceStatusToast(null), 4000);
+        }
+    };
+
+    const handleDeleteVoiceNote = async (noteId: string) => {
+        const base = isEditing && editedReport ? editedReport : selectedReport || createBlankReport();
+        const updated: ScoutingReport = {
+            ...base,
+            voiceNotes: (base.voiceNotes || []).filter((vn) => vn.id !== noteId)
+        };
+        await persistReportSnapshot(updated, false);
+    };
+
+    const VOICE_SECTION_OPTIONS: {
+        id: VoiceNoteTargetSection;
+        label: string;
+        shortLabel: string;
+        badgeClass: string;
+    }[] = [
+        {
+            id: "smart",
+            label: "✨ Smart Auto-Sort (Multi-Section)",
+            shortLabel: "✨ Auto-Sort",
+            badgeClass: "bg-brand/15 text-brand border-brand/40"
+        },
+        {
+            id: "voiceLog",
+            label: "📌 Voice Log Only",
+            shortLabel: "📌 Log Only",
+            badgeClass: "bg-slate-500/15 text-slate-300 border-slate-500/40"
+        },
+        {
+            id: "dangerMen",
+            label: "⚠️ Danger Men",
+            shortLabel: "⚠️ Danger Men",
+            badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/40"
+        },
+        {
+            id: "strengths",
+            label: "💪 Strengths",
+            shortLabel: "💪 Strengths",
+            badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
+        },
+        {
+            id: "weaknesses",
+            label: "🎯 Weaknesses",
+            shortLabel: "🎯 Weaknesses",
+            badgeClass: "bg-rose-500/15 text-rose-400 border-rose-500/40"
+        },
+        {
+            id: "inPossession",
+            label: "🟢 In Possession",
+            shortLabel: "🟢 In Poss",
+            badgeClass: "bg-blue-500/15 text-blue-400 border-blue-500/40"
+        },
+        {
+            id: "outOfPossession",
+            label: "🟣 Out ofPossession",
+            shortLabel: "🟣 Out of Poss",
+            badgeClass: "bg-purple-500/15 text-purple-400 border-purple-500/40"
+        },
+        {
+            id: "transition",
+            label: "⚡ Transitions",
+            shortLabel: "⚡ Transitions",
+            badgeClass: "bg-orange-500/15 text-orange-400 border-orange-500/40"
+        },
+        {
+            id: "setPieces",
+            label: "🚩 Set Pieces",
+            shortLabel: "🚩 Set Pieces",
+            badgeClass: "bg-cyan-500/15 text-cyan-400 border-cyan-500/40"
+        },
+        {
+            id: "postMatchReview",
+            label: "📋 Post-Match Review",
+            shortLabel: "📋 Review",
+            badgeClass: "bg-indigo-500/15 text-indigo-400 border-indigo-500/40"
+        }
+    ];
+
+    const renderVoiceScoutingCard = (isMobileLayout: boolean) => {
+        const savedNotes = activeReport.voiceNotes || [];
+        const hasDraftText = Boolean(`${voiceTranscript} ${voiceInterimText}`.trim());
+        const wordCount = `${voiceTranscript} ${voiceInterimText}`
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean).length;
+
+        return (
+            <div
+                className={`rounded-2xl bg-surface-1 border transition-all shadow-xs overflow-hidden ${
+                    isVoiceRecording
+                        ? "border-rose-500/60 ring-2 ring-rose-500/20"
+                        : isVoicePaused
+                            ? "border-amber-500/60 ring-1 ring-amber-500/20"
+                            : "border-brand/35 border-l-4 border-l-brand"
+                } ${isMobileLayout ? "p-3.5 space-y-3" : "p-4 space-y-3.5"}`}
+            >
+                {/* Top Header Row */}
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                            className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                                isVoiceRecording
+                                    ? "bg-rose-500/20 border-rose-500/40 text-rose-500 animate-pulse"
+                                    : isVoicePaused
+                                        ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
+                                        : "bg-brand/15 border-brand/30 text-brand"
+                            }`}
+                        >
+                            {isVoiceRecording ? (
+                                <Mic className="h-4 w-4" />
+                            ) : isVoicePaused ? (
+                                <Pause className="h-4 w-4" />
+                            ) : (
+                                <Mic className="h-4 w-4" />
+                            )}
+                        </div>
+                        <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-foreground">
+                                    Live Pitchside Voice Scout
+                                </h3>
+                                {isVoiceRecording && (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-400 text-[10px] font-black tabular-nums">
+                                        <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
+                                        REC {formatVoiceDuration(voiceElapsedSec)}
+                                    </span>
+                                )}
+                                {isVoicePaused && (
+                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[10px] font-black tabular-nums">
+                                        PAUSED {formatVoiceDuration(voiceElapsedSec)}
+                                    </span>
+                                )}
+                                {!isVoiceRecording && !isVoicePaused && savedNotes.length > 0 && (
+                                    <span className="px-2 py-0.5 rounded-full bg-surface-2 border border-border text-[10px] font-extrabold text-muted-foreground">
+                                        {savedNotes.length} saved {savedNotes.length === 1 ? "note" : "notes"}
+                                    </span>
+                                )}
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-snug">
+                                Continuous multi-minute voice-to-text — pause &amp; resume anytime while watching play, then auto-sort into the dossier
+                            </p>
+                        </div>
+                    </div>
+
+                    {/* Primary Action Controls */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        {!isVoiceRecording && !isVoicePaused ? (
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => handleStartVoiceRecording()}
+                                className="h-9 px-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-sm"
+                            >
+                                <Mic className="h-3.5 w-3.5 mr-1.5" />
+                                {hasDraftText ? "Continue Dictating" : "Start Live Voice Note"}
+                            </Button>
+                        ) : (
+                            <>
+                                {isVoiceRecording ? (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handlePauseVoiceRecording}
+                                        className="h-9 px-3 rounded-xl border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 font-extrabold text-xs"
+                                    >
+                                        <Pause className="h-3.5 w-3.5 mr-1.5" />
+                                        Pause
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={handleResumeVoiceRecording}
+                                        className="h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs"
+                                    >
+                                        <Play className="h-3.5 w-3.5 mr-1.5" />
+                                        Resume
+                                    </Button>
+                                )}
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleStopVoiceRecording}
+                                    className="h-9 px-3 rounded-xl border-rose-500/40 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 font-extrabold text-xs"
+                                >
+                                    <Square className="h-3.5 w-3.5 mr-1.5" />
+                                    Done Speaking
+                                </Button>
+                            </>
+                        )}
+
+                        <button
+                            type="button"
+                            onClick={() => setShowVoiceRecorder((prev) => !prev)}
+                            className="h-9 px-2.5 rounded-xl bg-surface-2 hover:bg-surface-2/80 border border-border text-[11px] font-bold text-muted-foreground hover:text-foreground transition-colors"
+                            title={showVoiceRecorder ? "Collapse Voice Studio" : "Expand Voice Studio"}
+                        >
+                            {showVoiceRecorder ? "Hide" : "Open"}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Toast Feedback */}
+                {voiceStatusToast && (
+                    <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-xs font-bold text-emerald-400 flex items-center justify-between gap-2">
+                        <span>✓ {voiceStatusToast}</span>
+                        <button
+                            type="button"
+                            onClick={() => setVoiceStatusToast(null)}
+                            className="text-[10px] text-muted-foreground hover:text-foreground"
+                        >
+                            Dismiss
+                        </button>
+                    </div>
+                )}
+
+                {(showVoiceRecorder || isVoiceRecording || isVoicePaused || hasDraftText) && (
+                    <div className="space-y-3 pt-1 border-t border-border/60">
+                        {/* Target Section Routing Pills */}
+                        <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                                    <Wand2 className="h-3 w-3 text-brand" />
+                                    Where should this voice note go when saved?
+                                </span>
+                                {voiceTargetSection === "smart" && (
+                                    <span className="text-[10px] font-semibold text-brand hidden sm:inline">
+                                        Splits sentences automatically into Strengths, Weaknesses, Set Pieces, etc.
+                                    </span>
+                                )}
+                            </div>
+                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                                {VOICE_SECTION_OPTIONS.map((opt) => {
+                                    const active = voiceTargetSection === opt.id;
+                                    return (
+                                        <button
+                                            key={opt.id}
+                                            type="button"
+                                            onClick={() => setVoiceTargetSection(opt.id)}
+                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border transition-all whitespace-nowrap shrink-0 ${
+                                                active
+                                                    ? `${opt.badgeClass} shadow-xs scale-[1.01]`
+                                                    : "bg-surface-2/70 border-border text-muted-foreground hover:text-foreground"
+                                            }`}
+                                        >
+                                            {isMobileLayout ? opt.shortLabel : opt.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Live Streaming & Editable Transcript Box */}
+                        <div className="space-y-2">
+                            <div className="relative">
+                                <textarea
+                                    rows={isMobileLayout ? 4 : 4}
+                                    value={
+                                        voiceInterimText
+                                            ? `${voiceTranscript}${voiceTranscript ? " " : ""}${voiceInterimText}`
+                                            : voiceTranscript
+                                    }
+                                    onChange={(e) => {
+                                        setVoiceTranscript(e.target.value);
+                                        setVoiceInterimText("");
+                                    }}
+                                    placeholder="Tap 'Start Live Voice Note' and speak naturally for as long as you need (e.g. 'Their #9 is rapid in behind, left-footed, but their two centre-backs struggle when pressed high. On corners they crowd the keeper...'). You can pause & resume anytime or type/edit directly here..."
+                                    className={`w-full rounded-xl border p-3 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground outline-none resize-y leading-relaxed transition-colors ${
+                                        isVoiceRecording
+                                            ? "bg-rose-500/5 border-rose-500/40 focus:ring-2 focus:ring-rose-500"
+                                            : "bg-surface-2 border-border focus:ring-2 focus:ring-brand"
+                                    }`}
+                                />
+                                {voiceInterimText && (
+                                    <div className="mt-1 text-[11px] font-medium text-rose-400 italic flex items-center gap-1.5">
+                                        <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping" />
+                                        Listening live: &ldquo;{voiceInterimText}&rdquo;
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Bottom Bar: Word count + Clear + Save & Route */}
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-semibold">
+                                    <span>
+                                        {wordCount} {wordCount === 1 ? "word" : "words"}
+                                    </span>
+                                    {voiceElapsedSec > 0 && (
+                                        <span>• Duration {formatVoiceDuration(voiceElapsedSec)}</span>
+                                    )}
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                    {hasDraftText && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="ghost"
+                                            onClick={() => {
+                                                handleStopVoiceRecording();
+                                                setVoiceTranscript("");
+                                                setVoiceInterimText("");
+                                                setVoiceElapsedSec(0);
+                                            }}
+                                            className="h-8 px-2.5 text-xs font-bold text-muted-foreground hover:text-rose-500"
+                                        >
+                                            Clear
+                                        </Button>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={!hasDraftText || isSavingVoiceNote}
+                                        onClick={handleSaveVoiceNote}
+                                        className="h-9 px-4 rounded-xl bg-brand hover:bg-brand/90 text-brand-foreground font-extrabold text-xs shadow-sm"
+                                    >
+                                        <Save className="h-3.5 w-3.5 mr-1.5" />
+                                        {isSavingVoiceNote
+                                            ? "Saving Note..."
+                                            : voiceTargetSection === "smart"
+                                                ? "Save & Smart Auto-Sort Note"
+                                                : "Save Voice Note to Dossier"}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Saved Voice Scouting Log Feed */}
+                {savedNotes.length > 0 && (
+                    <div className="pt-2 border-t border-border/60 space-y-2">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                🎙️ Saved Voice Scouting Log ({savedNotes.length})
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">
+                                Timestamped touchline audio transcripts
+                            </span>
+                        </div>
+                        <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                            {savedNotes.map((note) => {
+                                const opt =
+                                    VOICE_SECTION_OPTIONS.find((o) => o.id === note.targetSection) ||
+                                    VOICE_SECTION_OPTIONS[0];
+                                return (
+                                    <div
+                                        key={note.id}
+                                        className="rounded-xl bg-surface-2/80 border border-border p-3 space-y-1.5"
+                                    >
+                                        <div className="flex flex-wrap items-center justify-between gap-1.5">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span
+                                                    className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${opt.badgeClass}`}
+                                                >
+                                                    {opt.shortLabel}
+                                                </span>
+                                                {note.durationSec > 0 && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-surface-1 border border-border text-[10px] font-bold text-muted-foreground tabular-nums">
+                                                        ⏱ {formatVoiceDuration(note.durationSec)}
+                                                    </span>
+                                                )}
+                                                <span className="text-[10px] text-muted-foreground font-medium">
+                                                    {new Date(note.createdAt).toLocaleString("en-GB", {
+                                                        day: "numeric",
+                                                        month: "short",
+                                                        hour: "2-digit",
+                                                        minute: "2-digit"
+                                                    })}
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5">
+                                                <select
+                                                    value=""
+                                                    onChange={(e) => {
+                                                        const val = e.target.value as Exclude<
+                                                            VoiceNoteTargetSection,
+                                                            "smart" | "voiceLog"
+                                                        >;
+                                                        if (val) handleRouteSavedVoiceNote(note, val);
+                                                    }}
+                                                    className="h-6 rounded-md border border-border bg-surface-1 px-1.5 text-[10px] font-bold text-muted-foreground hover:text-foreground outline-none"
+                                                    title="Copy this voice note into another dossier section"
+                                                >
+                                                    <option value="">+ Copy to section...</option>
+                                                    <option value="dangerMen">⚠️ Danger Men</option>
+                                                    <option value="strengths">💪 Strengths</option>
+                                                    <option value="weaknesses">🎯 Weaknesses</option>
+                                                    <option value="inPossession">🟢 In Possession</option>
+                                                    <option value="outOfPossession">🟣 Out of Possession</option>
+                                                    <option value="transition">⚡ Transitions</option>
+                                                    <option value="setPieces">🚩 Set Pieces</option>
+                                                    <option value="postMatchReview">📋 Post-Match Review</option>
+                                                </select>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteVoiceNote(note.id)}
+                                                    className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                                                    title="Delete voice note"
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed">
+                                            {note.text}
+                                        </p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
     };
 
     // Danger Men structured list helpers
@@ -2036,6 +2918,9 @@ export default function OppositionReportsPage() {
                     )}
                 </div>
 
+                {/* 5B. MOBILE LIVE VOICE SCOUTING STUDIO & SAVED VOICE LOG */}
+                {renderVoiceScoutingCard(true)}
+
                 {/* 6. MOBILE SEGMENTED SUB-TAB BAR */}
                 <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-surface-1 border border-border">
                     {(
@@ -3331,6 +4216,11 @@ export default function OppositionReportsPage() {
                     </Card>
 
                     {/* ========================================================= */}
+                    {/* SECTION 0B: LIVE PITCHSIDE VOICE SCOUT & SAVED VOICE LOG  */}
+                    {/* ========================================================= */}
+                    {renderVoiceScoutingCard(false)}
+
+                    {/* ========================================================= */}
                     {/* SECTION 1: DANGER MEN & KEY THREATS                       */}
                     {/* ========================================================= */}
                     <Card className="bg-surface-1 border-amber-500/30 shadow-xs overflow-hidden border-l-4 border-l-amber-500">
@@ -3344,16 +4234,28 @@ export default function OppositionReportsPage() {
                                     Log their standout players by shirt number, position, preferred foot &amp; how to stop them
                                 </p>
                             </div>
-                            <Button
-                                type="button"
-                                size="sm"
-                                variant="outline"
-                                onClick={handleAddDangerMan}
-                                className="h-8 text-xs font-bold border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
-                            >
-                                <Plus className="h-3.5 w-3.5 mr-1" />
-                                Add Player
-                            </Button>
+                            <div className="flex items-center gap-1.5">
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => handleStartVoiceRecording("dangerMen")}
+                                    className="h-8 text-xs font-bold border-rose-500/40 text-rose-400 hover:bg-rose-500/10"
+                                >
+                                    <Mic className="h-3.5 w-3.5 mr-1" />
+                                    Voice
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleAddDangerMan}
+                                    className="h-8 text-xs font-bold border-amber-500/40 text-amber-500 hover:bg-amber-500/10"
+                                >
+                                    <Plus className="h-3.5 w-3.5 mr-1" />
+                                    Add Player
+                                </Button>
+                            </div>
                         </CardHeader>
                         <CardContent className="p-4 pt-2 space-y-3">
                             {/* Structured Danger Men Cards */}
@@ -3567,15 +4469,25 @@ export default function OppositionReportsPage() {
                                     <Sparkles className="h-3.5 w-3.5" />
                                     Their Strengths
                                 </CardTitle>
-                                {!isEditing && (
+                                <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={handleEditReport}
-                                        className="text-[11px] font-bold text-muted-foreground hover:text-emerald-500 transition-colors"
+                                        onClick={() => handleStartVoiceRecording("strengths")}
+                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                        title="Dictate voice note into Strengths"
                                     >
-                                        + Edit
+                                        <Mic className="h-3 w-3" /> Voice
                                     </button>
-                                )}
+                                    {!isEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={handleEditReport}
+                                            className="text-[11px] font-bold text-muted-foreground hover:text-emerald-500 transition-colors"
+                                        >
+                                            + Edit
+                                        </button>
+                                    )}
+                                </div>
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
@@ -3611,15 +4523,25 @@ export default function OppositionReportsPage() {
                                     <Target className="h-3.5 w-3.5" />
                                     Their Weaknesses (How We Hurt Them)
                                 </CardTitle>
-                                {!isEditing && (
+                                <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={handleEditReport}
-                                        className="text-[11px] font-bold text-muted-foreground hover:text-rose-500 transition-colors"
+                                        onClick={() => handleStartVoiceRecording("weaknesses")}
+                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                        title="Dictate voice note into Weaknesses"
                                     >
-                                        + Edit
+                                        <Mic className="h-3 w-3" /> Voice
                                     </button>
-                                )}
+                                    {!isEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={handleEditReport}
+                                            className="text-[11px] font-bold text-muted-foreground hover:text-rose-500 transition-colors"
+                                        >
+                                            + Edit
+                                        </button>
+                                    )}
+                                </div>
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
@@ -3655,15 +4577,25 @@ export default function OppositionReportsPage() {
                                     <Users className="h-3.5 w-3.5" />
                                     In Possession (Build-Up &amp; Shape)
                                 </CardTitle>
-                                {!isEditing && (
+                                <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={handleEditReport}
-                                        className="text-[11px] font-bold text-muted-foreground hover:text-blue-500 transition-colors"
+                                        onClick={() => handleStartVoiceRecording("inPossession")}
+                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                        title="Dictate voice note into In Possession"
                                     >
-                                        + Edit
+                                        <Mic className="h-3 w-3" /> Voice
                                     </button>
-                                )}
+                                    {!isEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={handleEditReport}
+                                            className="text-[11px] font-bold text-muted-foreground hover:text-blue-500 transition-colors"
+                                        >
+                                            + Edit
+                                        </button>
+                                    )}
+                                </div>
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
@@ -3699,15 +4631,25 @@ export default function OppositionReportsPage() {
                                     <Swords className="h-3.5 w-3.5" />
                                     Out of Possession (Defensive Shape &amp; Press)
                                 </CardTitle>
-                                {!isEditing && (
+                                <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={handleEditReport}
-                                        className="text-[11px] font-bold text-muted-foreground hover:text-purple-500 transition-colors"
+                                        onClick={() => handleStartVoiceRecording("outOfPossession")}
+                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                        title="Dictate voice note into Out of Possession"
                                     >
-                                        + Edit
+                                        <Mic className="h-3 w-3" /> Voice
                                     </button>
-                                )}
+                                    {!isEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={handleEditReport}
+                                            className="text-[11px] font-bold text-muted-foreground hover:text-purple-500 transition-colors"
+                                        >
+                                            + Edit
+                                        </button>
+                                    )}
+                                </div>
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
@@ -3743,15 +4685,25 @@ export default function OppositionReportsPage() {
                                     <Zap className="h-3.5 w-3.5" />
                                     Transition (Attacking &amp; Defensive)
                                 </CardTitle>
-                                {!isEditing && (
+                                <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={handleEditReport}
-                                        className="text-[11px] font-bold text-muted-foreground hover:text-orange-500 transition-colors"
+                                        onClick={() => handleStartVoiceRecording("transition")}
+                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                        title="Dictate voice note into Transitions"
                                     >
-                                        + Edit
+                                        <Mic className="h-3 w-3" /> Voice
                                     </button>
-                                )}
+                                    {!isEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={handleEditReport}
+                                            className="text-[11px] font-bold text-muted-foreground hover:text-orange-500 transition-colors"
+                                        >
+                                            + Edit
+                                        </button>
+                                    )}
+                                </div>
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
@@ -3787,15 +4739,25 @@ export default function OppositionReportsPage() {
                                     <Flag className="h-3.5 w-3.5" />
                                     Set Pieces (Corners, Free Kicks &amp; Throws)
                                 </CardTitle>
-                                {!isEditing && (
+                                <div className="flex items-center gap-2">
                                     <button
                                         type="button"
-                                        onClick={handleEditReport}
-                                        className="text-[11px] font-bold text-muted-foreground hover:text-cyan-500 transition-colors"
+                                        onClick={() => handleStartVoiceRecording("setPieces")}
+                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                        title="Dictate voice note into Set Pieces"
                                     >
-                                        + Edit
+                                        <Mic className="h-3 w-3" /> Voice
                                     </button>
-                                )}
+                                    {!isEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={handleEditReport}
+                                            className="text-[11px] font-bold text-muted-foreground hover:text-cyan-500 transition-colors"
+                                        >
+                                            + Edit
+                                        </button>
+                                    )}
+                                </div>
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
