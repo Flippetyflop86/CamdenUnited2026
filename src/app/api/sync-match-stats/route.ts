@@ -5,6 +5,27 @@ import { getServerSupabase } from '@/lib/supabase';
 export async function POST(request: Request) {
     const supabase = getServerSupabase();
     try {
+        const authHeader = request.headers.get('Authorization');
+        const token = authHeader?.split(' ')[1];
+        if (!token) {
+            return NextResponse.json({ success: false, error: 'Unauthorized: Missing authentication token' }, { status: 401 });
+        }
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        if (authError || !user) {
+            return NextResponse.json({ success: false, error: 'Unauthorized: Invalid token' }, { status: 401 });
+        }
+
+        const { data: member } = await supabase
+            .from('club_members')
+            .select('club_id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+        if (!member?.club_id) {
+            return NextResponse.json({ success: false, error: 'Forbidden: Club membership required' }, { status: 403 });
+        }
+
         const body = await request.json();
         const { url, matchId, clubName } = body;
 
@@ -26,8 +47,11 @@ export async function POST(request: Request) {
         const html = await response.text();
         const $ = cheerio.load(html);
 
-        // Fetch all players for the club from Supabase to match against
-        const { data: players } = await supabase.from('players').select('id, first_name, last_name');
+        // Fetch only players belonging to the authenticated user's club
+        const { data: players } = await supabase
+            .from('players')
+            .select('id, first_name, last_name')
+            .eq('club_id', member.club_id);
         if (!players) {
             return NextResponse.json({ success: false, error: 'Could not fetch players from database.' }, { status: 500 });
         }

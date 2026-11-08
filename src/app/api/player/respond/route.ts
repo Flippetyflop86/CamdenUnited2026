@@ -257,6 +257,10 @@ export async function POST(request: Request) {
                 return NextResponse.json({ success: false, error: "Match event not found." }, { status: 404 });
             }
 
+            if (match.club_id && player.club_id && match.club_id !== player.club_id) {
+                return NextResponse.json({ success: false, error: "Forbidden: Player does not belong to this club's event." }, { status: 403 });
+            }
+
             const currentNotes = match.notes || "";
             let currentList: any[] = [];
             const matchRaw = currentNotes.match(/\[AVAILABILITY:\s*(\[[\s\S]*?\])\s*\]/);
@@ -297,6 +301,10 @@ export async function POST(request: Request) {
 
             if (fetchSessionErr || !session) {
                 return NextResponse.json({ success: false, error: "Training session not found." }, { status: 404 });
+            }
+
+            if (session.club_id && player.club_id && session.club_id !== player.club_id) {
+                return NextResponse.json({ success: false, error: "Forbidden: Player does not belong to this club's session." }, { status: 403 });
             }
 
             const existingAttendance = session.attendance || [];

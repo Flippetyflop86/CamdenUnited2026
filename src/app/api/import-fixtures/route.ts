@@ -8,11 +8,33 @@ const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 export async function POST(request: Request) {
     try {
+        const authHeader = request.headers.get('Authorization');
+        const token = authHeader?.split(' ')[1];
+        if (!token) {
+            return NextResponse.json({ success: false, error: 'Unauthorized: Missing authentication token' }, { status: 401 });
+        }
+
+        const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+        if (authError || !user) {
+            return NextResponse.json({ success: false, error: 'Unauthorized: Invalid token' }, { status: 401 });
+        }
+
         const body = await request.json();
         const { fixtures, clubId } = body;
 
         if (!fixtures || !Array.isArray(fixtures) || !clubId) {
             return NextResponse.json({ success: false, error: 'Missing fixtures or clubId' }, { status: 400 });
+        }
+
+        const { data: member } = await supabase
+            .from('club_members')
+            .select('club_id, role')
+            .eq('user_id', user.id)
+            .eq('club_id', clubId)
+            .maybeSingle();
+
+        if (!member) {
+            return NextResponse.json({ success: false, error: 'Forbidden: You do not belong to this club' }, { status: 403 });
         }
 
         // Map parsed UI format to database format
