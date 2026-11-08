@@ -215,14 +215,19 @@ function JoinPageInner() {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="confirmPassword" className="text-slate-300">Confirm Password</Label>
-                                <Input
-                                    id="confirmPassword"
-                                    type={showPassword ? "text" : "password"}
-                                    required
-                                    value={confirmPassword}
-                                    onChange={(e) => setConfirmPassword(e.target.value)}
-                                    className="bg-slate-800 border-slate-700 text-white focus-visible:ring-red-500"
-                                />
+                                <div className="relative">
+                                    <Input
+                                        id="confirmPassword"
+                                        type={showPassword ? "text" : "password"}
+                                        required
+                                        value={confirmPassword}
+                                        onChange={(e) => setConfirmPassword(e.target.value)}
+                                        className="bg-slate-800 border-slate-700 text-white focus-visible:ring-red-500 pr-10"
+                                    />
+                                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300">
+                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
                             </div>
                             <div className="space-y-2.5 pt-2 border-t border-slate-800">
                                 <Label className="text-slate-300 text-xs font-semibold">

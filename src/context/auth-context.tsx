@@ -24,7 +24,9 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const DEVICE_UI_PREF_KEYS = new Set([
     "clubflow-sidebar-expanded",
     "clubflow_squad_display_layout",
-    "clubflow_calendar_collapsed"
+    "clubflow_calendar_collapsed",
+    "clubflow_remembered_email",
+    "clubflow_remember_me"
 ]);
 
 export function purgeUserAndClubStorage() {
@@ -235,6 +237,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     useEffect(() => {
+        // If user previously logged in with "Remember me" unchecked and closed their browser, clear session on new browser start
+        if (typeof window !== 'undefined') {
+            try {
+                const rememberPref = localStorage.getItem("clubflow_remember_me");
+                const activeTabSession = sessionStorage.getItem("clubflow_active_tab_session");
+                if (rememberPref === "false" && !activeTabSession) {
+                    purgeUserAndClubStorage();
+                    supabase.auth.signOut().catch(() => {});
+                } else {
+                    sessionStorage.setItem("clubflow_active_tab_session", "true");
+                }
+            } catch {}
+        }
+
         // Hydrate cached auth state on client mount (avoids SSR hydration mismatch)
         const cachedUser = getCachedVal('user', null);
         const cachedUserId: string | null = cachedUser?.id ?? null;

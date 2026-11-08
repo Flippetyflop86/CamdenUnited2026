@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, UserPlus, CheckCircle2, RefreshCw } from "lucide-react";
+import { AlertCircle, UserPlus, CheckCircle2, RefreshCw, Eye, EyeOff } from "lucide-react";
 
 function PlayerSignupForm() {
     const searchParams = useSearchParams();
@@ -17,6 +17,7 @@ function PlayerSignupForm() {
     const [lastName, setLastName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
     const [verifying, setVerifying] = useState(!!token);
     const [error, setError] = useState("");
@@ -198,14 +199,24 @@ function PlayerSignupForm() {
 
                             <div className="space-y-1">
                                 <label className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Password</label>
-                                <Input
-                                    type="password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
-                                    className="bg-slate-950 border-slate-800 text-white text-xs h-10"
-                                    placeholder="••••••••"
-                                />
+                                <div className="relative">
+                                    <Input
+                                        type={showPassword ? "text" : "password"}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        required
+                                        className="bg-slate-950 border-slate-800 text-white text-xs h-10 pr-10"
+                                        placeholder="••••••••"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword((prev) => !prev)}
+                                        aria-label={showPassword ? "Hide password" : "Show password"}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 focus:outline-none"
+                                    >
+                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    </button>
+                                </div>
                             </div>
 
                             <Button
