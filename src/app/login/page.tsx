@@ -133,7 +133,7 @@ export default function LoginPage() {
                         )}
                         
                         <div className="space-y-1.5">
-                            <Label htmlFor="email" className="cf-metadata uppercase tracking-wider font-bold">Email address</Label>
+                            <Label htmlFor="email" className="text-slate-300 text-[11px] uppercase tracking-wider font-bold">Email address</Label>
                             <Input
                                 id="email"
                                 type="email"
@@ -141,14 +141,15 @@ export default function LoginPage() {
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
                                 required
-                                className="bg-surface-2 border-border text-foreground placeholder:text-muted-foreground focus-visible:ring-primary rounded-xl h-10 text-xs transition-all"
+                                autoComplete="email"
+                                className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500 focus-visible:ring-red-500 rounded-xl h-10 text-xs transition-all"
                             />
                         </div>
                         
                         <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
-                                <Label htmlFor="password" className="cf-metadata uppercase tracking-wider font-bold">Password</Label>
-                                <Link href="/reset-password" className="text-[10px] font-bold text-muted-foreground hover:text-primary transition-colors">
+                                <Label htmlFor="password" className="text-slate-300 text-[11px] uppercase tracking-wider font-bold">Password</Label>
+                                <Link href="/reset-password" className="text-[10px] font-bold text-slate-400 hover:text-red-400 transition-colors">
                                     Forgot?
                                 </Link>
                             </div>
@@ -156,20 +157,33 @@ export default function LoginPage() {
                                 <Input
                                     id="password"
                                     type={showPassword ? "text" : "password"}
+                                    placeholder="••••••••"
                                     value={password}
                                     onChange={(e) => setPassword(e.target.value)}
                                     required
                                     autoComplete="current-password"
-                                    className="bg-surface-2 border-border text-foreground focus-visible:ring-primary rounded-xl h-10 text-xs transition-all pr-10"
+                                    style={!showPassword ? ({ WebkitTextSecurity: "disc" } as React.CSSProperties) : undefined}
+                                    className="bg-slate-900 border-slate-800 text-white placeholder:text-slate-500 focus-visible:ring-red-500 rounded-xl h-10 text-xs transition-all pr-16"
                                 />
                                 <button
                                     type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
                                     onClick={() => setShowPassword((prev) => !prev)}
                                     aria-label={showPassword ? "Hide password" : "Show password"}
                                     title={showPassword ? "Hide password" : "Show password"}
-                                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white transition-colors focus:outline-none"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-10 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors focus:outline-none"
                                 >
-                                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                    {showPassword ? (
+                                        <>
+                                            <EyeOff className="h-3.5 w-3.5 text-red-400" />
+                                            <span>Hide</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Eye className="h-3.5 w-3.5 text-slate-400" />
+                                            <span>Show</span>
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </div>

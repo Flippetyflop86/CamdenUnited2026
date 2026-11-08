@@ -215,17 +215,30 @@ export default function SignupPage() {
                                     <Input
                                         id="password"
                                         type={showPassword ? "text" : "password"}
+                                        placeholder="••••••••"
                                         required
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="bg-slate-800 border-slate-700 text-white focus-visible:ring-red-500 pr-10"
+                                        style={!showPassword ? ({ WebkitTextSecurity: "disc" } as React.CSSProperties) : undefined}
+                                        className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-red-500 pr-16"
                                     />
                                     <button
                                         type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 focus:outline-none"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-700/70 focus:outline-none"
                                     >
-                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        {showPassword ? (
+                                            <>
+                                                <EyeOff className="h-3.5 w-3.5 text-red-400" />
+                                                <span>Hide</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Eye className="h-3.5 w-3.5 text-slate-400" />
+                                                <span>Show</span>
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             </div>
@@ -236,17 +249,30 @@ export default function SignupPage() {
                                     <Input
                                         id="confirmPassword"
                                         type={showPassword ? "text" : "password"}
+                                        placeholder="••••••••"
                                         required
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className="bg-slate-800 border-slate-700 text-white focus-visible:ring-red-500 pr-10"
+                                        style={!showPassword ? ({ WebkitTextSecurity: "disc" } as React.CSSProperties) : undefined}
+                                        className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500 focus-visible:ring-red-500 pr-16"
                                     />
                                     <button
                                         type="button"
+                                        onMouseDown={(e) => e.preventDefault()}
                                         onClick={() => setShowPassword(!showPassword)}
-                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 focus:outline-none"
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 z-10 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-slate-300 hover:text-white hover:bg-slate-700/70 focus:outline-none"
                                     >
-                                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        {showPassword ? (
+                                            <>
+                                                <EyeOff className="h-3.5 w-3.5 text-red-400" />
+                                                <span>Hide</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Eye className="h-3.5 w-3.5 text-slate-400" />
+                                                <span>Show</span>
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             </div>
