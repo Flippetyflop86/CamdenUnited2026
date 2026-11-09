@@ -1946,8 +1946,19 @@ export default function LeagueTablePage() {
                                         if (row.played > 0 && row.won === row.played && row.drawn === 0 && row.lost === 0) {
                                             trailingWins = Math.max(trailingWins, row.won);
                                         }
+                                        let trailingUnbeaten = 0;
+                                        for (let i = fullForm.length - 1; i >= 0; i--) {
+                                            if (fullForm[i] === 'W' || fullForm[i] === 'D') trailingUnbeaten++;
+                                            else break;
+                                        }
+                                        if (row.played > 0 && row.lost === 0 && (row.won + row.drawn) === row.played) {
+                                            trailingUnbeaten = Math.max(trailingUnbeaten, row.played);
+                                        }
                                         const streakLabel = trailingWins >= 4
                                             ? `🔥 ${trailingWins}W Streak`
+                                            : null;
+                                        const unbeatenLabel = trailingUnbeaten >= 5 && trailingUnbeaten > trailingWins
+                                            ? `🛡️ ${trailingUnbeaten} Unbeaten`
                                             : null;
 
                                         const gdColorClass =
@@ -1994,7 +2005,7 @@ export default function LeagueTablePage() {
                                                             <span className={`truncate leading-tight ${row.is_our_club ? 'font-extrabold text-primary' : 'font-semibold text-foreground'}`}>
                                                                 {row.team_name}
                                                             </span>
-                                                            {(isNextOpp || streakLabel) && (
+                                                            {(isNextOpp || streakLabel || unbeatenLabel) && (
                                                                 <div className="flex items-center gap-1 mt-0.5 flex-wrap">
                                                                     {isNextOpp && (
                                                                         <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-500 text-white px-1.5 py-0 text-[9px] font-extrabold uppercase tracking-tight max-w-full truncate">
@@ -2005,6 +2016,11 @@ export default function LeagueTablePage() {
                                                                     {streakLabel && (
                                                                         <span className="inline-flex items-center rounded-full bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/35 px-1.5 py-0 text-[9px] font-bold max-w-full truncate">
                                                                             {streakLabel}
+                                                                        </span>
+                                                                    )}
+                                                                    {unbeatenLabel && (
+                                                                        <span className="inline-flex items-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35 px-1.5 py-0 text-[9px] font-bold max-w-full truncate">
+                                                                            {unbeatenLabel}
                                                                         </span>
                                                                     )}
                                                                 </div>
@@ -2232,7 +2248,7 @@ export default function LeagueTablePage() {
                                             const formItems = fullForm.slice(-5);
                                             const rowPpg = row.played > 0 ? (row.points / row.played).toFixed(2) : "0.00";
 
-                                            // Feature #8: Unbeaten or Winning Streak Detection (full season, 5+ / 14+ games)
+                                            // Feature #8: Unbeaten or Winning Streak Detection (full season, 5+ unbeaten / 4+ wins)
                                             let trailingWins = 0;
                                             for (let i = fullForm.length - 1; i >= 0; i--) {
                                                 if (fullForm[i] === 'W') trailingWins++;
@@ -2241,8 +2257,19 @@ export default function LeagueTablePage() {
                                             if (row.played > 0 && row.won === row.played && row.drawn === 0 && row.lost === 0) {
                                                 trailingWins = Math.max(trailingWins, row.won);
                                             }
+                                            let trailingUnbeaten = 0;
+                                            for (let i = fullForm.length - 1; i >= 0; i--) {
+                                                if (fullForm[i] === 'W' || fullForm[i] === 'D') trailingUnbeaten++;
+                                                else break;
+                                            }
+                                            if (row.played > 0 && row.lost === 0 && (row.won + row.drawn) === row.played) {
+                                                trailingUnbeaten = Math.max(trailingUnbeaten, row.played);
+                                            }
                                             const streakLabel = trailingWins >= 4
                                                 ? `🔥 ${trailingWins}W Streak`
+                                                : null;
+                                            const unbeatenLabel = trailingUnbeaten >= 5 && trailingUnbeaten > trailingWins
+                                                ? `🛡️ ${trailingUnbeaten} Unbeaten`
                                                 : null;
 
                                             // Feature #2: Colour-coded Goal Difference
@@ -2304,6 +2331,11 @@ export default function LeagueTablePage() {
                                                             {streakLabel && (
                                                                 <span className="inline-flex items-center rounded-full bg-orange-500/15 text-orange-700 dark:text-orange-300 border border-orange-500/35 px-2 py-0.5 text-[10px] font-bold tracking-tight">
                                                                     {streakLabel}
+                                                                </span>
+                                                            )}
+                                                            {unbeatenLabel && (
+                                                                <span className="inline-flex items-center rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/35 px-2 py-0.5 text-[10px] font-bold tracking-tight">
+                                                                    {unbeatenLabel}
                                                                 </span>
                                                             )}
                                                         </div>
