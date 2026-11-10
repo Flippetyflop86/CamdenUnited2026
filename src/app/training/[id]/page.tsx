@@ -12,6 +12,8 @@ import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
 import { isFormerPlayer, isPlayerInDeletedSquad, parsePlayerDeparture } from "@/lib/utils";
 import { useClub } from "@/context/club-context";
+import { useAuth } from "@/context/auth-context";
+import { encodePaymentDescription } from "@/lib/clubflow-pay";
 
 function formatSquad(squad: string) {
     if (squad === "firstTeam") return "First Team";
@@ -39,6 +41,8 @@ function formatFriendlyDate(dateStr: string) {
 export default function TrainingSessionPage() {
     const routeParams = useParams();
     const { settings } = useClub();
+    const { clubId } = useAuth();
+    const [finedSessionPlayerIds, setFinedSessionPlayerIds] = useState<Record<string, boolean>>({});
     const currentSquads = settings.squads || ["First Team"];
     const [session, setSession] = useState<TrainingSession | null>(null);
     const [players, setPlayers] = useState<Player[]>([]);
@@ -236,6 +240,47 @@ export default function TrainingSessionPage() {
 
         setSession({ ...session, attendance: updated });
         setUnsavedChanges(true);
+    };
+
+    const handleMarkLate = (playerId: string, e: React.MouseEvent) => {
+        e.stopPropagation();
+        if (!session) return;
+        const idx = session.attendance.findIndex(a => a.playerId === playerId);
+        let updated = [...session.attendance];
+        if (idx >= 0) {
+            const current = updated[idx].status;
+            updated[idx] = { ...updated[idx], status: current === 'Late' ? 'Present' : 'Late' };
+        } else {
+            updated.push({ playerId, status: 'Late', notes: '' });
+        }
+        setSession({ ...session, attendance: updated });
+        setUnsavedChanges(true);
+    };
+
+    const handleIssueSessionFine = async (player: Player, reason: "late" | "noshow", e: React.MouseEvent) => {
+        e.stopPropagation();
+        const key = `${player.id}_${reason}`;
+        if (finedSessionPlayerIds[key]) return;
+        const amount = reason === "late" ? 5 : 15;
+        const label = reason === "late" ? `🕒 Late to Training (${session?.date || ""})` : `👻 No Show at Training (${session?.date || ""})`;
+        try {
+            const desc = encodePaymentDescription(label, {
+                feeCoverage: "player",
+            });
+            const { error } = await supabase.from("player_payment_requests").insert([
+                {
+                    ...(clubId ? { club_id: clubId } : {}),
+                    player_id: player.id,
+                    amount,
+                    description: desc,
+                    status: "Unpaid",
+                },
+            ]);
+            if (error) throw error;
+            setFinedSessionPlayerIds(prev => ({ ...prev, [key]: true }));
+        } catch (err) {
+            console.error("Failed to issue fine:", err);
+        }
     };
 
     const handleAddGuest = () => {
@@ -611,7 +656,8 @@ export default function TrainingSessionPage() {
                         {eligiblePlayers.map((player) => {
                             const record = session.attendance.find(a => a.playerId === player.id);
                             const status = record?.status ?? 'Absent';
-                            const isPresent = status === 'Present';
+                            const isPresent = status === 'Present' || status === 'Late';
+                            const isLate = status === 'Late';
                             const isInjured = status === 'Injured';
                             const isFormerOrDeleted = isFormerPlayer(player) || isPlayerInDeletedSquad(player.squad, currentSquads);
 
@@ -626,15 +672,33 @@ export default function TrainingSessionPage() {
                                     onClick={() => handleTogglePresent(player.id)}
                                     className={`
                                         relative flex flex-col items-center justify-center p-3 rounded-xl border-2 cursor-pointer
-                                        transition-all duration-150 select-none text-center gap-0.5 min-h-[96px] active:scale-[0.98]
-                                        ${isPresent
-                                            ? 'bg-emerald-600 border-emerald-400 shadow-sm text-white'
-                                            : isInjured
-                                                ? 'bg-rose-500/10 border-rose-500/40 text-foreground'
-                                                : 'bg-background border-border text-foreground'
+                                        transition-all duration-150 select-none text-center gap-0.5 min-h-[104px] active:scale-[0.98]
+                                        ${isLate
+                                            ? 'bg-amber-600 border-amber-400 shadow-sm text-white'
+                                            : isPresent
+                                                ? 'bg-emerald-600 border-emerald-400 shadow-sm text-white'
+                                                : isInjured
+                                                    ? 'bg-rose-500/10 border-rose-500/40 text-foreground'
+                                                    : 'bg-background border-border text-foreground'
                                         }
                                     `}
                                 >
+                                    {/* Late toggle button */}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleMarkLate(player.id, e)}
+                                        title="Toggle Late"
+                                        className={`absolute top-1.5 left-1.5 rounded-full w-6 h-6 text-[11px] flex items-center justify-center transition-colors z-10 border
+                                            ${isLate
+                                                ? 'bg-amber-400 text-slate-950 border-amber-200 font-bold'
+                                                : isPresent
+                                                    ? 'bg-black/20 text-white border-white/20'
+                                                    : 'bg-surface-1 text-muted-foreground border-border'
+                                            }`}
+                                    >
+                                        🕒
+                                    </button>
+
                                     {/* Injured toggle button — larger 28x28 touch target on mobile */}
                                     <button
                                         type="button"
@@ -672,14 +736,27 @@ export default function TrainingSessionPage() {
                                             Left Club
                                         </span>
                                     )}
-                                    <div className={`mt-1.5 text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full
-                                        ${isPresent
-                                            ? 'bg-white/20 text-white'
-                                            : isInjured
-                                                ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300'
-                                                : 'bg-surface-1 text-muted-foreground border border-border'
-                                        }`}>
-                                        {isPresent ? '✓ Present' : isInjured ? 'Injured' : 'Absent'}
+                                    <div className="mt-1.5 flex items-center gap-1 flex-wrap justify-center">
+                                        <div className={`text-[9px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full
+                                            ${isLate
+                                                ? 'bg-black/25 text-white'
+                                                : isPresent
+                                                    ? 'bg-white/20 text-white'
+                                                    : isInjured
+                                                        ? 'bg-rose-500/20 text-rose-600 dark:text-rose-300'
+                                                        : 'bg-surface-1 text-muted-foreground border border-border'
+                                            }`}>
+                                            {isLate ? '🕒 Late' : isPresent ? '✓ Present' : isInjured ? 'Injured' : 'Absent'}
+                                        </div>
+                                        {isLate && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => handleIssueSessionFine(player, "late", e)}
+                                                className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-white text-amber-900 shadow-2xs"
+                                            >
+                                                {finedSessionPlayerIds[`${player.id}_late`] ? "✓ Fined" : "+£5 Fine"}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             );
@@ -875,7 +952,8 @@ export default function TrainingSessionPage() {
                         {eligiblePlayers.map((player) => {
                             const record = session.attendance.find(a => a.playerId === player.id);
                             const status = record?.status ?? 'Absent';
-                            const isPresent = status === 'Present';
+                            const isPresent = status === 'Present' || status === 'Late';
+                            const isLate = status === 'Late';
                             const isInjured = status === 'Injured';
                             const isFormerOrDeleted = isFormerPlayer(player) || isPlayerInDeletedSquad(player.squad, currentSquads);
 
@@ -891,17 +969,31 @@ export default function TrainingSessionPage() {
                                     onClick={() => handleTogglePresent(player.id)}
                                     className={`
                                         relative flex flex-col items-center justify-center p-3 rounded-xl border-2 cursor-pointer
-                                        transition-all duration-150 select-none text-center gap-1 min-h-[100px]
-                                        ${isPresent
-                                            ? 'bg-green-500 border-green-400 shadow-md scale-[1.02]'
-                                            : isInjured
-                                                ? 'bg-red-50 border-red-300'
-                                                : 'bg-white border-slate-200 hover:border-slate-400 hover:bg-slate-50'
+                                        transition-all duration-150 select-none text-center gap-1 min-h-[108px]
+                                        ${isLate
+                                            ? 'bg-amber-500 border-amber-400 shadow-md scale-[1.02] text-white'
+                                            : isPresent
+                                                ? 'bg-green-500 border-green-400 shadow-md scale-[1.02]'
+                                                : isInjured
+                                                    ? 'bg-red-50 border-red-300'
+                                                    : 'bg-white border-slate-200 hover:border-slate-400 hover:bg-slate-50'
                                         }
                                     `}
                                 >
+                                    {/* Late toggle */}
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleMarkLate(player.id, e)}
+                                        title="Toggle Late"
+                                        className={`absolute top-1.5 left-1.5 rounded-full w-5 h-5 text-[10px] flex items-center justify-center transition-colors z-10
+                                            ${isLate ? 'bg-amber-300 text-slate-950 font-bold' : 'bg-slate-100 hover:bg-amber-100'}`}
+                                    >
+                                        🕒
+                                    </button>
+
                                     {/* Injured toggle */}
                                     <button
+                                        type="button"
                                         onClick={(e) => handleMarkInjured(player.id, e)}
                                         title="Toggle Injured"
                                         className={`absolute top-1.5 right-1.5 rounded-full w-5 h-5 text-[10px] flex items-center justify-center transition-colors z-10
@@ -931,9 +1023,20 @@ export default function TrainingSessionPage() {
                                             Left Club
                                         </span>
                                     )}
-                                    <div className={`mt-1.5 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full
-                                        ${isPresent ? 'bg-green-400 text-white' : isInjured ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
-                                        {isPresent ? '✓ Here' : isInjured ? 'Injured' : 'Absent'}
+                                    <div className="mt-1.5 flex items-center gap-1 flex-wrap justify-center">
+                                        <div className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full
+                                            ${isLate ? 'bg-black/25 text-white' : isPresent ? 'bg-green-400 text-white' : isInjured ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'}`}>
+                                            {isLate ? '🕒 Late' : isPresent ? '✓ Here' : isInjured ? 'Injured' : 'Absent'}
+                                        </div>
+                                        {isLate && (
+                                            <button
+                                                type="button"
+                                                onClick={(e) => handleIssueSessionFine(player, "late", e)}
+                                                className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full bg-white text-amber-900 shadow-2xs"
+                                            >
+                                                {finedSessionPlayerIds[`${player.id}_late`] ? "✓ Fined" : "+£5 Fine"}
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             );

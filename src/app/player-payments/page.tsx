@@ -3,7 +3,8 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/context/auth-context";
 import { useClub } from "@/context/club-context";
-import { supabase } from "@/lib/supabase";
+import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
+import { parseStatTextString } from "@/lib/match-stats-sync";
 import { isFormerPlayer } from "@/lib/utils";
 import {
     calculateClubFlowFee,
@@ -171,6 +172,8 @@ export default function PlayerPaymentsPage() {
     const [copiedGroupSheet, setCopiedGroupSheet] = useState(false);
     const [onboardingLoading, setOnboardingLoading] = useState(false);
     const [syncingStripe, setSyncingStripe] = useState(false);
+    const [syncingCardFines, setSyncingCardFines] = useState(false);
+    const [cardFineBanner, setCardFineBanner] = useState<string | null>(null);
 
     const storageKey = clubId ? `clubflow-standard-fines-${clubId}` : "clubflow-standard-fines-default";
     const accountStorageKey = clubId ? `clubflow-payout-account-${clubId}` : "clubflow-payout-account-default";
@@ -371,6 +374,123 @@ export default function PlayerPaymentsPage() {
             console.error("Error loading ClubFlow Pay:", error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleSyncMatchdayCardFines = async () => {
+        if (!clubId) return;
+        setSyncingCardFines(true);
+        try {
+            const [{ data: matchesData }, statsRows] = await Promise.all([
+                supabase
+                    .from("matches")
+                    .select("id, date, opponent, yellow_cards, red_cards")
+                    .eq("club_id", clubId)
+                    .order("date", { ascending: false }),
+                fetchScopedMatchPlayerStats({ playerIds: players.map(p => p.id) }),
+            ]);
+
+            const yellowRule =
+                fineRules.find(r => r.id === "fine-yellow-foul") ||
+                fineRules.find(r => r.title.toLowerCase().includes("yellow")) ||
+                { amount: 5, emoji: "🟨", title: "Yellow Card" };
+            const redRule =
+                fineRules.find(r => r.id === "fine-red-card") ||
+                fineRules.find(r => r.title.toLowerCase().includes("red")) ||
+                { amount: 20, emoji: "🟥", title: "Red Card" };
+
+            const newFinePayloads: any[] = [];
+            const existingDescriptions = new Set(
+                payments.map(p => `${p.player_id}::${parsePaymentDescription(p.description).cleanDescription.toLowerCase()}`)
+            );
+
+            for (const m of matchesData || []) {
+                const matchLabel = `vs ${m.opponent} (${m.date})`;
+                const ycMap = new Map<string, number>();
+                const rcMap = new Map<string, number>();
+
+                // 1. From match_player_stats
+                for (const st of statsRows || []) {
+                    if (st.match_id === m.id) {
+                        if (Number(st.yellow_cards) > 0) ycMap.set(st.player_id, Number(st.yellow_cards));
+                        if (Number(st.red_cards) > 0) rcMap.set(st.player_id, Number(st.red_cards));
+                    }
+                }
+
+                // 2. Fallback from text strings on match row
+                if (ycMap.size === 0 && m.yellow_cards) {
+                    const tokens = parseStatTextString(m.yellow_cards, players as any);
+                    tokens.forEach(t => {
+                        if (t.playerId) ycMap.set(t.playerId, (ycMap.get(t.playerId) || 0) + (t.count || 1));
+                    });
+                }
+                if (rcMap.size === 0 && m.red_cards) {
+                    const tokens = parseStatTextString(m.red_cards, players as any);
+                    tokens.forEach(t => {
+                        if (t.playerId) rcMap.set(t.playerId, (rcMap.get(t.playerId) || 0) + (t.count || 1));
+                    });
+                }
+
+                ycMap.forEach((count, pid) => {
+                    const cleanReason = `${yellowRule.emoji} ${yellowRule.title} (${matchLabel})`;
+                    const key = `${pid}::${cleanReason.toLowerCase()}`;
+                    if (!existingDescriptions.has(key)) {
+                        existingDescriptions.add(key);
+                        newFinePayloads.push({
+                            club_id: clubId,
+                            player_id: pid,
+                            amount: Number(yellowRule.amount) * count,
+                            description: encodePaymentDescription(cleanReason, {
+                                dueDate: getDefaultDueDateStr(7),
+                                feeCoverage,
+                                payoutAccountLabel: formattedPayoutAccountLabel,
+                            }),
+                            status: "Unpaid",
+                        });
+                    }
+                });
+
+                rcMap.forEach((count, pid) => {
+                    const cleanReason = `${redRule.emoji} ${redRule.title} (${matchLabel})`;
+                    const key = `${pid}::${cleanReason.toLowerCase()}`;
+                    if (!existingDescriptions.has(key)) {
+                        existingDescriptions.add(key);
+                        newFinePayloads.push({
+                            club_id: clubId,
+                            player_id: pid,
+                            amount: Number(redRule.amount) * count,
+                            description: encodePaymentDescription(cleanReason, {
+                                dueDate: getDefaultDueDateStr(7),
+                                feeCoverage,
+                                payoutAccountLabel: formattedPayoutAccountLabel,
+                            }),
+                            status: "Unpaid",
+                        });
+                    }
+                });
+            }
+
+            if (newFinePayloads.length === 0) {
+                setCardFineBanner("All matchday Yellow & Red cards are already synced to Fines!");
+                setTimeout(() => setCardFineBanner(null), 4000);
+                return;
+            }
+
+            const { data, error } = await supabase
+                .from("player_payment_requests")
+                .insert(newFinePayloads)
+                .select();
+            if (error) throw error;
+            if (data) {
+                setPayments(prev => [...(data as PaymentRequest[]), ...prev]);
+            }
+            setCardFineBanner(`Synced ${newFinePayloads.length} new matchday card fine(s) from your fixtures!`);
+            setTimeout(() => setCardFineBanner(null), 5000);
+        } catch (err: any) {
+            setCardFineBanner(`Error syncing matchday cards: ${err.message}`);
+            setTimeout(() => setCardFineBanner(null), 4000);
+        } finally {
+            setSyncingCardFines(false);
         }
     };
 
@@ -873,6 +993,17 @@ export default function PlayerPaymentsPage() {
             )}
 
             {/* Page Header */}
+            {cardFineBanner && (
+                <div className="rounded-xl bg-amber-500/15 border border-amber-500/40 px-4 py-3 text-xs font-bold text-amber-600 dark:text-amber-300 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        <span>{cardFineBanner}</span>
+                    </div>
+                    <button type="button" onClick={() => setCardFineBanner(null)} className="text-muted-foreground hover:text-foreground">
+                        ✕
+                    </button>
+                </div>
+            )}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <div className="flex items-center gap-2.5 flex-wrap">
@@ -888,6 +1019,17 @@ export default function PlayerPaymentsPage() {
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleSyncMatchdayCardFines}
+                        disabled={syncingCardFines}
+                        className="text-xs font-bold gap-1.5 bg-amber-500/10 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20"
+                        title="Automatically scan match results for Yellow & Red cards and create unpaid fines using your Fine Tariff"
+                    >
+                        <Sparkles className={`h-3.5 w-3.5 ${syncingCardFines ? "animate-spin" : ""}`} />
+                        {syncingCardFines ? "Scanning Cards..." : "Sync Matchday Card Fines"}
+                    </Button>
                     <Button
                         variant="outline"
                         size="sm"

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Plus, Trash2, Search, Pencil, User, AlertTriangle, PackageX, ShieldAlert, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { InventoryItem } from "@/types";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/auth-context";
 
 // ── Category config ──────────────────────────────────────────────────────────
 const CATEGORIES = ["All", "Kit", "Equipment", "Medical", "Technology", "Other"] as const;
@@ -51,6 +52,7 @@ function sortItems(items: InventoryItem[], key: SortKey, dir: SortDir) {
 }
 
 export default function InventoryPage() {
+    const { clubId } = useAuth();
     const [items, setItems] = useState<InventoryItem[]>([]);
     const [searchTerm, setSearchTerm] = useState("");
     const [categoryFilter, setCategoryFilter] = useState<string>("All");
@@ -65,7 +67,9 @@ export default function InventoryPage() {
     });
 
     const fetchInventory = useCallback(async () => {
-        const { data } = await supabase.from("inventory_items").select("*");
+        let query = supabase.from("inventory_items").select("*");
+        if (clubId) query = query.eq("club_id", clubId);
+        const { data } = await query;
         if (data) {
             setItems(data.map((i: any) => ({
                 id: i.id,
@@ -78,7 +82,7 @@ export default function InventoryPage() {
                 lastUpdated: i.last_updated,
             })));
         }
-    }, []);
+    }, [clubId]);
 
     useEffect(() => {
         fetchInventory();
@@ -91,6 +95,7 @@ export default function InventoryPage() {
     const handleSaveItem = async () => {
         if (!newItem.name || (newItem.quantity ?? 0) < 0) return;
         const payload = {
+            ...(clubId ? { club_id: clubId } : {}),
             name: newItem.name,
             quantity: newItem.quantity,
             category: newItem.category,
@@ -168,21 +173,21 @@ export default function InventoryPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-bold tracking-tight text-slate-900">Inventory</h2>
-                    <p className="text-slate-500">Track kit, equipment, and supplies.</p>
+                    <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">Inventory</h2>
+                    <p className="text-xs md:text-sm text-muted-foreground">Track kit, equipment, and medical supplies.</p>
                 </div>
-                <div className="flex gap-2">
-                    <div className="relative">
-                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                <div className="flex gap-2 w-full md:w-auto">
+                    <div className="relative flex-1 md:flex-initial">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search inventory..."
-                            className="pl-9 w-[200px] md:w-[260px]"
+                            className="pl-9 w-full md:w-[260px]"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                         />
                     </div>
-                    <Button onClick={() => setIsAddOpen(true)} className="bg-slate-900 text-white hover:bg-slate-800">
-                        <Plus className="h-4 w-4 mr-2" /> Add Item
+                    <Button onClick={() => setIsAddOpen(true)} className="bg-brand text-white hover:bg-brand/90 shrink-0">
+                        <Plus className="h-4 w-4 mr-1.5" /> Add Item
                     </Button>
                 </div>
             </div>

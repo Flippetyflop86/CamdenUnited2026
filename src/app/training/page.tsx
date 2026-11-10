@@ -11,6 +11,8 @@ import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
+import { useAuth } from "@/context/auth-context";
+import { encodePaymentDescription } from "@/lib/clubflow-pay";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,6 +65,37 @@ function getPositionGroup(pos?: string): "GK" | "DEF" | "MID" | "FWD" | "OTHER" 
 
 export default function TrainingPage() {
     const { settings, isLoaded: isClubLoaded } = useClub();
+    const { clubId } = useAuth();
+    const [finedTrainingPlayerIds, setFinedTrainingPlayerIds] = useState<Record<string, boolean>>({});
+    const [trainingFeedback, setTrainingFeedback] = useState<string | null>(null);
+
+    const handleQuickTrainingFine = async (player: any, reason: "late" | "noshow") => {
+        const amount = reason === "late" ? 5 : 15;
+        const label = reason === "late" ? "🕒 Late to Training" : "👻 No Show at Training";
+        const key = `${player.id}_${reason}`;
+        if (finedTrainingPlayerIds[key]) return;
+        try {
+            const desc = encodePaymentDescription(label, {
+                feeCoverage: "player",
+            });
+            const { error } = await supabase.from("player_payment_requests").insert([
+                {
+                    ...(clubId ? { club_id: clubId } : {}),
+                    player_id: player.id,
+                    amount,
+                    description: desc,
+                    status: "Unpaid",
+                },
+            ]);
+            if (error) throw error;
+            setFinedTrainingPlayerIds(prev => ({ ...prev, [key]: true }));
+            setTrainingFeedback(`Issued £${amount} fine (${label}) to ${player.firstName} ${player.lastName}`);
+            setTimeout(() => setTrainingFeedback(null), 4000);
+        } catch (err: any) {
+            setTrainingFeedback(`Could not issue fine: ${err.message}`);
+            setTimeout(() => setTrainingFeedback(null), 4000);
+        }
+    };
     const searchParams = useSearchParams();
     const currentSquads = settings.squads || ["First Team"];
     const healedDeletedSquadIdsRef = useRef<Set<string>>(new Set());
@@ -165,7 +198,9 @@ export default function TrainingPage() {
     };
 
     const fetchSessionsOnly = async () => {
-        const { data, error } = await supabase.from("training_sessions").select("*");
+        let query = supabase.from("training_sessions").select("*");
+        if (clubId) query = query.eq("club_id", clubId);
+        const { data, error } = await query;
         if (!error && data) {
             setSessions(data.map((s: any) => ({
                 id: s.id,
@@ -181,7 +216,9 @@ export default function TrainingPage() {
     };
 
     const fetchPlayers = async () => {
-        const { data, error } = await supabase.from("players").select("*");
+        let query = supabase.from("players").select("*");
+        if (clubId) query = query.eq("club_id", clubId);
+        const { data, error } = await query;
         if (!error && data) {
             setPlayers(data.map((p: any) => {
                 const matchedActiveSquad = findMatchingActiveSquad(p.squad, currentSquads);
@@ -278,6 +315,7 @@ export default function TrainingPage() {
     const handleSchedule = async () => {
         const isNew = !editingSessionId;
         const payload: any = {
+            ...(clubId ? { club_id: clubId } : {}),
             date: newSession.date,
             time: newSession.time,
             location: newSession.location,
@@ -361,6 +399,7 @@ export default function TrainingPage() {
         const nextWeekDate = d.toISOString().split('T')[0];
 
         const payload = {
+            ...(clubId ? { club_id: clubId } : {}),
             date: nextWeekDate,
             time: session.time,
             location: session.location,
@@ -2053,8 +2092,21 @@ export default function TrainingPage() {
                                                     </div>
 
                                                     {player.stats.late > 0 && (
-                                                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/35">
-                                                            {player.stats.late} Late
+                                                        <span className="inline-flex items-center gap-1">
+                                                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/35">
+                                                                {player.stats.late} Late
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleQuickTrainingFine(player, "late")}
+                                                                className={`px-1.5 py-0.2 rounded text-[9px] font-extrabold border transition-colors ${
+                                                                    finedTrainingPlayerIds[`${player.id}_late`]
+                                                                        ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                                                                        : "bg-rose-500/15 text-rose-400 border-rose-500/35 hover:bg-rose-500/25"
+                                                                }`}
+                                                            >
+                                                                {finedTrainingPlayerIds[`${player.id}_late`] ? "✓ Fined £5" : "+ Fine £5"}
+                                                            </button>
                                                         </span>
                                                     )}
 
@@ -2320,9 +2372,23 @@ export default function TrainingPage() {
                                             </td>
                                             <td className="px-4 py-4 text-center hidden sm:table-cell">
                                                 {player.stats.late > 0 ? (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/35">
-                                                        {player.stats.late}
-                                                    </span>
+                                                    <div className="inline-flex items-center gap-1.5">
+                                                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/35">
+                                                            {player.stats.late}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => handleQuickTrainingFine(player, "late")}
+                                                            title="Issue £5 Late to Training fine"
+                                                            className={`px-2 py-0.5 rounded text-[10px] font-extrabold border transition-colors ${
+                                                                finedTrainingPlayerIds[`${player.id}_late`]
+                                                                    ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/40"
+                                                                    : "bg-rose-500/15 text-rose-400 border-rose-500/35 hover:bg-rose-500/25"
+                                                            }`}
+                                                        >
+                                                            {finedTrainingPlayerIds[`${player.id}_late`] ? "✓ Fined £5" : "+ Fine £5"}
+                                                        </button>
+                                                    </div>
                                                 ) : (
                                                     <span className="text-xs text-muted-foreground font-medium">0</span>
                                                 )}

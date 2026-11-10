@@ -85,6 +85,16 @@ export default function MatchesPage() {
     const [expenseAmount, setExpenseAmount] = useState("");
     const [expenseCategory, setExpenseCategory] = useState("Ref Fees");
     const [expenseNotes, setExpenseNotes] = useState("");
+    const [matchFeedbackBanner, setMatchFeedbackBanner] = useState<{ type: "success" | "error"; message: string } | null>(null);
+    const [bulkKickoffTime, setBulkKickoffTime] = useState("14:00");
+    const [bulkCompetition, setBulkCompetition] = useState("League Match");
+    const [bulkVenueIsHome, setBulkVenueIsHome] = useState<"Home" | "Away">("Home");
+    const [isBulkUpdatingMatches, setIsBulkUpdatingMatches] = useState(false);
+
+    const showMatchFeedback = (message: string, type: "success" | "error" = "success") => {
+        setMatchFeedbackBanner({ type, message });
+        setTimeout(() => setMatchFeedbackBanner(null), 3500);
+    };
 
 
 
@@ -100,6 +110,7 @@ export default function MatchesPage() {
         const desc = `${expenseCategory} - vs ${selectedExpenseMatch.opponent}${notesPart}`;
 
         const payload = {
+            ...(clubId ? { club_id: clubId } : {}),
             date: selectedExpenseMatch.date,
             description: desc,
             amount: amt,
@@ -115,7 +126,7 @@ export default function MatchesPage() {
                 .insert([payload]);
 
             if (error) throw error;
-            alert("Expense logged successfully!");
+            showMatchFeedback(`Logged £${amt.toFixed(2)} (${expenseCategory}) vs ${selectedExpenseMatch.opponent}`);
             setIsExpenseOpen(false);
             setExpenseAmount("");
             setExpenseNotes("");
@@ -709,6 +720,7 @@ export default function MatchesPage() {
                 if (teamNameClean) {
                     const existingTeam = leagueTeams.find(t => (t.name || t.team_name || "").toLowerCase() === teamNameClean.toLowerCase());
                     const teamPayload = {
+                        ...(clubId ? { club_id: clubId } : {}),
                         name: teamNameClean,
                         badge_url: opponentBadgeUrl || null,
                         instagram_handle: opponentInstagram || null
@@ -798,6 +810,32 @@ export default function MatchesPage() {
             else next.add(id);
             return next;
         });
+    };
+
+    const handleBulkUpdateField = async (field: "time" | "competition" | "is_home", value: any) => {
+        const ids = Array.from(selectedMatchIds);
+        if (ids.length === 0) return;
+        setIsBulkUpdatingMatches(true);
+        try {
+            const updatePayload: Record<string, any> = { [field]: value };
+            const { error } = await supabase
+                .from("matches")
+                .update(updatePayload)
+                .in("id", ids);
+            if (error) throw error;
+            await fetchMatches();
+            const label =
+                field === "time"
+                    ? `Kick-off time set to ${value}`
+                    : field === "competition"
+                    ? `Competition set to ${value}`
+                    : `Venue set to ${value ? "Home" : "Away"}`;
+            showMatchFeedback(`${label} for ${ids.length} fixture(s).`);
+        } catch (err: any) {
+            showMatchFeedback("Bulk update failed: " + err.message, "error");
+        } finally {
+            setIsBulkUpdatingMatches(false);
+        }
     };
 
     const handleBulkDelete = async () => {
@@ -2230,6 +2268,138 @@ export default function MatchesPage() {
     return (
         <div className="space-y-4 md:space-y-6 pb-8 md:pb-0">
             {/* Shared Opponent Autocomplete Datalist (#4) */}
+            {matchFeedbackBanner && (
+                <div
+                    className={`rounded-xl border px-4 py-2.5 text-xs font-bold flex items-center justify-between gap-2 ${
+                        matchFeedbackBanner.type === "error"
+                            ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                            : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                    }`}
+                >
+                    <div className="flex items-center gap-2">
+                        {matchFeedbackBanner.type === "error" ? (
+                            <AlertCircle className="h-4 w-4 shrink-0" />
+                        ) : (
+                            <CheckCircle2 className="h-4 w-4 shrink-0" />
+                        )}
+                        <span>{matchFeedbackBanner.message}</span>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setMatchFeedbackBanner(null)}
+                        className="text-muted-foreground hover:text-foreground"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
+
+            {isBulkSelectMode && (
+                <div className="rounded-xl border border-brand/40 bg-brand/5 p-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Badge className="bg-brand text-brand-foreground font-bold text-xs">
+                            {selectedMatchIds.size} Selected
+                        </Badge>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                                const allVisibleIds = filteredMatches.map(m => m.id);
+                                if (selectedMatchIds.size === allVisibleIds.length) {
+                                    setSelectedMatchIds(new Set());
+                                } else {
+                                    setSelectedMatchIds(new Set(allVisibleIds));
+                                }
+                            }}
+                            className="h-7 px-2.5 text-[11px] font-bold"
+                        >
+                            {selectedMatchIds.size === filteredMatches.length && filteredMatches.length > 0
+                                ? "Deselect All"
+                                : `Select All (${filteredMatches.length})`}
+                        </Button>
+                    </div>
+
+                    {selectedMatchIds.size > 0 && (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex items-center gap-1 bg-surface-1 border border-border rounded-lg px-2 py-1">
+                                <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                                <input
+                                    type="time"
+                                    value={bulkKickoffTime}
+                                    onChange={e => setBulkKickoffTime(e.target.value)}
+                                    className="bg-transparent text-xs font-bold text-foreground outline-none w-[70px]"
+                                />
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={isBulkUpdatingMatches}
+                                    onClick={() => handleBulkUpdateField("time", bulkKickoffTime)}
+                                    className="h-6 px-2 text-[10px] font-bold bg-brand hover:bg-brand/90 text-brand-foreground"
+                                >
+                                    Set KO
+                                </Button>
+                            </div>
+
+                            <div className="flex items-center gap-1 bg-surface-1 border border-border rounded-lg px-2 py-1">
+                                <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                                <select
+                                    value={bulkVenueIsHome}
+                                    onChange={e => setBulkVenueIsHome(e.target.value as "Home" | "Away")}
+                                    className="bg-transparent text-xs font-bold text-foreground outline-none"
+                                >
+                                    <option value="Home">Home</option>
+                                    <option value="Away">Away</option>
+                                </select>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={isBulkUpdatingMatches}
+                                    onClick={() => handleBulkUpdateField("is_home", bulkVenueIsHome === "Home")}
+                                    className="h-6 px-2 text-[10px] font-bold bg-brand hover:bg-brand/90 text-brand-foreground"
+                                >
+                                    Set Venue
+                                </Button>
+                            </div>
+
+                            <div className="flex items-center gap-1 bg-surface-1 border border-border rounded-lg px-2 py-1">
+                                <Trophy className="h-3.5 w-3.5 text-muted-foreground" />
+                                <select
+                                    value={bulkCompetition}
+                                    onChange={e => setBulkCompetition(e.target.value)}
+                                    className="bg-transparent text-xs font-bold text-foreground outline-none max-w-[130px]"
+                                >
+                                    <option value="League Match">League Match</option>
+                                    <option value="Alec Smith Premier Division Cup">Alec Smith Cup</option>
+                                    <option value="Middlesex Cup">Middlesex Cup</option>
+                                    <option value="Friendly">Friendly</option>
+                                    <option value="Trial Match">Trial Match</option>
+                                </select>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    disabled={isBulkUpdatingMatches}
+                                    onClick={() => handleBulkUpdateField("competition", bulkCompetition)}
+                                    className="h-6 px-2 text-[10px] font-bold bg-brand hover:bg-brand/90 text-brand-foreground"
+                                >
+                                    Set Comp
+                                </Button>
+                            </div>
+
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={handleBulkDelete}
+                                className="h-8 px-2.5 text-xs bg-rose-600 hover:bg-rose-700 text-white font-bold"
+                            >
+                                <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                Delete ({selectedMatchIds.size})
+                            </Button>
+                        </div>
+                    )}
+                </div>
+            )}
             <datalist id="known-opponents-list">
                 {knownOpponents.map(opp => (
                     <option key={opp} value={opp} />

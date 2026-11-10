@@ -138,6 +138,56 @@ export default function SquadPage() {
     // CSV Import and Bulk Invite Hooks/Handlers
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isBulkInviting, setIsBulkInviting] = useState(false);
+    const [csvFeedbackBanner, setCsvFeedbackBanner] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+    const resolveCsvRowPlayer = (rawRow: Record<string, any>) => {
+        const lowerMap: Record<string, string> = {};
+        Object.entries(rawRow || {}).forEach(([k, v]) => {
+            if (k && v !== undefined && v !== null) {
+                lowerMap[k.trim().toLowerCase().replace(/[\s_-]+/g, "")] = String(v).trim();
+            }
+        });
+        const fullNameRaw =
+            lowerMap["fullname"] ||
+            lowerMap["playername"] ||
+            lowerMap["player"] ||
+            "";
+        let firstName =
+            lowerMap["firstname"] ||
+            lowerMap["forename"] ||
+            lowerMap["name"] ||
+            "";
+        let lastName =
+            lowerMap["lastname"] ||
+            lowerMap["surname"] ||
+            lowerMap["familyname"] ||
+            "";
+
+        if (!firstName && !lastName && fullNameRaw) {
+            const parts = fullNameRaw.split(/\s+/);
+            firstName = parts[0] || "";
+            lastName = parts.slice(1).join(" ");
+        } else if (firstName && !lastName && firstName.includes(" ")) {
+            const parts = firstName.split(/\s+/);
+            firstName = parts[0] || "";
+            lastName = parts.slice(1).join(" ");
+        }
+        if (!firstName && !lastName) return null;
+
+        const rawPos = (lowerMap["position"] || lowerMap["pos"] || lowerMap["role"] || "MID").toUpperCase();
+        const squadNum = parseInt(lowerMap["squadnumber"] || lowerMap["number"] || lowerMap["shirt"] || lowerMap["no"] || "", 10);
+
+        return {
+            club_id: clubId,
+            first_name: firstName || "Player",
+            last_name: lastName || "",
+            position: rawPos || "MID",
+            ...(isNaN(squadNum) ? {} : { squad_number: squadNum }),
+            squad: "firstTeam",
+            medical_status: "Available",
+            availability: true,
+        };
+    };
 
     const handleCSVImport = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -153,8 +203,8 @@ export default function SquadPage() {
                     return;
                 }
 
-                // Parse columns: Name, Surname, Email, Phone, Position
-                const playersToInsert = rows
+                const playersToInsert = rows.map(resolveCsvRowPlayer).filter(Boolean) as any[];
+                const _legacyUnused = rows
                     .filter(row => row.Name || row.Surname)
                     .map(row => ({
                         club_id: clubId,
@@ -169,7 +219,7 @@ export default function SquadPage() {
                     }));
 
                 if (playersToInsert.length === 0) {
-                    alert("No valid player rows found. Columns must be Name, Surname, Email, Phone, Position.");
+                    setCsvFeedbackBanner({ type: "error", message: "No valid player rows found. Include a Name, First Name/Last Name, or Player column." });
                     return;
                 }
 
@@ -178,10 +228,11 @@ export default function SquadPage() {
                     if (error) throw error;
 
                     logActivity("Imported Squad", `Imported ${playersToInsert.length} players via CSV.`);
-                    alert(`Successfully imported ${playersToInsert.length} players!`);
+                    setCsvFeedbackBanner({ type: "success", message: `Successfully imported ${playersToInsert.length} player(s) via CSV!` });
+                    setTimeout(() => setCsvFeedbackBanner(null), 5000);
                     fetchData();
                 } catch (err: any) {
-                    alert("Error importing players: " + err.message);
+                    setCsvFeedbackBanner({ type: "error", message: "Error importing players: " + err.message });
                 }
             }
         });
@@ -1792,6 +1843,20 @@ export default function SquadPage() {
 
     return (
         <div className="pb-16 bg-background min-h-screen">
+            {csvFeedbackBanner && (
+                <div
+                    className={`mx-4 mt-3 rounded-xl border px-4 py-2.5 text-xs font-bold flex items-center justify-between gap-2 ${
+                        csvFeedbackBanner.type === "error"
+                            ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                            : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                    }`}
+                >
+                    <span>{csvFeedbackBanner.message}</span>
+                    <button type="button" onClick={() => setCsvFeedbackBanner(null)} className="text-muted-foreground hover:text-foreground">
+                        ✕
+                    </button>
+                </div>
+            )}
             {/* =====================================================================
                 MOBILE SQUAD VIEW (< 768px) — Fantasy Football Hub / FotMob Style
                ===================================================================== */}

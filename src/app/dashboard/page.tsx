@@ -47,6 +47,7 @@ type StandingsRow = {
     goal_difference: number;
     points: number;
     is_our_club?: boolean;
+    form?: ("W" | "D" | "L")[];
 };
 
 export default function DashboardPage() {
@@ -68,6 +69,16 @@ export default function DashboardPage() {
     const [isInitialLoaded, setIsInitialLoaded] = useState<boolean>(false);
     const [copiedWhatsApp, setCopiedWhatsApp] = useState<"match" | "training" | null>(null);
     const [hideSetupChecklist, setHideSetupChecklist] = useState<boolean>(false);
+    const [oppositionTeams, setOppositionTeams] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (!clubId) return;
+        let q = supabase.from("opposition_teams").select("*");
+        q = q.eq("club_id", clubId);
+        q.then(({ data }) => {
+            if (data) setOppositionTeams(data);
+        });
+    }, [clubId]);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -103,6 +114,7 @@ export default function DashboardPage() {
                     goal_difference: Number(r.goal_difference ?? r.gd ?? 0),
                     points: Number(r.points ?? r.pts ?? 0),
                     is_our_club: Boolean(r.is_our_club),
+                    form: Array.isArray(r.form) ? r.form : undefined,
                 }));
 
         const loadStandings = async () => {
@@ -809,6 +821,53 @@ export default function DashboardPage() {
     const nextOppPos = getTeamLeaguePos(nextMatch?.opponent);
     const lastOppPos = getTeamLeaguePos(lastMatch?.opponent);
 
+    const nextOpponentScoutBrief = useMemo(() => {
+        if (!nextMatch?.opponent || oppositionTeams.length === 0) return null;
+        const cleanOpp = nextMatch.opponent.toLowerCase().replace(/\b(fc|afc|1st|first)\b/g, "").replace(/[^a-z0-9]/g, "").trim();
+        const found = oppositionTeams.find(t => {
+            const cleanT = (t.name || "").toLowerCase().replace(/\b(fc|afc|1st|first)\b/g, "").replace(/[^a-z0-9]/g, "").trim();
+            return cleanT && cleanOpp && (cleanT === cleanOpp || cleanT.includes(cleanOpp) || cleanOpp.includes(cleanT));
+        });
+        if (!found) return null;
+        const raw = found.notes && typeof found.notes === "object" ? found.notes : {};
+        const strengths = (raw.strengths || "").trim();
+        const weaknesses = (raw.weaknesses || "").trim();
+        const dangerMen = (raw.dangerMen || "").trim();
+        const voiceNotesCount = Array.isArray(raw.voiceNotes) ? raw.voiceNotes.length : 0;
+        if (!strengths && !weaknesses && !dangerMen && voiceNotesCount === 0 && !found.formation) return null;
+        return {
+            formation: found.formation || "4-2-3-1",
+            strengths,
+            weaknesses,
+            dangerMen,
+            voiceNotesCount,
+        };
+    }, [nextMatch?.opponent, oppositionTeams]);
+
+    const getRowStreakBadges = (row: StandingsRow) => {
+        const fullForm = Array.isArray(row.form) ? row.form : [];
+        let trailingWins = 0;
+        for (let i = fullForm.length - 1; i >= 0; i--) {
+            if (fullForm[i] === "W") trailingWins++;
+            else break;
+        }
+        if (row.played > 0 && row.won === row.played && row.drawn === 0 && row.lost === 0) {
+            trailingWins = Math.max(trailingWins, row.won);
+        }
+        let trailingUnbeaten = 0;
+        for (let i = fullForm.length - 1; i >= 0; i--) {
+            if (fullForm[i] === "W" || fullForm[i] === "D") trailingUnbeaten++;
+            else break;
+        }
+        if (row.played > 0 && row.lost === 0 && row.won + row.drawn === row.played) {
+            trailingUnbeaten = Math.max(trailingUnbeaten, row.played);
+        }
+        return {
+            winStreak: trailingWins >= 4 ? `🔥 ${trailingWins}W` : null,
+            unbeatenStreak: trailingUnbeaten >= 5 && trailingUnbeaten > trailingWins ? `🛡️ ${trailingUnbeaten} Unbeaten` : null,
+        };
+    };
+
     const setupChecklistSteps = [
         {
             id: "identity",
@@ -1156,6 +1215,35 @@ export default function DashboardPage() {
                                             Matchday Planner <ArrowRight className="h-3.5 w-3.5" />
                                         </Link>
                                     </div>
+                                    {nextOpponentScoutBrief && (
+                                        <div className="rounded-lg bg-surface-2/80 border border-brand/25 p-2.5 text-[11px] space-y-1">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="font-extrabold uppercase tracking-wider text-brand text-[10px]">
+                                                    🎯 Scout Brief ({nextOpponentScoutBrief.formation})
+                                                </span>
+                                                {nextOpponentScoutBrief.voiceNotesCount > 0 && (
+                                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-brand/15 text-brand">
+                                                        🎙️ {nextOpponentScoutBrief.voiceNotesCount} Voice Note{nextOpponentScoutBrief.voiceNotesCount > 1 ? "s" : ""}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {nextOpponentScoutBrief.weaknesses && (
+                                                <p className="text-muted-foreground truncate" title={nextOpponentScoutBrief.weaknesses}>
+                                                    <strong className="text-emerald-500">Exploit:</strong> {nextOpponentScoutBrief.weaknesses}
+                                                </p>
+                                            )}
+                                            {nextOpponentScoutBrief.dangerMen && (
+                                                <p className="text-muted-foreground truncate" title={nextOpponentScoutBrief.dangerMen}>
+                                                    <strong className="text-amber-500">Threats:</strong> {nextOpponentScoutBrief.dangerMen}
+                                                </p>
+                                            )}
+                                            {!nextOpponentScoutBrief.weaknesses && nextOpponentScoutBrief.strengths && (
+                                                <p className="text-muted-foreground truncate" title={nextOpponentScoutBrief.strengths}>
+                                                    <strong className="text-sky-500">Strengths:</strong> {nextOpponentScoutBrief.strengths}
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
                                     <Link
                                         href={`/opposition?team=${encodeURIComponent(nextMatch.opponent)}`}
                                         className="h-7 w-full px-3 rounded-md bg-surface-2 hover:bg-accent border border-border text-foreground text-[11px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors"
@@ -1506,6 +1594,7 @@ export default function DashboardPage() {
                                         <tbody>
                                             {miniTableRows.map((r, i) => {
                                                 const isOurs = r.is_our_club || (settings.name && r.team_name.toLowerCase().includes(settings.name.toLowerCase()));
+                                                const streaks = getRowStreakBadges(r);
                                                 return (
                                                     <tr
                                                         key={i}
@@ -1515,7 +1604,19 @@ export default function DashboardPage() {
                                                     >
                                                         <td className="pl-3 py-2.5 font-bold">{r.position}</td>
                                                         <td className={`py-2.5 px-2 truncate ${isOurs ? "text-brand font-extrabold" : "text-foreground font-medium"}`}>
-                                                            {r.team_name}
+                                                            <div className="flex items-center gap-1.5 truncate">
+                                                                <span className="truncate">{r.team_name}</span>
+                                                                {streaks.winStreak && (
+                                                                    <span className="inline-flex items-center rounded-full bg-orange-500/15 text-orange-600 dark:text-orange-300 border border-orange-500/35 px-1.5 py-0 text-[9px] font-bold shrink-0">
+                                                                        {streaks.winStreak}
+                                                                    </span>
+                                                                )}
+                                                                {streaks.unbeatenStreak && (
+                                                                    <span className="inline-flex items-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-500/35 px-1.5 py-0 text-[9px] font-bold shrink-0">
+                                                                        {streaks.unbeatenStreak}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                         <td className="py-2.5 text-center text-muted-foreground">{r.played}</td>
                                                         <td className={`py-2.5 text-center font-mono text-[11px] ${

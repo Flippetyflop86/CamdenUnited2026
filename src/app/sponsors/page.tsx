@@ -34,6 +34,7 @@ import { useClub } from "@/context/club-context";
 
 export default function SponsorsPage() {
     const { settings } = useClub();
+    const { clubId } = useAuth();
     const [sponsors, setSponsors] = useState<Sponsor[]>([]);
 
     const [isAddOpen, setIsAddOpen] = useState(false);
@@ -81,7 +82,9 @@ export default function SponsorsPage() {
     }, []);
 
     const fetchSponsors = async () => {
-        const { data } = await supabase.from('sponsors').select('*');
+        let query = supabase.from('sponsors').select('*');
+        if (clubId) query = query.eq('club_id', clubId);
+        const { data } = await query;
         if (data) {
             setSponsors(data.map((s: any) => ({
                 id: s.id,
@@ -138,6 +141,7 @@ export default function SponsorsPage() {
             }
 
             const payload = {
+                ...(clubId ? { club_id: clubId } : {}),
                 name: formData.name,
                 amount: formData.amount,
                 frequency: formData.frequency,
@@ -186,6 +190,7 @@ export default function SponsorsPage() {
 
         const payload = {
             date: new Date().toISOString().split("T")[0],
+            ...(clubId ? { club_id: clubId } : {}),
             description: `Sponsorship Payment - ${sponsor.name}`,
             amount: sponsor.amount,
             type: "Income",

@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Trash2, Edit2, Users, Mail, Phone, ShieldCheck } from "lucide-react";
+import { Plus, Trash2, Edit2, Users, Mail, Phone, ShieldCheck, MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/context/auth-context";
 
 type StaffMember = {
     id: string;
@@ -24,6 +25,7 @@ type StaffMember = {
 };
 
 export default function StaffPage() {
+    const { clubId } = useAuth();
     const [staff, setStaff] = useState<StaffMember[]>([]);
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -46,10 +48,14 @@ export default function StaffPage() {
 
     async function fetchStaff() {
         try {
-            const { data: staffData, error: staffError } = await supabase.from("staff").select("*");
+            let staffQuery = supabase.from("staff").select("*");
+            if (clubId) staffQuery = staffQuery.eq("club_id", clubId);
+            const { data: staffData, error: staffError } = await staffQuery;
             if (staffError) throw staffError;
 
-            const { data: membersData, error: membersError } = await supabase.from("club_members").select("*");
+            let membersQuery = supabase.from("club_members").select("*");
+            if (clubId) membersQuery = membersQuery.eq("club_id", clubId);
+            const { data: membersData, error: membersError } = await membersQuery;
             if (membersError) throw membersError;
 
             const formattedStaff = (staffData || []).map((s: any) => ({
@@ -163,6 +169,7 @@ export default function StaffPage() {
 
                     // Insert or update staff details in staff table using the email
                     const staffPayload = {
+                        ...(clubId ? { club_id: clubId } : {}),
                         name: formData.name,
                         role: formData.role,
                         email: formData.email || matchingMember.email,
@@ -183,6 +190,7 @@ export default function StaffPage() {
                     }
                 } else {
                     const payload = {
+                        ...(clubId ? { club_id: clubId } : {}),
                         name: formData.name,
                         role: formData.role,
                         email: formData.email,
@@ -210,6 +218,7 @@ export default function StaffPage() {
 
                     // Update or insert staff details table
                     const staffPayload = {
+                        ...(clubId ? { club_id: clubId } : {}),
                         name: formData.name,
                         role: formData.role,
                         email: formData.email,
@@ -239,6 +248,7 @@ export default function StaffPage() {
                     }
                 } else {
                     const payload = {
+                        ...(clubId ? { club_id: clubId } : {}),
                         name: formData.name,
                         role: formData.role,
                         email: formData.email,
@@ -364,19 +374,43 @@ export default function StaffPage() {
                             </CardHeader>
                             <CardContent className="pt-4 space-y-3">
                                 {member.email && (
-                                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                                        <Mail className="h-4 w-4 text-slate-400 shrink-0" />
-                                        <a href={`mailto:${member.email}`} className="hover:text-blue-600 truncate">{member.email}</a>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Mail className="h-4 w-4 text-muted-foreground shrink-0" />
+                                        <a href={`mailto:${member.email}`} className="hover:text-brand truncate">{member.email}</a>
                                     </div>
                                 )}
                                 {member.phone && (
-                                    <div className="flex items-center gap-2 text-sm text-slate-600">
-                                        <Phone className="h-4 w-4 text-slate-400 shrink-0" />
-                                        <a href={`tel:${member.phone}`} className="hover:text-blue-600">{member.phone}</a>
+                                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                                        <a href={`tel:${member.phone}`} className="hover:text-brand">{member.phone}</a>
+                                    </div>
+                                )}
+                                {(member.phone || member.email) && (
+                                    <div className="flex items-center gap-2 pt-2">
+                                        {member.phone && (
+                                            <a
+                                                href={`https://wa.me/${member.phone.replace(/[^0-9]/g, "").replace(/^0/, "44")}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 text-xs font-bold hover:bg-emerald-500/25 transition-colors"
+                                            >
+                                                <MessageCircle className="h-3.5 w-3.5" />
+                                                WhatsApp
+                                            </a>
+                                        )}
+                                        {member.email && (
+                                            <a
+                                                href={`mailto:${member.email}`}
+                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-2 text-foreground border border-border text-xs font-bold hover:bg-accent transition-colors"
+                                            >
+                                                <Mail className="h-3.5 w-3.5" />
+                                                Email
+                                            </a>
+                                        )}
                                     </div>
                                 )}
                                 {member.notes && (
-                                    <div className="mt-4 pt-3 border-t border-slate-100 text-xs text-slate-500 italic">
+                                    <div className="mt-4 pt-3 border-t border-border text-xs text-muted-foreground italic">
                                         {member.notes}
                                     </div>
                                 )}

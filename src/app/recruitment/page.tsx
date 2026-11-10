@@ -50,6 +50,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
 import { useClub } from "@/context/club-context";
+import { useAuth } from "@/context/auth-context";
+import Link from "next/link";
 import {
     PIPELINE_STAGES,
     COMMUTE_OPTIONS,
@@ -84,8 +86,15 @@ interface SquadComparisonPlayer {
 
 export default function RecruitmentPage() {
     const { settings } = useClub();
+    const { clubId } = useAuth();
     const [recruits, setRecruits] = useState<Recruit[]>([]);
     const [squadPlayers, setSquadPlayers] = useState<SquadComparisonPlayer[]>([]);
+    const [recruitFeedback, setRecruitFeedback] = useState<{ type: "success" | "error"; message: string; showSquadLink?: boolean } | null>(null);
+
+    const showRecruitFeedback = (message: string, type: "success" | "error" = "success", showSquadLink = false) => {
+        setRecruitFeedback({ type, message, showSquadLink });
+        setTimeout(() => setRecruitFeedback(null), 5000);
+    };
 
     // View & UI State (#21) — Default to Spreadsheet ("table") on desktop
     const [viewMode, setViewMode] = useState<"cards" | "table">("table");
@@ -197,9 +206,9 @@ export default function RecruitmentPage() {
                 commutePracticality: "Easy / Local",
                 notes: mobileQuickForm.notes.trim(),
             });
-            const { error } = await supabase.from("recruits").insert([payload]);
+            const { error } = await supabase.from("recruits").insert([{ ...payload, ...(clubId ? { club_id: clubId } : {}) }]);
             if (error) {
-                alert("Could not save quick scout target: " + error.message);
+                showRecruitFeedback("Could not save quick scout target: " + error.message, "error");
                 return;
             }
             setMobileQuickForm({
@@ -228,20 +237,24 @@ export default function RecruitmentPage() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, []);
+    }, [clubId]);
 
     const fetchRecruits = async () => {
-        const { data } = await supabase.from("recruits").select("*").order("updated_at", { ascending: false });
+        let query = supabase.from("recruits").select("*").order("updated_at", { ascending: false });
+        if (clubId) query = query.eq("club_id", clubId);
+        const { data } = await query;
         if (data) {
             setRecruits(data.map(parseRecruitFromDbRow));
         }
     };
 
     const fetchSquadPlayersForComparison = async () => {
-        const { data: pData } = await supabase
+        let query = supabase
             .from("players")
             .select("id, first_name, last_name, position, secondary_positions, age, preferred_foot, appearances, goals, assists, notes")
             .order("last_name");
+        if (clubId) query = query.eq("club_id", clubId);
+        const { data: pData } = await query;
         if (pData) {
             setSquadPlayers(
                 pData.map((p: any) => ({
@@ -310,13 +323,13 @@ export default function RecruitmentPage() {
         if (editingRecruit) {
             const { error } = await supabase.from("recruits").update(payload).eq("id", editingRecruit.id);
             if (error) {
-                alert("Error updating recruit: " + error.message);
+                showRecruitFeedback("Error updating recruit: " + error.message, "error");
                 return;
             }
         } else {
-            const { error } = await supabase.from("recruits").insert([payload]);
+            const { error } = await supabase.from("recruits").insert([{ ...payload, ...(clubId ? { club_id: clubId } : {}) }]);
             if (error) {
-                alert("Error inserting recruit: " + error.message);
+                showRecruitFeedback("Error inserting recruit: " + error.message, "error");
                 return;
             }
         }
@@ -354,6 +367,10 @@ export default function RecruitmentPage() {
 
         const payload = serializeRecruitForDb(merged);
         await supabase.from("recruits").update(payload).eq("id", recruit.id);
+
+        if (updates.pipelineStage === "Signed" && recruit.pipelineStage !== "Signed") {
+            await handleSignPlayer(merged);
+        }
     };
 
     const handleEdit = (recruit: Recruit) => {
@@ -423,35 +440,43 @@ export default function RecruitmentPage() {
     };
 
     const handleSignPlayer = async (recruit: Recruit) => {
-        if (!window.confirm(`Sign ${recruit.name} to the First Team squad?`)) return;
+        if (!window.confirm(`Promote ${recruit.name} to the Squad now? Their position, preferred foot, age, and scouting notes will be transferred automatically.`)) return;
 
         const nameParts = recruit.name.trim().split(/\s+/);
         const firstName = nameParts[0] || "Unknown";
         const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
+        const secondaryPosArr = recruit.secondaryPosition
+            ? recruit.secondaryPosition.split(/[,/]/).map(s => s.trim()).filter(Boolean)
+            : [];
 
         const { error: insertError } = await supabase.from("players").insert([
             {
+                ...(clubId ? { club_id: clubId } : {}),
                 first_name: firstName,
                 last_name: lastName,
                 position: recruit.primaryPosition,
+                ...(secondaryPosArr.length > 0 ? { secondary_positions: secondaryPosArr } : {}),
                 age: recruit.age || 21,
                 preferred_foot: recruit.preferredFoot || "Right",
                 squad: "firstTeam",
                 medical_status: "Available",
                 availability: true,
-                notes: `Signed from Recruitment Black Book.${recruit.highestLevel ? ` Level: ${recruit.highestLevel}.` : ""}${recruit.previousClubs ? ` Former clubs: ${recruit.previousClubs}.` : ""} ${recruit.notes || ""}`.trim(),
+                notes: `Signed from Recruitment Black Book.${recruit.highestLevel ? ` Level: ${recruit.highestLevel}.` : ""}${recruit.previousClubs ? ` Former clubs: ${recruit.previousClubs}.` : ""}${recruit.phone ? ` Tel: ${recruit.phone}.` : ""} ${recruit.notes || ""}`.trim(),
             },
         ]);
 
         if (insertError) {
-            alert("Error signing player: " + insertError.message);
+            showRecruitFeedback("Error promoting player to squad: " + insertError.message, "error");
             return;
         }
 
         await supabase.from("recruits").delete().eq("id", recruit.id);
         await fetchRecruits();
         await fetchSquadPlayersForComparison();
-        alert(`${recruit.name} has been signed and added to the Squad page!`);
+        if (enlargedRecruit?.id === recruit.id) {
+            setEnlargedRecruit(null);
+        }
+        showRecruitFeedback(`${recruit.name} (${recruit.primaryPosition}) has been promoted to your Squad!`, "success", true);
     };
 
     // #2: Bulk CSV / Excel Import Handlers
@@ -474,13 +499,17 @@ export default function RecruitmentPage() {
         if (previewImportedRecruits.length === 0) return;
         setIsImporting(true);
         try {
-            const payloads = previewImportedRecruits.map((r) => serializeRecruitForDb(r));
+            const payloads = previewImportedRecruits.map((r) => ({
+                ...serializeRecruitForDb(r),
+                ...(clubId ? { club_id: clubId } : {}),
+            }));
             const { error } = await supabase.from("recruits").insert(payloads);
             if (error) {
-                alert("Bulk import failed: " + error.message);
+                showRecruitFeedback("Bulk import failed: " + error.message, "error");
                 return;
             }
             await fetchRecruits();
+            showRecruitFeedback(`Imported ${payloads.length} scouting target(s) into your Black Book!`);
             setImportRawText("");
             setIsImportModalOpen(false);
         } finally {
@@ -905,6 +934,35 @@ export default function RecruitmentPage() {
 
     return (
         <div className="space-y-5 pb-20 md:pb-6">
+            {recruitFeedback && (
+                <div
+                    className={`rounded-xl border px-4 py-3 text-xs font-bold flex items-center justify-between gap-3 ${
+                        recruitFeedback.type === "error"
+                            ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                            : "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+                    }`}
+                >
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <Check className="h-4 w-4 shrink-0" />
+                        <span>{recruitFeedback.message}</span>
+                        {recruitFeedback.showSquadLink && (
+                            <Link
+                                href="/squad"
+                                className="inline-flex items-center gap-1 underline font-extrabold text-emerald-300 hover:text-white ml-1"
+                            >
+                                View in Squad →
+                            </Link>
+                        )}
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => setRecruitFeedback(null)}
+                        className="text-muted-foreground hover:text-foreground"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
             {/* ================================================================= */}
             {/* MOBILE RECRUITMENT & PITCHSIDE BLACK BOOK (< 768px)               */}
             {/* ================================================================= */}
