@@ -705,1434 +705,127 @@ export default function OppositionReportsPage() {
     };
 
     // =========================================================================
-    // CONTINUOUS LONG-FORM LIVE VOICE-TO-TEXT SCOUTING ENGINE (UPGRADED)
-    // 1. Football Domain Multi-Alternative Scorer + Real-Time Phonetic Normalizer
-    // 2. 1-Tap Phone Keyboard Mic Mode (Apple Dictation / Gboard Voice)
-    // 3. Quick-Tap Pitchside Shirt Numbers (#1–#11) & Tactical Chips
-    // 4. Hardware Noise-Suppressed Audio Recorder + Playable Voice Memo + AI Whisper Hook
+    // 1-TAP TOUCHLINE QUICK-TAG PILLS (SHOWN INSIDE EDIT BOXES)
     // =========================================================================
-    const [isVoiceRecording, setIsVoiceRecording] = useState(false);
-    const [isVoicePaused, setIsVoicePaused] = useState(false);
-    const [isKeyboardDictationMode, setIsKeyboardDictationMode] = useState(false);
-    const [voiceTranscript, setVoiceTranscript] = useState("");
-    const [voiceInterimText, setVoiceInterimText] = useState("");
-    const [voiceTargetSection, setVoiceTargetSection] = useState<VoiceNoteTargetSection>("smart");
-    const [voiceElapsedSec, setVoiceElapsedSec] = useState(0);
-    const [isSavingVoiceNote, setIsSavingVoiceNote] = useState(false);
-    const [voiceStatusToast, setVoiceStatusToast] = useState<string | null>(null);
-    const [showVoiceRecorder, setShowVoiceRecorder] = useState(true);
-    const [voiceAudioPreviewUrl, setVoiceAudioPreviewUrl] = useState<string | null>(null);
-    const [voiceAudioDataUrl, setVoiceAudioDataUrl] = useState<string | undefined>(undefined);
-    const [isAiTranscribing, setIsAiTranscribing] = useState(false);
-    const [voiceTranscriptionEngine, setVoiceTranscriptionEngine] = useState<string | undefined>(undefined);
+    type QuickPillSectionKey =
+        | "strengths"
+        | "weaknesses"
+        | "inPossession"
+        | "outOfPossession"
+        | "transition"
+        | "setPieces"
+        | "postMatchReview";
 
-    const speechRecRef = useRef<any>(null);
-    const keepListeningRef = useRef<boolean>(false);
-    const voiceTimerRef = useRef<any>(null);
-    const mobileVoiceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-    const desktopVoiceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
-    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-    const mediaStreamRef = useRef<MediaStream | null>(null);
-    const audioChunksRef = useRef<Blob[]>([]);
-
-    const getKeyboardDictationDeviceGuide = () => {
-        if (typeof navigator === "undefined") {
-            return {
-                deviceLabel: "Phone Keyboard Mic",
-                instruction:
-                    "Your keyboard is open below — tap the 🎤 microphone key on your phone's keyboard to dictate with hardware noise cancellation."
-            };
-        }
-        const ua = navigator.userAgent || "";
-        if (/iPhone|iPad|iPod/i.test(ua)) {
-            return {
-                deviceLabel: "iPhone / iOS Dictation",
-                instruction:
-                    "Your iPhone keyboard is open at the bottom of the screen — tap the 🎤 microphone icon in the bottom-right corner (right under the Return key) to speak."
-            };
-        }
-        if (/Samsung|SM-|GT-/i.test(ua)) {
-            return {
-                deviceLabel: "Samsung Keyboard Voice",
-                instruction:
-                    "Your Samsung keyboard is open at the bottom of the screen — tap the 🎤 microphone icon in the top toolbar strip of your Samsung keyboard to speak."
-            };
-        }
-        if (/Android/i.test(ua)) {
-            return {
-                deviceLabel: "Android / Gboard Voice",
-                instruction:
-                    "Your Android keyboard is open at the bottom of the screen — tap the 🎤 microphone icon in the top-right corner of the keyboard strip to speak."
-            };
-        }
-        if (/Mac/i.test(ua)) {
-            return {
-                deviceLabel: "Mac Voice Dictation",
-                instruction:
-                    "Cursor is ready in the box below — press the 🎤 Dictation key (F5) or press Fn twice on your Mac keyboard to dictate."
-            };
-        }
-        return {
-            deviceLabel: "Device Voice Typing",
-            instruction:
-                "Cursor is ready in the box below — tap the 🎤 key on your touch keyboard (or press Win + H on Windows) to dictate."
-        };
+    const SECTION_QUICK_PILLS: Record<QuickPillSectionKey, string[]> = {
+        strengths: [
+            "Physical & strong in midfield",
+            "Rapid pace on the wings",
+            "Dangerous on corners & set pieces",
+            "Comfortable playing out from the back",
+            "Clinical #9 in the box",
+            "High work rate & fitness"
+        ],
+        weaknesses: [
+            "Slow CBs against balls in behind",
+            "Struggles when pressed high",
+            "Full-backs leave space in behind",
+            "Keeper hesitant under high crosses",
+            "Loses discipline when frustrated",
+            "Fitness drops after 65 mins"
+        ],
+        inPossession: [
+            "Plays short to #6 pivot",
+            "Direct long balls into #9",
+            "Full-backs overlap high",
+            "Wingers cut inside onto stronger foot",
+            "Looks to switch play early"
+        ],
+        outOfPossession: [
+            "Aggressive high press from goal kicks",
+            "Compact mid-block (4-4-2 shape)",
+            "Deep low block — hard to break down",
+            "High defensive line (space in behind)",
+            "Man-to-man in midfield"
+        ],
+        transition: [
+            "Fast counter-attack through wide areas",
+            "Looks for early ball over the top",
+            "Slow to track back after turnovers",
+            "Counter-presses immediately for 5 secs"
+        ],
+        setPieces: [
+            "Inswinging corners to near post",
+            "Crowds the goalkeeper on corners",
+            "Long throw-in into the 6-yard box",
+            "Vulnerable to quick short corners",
+            "Zonal marking on defensive corners"
+        ],
+        postMatchReview: [
+            "High press worked well against their back line",
+            "Balls in behind caused them problems all game",
+            "Target their full-backs early in return fixture",
+            "Watch their counter-attack on turnovers"
+        ]
     };
 
-    const formatVoiceTimer = (totalSec: number) => {
-        const mins = Math.floor(totalSec / 60);
-        const secs = totalSec % 60;
-        return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
-    };
-    const formatVoiceDuration = formatVoiceTimer;
-
-    // #1: Football Domain Vocabulary Scorer & Phonetic Auto-Corrector
-    const FOOTBALL_VOCAB_PATTERNS =
-        /\b(corner|free kick|set piece|throw-in|long throw|goal kick|press|pressing|high line|low block|mid block|counter|transition|overlap|underlap|overload|pivot|centre-back|center-back|full-back|wing-back|winger|striker|keeper|goalkeeper|left-footed|right-footed|weak foot|in behind|near post|back post|number|shirt|formation|4-2-3-1|4-3-3|4-4-2|3-5-2|3-4-3|5-3-2)\b/gi;
-
-    const pickBestFootballAlternative = (resultItem: any): string => {
-        if (!resultItem || resultItem.length === 0) return "";
-        let bestTranscript = resultItem[0]?.transcript || "";
-        let bestScore = -1;
-
-        for (let idx = 0; idx < resultItem.length; idx++) {
-            const candidate = resultItem[idx]?.transcript || "";
-            if (!candidate.trim()) continue;
-            const confidence = typeof resultItem[idx]?.confidence === "number" ? resultItem[idx].confidence : 0.8 - idx * 0.05;
-            const normalizedCandidate = cleanAndNormalizeFootballSpeech(candidate);
-            const matches = normalizedCandidate.match(FOOTBALL_VOCAB_PATTERNS);
-            const footballBonus = (matches ? matches.length : 0) * 0.28;
-            const totalScore = confidence + footballBonus;
-            if (totalScore > bestScore) {
-                bestScore = totalScore;
-                bestTranscript = candidate;
-            }
-        }
-        return bestTranscript;
-    };
-
-    const cleanAndNormalizeFootballSpeech = (rawText: string): string => {
-        if (!rawText) return "";
-        let text = rawText;
-
-        // 1. Spoken formations -> hyphenated tactical notation
-        const formationMap: [RegExp, string][] = [
-            [/\b(?:four|for|4)[\s-]+(?:two|to|too|2)[\s-]+(?:three|free|tree|3)[\s-]+(?:one|won|1)\b/gi, "4-2-3-1"],
-            [/\b4231\b/g, "4-2-3-1"],
-            [/\b(?:four|for|4)[\s-]+(?:three|free|tree|3)[\s-]+(?:three|free|tree|3)\b/gi, "4-3-3"],
-            [/\b433\b/g, "4-3-3"],
-            [/\b(?:four|for|4)[\s-]+(?:four|for|4)[\s-]+(?:two|to|too|2)\b/gi, "4-4-2"],
-            [/\b442\b/g, "4-4-2"],
-            [/\b(?:three|free|tree|3)[\s-]+(?:five|5)[\s-]+(?:two|to|too|2)\b/gi, "3-5-2"],
-            [/\b352\b/g, "3-5-2"],
-            [/\b(?:three|free|tree|3)[\s-]+(?:four|for|4)[\s-]+(?:three|free|tree|3)\b/gi, "3-4-3"],
-            [/\b343\b/g, "3-4-3"],
-            [/\b(?:five|5)[\s-]+(?:three|free|tree|3)[\s-]+(?:two|to|too|2)\b/gi, "5-3-2"],
-            [/\b532\b/g, "5-3-2"],
-            [/\b(?:four|for|4)[\s-]+(?:one|won|1)[\s-]+(?:four|for|4)[\s-]+(?:one|won|1)\b/gi, "4-1-4-1"],
-            [/\b4141\b/g, "4-1-4-1"],
-            [/\b(?:four|for|4)[\s-]+(?:two|to|too|2)[\s-]+(?:two|to|too|2)[\s-]+(?:two|to|too|2)\b/gi, "4-2-2-2"],
-            [/\b4222\b/g, "4-2-2-2"]
-        ];
-        for (const [pattern, replacement] of formationMap) {
-            text = text.replace(pattern, replacement);
-        }
-
-        // 2. Spoken shirt numbers -> #X
-        const wordToNum: Record<string, string> = {
-            one: "1",
-            won: "1",
-            two: "2",
-            to: "2",
-            too: "2",
-            three: "3",
-            free: "3",
-            four: "4",
-            for: "4",
-            five: "5",
-            six: "6",
-            seven: "7",
-            eight: "8",
-            ate: "8",
-            nine: "9",
-            line: "9",
-            ten: "10",
-            eleven: "11",
-            twelve: "12",
-            thirteen: "13",
-            fourteen: "14",
-            fifteen: "15",
-            sixteen: "16",
-            seventeen: "17",
-            eighteen: "18",
-            nineteen: "19",
-            twenty: "20"
-        };
-
-        text = text.replace(
-            /\b(?:number|no\.?|shirt)\s+(one|won|two|to|too|three|free|four|for|five|six|seven|eight|ate|nine|line|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|[0-9]{1,2})\b/gi,
-            (_match, token) => {
-                const lower = String(token).toLowerCase();
-                const digit = wordToNum[lower] || lower;
-                return `#${digit}`;
-            }
-        );
-
-        // "their nine", "their ten", "their seven", "their eleven", "their six", "their eight"
-        text = text.replace(
-            /\b(their|the)\s+(six|seven|eight|nine|ten|eleven)\b/gi,
-            (_match, prefix, token) => {
-                const digit = wordToNum[String(token).toLowerCase()];
-                return digit ? `${prefix} #${digit}` : _match;
-            }
-        );
-
-        // 3. Common pitchside football homophones & misheard terms
-        const footballPhraseFixes: [RegExp, string | ((m: string) => string)][] = [
-            [/\b(?:set|said)\s+(?:peace|peaces|piece|pieces)\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "set pieces" : "set piece")],
-            [/\b(?:three|free)\s+kicks?\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "free kicks" : "free kick")],
-            [/\b(?:center|centre|send her|sent a)\s+backs?\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "centre-backs" : "centre-back")],
-            [/\b(?:center|centre|send her|sent a)\s+(?:half|halves)\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "centre-halves" : "centre-half")],
-            [/\b(left|right|their|two|both)\s+(?:full|fall)\s*backs?\b/gi, "$1 full-back"],
-            [/\bfull\s+backs?\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "full-backs" : "full-back")],
-            [/\bwing\s+backs?\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "wing-backs" : "wing-back")],
-            [/\b(?:hi|high)\s+press\b/gi, "high press"],
-            [/\b(?:no|low)\s+block\b/gi, "low block"],
-            [/\bmid\s+block\b/gi, "mid-block"],
-            [/\bcounter\s+attacks?\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "counter-attacks" : "counter-attack")],
-            [/\bin\s+swinging\b/gi, "inswinging"],
-            [/\bout\s+swinging\b/gi, "outswinging"],
-            [/\bleft\s+footed\b/gi, "left-footed"],
-            [/\bright\s+footed\b/gi, "right-footed"],
-            [/\b(?:one|1)\s+(?:v|on|vs\.?)\s+(?:one|1)\b/gi, "1v1"],
-            [/\b(?:two|2)\s+(?:v|on|vs\.?)\s+(?:one|1)\b/gi, "2v1"]
-        ];
-
-        for (const [pattern, replacement] of footballPhraseFixes) {
-            text = text.replace(pattern, replacement as any);
-        }
-
-        return text.replace(/\s{2,}/g, " ").trim();
-    };
-
-    // Stitch mobile pause chunks without duplicating boundary words when SpeechRecognition restarts
-    const appendSpeechChunkCleanly = (existing: string, incomingRaw: string): string => {
-        const cleanedIncoming = cleanAndNormalizeFootballSpeech(incomingRaw);
-        if (!cleanedIncoming) return existing;
-
-        const prevTrimmed = existing.trim();
-        if (!prevTrimmed) {
-            const cap = cleanedIncoming.charAt(0).toUpperCase() + cleanedIncoming.slice(1);
-            return /[.!?]$/.test(cap) ? cap : `${cap}.`;
-        }
-
-        // Check if mobile browser repeated the last 1-4 words at the start of the new chunk
-        const prevWords = prevTrimmed.replace(/[.!?]+$/, "").split(/\s+/);
-        const nextWords = cleanedIncoming.split(/\s+/);
-        let overlapCount = 0;
-        const maxOverlap = Math.min(4, prevWords.length, nextWords.length);
-        for (let k = maxOverlap; k >= 1; k--) {
-            const tail = prevWords.slice(-k).join(" ").toLowerCase();
-            const head = nextWords.slice(0, k).join(" ").toLowerCase();
-            if (tail === head) {
-                overlapCount = k;
-                break;
-            }
-        }
-
-        const dedupedWords = overlapCount > 0 ? nextWords.slice(overlapCount) : nextWords;
-        if (dedupedWords.length === 0) return prevTrimmed;
-
-        const dedupedStr = dedupedWords.join(" ");
-        const capitalized = dedupedStr.charAt(0).toUpperCase() + dedupedStr.slice(1);
-        const withPunct = /[.!?]$/.test(capitalized) ? capitalized : `${capitalized}.`;
-        return `${prevTrimmed} ${withPunct}`;
-    };
-
-    const voiceSectionMeta: Record<
-        VoiceNoteTargetSection,
-        { label: string; shortLabel: string; badgeCls: string }
-    > = {
-        smart: {
-            label: "✨ Smart Auto-Sort (Multi-Section + Voice Log)",
-            shortLabel: "✨ Smart Auto-Sort",
-            badgeCls: "bg-brand/15 text-brand border-brand/35"
-        },
-        voiceLog: {
-            label: "📌 Voice Log Only",
-            shortLabel: "📌 Voice Log",
-            badgeCls: "bg-slate-500/15 text-slate-300 border-slate-500/35"
-        },
-        dangerMen: {
-            label: "⚠️ Danger Men & Key Threats",
-            shortLabel: "⚠️ Danger Men",
-            badgeCls: "bg-amber-500/15 text-amber-400 border-amber-500/35"
-        },
-        strengths: {
-            label: "💪 Their Strengths",
-            shortLabel: "💪 Strengths",
-            badgeCls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/35"
-        },
-        weaknesses: {
-            label: "🎯 Their Weaknesses",
-            shortLabel: "🎯 Weaknesses",
-            badgeCls: "bg-rose-500/15 text-rose-400 border-rose-500/35"
-        },
-        inPossession: {
-            label: "🟢 In Possession (Build-Up)",
-            shortLabel: "🟢 In Possession",
-            badgeCls: "bg-blue-500/15 text-blue-400 border-blue-500/35"
-        },
-        outOfPossession: {
-            label: "🟣 Out of Possession (Press / Block)",
-            shortLabel: "🟣 Out of Poss",
-            badgeCls: "bg-purple-500/15 text-purple-400 border-purple-500/35"
-        },
-        transition: {
-            label: "⚡ Transitions",
-            shortLabel: "⚡ Transitions",
-            badgeCls: "bg-orange-500/15 text-orange-400 border-orange-500/35"
-        },
-        setPieces: {
-            label: "🚩 Set Pieces",
-            shortLabel: "🚩 Set Pieces",
-            badgeCls: "bg-cyan-500/15 text-cyan-400 border-cyan-500/35"
-        },
-        postMatchReview: {
-            label: "📋 Post-Match Review",
-            shortLabel: "📋 Review",
-            badgeCls: "bg-indigo-500/15 text-indigo-400 border-indigo-500/35"
-        }
-    };
-
-    // #4: Hardware Noise-Suppressed Audio Capture + Optional AI Transcription
-    const startHardwareAudioRecorder = async () => {
-        if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-            return;
-        }
-        try {
-            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-                return;
-            }
-            const stream = await navigator.mediaDevices.getUserMedia({
-                audio: {
-                    echoCancellation: true,
-                    noiseSuppression: true,
-                    autoGainControl: true
-                }
-            });
-            mediaStreamRef.current = stream;
-            audioChunksRef.current = [];
-
-            const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
-                ? "audio/webm;codecs=opus"
-                : MediaRecorder.isTypeSupported("audio/mp4")
-                    ? "audio/mp4"
-                    : "";
-            const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
-
-            recorder.ondataavailable = (ev) => {
-                if (ev.data && ev.data.size > 0) {
-                    audioChunksRef.current.push(ev.data);
-                }
-            };
-
-            recorder.start(1000);
-            mediaRecorderRef.current = recorder;
-        } catch {
-            // Non-blocking fallback if MediaRecorder isn't available
-        }
-    };
-
-    const finalizeHardwareAudioAndTranscribe = async () => {
-        const recorder = mediaRecorderRef.current;
-        if (!recorder) return;
-
-        await new Promise<void>((resolve) => {
-            if (recorder.state === "inactive") {
-                resolve();
-                return;
-            }
-            recorder.onstop = () => resolve();
-            try {
-                recorder.stop();
-            } catch {
-                resolve();
-            }
-        });
-
-        if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-            mediaStreamRef.current = null;
-        }
-        mediaRecorderRef.current = null;
-
-        if (audioChunksRef.current.length === 0) return;
-
-        const mimeType = audioChunksRef.current[0]?.type || "audio/webm";
-        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
-        if (audioBlob.size < 500) return;
-
-        // 1. Set instant playable audio preview URL
-        const previewUrl = URL.createObjectURL(audioBlob);
-        setVoiceAudioPreviewUrl(previewUrl);
-
-        // Save compact data URL for voice notes under ~450KB so they remain playable in the log
-        if (audioBlob.size <= 450 * 1024) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                if (typeof reader.result === "string") {
-                    setVoiceAudioDataUrl(reader.result);
-                }
-            };
-            reader.readAsDataURL(audioBlob);
-        } else {
-            setVoiceAudioDataUrl(previewUrl);
-        }
-
-        // 2. Attempt Server AI Whisper / Gemini Audio Transcription if API key is configured
-        try {
-            setIsAiTranscribing(true);
-            const ext = mimeType.includes("mp4") ? "m4a" : "webm";
-            const form = new FormData();
-            form.append("audio", audioBlob, `scout-voice.${ext}`);
-
-            const res = await fetch("/api/transcribe", {
-                method: "POST",
-                body: form
-            });
-            if (res.ok) {
-                const payload = await res.json();
-                if (payload?.available && payload?.text) {
-                    const normalizedAiText = cleanAndNormalizeFootballSpeech(payload.text);
-                    setVoiceTranscript(normalizedAiText);
-                    setVoiceTranscriptionEngine(payload.engine || "AI Whisper");
-                    setVoiceStatusToast(`Decoded with ${payload.engine || "AI Audio"} + Football Vocabulary`);
-                    setTimeout(() => setVoiceStatusToast(null), 4000);
-                }
-            }
-        } catch {
-            // Silently fall back to the local football-normalized transcript
-        } finally {
-            setIsAiTranscribing(false);
-        }
-    };
-
-    const startSpeechEngine = () => {
-        if (typeof window === "undefined") return;
-        const SpeechRecognitionCtor =
-            (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognitionCtor) {
-            setIsKeyboardDictationMode(true);
-            setIsVoiceRecording(false);
-            const activeEl = mobileVoiceTextareaRef.current || desktopVoiceTextareaRef.current;
-            activeEl?.focus();
-            return;
-        }
-
-        if (speechRecRef.current) {
-            try {
-                speechRecRef.current.onend = null;
-                speechRecRef.current.stop();
-            } catch {}
-        }
-
-        const recognition = new SpeechRecognitionCtor();
-        recognition.continuous = true;
-        recognition.interimResults = true;
-        recognition.maxAlternatives = 5;
-        recognition.lang = "en-GB";
-
-        recognition.onresult = (event: any) => {
-            let finalChunk = "";
-            let interimChunk = "";
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const res = event.results[i];
-                if (res.isFinal) {
-                    finalChunk += pickBestFootballAlternative(res) + " ";
-                } else {
-                    interimChunk += res[0]?.transcript || "";
-                }
-            }
-            if (finalChunk.trim()) {
-                setVoiceTranscript((prev) => appendSpeechChunkCleanly(prev, finalChunk));
-                setVoiceTranscriptionEngine("Football Smart Decoder");
-            }
-            setVoiceInterimText(interimChunk ? cleanAndNormalizeFootballSpeech(interimChunk) : "");
-        };
-
-        recognition.onerror = (event: any) => {
-            if (event?.error === "not-allowed" || event?.error === "service-not-allowed") {
-                keepListeningRef.current = false;
-                setIsVoiceRecording(false);
-                setIsVoicePaused(false);
-                alert("Microphone access was blocked. Please allow microphone permissions in your browser, or tap 'Use Phone Keyboard Mic'.");
-            }
-        };
-
-        recognition.onend = () => {
-            setVoiceInterimText("");
-            if (keepListeningRef.current) {
-                setTimeout(() => {
-                    if (keepListeningRef.current) {
-                        try {
-                            recognition.start();
-                        } catch {
-                            startSpeechEngine();
-                        }
-                    }
-                }, 150);
-            }
-        };
-
-        speechRecRef.current = recognition;
-        try {
-            recognition.start();
-        } catch {}
-    };
-
-    const handleStartVoiceRecording = (sectionOverride?: VoiceNoteTargetSection) => {
-        if (sectionOverride) setVoiceTargetSection(sectionOverride);
-        setShowVoiceRecorder(true);
-        setIsKeyboardDictationMode(false);
-        keepListeningRef.current = true;
-        setIsVoiceRecording(true);
-        setIsVoicePaused(false);
-        setVoiceStatusToast(null);
-        startSpeechEngine();
-        startHardwareAudioRecorder();
-    };
-
-    // #2: 1-Tap Phone Keyboard Mic Mode (iOS Dictation / Samsung Keyboard / Gboard Voice)
-    const handleActivateKeyboardDictation = (isMobileLayout?: boolean) => {
-        const targetTextarea = isMobileLayout
-            ? mobileVoiceTextareaRef.current || desktopVoiceTextareaRef.current
-            : desktopVoiceTextareaRef.current || mobileVoiceTextareaRef.current;
-
-        // CRITICAL FOR iOS SAFARI & SAMSUNG/ANDROID: call .focus() synchronously inside the tap gesture!
-        if (targetTextarea) {
-            targetTextarea.focus();
-            try {
-                const len = targetTextarea.value.length;
-                targetTextarea.setSelectionRange(len, len);
-            } catch {}
-        }
-
-        keepListeningRef.current = false;
-        setIsVoiceRecording(false);
-        setIsVoicePaused(false);
-        setVoiceInterimText("");
-        if (speechRecRef.current) {
-            try {
-                speechRecRef.current.onend = null;
-                speechRecRef.current.stop();
-            } catch {}
-        }
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-            try {
-                mediaRecorderRef.current.stop();
-            } catch {}
-        }
-        if (mediaStreamRef.current) {
-            mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-            mediaStreamRef.current = null;
-        }
-        setShowVoiceRecorder(true);
-        setIsKeyboardDictationMode(true);
-        const guide = getKeyboardDictationDeviceGuide();
-        setVoiceTranscriptionEngine(guide.deviceLabel);
-    };
-
-    // #3: Quick-Tap Pitchside Chip Inserter
-    const handleInsertVoiceQuickChip = (chipText: string, isMobileLayout?: boolean) => {
-        setShowVoiceRecorder(true);
-        setVoiceTranscript((prev) => {
-            const cleanPrev = prev.trim();
-            if (!cleanPrev) return `${chipText} `;
-            const needsSpace = !/\s$/.test(prev);
-            return `${prev}${needsSpace ? " " : ""}${chipText} `;
-        });
-        if (isKeyboardDictationMode) {
-            const targetTextarea = isMobileLayout
-                ? mobileVoiceTextareaRef.current || desktopVoiceTextareaRef.current
-                : desktopVoiceTextareaRef.current || mobileVoiceTextareaRef.current;
-            targetTextarea?.focus();
-        }
-    };
-
-    const handlePauseVoiceRecording = () => {
-        keepListeningRef.current = false;
-        setIsVoicePaused(true);
-        setVoiceInterimText("");
-        if (speechRecRef.current) {
-            try {
-                speechRecRef.current.onend = null;
-                speechRecRef.current.stop();
-            } catch {}
-        }
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
-            try {
-                mediaRecorderRef.current.pause();
-            } catch {}
-        }
-    };
-
-    const handleResumeVoiceRecording = () => {
-        keepListeningRef.current = true;
-        setIsVoicePaused(false);
-        startSpeechEngine();
-        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "paused") {
-            try {
-                mediaRecorderRef.current.resume();
-            } catch {}
-        }
-    };
-
-    const handleStopVoiceRecording = () => {
-        keepListeningRef.current = false;
-        setIsVoiceRecording(false);
-        setIsVoicePaused(false);
-        if (voiceInterimText.trim()) {
-            setVoiceTranscript((prev) => appendSpeechChunkCleanly(prev, voiceInterimText));
-        }
-        setVoiceInterimText("");
-        if (speechRecRef.current) {
-            try {
-                speechRecRef.current.onend = null;
-                speechRecRef.current.stop();
-            } catch {}
-        }
-        finalizeHardwareAudioAndTranscribe();
-    };
-
-    // Elapsed second counter while actively recording (and not paused)
-    useEffect(() => {
-        if (isVoiceRecording && !isVoicePaused) {
-            voiceTimerRef.current = setInterval(() => {
-                setVoiceElapsedSec((prev) => prev + 1);
-            }, 1000);
-        } else if (voiceTimerRef.current) {
-            clearInterval(voiceTimerRef.current);
-            voiceTimerRef.current = null;
-        }
-        return () => {
-            if (voiceTimerRef.current) clearInterval(voiceTimerRef.current);
-        };
-    }, [isVoiceRecording, isVoicePaused]);
-
-    // Cleanup speech and media streams on unmount
-    useEffect(() => {
-        return () => {
-            keepListeningRef.current = false;
-            if (speechRecRef.current) {
-                try {
-                    speechRecRef.current.onend = null;
-                    speechRecRef.current.stop();
-                } catch {}
-            }
-            if (mediaStreamRef.current) {
-                mediaStreamRef.current.getTracks().forEach((t) => t.stop());
-            }
-        };
-    }, []);
-
-    const appendLineToField = (existing: string, addition: string): string => {
-        const cleanExisting = (existing || "").trim();
-        const cleanAdd = addition.trim();
-        if (!cleanAdd) return cleanExisting;
-        const bulletAdd = cleanAdd.startsWith("•") || cleanAdd.startsWith("-") ? cleanAdd : `• ${cleanAdd}`;
-        return cleanExisting ? `${cleanExisting}\n${bulletAdd}` : bulletAdd;
-    };
-
-    const routeTextIntoReportSections = (
-        base: ScoutingReport,
-        rawText: string,
-        target: VoiceNoteTargetSection
-    ): { updated: ScoutingReport; routedLabels: string[] } => {
-        const next: ScoutingReport = {
-            ...base,
-            dangerMenList: [...(base.dangerMenList || [])],
-            playerProfiles: [...(base.playerProfiles || [])],
-            voiceNotes: [...(base.voiceNotes || [])],
-            lineup: [...(base.lineup || [])]
-        };
-        const routedLabels: string[] = [];
-        const text = cleanAndNormalizeFootballSpeech(rawText);
-        if (!text) return { updated: next, routedLabels };
-
-        // Auto-detect formation mentions (e.g. "4-3-3", "3-5-2", "4-2-3-1")
-        const formationMatch = text.match(/\b(4-2-3-1|4-3-3|4-4-2|3-5-2|3-4-3|5-3-2|4-1-4-1|4-2-2-2)\b/);
-        if (formationMatch && FORMATION_NAMES.includes(formationMatch[1])) {
-            next.formation = formationMatch[1];
-            routedLabels.push(`Formation (${formationMatch[1]})`);
-        }
-
-        if (target !== "smart") {
-            if (target === "voiceLog") {
-                routedLabels.push("Voice Log");
-            } else if (target === "dangerMen") {
-                next.dangerMen = appendLineToField(next.dangerMen, text);
-                routedLabels.push("Danger Men");
-            } else if (target === "strengths") {
-                next.strengths = appendLineToField(next.strengths, text);
-                routedLabels.push("Strengths");
-            } else if (target === "weaknesses") {
-                next.weaknesses = appendLineToField(next.weaknesses, text);
-                routedLabels.push("Weaknesses");
-            } else if (target === "inPossession") {
-                next.inPossession = appendLineToField(next.inPossession, text);
-                routedLabels.push("In Possession");
-            } else if (target === "outOfPossession") {
-                next.outOfPossession = appendLineToField(next.outOfPossession, text);
-                routedLabels.push("Out of Possession");
-            } else if (target === "transition") {
-                next.transition = appendLineToField(next.transition, text);
-                routedLabels.push("Transitions");
-            } else if (target === "setPieces") {
-                next.setPieces = appendLineToField(next.setPieces, text);
-                routedLabels.push("Set Pieces");
-            } else if (target === "postMatchReview") {
-                next.postMatchReview = appendLineToField(next.postMatchReview, text);
-                routedLabels.push("Post-Match Review");
-            }
-            return { updated: next, routedLabels };
-        }
-
-        // Smart Auto-Sort: break long-form monologue into sentences and route to matching tactical cards
-        const sentences = text
-            .split(/(?<=[.!?])\s+|\r?\n+/)
-            .map((s) => s.trim())
+    const handleToggleSectionQuickPill = (field: QuickPillSectionKey, phrase: string) => {
+        if (!editedReport) return;
+        const currentRaw = editedReport[field] || "";
+        const bulletPhrase = `• ${phrase}`;
+        const lines = currentRaw
+            .split(/\r?\n/)
+            .map((l) => l.trim())
             .filter(Boolean);
 
-        let matchedAny = false;
-
-        for (const sentence of sentences) {
-            let matchedSentence = false;
-            if (
-                /\b(corner|corners|free kick|free-kick|throw-in|long throw|set piece|set-piece|near post|back post|delivery|dead ball|inswinging|outswinging)\b/i.test(
-                    sentence
-                )
-            ) {
-                next.setPieces = appendLineToField(next.setPieces, sentence);
-                if (!routedLabels.includes("Set Pieces")) routedLabels.push("Set Pieces");
-                matchedSentence = true;
-            }
-            if (
-                /\b(transition|counter|counter-attack|turnover|break fast|break quickly|on the break|track back|recovery run)\b/i.test(
-                    sentence
-                )
-            ) {
-                next.transition = appendLineToField(next.transition, sentence);
-                if (!routedLabels.includes("Transitions")) routedLabels.push("Transitions");
-                matchedSentence = true;
-            }
-            if (
-                /\b(out of possession|defend|defending|high line|low block|mid block|mid-block|press|pressing|man-to-man|compact)\b/i.test(
-                    sentence
-                )
-            ) {
-                next.outOfPossession = appendLineToField(next.outOfPossession, sentence);
-                if (!routedLabels.includes("Out of Possession")) routedLabels.push("Out of Possession");
-                matchedSentence = true;
-            }
-            if (
-                /\b(in possession|build up|build-up|play out|playing out|goal kick|pivot|overload|overlap|underlap|rotate|shape|possession)\b/i.test(
-                    sentence
-                )
-            ) {
-                next.inPossession = appendLineToField(next.inPossession, sentence);
-                if (!routedLabels.includes("In Possession")) routedLabels.push("In Possession");
-                matchedSentence = true;
-            }
-            if (
-                /\b(weak|weakness|struggle|struggles|slow|exploit|target|hurt them|vulnerable|mistake|error|bad touch|poor|tired|space in behind|leaves space|can't defend|doesn't track)\b/i.test(
-                    sentence
-                )
-            ) {
-                next.weaknesses = appendLineToField(next.weaknesses, sentence);
-                if (!routedLabels.includes("Weaknesses")) routedLabels.push("Weaknesses");
-                matchedSentence = true;
-            }
-            if (
-                /\b(strong|strength|dangerous|quality|athletic|physical|technical|good on the ball|sharp|clinical|dominant|pace|rapid|1v1)\b/i.test(
-                    sentence
-                )
-            ) {
-                next.strengths = appendLineToField(next.strengths, sentence);
-                if (!routedLabels.includes("Strengths")) routedLabels.push("Strengths");
-                matchedSentence = true;
-            }
-            if (
-                /(#[0-9]{1,2}\b|\bnumber\s+[0-9]{1,2}\b|\bno\.?\s*[0-9]{1,2}\b|\bshirt\s+[0-9]{1,2}\b)/i.test(
-                    sentence
-                )
-            ) {
-                next.dangerMen = appendLineToField(next.dangerMen, sentence);
-                if (!routedLabels.includes("Danger Men")) routedLabels.push("Danger Men");
-                matchedSentence = true;
-            }
-            if (matchedSentence) matchedAny = true;
-        }
-
-        if (!matchedAny) {
-            next.postMatchReview = appendLineToField(next.postMatchReview, text);
-            routedLabels.push("Post-Match Review");
-        }
-
-        return { updated: next, routedLabels };
-    };
-
-    const handleSaveVoiceNote = async () => {
-        const rawCombined = `${voiceTranscript} ${voiceInterimText}`.trim();
-        const combinedText = cleanAndNormalizeFootballSpeech(rawCombined);
-        if (!combinedText) return;
-
-        handleStopVoiceRecording();
-        setIsSavingVoiceNote(true);
-        try {
-            const base = isEditing && editedReport ? editedReport : selectedReport || createBlankReport();
-            const newVoiceItem: VoiceNoteItem = {
-                id: Math.random().toString(36).substring(2, 10),
-                text: combinedText,
-                targetSection: voiceTargetSection,
-                durationSec: voiceElapsedSec,
-                createdAt: new Date().toISOString(),
-                audioDataUrl: voiceAudioDataUrl,
-                transcriptionEngine: voiceTranscriptionEngine
-            };
-
-            const { updated, routedLabels } = routeTextIntoReportSections(
-                base,
-                combinedText,
-                voiceTargetSection
-            );
-            updated.voiceNotes = [newVoiceItem, ...(updated.voiceNotes || [])];
-
-            const saved = await persistReportSnapshot(updated, false);
-            if (saved) {
-                setVoiceTranscript("");
-                setVoiceInterimText("");
-                setVoiceElapsedSec(0);
-                setVoiceAudioPreviewUrl(null);
-                setVoiceAudioDataUrl(undefined);
-                setVoiceTranscriptionEngine(undefined);
-                setIsKeyboardDictationMode(false);
-                setVoiceStatusToast(
-                    routedLabels.length > 0
-                        ? `Saved to Voice Log & routed to: ${routedLabels.join(", ")}`
-                        : "Saved to Voice Scouting Log"
-                );
-                setTimeout(() => setVoiceStatusToast(null), 5000);
-            }
-        } finally {
-            setIsSavingVoiceNote(false);
-        }
-    };
-
-    const handleRouteSavedVoiceNote = async (
-        note: VoiceNoteItem,
-        section: Exclude<VoiceNoteTargetSection, "smart" | "voiceLog">
-    ) => {
-        const base = isEditing && editedReport ? editedReport : selectedReport || createBlankReport();
-        const { updated, routedLabels } = routeTextIntoReportSections(base, note.text, section);
-        updated.voiceNotes = (updated.voiceNotes || []).map((vn) =>
-            vn.id === note.id ? { ...vn, targetSection: section } : vn
+        const existsIdx = lines.findIndex(
+            (l) => l.replace(/^[•\-*]\s*/, "").toLowerCase() === phrase.toLowerCase()
         );
-        const saved = await persistReportSnapshot(updated, false);
-        if (saved && routedLabels.length > 0) {
-            setVoiceStatusToast(`Copied voice note into ${routedLabels.join(", ")}`);
-            setTimeout(() => setVoiceStatusToast(null), 4000);
+
+        let nextValue: string;
+        if (existsIdx > -1) {
+            lines.splice(existsIdx, 1);
+            nextValue = lines.join("\n");
+        } else {
+            nextValue = lines.length > 0 ? `${lines.join("\n")}\n${bulletPhrase}` : bulletPhrase;
         }
+
+        setEditedReport((prev) => (prev ? { ...prev, [field]: nextValue } : null));
     };
 
-    const handleDeleteVoiceNote = async (noteId: string) => {
-        const base = isEditing && editedReport ? editedReport : selectedReport || createBlankReport();
-        const updated: ScoutingReport = {
-            ...base,
-            voiceNotes: (base.voiceNotes || []).filter((vn) => vn.id !== noteId)
+    const renderSectionQuickPills = (field: QuickPillSectionKey, accentColor = "brand") => {
+        if (!isEditing || !editedReport) return null;
+        const pills = SECTION_QUICK_PILLS[field] || [];
+        const currentText = (editedReport[field] || "").toLowerCase();
+
+        const activeStyles: Record<string, string> = {
+            emerald: "bg-emerald-500/20 border-emerald-500/50 text-emerald-400",
+            rose: "bg-rose-500/20 border-rose-500/50 text-rose-400",
+            blue: "bg-blue-500/20 border-blue-500/50 text-blue-400",
+            purple: "bg-purple-500/20 border-purple-500/50 text-purple-400",
+            orange: "bg-orange-500/20 border-orange-500/50 text-orange-400",
+            cyan: "bg-cyan-500/20 border-cyan-500/50 text-cyan-400",
+            brand: "bg-brand/20 border-brand/50 text-brand"
         };
-        await persistReportSnapshot(updated, false);
-    };
-
-    const VOICE_QUICK_SHIRT_CHIPS = [
-        { label: "#1 GK", insert: "Their #1 (GK)" },
-        { label: "#2 RB", insert: "Their #2 (RB)" },
-        { label: "#3 LB", insert: "Their #3 (LB)" },
-        { label: "#4 CB", insert: "Their #4 (CB)" },
-        { label: "#5 CB", insert: "Their #5 (CB)" },
-        { label: "#6 CDM", insert: "Their #6 (pivot)" },
-        { label: "#7 RW", insert: "Their #7 (winger)" },
-        { label: "#8 CM", insert: "Their #8 (CM)" },
-        { label: "#9 ST", insert: "Their #9 (striker)" },
-        { label: "#10 CAM", insert: "Their #10" },
-        { label: "#11 LW", insert: "Their #11 (winger)" }
-    ];
-
-    const VOICE_QUICK_TACTICAL_CHIPS = [
-        { label: "4-2-3-1", insert: "Playing 4-2-3-1." },
-        { label: "4-3-3", insert: "Playing 4-3-3." },
-        { label: "3-5-2", insert: "Playing 3-5-2." },
-        { label: "High Press", insert: "They press high from goal kicks." },
-        { label: "Low Block", insert: "They sit in a compact low block." },
-        { label: "Pace in Behind", insert: "rapid pace in behind" },
-        { label: "Weak Left Foot", insert: "weak on their left foot" },
-        { label: "Slow to Turn", insert: "slow to turn when pressed" },
-        { label: "Set-Piece Threat", insert: "dangerous delivery on corners and set pieces." },
-        { label: "Space in Behind", insert: "leaves space in behind when full-backs push on." }
-    ];
-
-    const VOICE_SECTION_OPTIONS: {
-        id: VoiceNoteTargetSection;
-        label: string;
-        shortLabel: string;
-        badgeClass: string;
-    }[] = [
-        {
-            id: "smart",
-            label: "✨ Smart Auto-Sort (Multi-Section)",
-            shortLabel: "✨ Auto-Sort",
-            badgeClass: "bg-brand/15 text-brand border-brand/40"
-        },
-        {
-            id: "voiceLog",
-            label: "📌 Voice Log Only",
-            shortLabel: "📌 Log Only",
-            badgeClass: "bg-slate-500/15 text-slate-300 border-slate-500/40"
-        },
-        {
-            id: "dangerMen",
-            label: "⚠️ Danger Men",
-            shortLabel: "⚠️ Danger Men",
-            badgeClass: "bg-amber-500/15 text-amber-400 border-amber-500/40"
-        },
-        {
-            id: "strengths",
-            label: "💪 Strengths",
-            shortLabel: "💪 Strengths",
-            badgeClass: "bg-emerald-500/15 text-emerald-400 border-emerald-500/40"
-        },
-        {
-            id: "weaknesses",
-            label: "🎯 Weaknesses",
-            shortLabel: "🎯 Weaknesses",
-            badgeClass: "bg-rose-500/15 text-rose-400 border-rose-500/40"
-        },
-        {
-            id: "inPossession",
-            label: "🟢 In Possession",
-            shortLabel: "🟢 In Poss",
-            badgeClass: "bg-blue-500/15 text-blue-400 border-blue-500/40"
-        },
-        {
-            id: "outOfPossession",
-            label: "🟣 Out of Possession",
-            shortLabel: "🟣 Out of Poss",
-            badgeClass: "bg-purple-500/15 text-purple-400 border-purple-500/40"
-        },
-        {
-            id: "transition",
-            label: "⚡ Transitions",
-            shortLabel: "⚡ Transitions",
-            badgeClass: "bg-orange-500/15 text-orange-400 border-orange-500/40"
-        },
-        {
-            id: "setPieces",
-            label: "🚩 Set Pieces",
-            shortLabel: "🚩 Set Pieces",
-            badgeClass: "bg-cyan-500/15 text-cyan-400 border-cyan-500/40"
-        },
-        {
-            id: "postMatchReview",
-            label: "📋 Post-Match Review",
-            shortLabel: "📋 Review",
-            badgeClass: "bg-indigo-500/15 text-indigo-400 border-indigo-500/40"
-        }
-    ];
-
-    const renderVoiceScoutingCard = (isMobileLayout: boolean) => {
-        const savedNotes = activeReport.voiceNotes || [];
-        const hasDraftText = Boolean(`${voiceTranscript} ${voiceInterimText}`.trim());
-        const wordCount = `${voiceTranscript} ${voiceInterimText}`
-            .trim()
-            .split(/\s+/)
-            .filter(Boolean).length;
-        const textareaId = isMobileLayout
-            ? "pitchside-voice-textarea-mobile"
-            : "pitchside-voice-textarea-desktop";
-        const textareaRef = isMobileLayout ? mobileVoiceTextareaRef : desktopVoiceTextareaRef;
-        const deviceGuide = getKeyboardDictationDeviceGuide();
-        const isStudioExpanded =
-            showVoiceRecorder ||
-            isVoiceRecording ||
-            isVoicePaused ||
-            isKeyboardDictationMode ||
-            hasDraftText;
 
         return (
-            <div
-                className={`rounded-2xl bg-surface-1 border transition-all shadow-xs overflow-hidden ${
-                    isVoiceRecording
-                        ? "border-rose-500/60 ring-2 ring-rose-500/20"
-                        : isVoicePaused
-                            ? "border-amber-500/60 ring-1 ring-amber-500/20"
-                            : isKeyboardDictationMode
-                                ? "border-emerald-500/60 ring-2 ring-emerald-500/20"
-                                : "border-brand/35 border-l-4 border-l-brand"
-                } ${isMobileLayout ? "p-3.5 space-y-3" : "p-4 space-y-3.5"}`}
-            >
-                {/* Top Header Row */}
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <div
-                            className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border ${
-                                isVoiceRecording
-                                    ? "bg-rose-500/20 border-rose-500/40 text-rose-500 animate-pulse"
-                                    : isVoicePaused
-                                        ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
-                                        : isKeyboardDictationMode
-                                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
-                                            : "bg-brand/15 border-brand/30 text-brand"
+            <div className="flex flex-wrap gap-1 pb-1">
+                {pills.map((phrase) => {
+                    const isAdded = currentText.includes(phrase.toLowerCase());
+                    return (
+                        <button
+                            key={phrase}
+                            type="button"
+                            onClick={() => handleToggleSectionQuickPill(field, phrase)}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-all text-left leading-tight ${
+                                isAdded
+                                    ? activeStyles[accentColor] || activeStyles.brand
+                                    : "bg-surface-2 hover:bg-surface-2/80 border-border text-muted-foreground hover:text-foreground"
                             }`}
                         >
-                            {isVoiceRecording ? (
-                                <Mic className="h-4 w-4" />
-                            ) : isVoicePaused ? (
-                                <Pause className="h-4 w-4" />
-                            ) : (
-                                <Mic className="h-4 w-4" />
-                            )}
-                        </div>
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-foreground">
-                                    Live Pitchside Voice Scout
-                                </h3>
-                                {isVoiceRecording && (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-400 text-[10px] font-black tabular-nums">
-                                        <span className="h-2 w-2 rounded-full bg-rose-500 animate-ping" />
-                                        REC {formatVoiceDuration(voiceElapsedSec)}
-                                    </span>
-                                )}
-                                {isVoicePaused && (
-                                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 text-[10px] font-black tabular-nums">
-                                        PAUSED {formatVoiceDuration(voiceElapsedSec)}
-                                    </span>
-                                )}
-                                {isKeyboardDictationMode && !isVoiceRecording && (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-400 text-[10px] font-black">
-                                        ⌨️🎙️ {deviceGuide.deviceLabel} Active
-                                    </span>
-                                )}
-                                {isAiTranscribing && (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand/20 border border-brand/40 text-brand text-[10px] font-black animate-pulse">
-                                        ✨ Enhancing Audio...
-                                    </span>
-                                )}
-                                {!isVoiceRecording && !isVoicePaused && savedNotes.length > 0 && (
-                                    <span className="px-2 py-0.5 rounded-full bg-surface-2 border border-border text-[10px] font-extrabold text-muted-foreground">
-                                        {savedNotes.length} saved {savedNotes.length === 1 ? "note" : "notes"}
-                                    </span>
-                                )}
-                            </div>
-                            <p className="text-[11px] text-muted-foreground leading-snug">
-                                Football-smart voice decoder (`4-2-3-1`, `#9`, `set piece`) + Phone Keyboard Mic mode + playable audio memo
-                            </p>
-                        </div>
-                    </div>
-
-                    {/* Primary Action Controls */}
-                    <div className="flex items-center gap-1.5 flex-wrap shrink-0">
-                        {!isVoiceRecording && !isVoicePaused ? (
-                            <>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={() => handleStartVoiceRecording()}
-                                    className="h-9 px-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-sm"
-                                >
-                                    <Mic className="h-3.5 w-3.5 mr-1.5" />
-                                    {hasDraftText ? "Continue Live Mic" : "Start Live Mic"}
-                                </Button>
-                                <label
-                                    htmlFor={textareaId}
-                                    onClick={() => handleActivateKeyboardDictation(isMobileLayout)}
-                                    className={`h-9 px-3 rounded-xl border font-extrabold text-xs inline-flex items-center justify-center cursor-pointer select-none transition-all ${
-                                        isKeyboardDictationMode
-                                            ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400 shadow-xs"
-                                            : "border-border bg-surface-2 hover:bg-surface-2/80 text-foreground"
-                                    }`}
-                                    title="Opens your phone keyboard immediately (iPhone, Samsung, or Android) so you can tap its built-in 🎤 microphone key"
-                                >
-                                    ⌨️🎙️ Phone Keyboard Mic
-                                </label>
-                            </>
-                        ) : (
-                            <>
-                                {isVoiceRecording ? (
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={handlePauseVoiceRecording}
-                                        className="h-9 px-3 rounded-xl border-amber-500/40 bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 font-extrabold text-xs"
-                                    >
-                                        <Pause className="h-3.5 w-3.5 mr-1.5" />
-                                        Pause
-                                    </Button>
-                                ) : (
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        onClick={handleResumeVoiceRecording}
-                                        className="h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs"
-                                    >
-                                        <Play className="h-3.5 w-3.5 mr-1.5" />
-                                        Resume
-                                    </Button>
-                                )}
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={handleStopVoiceRecording}
-                                    className="h-9 px-3 rounded-xl border-rose-500/40 bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 font-extrabold text-xs"
-                                >
-                                    <Square className="h-3.5 w-3.5 mr-1.5" />
-                                    Done Speaking
-                                </Button>
-                            </>
-                        )}
-
-                        <button
-                            type="button"
-                            onClick={() => setShowVoiceRecorder((prev) => !prev)}
-                            className="h-9 px-2.5 rounded-xl bg-surface-2 hover:bg-surface-2/80 border border-border text-[11px] font-bold text-muted-foreground hover:text-foreground transition-colors"
-                            title={showVoiceRecorder ? "Collapse Voice Studio" : "Expand Voice Studio"}
-                        >
-                            {showVoiceRecorder ? "Hide" : "Open"}
+                            {isAdded ? `✓ ${phrase}` : `+ ${phrase}`}
                         </button>
-                    </div>
-                </div>
-
-                {/* Toast Feedback */}
-                {voiceStatusToast && (
-                    <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-xs font-bold text-emerald-400 flex items-center justify-between gap-2">
-                        <span>✓ {voiceStatusToast}</span>
-                        <button
-                            type="button"
-                            onClick={() => setVoiceStatusToast(null)}
-                            className="text-[10px] text-muted-foreground hover:text-foreground"
-                        >
-                            Dismiss
-                        </button>
-                    </div>
-                )}
-
-                <div className={isStudioExpanded ? "space-y-3 pt-1 border-t border-border/60" : "sr-only"}>
-                    {/* Phone Keyboard Mic Device-Aware Banner (#2) */}
-                    {isKeyboardDictationMode && (
-                        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-[11px] text-emerald-300 flex items-center justify-between gap-2">
-                            <span>
-                                💡 <strong>{deviceGuide.deviceLabel}:</strong> {deviceGuide.instruction}
-                            </span>
-                            <button
-                                type="button"
-                                onClick={() => setIsKeyboardDictationMode(false)}
-                                className="text-[10px] font-bold text-emerald-400 hover:underline shrink-0"
-                            >
-                                Got it
-                            </button>
-                        </div>
-                    )}
-
-                    {/* Quick-Tap Pitchside Shirt Numbers & Tactical Chips (#3) */}
-                    <div className="space-y-1.5">
-                        <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                                ⚡ 1-Tap Pitchside Insert (Tap while speaking or typing — never mishears numbers)
-                            </span>
-                            {hasDraftText && (
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setVoiceTranscript((prev) => cleanAndNormalizeFootballSpeech(prev))
-                                    }
-                                    className="px-2 py-0.5 rounded-md bg-brand/15 hover:bg-brand/25 border border-brand/35 text-[10px] font-extrabold text-brand transition-colors shrink-0"
-                                    title="Normalize spoken numbers ('number ten' -> '#10') and formations ('four three three' -> '4-3-3')"
-                                >
-                                    ✨ Fix Football Terms
-                                </button>
-                            )}
-                        </div>
-                        {/* Row 1: Shirt Numbers #1 - #11 */}
-                        <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar">
-                            {VOICE_QUICK_SHIRT_CHIPS.map((chip) => (
-                                <button
-                                    key={chip.label}
-                                    type="button"
-                                    onClick={() => handleInsertVoiceQuickChip(chip.insert, isMobileLayout)}
-                                    className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-black whitespace-nowrap shrink-0 transition-colors"
-                                >
-                                    {chip.label}
-                                </button>
-                            ))}
-                        </div>
-                        {/* Row 2: Tactical & Formation Phrases */}
-                        <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar">
-                            {VOICE_QUICK_TACTICAL_CHIPS.map((chip) => (
-                                <button
-                                    key={chip.label}
-                                    type="button"
-                                    onClick={() => handleInsertVoiceQuickChip(chip.insert, isMobileLayout)}
-                                    className="px-2 py-1 rounded-lg bg-surface-2 hover:bg-brand/15 border border-border hover:border-brand/40 text-muted-foreground hover:text-foreground text-[10px] font-bold whitespace-nowrap shrink-0 transition-colors"
-                                >
-                                    + {chip.label}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Target Section Routing Pills */}
-                    <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                                <Wand2 className="h-3 w-3 text-brand" />
-                                Where should this voice note go when saved?
-                            </span>
-                            {voiceTargetSection === "smart" && (
-                                <span className="text-[10px] font-semibold text-brand hidden sm:inline">
-                                    Splits sentences automatically into Formation, Danger Men, Strengths, Weaknesses, Set Pieces
-                                </span>
-                            )}
-                        </div>
-                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                            {VOICE_SECTION_OPTIONS.map((opt) => {
-                                const active = voiceTargetSection === opt.id;
-                                return (
-                                    <button
-                                        key={opt.id}
-                                        type="button"
-                                        onClick={() => setVoiceTargetSection(opt.id)}
-                                        className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border transition-all whitespace-nowrap shrink-0 ${
-                                            active
-                                                ? `${opt.badgeClass} shadow-xs scale-[1.01]`
-                                                : "bg-surface-2/70 border-border text-muted-foreground hover:text-foreground"
-                                        }`}
-                                    >
-                                        {isMobileLayout ? opt.shortLabel : opt.label}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-
-                    {/* Live Streaming & Editable Transcript Box */}
-                    <div className="space-y-2">
-                        <div className="relative">
-                            <textarea
-                                id={textareaId}
-                                ref={textareaRef}
-                                rows={isMobileLayout ? 4 : 4}
-                                value={
-                                    voiceInterimText
-                                        ? `${voiceTranscript}${voiceTranscript ? " " : ""}${voiceInterimText}`
-                                        : voiceTranscript
-                                }
-                                onChange={(e) => {
-                                    setVoiceTranscript(e.target.value);
-                                    setVoiceInterimText("");
-                                }}
-                                onBlur={() => {
-                                    if (voiceTranscript.trim()) {
-                                        setVoiceTranscript((prev) => cleanAndNormalizeFootballSpeech(prev));
-                                    }
-                                }}
-                                placeholder="Speak with 'Start Live Mic', tap 'Phone Keyboard Mic' to pop up your phone's keyboard mic, or tap any #shirt / tactical chip above (e.g. 'Playing 4-2-3-1. Their #9 is rapid in behind, left-footed, but their centre-backs struggle when pressed high...')"
-                                className={`w-full rounded-xl border p-3 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground outline-none resize-y leading-relaxed transition-colors ${
-                                    isVoiceRecording
-                                        ? "bg-rose-500/5 border-rose-500/40 focus:ring-2 focus:ring-rose-500"
-                                        : isKeyboardDictationMode
-                                            ? "bg-emerald-500/5 border-emerald-500/40 focus:ring-2 focus:ring-emerald-500"
-                                            : "bg-surface-2 border-border focus:ring-2 focus:ring-brand"
-                                }`}
-                            />
-                            {voiceInterimText && (
-                                <div className="mt-1 text-[11px] font-medium text-rose-400 italic flex items-center gap-1.5">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping" />
-                                    Decoding football speech: &ldquo;{voiceInterimText}&rdquo;
-                                </div>
-                            )}
-                        </div>
-
-                            {/* Playable Hardware Audio Memo Bar (#4) */}
-                            {voiceAudioPreviewUrl && (
-                                <div className="rounded-xl bg-surface-2/90 border border-border px-3 py-2 flex flex-wrap items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-brand">
-                                            🎧 Recorded Touchline Audio Clip
-                                        </span>
-                                        {voiceTranscriptionEngine && (
-                                            <span className="px-1.5 py-0.5 rounded bg-brand/15 border border-brand/30 text-[9px] font-black text-brand">
-                                                {voiceTranscriptionEngine}
-                                            </span>
-                                        )}
-                                    </div>
-                                    <audio
-                                        controls
-                                        src={voiceAudioPreviewUrl}
-                                        className="h-8 max-w-full sm:w-64"
-                                    />
-                                </div>
-                            )}
-
-                            {/* Bottom Bar: Word count + Clear + Save & Route */}
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-semibold">
-                                    <span>
-                                        {wordCount} {wordCount === 1 ? "word" : "words"}
-                                    </span>
-                                    {voiceElapsedSec > 0 && (
-                                        <span>• Duration {formatVoiceDuration(voiceElapsedSec)}</span>
-                                    )}
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                    {(hasDraftText || voiceAudioPreviewUrl) && (
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => {
-                                                handleStopVoiceRecording();
-                                                setVoiceTranscript("");
-                                                setVoiceInterimText("");
-                                                setVoiceElapsedSec(0);
-                                                setVoiceAudioPreviewUrl(null);
-                                                setVoiceAudioDataUrl(undefined);
-                                                setVoiceTranscriptionEngine(undefined);
-                                            }}
-                                            className="h-8 px-2.5 text-xs font-bold text-muted-foreground hover:text-rose-500"
-                                        >
-                                            Clear
-                                        </Button>
-                                    )}
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        disabled={!hasDraftText || isSavingVoiceNote}
-                                        onClick={handleSaveVoiceNote}
-                                        className="h-9 px-4 rounded-xl bg-brand hover:bg-brand/90 text-brand-foreground font-extrabold text-xs shadow-sm"
-                                    >
-                                        <Save className="h-3.5 w-3.5 mr-1.5" />
-                                        {isSavingVoiceNote
-                                            ? "Saving Note..."
-                                            : voiceTargetSection === "smart"
-                                                ? "Save & Smart Auto-Sort Note"
-                                                : "Save Voice Note to Dossier"}
-                                    </Button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                {/* Saved Voice Scouting Log Feed */}
-                {savedNotes.length > 0 && (
-                    <div className="pt-2 border-t border-border/60 space-y-2">
-                        <div className="flex items-center justify-between">
-                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                                🎙️ Saved Voice Scouting Log ({savedNotes.length})
-                            </span>
-                            <span className="text-[10px] text-muted-foreground">
-                                Timestamped touchline transcripts &amp; audio
-                            </span>
-                        </div>
-                        <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-                            {savedNotes.map((note) => {
-                                const opt =
-                                    VOICE_SECTION_OPTIONS.find((o) => o.id === note.targetSection) ||
-                                    VOICE_SECTION_OPTIONS[0];
-                                return (
-                                    <div
-                                        key={note.id}
-                                        className="rounded-xl bg-surface-2/80 border border-border p-3 space-y-1.5"
-                                    >
-                                        <div className="flex flex-wrap items-center justify-between gap-1.5">
-                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                <span
-                                                    className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold border ${opt.badgeClass}`}
-                                                >
-                                                    {opt.shortLabel}
-                                                </span>
-                                                {note.durationSec > 0 && (
-                                                    <span className="px-1.5 py-0.5 rounded bg-surface-1 border border-border text-[10px] font-bold text-muted-foreground tabular-nums">
-                                                        ⏱ {formatVoiceDuration(note.durationSec)}
-                                                    </span>
-                                                )}
-                                                {note.transcriptionEngine && (
-                                                    <span className="px-1.5 py-0.5 rounded bg-brand/10 border border-brand/25 text-[9px] font-bold text-brand">
-                                                        {note.transcriptionEngine}
-                                                    </span>
-                                                )}
-                                                <span className="text-[10px] text-muted-foreground font-medium">
-                                                    {new Date(note.createdAt).toLocaleString("en-GB", {
-                                                        day: "numeric",
-                                                        month: "short",
-                                                        hour: "2-digit",
-                                                        minute: "2-digit"
-                                                    })}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                                <select
-                                                    value=""
-                                                    onChange={(e) => {
-                                                        const val = e.target.value as Exclude<
-                                                            VoiceNoteTargetSection,
-                                                            "smart" | "voiceLog"
-                                                        >;
-                                                        if (val) handleRouteSavedVoiceNote(note, val);
-                                                    }}
-                                                    className="h-6 rounded-md border border-border bg-surface-1 px-1.5 text-[10px] font-bold text-muted-foreground hover:text-foreground outline-none"
-                                                    title="Copy this voice note into another dossier section"
-                                                >
-                                                    <option value="">+ Copy to section...</option>
-                                                    <option value="dangerMen">⚠️ Danger Men</option>
-                                                    <option value="strengths">💪 Strengths</option>
-                                                    <option value="weaknesses">🎯 Weaknesses</option>
-                                                    <option value="inPossession">🟢 In Possession</option>
-                                                    <option value="outOfPossession">🟣 Out of Possession</option>
-                                                    <option value="transition">⚡ Transitions</option>
-                                                    <option value="setPieces">🚩 Set Pieces</option>
-                                                    <option value="postMatchReview">📋 Post-Match Review</option>
-                                                </select>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeleteVoiceNote(note.id)}
-                                                    className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
-                                                    title="Delete voice note"
-                                                >
-                                                    <Trash2 className="h-3 w-3" />
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <p className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed">
-                                            {note.text}
-                                        </p>
-                                        {note.audioDataUrl && (
-                                            <div className="pt-1">
-                                                <audio
-                                                    controls
-                                                    src={note.audioDataUrl}
-                                                    className="h-7 w-full max-w-xs"
-                                                />
-                                            </div>
-                                        )}
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
+                    );
+                })}
             </div>
         );
     };
@@ -3514,9 +2207,6 @@ export default function OppositionReportsPage() {
                     )}
                 </div>
 
-                {/* 5B. MOBILE LIVE VOICE SCOUTING STUDIO & SAVED VOICE LOG */}
-                {renderVoiceScoutingCard(true)}
-
                 {/* 6. MOBILE SEGMENTED SUB-TAB BAR */}
                 <div className="grid grid-cols-5 gap-1 p-1 rounded-xl bg-surface-1 border border-border">
                     {(
@@ -3774,16 +2464,19 @@ export default function OppositionReportsPage() {
                                 Their Strengths
                             </h3>
                             {isEditing ? (
-                                <textarea
-                                    value={editedReport?.strengths || ""}
-                                    onChange={(e) =>
-                                        setEditedReport((prev) =>
-                                            prev ? { ...prev, strengths: e.target.value } : null
-                                        )
-                                    }
-                                    placeholder="What are they good at? (e.g. Physical midfield, fast wingers, dangerous on corners)..."
-                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
-                                />
+                                <div className="space-y-1.5">
+                                    {renderSectionQuickPills("strengths", "emerald")}
+                                    <textarea
+                                        value={editedReport?.strengths || ""}
+                                        onChange={(e) =>
+                                            setEditedReport((prev) =>
+                                                prev ? { ...prev, strengths: e.target.value } : null
+                                            )
+                                        }
+                                        placeholder="What are they good at? (e.g. Physical midfield, fast wingers, dangerous on corners)..."
+                                        className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
+                                    />
+                                </div>
                             ) : (
                                 <p
                                     onClick={handleEditReport}
@@ -3805,16 +2498,19 @@ export default function OppositionReportsPage() {
                                 Their Weaknesses (How We Hurt Them)
                             </h3>
                             {isEditing ? (
-                                <textarea
-                                    value={editedReport?.weaknesses || ""}
-                                    onChange={(e) =>
-                                        setEditedReport((prev) =>
-                                            prev ? { ...prev, weaknesses: e.target.value } : null
-                                        )
-                                    }
-                                    placeholder="Where can we exploit them? (e.g. Slow CBs against balls in behind, GK struggles under high crosses)..."
-                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
-                                />
+                                <div className="space-y-1.5">
+                                    {renderSectionQuickPills("weaknesses", "rose")}
+                                    <textarea
+                                        value={editedReport?.weaknesses || ""}
+                                        onChange={(e) =>
+                                            setEditedReport((prev) =>
+                                                prev ? { ...prev, weaknesses: e.target.value } : null
+                                            )
+                                        }
+                                        placeholder="Where can we exploit them? (e.g. Slow CBs against balls in behind, GK struggles under high crosses)..."
+                                        className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
+                                    />
+                                </div>
                             ) : (
                                 <p
                                     onClick={handleEditReport}
@@ -3841,16 +2537,19 @@ export default function OppositionReportsPage() {
                                 In Possession (Build-Up &amp; Shape)
                             </h3>
                             {isEditing ? (
-                                <textarea
-                                    value={editedReport?.inPossession || ""}
-                                    onChange={(e) =>
-                                        setEditedReport((prev) =>
-                                            prev ? { ...prev, inPossession: e.target.value } : null
-                                        )
-                                    }
-                                    placeholder="How do they build up and attack? (e.g. Play short to #6 or go direct to #9?)..."
-                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
-                                />
+                                <div className="space-y-1.5">
+                                    {renderSectionQuickPills("inPossession", "blue")}
+                                    <textarea
+                                        value={editedReport?.inPossession || ""}
+                                        onChange={(e) =>
+                                            setEditedReport((prev) =>
+                                                prev ? { ...prev, inPossession: e.target.value } : null
+                                            )
+                                        }
+                                        placeholder="How do they build up and attack? (e.g. Play short to #6 or go direct to #9?)..."
+                                        className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
+                                    />
+                                </div>
                             ) : (
                                 <p
                                     onClick={handleEditReport}
@@ -3872,16 +2571,19 @@ export default function OppositionReportsPage() {
                                 Out of Possession (Defensive Shape &amp; Press)
                             </h3>
                             {isEditing ? (
-                                <textarea
-                                    value={editedReport?.outOfPossession || ""}
-                                    onChange={(e) =>
-                                        setEditedReport((prev) =>
-                                            prev ? { ...prev, outOfPossession: e.target.value } : null
-                                        )
-                                    }
-                                    placeholder="How do they defend? (e.g. High line with aggressive press, or compact mid/low block?)..."
-                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
-                                />
+                                <div className="space-y-1.5">
+                                    {renderSectionQuickPills("outOfPossession", "purple")}
+                                    <textarea
+                                        value={editedReport?.outOfPossession || ""}
+                                        onChange={(e) =>
+                                            setEditedReport((prev) =>
+                                                prev ? { ...prev, outOfPossession: e.target.value } : null
+                                            )
+                                        }
+                                        placeholder="How do they defend? (e.g. High line with aggressive press, or compact mid/low block?)..."
+                                        className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
+                                    />
+                                </div>
                             ) : (
                                 <p
                                     onClick={handleEditReport}
@@ -3903,16 +2605,19 @@ export default function OppositionReportsPage() {
                                 Transition (Attacking &amp; Defensive)
                             </h3>
                             {isEditing ? (
-                                <textarea
-                                    value={editedReport?.transition || ""}
-                                    onChange={(e) =>
-                                        setEditedReport((prev) =>
-                                            prev ? { ...prev, transition: e.target.value } : null
-                                        )
-                                    }
-                                    placeholder="What happens when the ball turns over? (e.g. Early ball over the top to wingers; slow to track back)..."
-                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
-                                />
+                                <div className="space-y-1.5">
+                                    {renderSectionQuickPills("transition", "orange")}
+                                    <textarea
+                                        value={editedReport?.transition || ""}
+                                        onChange={(e) =>
+                                            setEditedReport((prev) =>
+                                                prev ? { ...prev, transition: e.target.value } : null
+                                            )
+                                        }
+                                        placeholder="What happens when the ball turns over? (e.g. Early ball over the top to wingers; slow to track back)..."
+                                        className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
+                                    />
+                                </div>
                             ) : (
                                 <p
                                     onClick={handleEditReport}
@@ -3934,16 +2639,19 @@ export default function OppositionReportsPage() {
                                 Set Pieces (Corners, Free Kicks &amp; Throws)
                             </h3>
                             {isEditing ? (
-                                <textarea
-                                    value={editedReport?.setPieces || ""}
-                                    onChange={(e) =>
-                                        setEditedReport((prev) =>
-                                            prev ? { ...prev, setPieces: e.target.value } : null
-                                        )
-                                    }
-                                    placeholder="Inswinging corners to near post? Long throw specialist? Zonal or man-marking?..."
-                                    className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
-                                />
+                                <div className="space-y-1.5">
+                                    {renderSectionQuickPills("setPieces", "cyan")}
+                                    <textarea
+                                        value={editedReport?.setPieces || ""}
+                                        onChange={(e) =>
+                                            setEditedReport((prev) =>
+                                                prev ? { ...prev, setPieces: e.target.value } : null
+                                            )
+                                        }
+                                        placeholder="Inswinging corners to near post? Long throw specialist? Zonal or man-marking?..."
+                                        className="w-full min-h-[90px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
+                                    />
+                                </div>
                             ) : (
                                 <p
                                     onClick={handleEditReport}
@@ -4153,16 +2861,19 @@ export default function OppositionReportsPage() {
                                 )}
                             </div>
                             {isEditing ? (
-                                <textarea
-                                    value={editedReport?.postMatchReview || ""}
-                                    onChange={(e) =>
-                                        setEditedReport((prev) =>
-                                            prev ? { ...prev, postMatchReview: e.target.value } : null
-                                        )
-                                    }
-                                    placeholder="Log what worked after full-time so you have it ready for the reverse fixture..."
-                                    className="w-full min-h-[85px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
-                                />
+                                <div className="space-y-2">
+                                    {renderSectionQuickPills("postMatchReview", "brand")}
+                                    <textarea
+                                        value={editedReport?.postMatchReview || ""}
+                                        onChange={(e) =>
+                                            setEditedReport((prev) =>
+                                                prev ? { ...prev, postMatchReview: e.target.value } : null
+                                            )
+                                        }
+                                        placeholder="Log what worked after full-time so you have it ready for the reverse fixture..."
+                                        className="w-full min-h-[85px] rounded-xl border border-border bg-surface-2 p-2.5 text-base sm:text-xs text-foreground outline-none"
+                                    />
+                                </div>
                             ) : (
                                 <p
                                     onClick={handleEditReport}
@@ -4812,11 +3523,6 @@ export default function OppositionReportsPage() {
                     </Card>
 
                     {/* ========================================================= */}
-                    {/* SECTION 0B: LIVE PITCHSIDE VOICE SCOUT & SAVED VOICE LOG  */}
-                    {/* ========================================================= */}
-                    {renderVoiceScoutingCard(false)}
-
-                    {/* ========================================================= */}
                     {/* SECTION 1: DANGER MEN & KEY THREATS                       */}
                     {/* ========================================================= */}
                     <Card className="bg-surface-1 border-amber-500/30 shadow-xs overflow-hidden border-l-4 border-l-amber-500">
@@ -4831,16 +3537,6 @@ export default function OppositionReportsPage() {
                                 </p>
                             </div>
                             <div className="flex items-center gap-1.5">
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleStartVoiceRecording("dangerMen")}
-                                    className="h-8 text-xs font-bold border-rose-500/40 text-rose-400 hover:bg-rose-500/10"
-                                >
-                                    <Mic className="h-3.5 w-3.5 mr-1" />
-                                    Voice
-                                </Button>
                                 <Button
                                     type="button"
                                     size="sm"
@@ -5066,14 +3762,6 @@ export default function OppositionReportsPage() {
                                     Their Strengths
                                 </CardTitle>
                                 <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleStartVoiceRecording("strengths")}
-                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
-                                        title="Dictate voice note into Strengths"
-                                    >
-                                        <Mic className="h-3 w-3" /> Voice
-                                    </button>
                                     {!isEditing && (
                                         <button
                                             type="button"
@@ -5087,16 +3775,19 @@ export default function OppositionReportsPage() {
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
-                                    <textarea
-                                        value={editedReport?.strengths || ""}
-                                        onChange={(e) =>
-                                            setEditedReport((prev) =>
-                                                prev ? { ...prev, strengths: e.target.value } : null
-                                            )
-                                        }
-                                        placeholder="What are they good at? (e.g. Physical midfield, fast wingers, strong aerial presence)..."
-                                        className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-emerald-500 outline-none resize-y"
-                                    />
+                                    <div className="space-y-2">
+                                        {renderSectionQuickPills("strengths", "emerald")}
+                                        <textarea
+                                            value={editedReport?.strengths || ""}
+                                            onChange={(e) =>
+                                                setEditedReport((prev) =>
+                                                    prev ? { ...prev, strengths: e.target.value } : null
+                                                )
+                                            }
+                                            placeholder="What are they good at? (e.g. Physical midfield, fast wingers, strong aerial presence)..."
+                                            className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-emerald-500 outline-none resize-y"
+                                        />
+                                    </div>
                                 ) : (
                                     <p
                                         onClick={handleEditReport}
@@ -5120,14 +3811,6 @@ export default function OppositionReportsPage() {
                                     Their Weaknesses (How We Hurt Them)
                                 </CardTitle>
                                 <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleStartVoiceRecording("weaknesses")}
-                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
-                                        title="Dictate voice note into Weaknesses"
-                                    >
-                                        <Mic className="h-3 w-3" /> Voice
-                                    </button>
                                     {!isEditing && (
                                         <button
                                             type="button"
@@ -5141,16 +3824,19 @@ export default function OppositionReportsPage() {
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
-                                    <textarea
-                                        value={editedReport?.weaknesses || ""}
-                                        onChange={(e) =>
-                                            setEditedReport((prev) =>
-                                                prev ? { ...prev, weaknesses: e.target.value } : null
-                                            )
-                                        }
-                                        placeholder="Where can we exploit them? (e.g. Slow CBs against balls in behind, keeper struggles under high crosses, fitness drops after 65 mins)..."
-                                        className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-rose-500 outline-none resize-y"
-                                    />
+                                    <div className="space-y-2">
+                                        {renderSectionQuickPills("weaknesses", "rose")}
+                                        <textarea
+                                            value={editedReport?.weaknesses || ""}
+                                            onChange={(e) =>
+                                                setEditedReport((prev) =>
+                                                    prev ? { ...prev, weaknesses: e.target.value } : null
+                                                )
+                                            }
+                                            placeholder="Where can we exploit them? (e.g. Slow CBs against balls in behind, keeper struggles under high crosses, fitness drops after 65 mins)..."
+                                            className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-rose-500 outline-none resize-y"
+                                        />
+                                    </div>
                                 ) : (
                                     <p
                                         onClick={handleEditReport}
@@ -5174,14 +3860,6 @@ export default function OppositionReportsPage() {
                                     In Possession (Build-Up &amp; Shape)
                                 </CardTitle>
                                 <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleStartVoiceRecording("inPossession")}
-                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
-                                        title="Dictate voice note into In Possession"
-                                    >
-                                        <Mic className="h-3 w-3" /> Voice
-                                    </button>
                                     {!isEditing && (
                                         <button
                                             type="button"
@@ -5195,16 +3873,19 @@ export default function OppositionReportsPage() {
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
-                                    <textarea
-                                        value={editedReport?.inPossession || ""}
-                                        onChange={(e) =>
-                                            setEditedReport((prev) =>
-                                                prev ? { ...prev, inPossession: e.target.value } : null
-                                            )
-                                        }
-                                        placeholder="How do they build up and attack? (e.g. Play short to #6 or go direct to #9? Full-backs overlap high?)..."
-                                        className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-blue-500 outline-none resize-y"
-                                    />
+                                    <div className="space-y-2">
+                                        {renderSectionQuickPills("inPossession", "blue")}
+                                        <textarea
+                                            value={editedReport?.inPossession || ""}
+                                            onChange={(e) =>
+                                                setEditedReport((prev) =>
+                                                    prev ? { ...prev, inPossession: e.target.value } : null
+                                                )
+                                            }
+                                            placeholder="How do they build up and attack? (e.g. Play short to #6 or go direct to #9? Full-backs overlap high?)..."
+                                            className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-blue-500 outline-none resize-y"
+                                        />
+                                    </div>
                                 ) : (
                                     <p
                                         onClick={handleEditReport}
@@ -5228,14 +3909,6 @@ export default function OppositionReportsPage() {
                                     Out of Possession (Defensive Shape &amp; Press)
                                 </CardTitle>
                                 <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleStartVoiceRecording("outOfPossession")}
-                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
-                                        title="Dictate voice note into Out of Possession"
-                                    >
-                                        <Mic className="h-3 w-3" /> Voice
-                                    </button>
                                     {!isEditing && (
                                         <button
                                             type="button"
@@ -5249,16 +3922,19 @@ export default function OppositionReportsPage() {
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
-                                    <textarea
-                                        value={editedReport?.outOfPossession || ""}
-                                        onChange={(e) =>
-                                            setEditedReport((prev) =>
-                                                prev ? { ...prev, outOfPossession: e.target.value } : null
-                                            )
-                                        }
-                                        placeholder="How do they defend? (e.g. High line with aggressive press, or compact mid/low block? Spaces left in wide channels?)..."
-                                        className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-purple-500 outline-none resize-y"
-                                    />
+                                    <div className="space-y-2">
+                                        {renderSectionQuickPills("outOfPossession", "purple")}
+                                        <textarea
+                                            value={editedReport?.outOfPossession || ""}
+                                            onChange={(e) =>
+                                                setEditedReport((prev) =>
+                                                    prev ? { ...prev, outOfPossession: e.target.value } : null
+                                                )
+                                            }
+                                            placeholder="How do they defend? (e.g. High line with aggressive press, or compact mid/low block? Spaces left in wide channels?)..."
+                                            className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-purple-500 outline-none resize-y"
+                                        />
+                                    </div>
                                 ) : (
                                     <p
                                         onClick={handleEditReport}
@@ -5282,14 +3958,6 @@ export default function OppositionReportsPage() {
                                     Transition (Attacking &amp; Defensive)
                                 </CardTitle>
                                 <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleStartVoiceRecording("transition")}
-                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
-                                        title="Dictate voice note into Transitions"
-                                    >
-                                        <Mic className="h-3 w-3" /> Voice
-                                    </button>
                                     {!isEditing && (
                                         <button
                                             type="button"
@@ -5303,16 +3971,19 @@ export default function OppositionReportsPage() {
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
-                                    <textarea
-                                        value={editedReport?.transition || ""}
-                                        onChange={(e) =>
-                                            setEditedReport((prev) =>
-                                                prev ? { ...prev, transition: e.target.value } : null
-                                            )
-                                        }
-                                        placeholder="What happens when the ball turns over? (e.g. Look for early ball over the top to wingers; slow to track back when they lose it)..."
-                                        className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-orange-500 outline-none resize-y"
-                                    />
+                                    <div className="space-y-2">
+                                        {renderSectionQuickPills("transition", "orange")}
+                                        <textarea
+                                            value={editedReport?.transition || ""}
+                                            onChange={(e) =>
+                                                setEditedReport((prev) =>
+                                                    prev ? { ...prev, transition: e.target.value } : null
+                                                )
+                                            }
+                                            placeholder="What happens when the ball turns over? (e.g. Look for early ball over the top to wingers; slow to track back when they lose it)..."
+                                            className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-orange-500 outline-none resize-y"
+                                        />
+                                    </div>
                                 ) : (
                                     <p
                                         onClick={handleEditReport}
@@ -5336,14 +4007,6 @@ export default function OppositionReportsPage() {
                                     Set Pieces (Corners, Free Kicks &amp; Throws)
                                 </CardTitle>
                                 <div className="flex items-center gap-2">
-                                    <button
-                                        type="button"
-                                        onClick={() => handleStartVoiceRecording("setPieces")}
-                                        className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
-                                        title="Dictate voice note into Set Pieces"
-                                    >
-                                        <Mic className="h-3 w-3" /> Voice
-                                    </button>
                                     {!isEditing && (
                                         <button
                                             type="button"
@@ -5357,16 +4020,19 @@ export default function OppositionReportsPage() {
                             </CardHeader>
                             <CardContent className="p-4 pt-1">
                                 {isEditing ? (
-                                    <textarea
-                                        value={editedReport?.setPieces || ""}
-                                        onChange={(e) =>
-                                            setEditedReport((prev) =>
-                                                prev ? { ...prev, setPieces: e.target.value } : null
-                                            )
-                                        }
-                                        placeholder="Inswinging corners to near post? Long throw specialist? Zonal or man-marking when defending corners?..."
-                                        className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-cyan-500 outline-none resize-y"
-                                    />
+                                    <div className="space-y-2">
+                                        {renderSectionQuickPills("setPieces", "cyan")}
+                                        <textarea
+                                            value={editedReport?.setPieces || ""}
+                                            onChange={(e) =>
+                                                setEditedReport((prev) =>
+                                                    prev ? { ...prev, setPieces: e.target.value } : null
+                                                )
+                                            }
+                                            placeholder="Inswinging corners to near post? Long throw specialist? Zonal or man-marking when defending corners?..."
+                                            className="w-full min-h-[110px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-cyan-500 outline-none resize-y"
+                                        />
+                                    </div>
                                 ) : (
                                     <p
                                         onClick={handleEditReport}
@@ -5422,16 +4088,19 @@ export default function OppositionReportsPage() {
                         </CardHeader>
                         <CardContent className="p-4 pt-1 space-y-2">
                             {isEditing ? (
-                                <textarea
-                                    value={editedReport?.postMatchReview || ""}
-                                    onChange={(e) =>
-                                        setEditedReport((prev) =>
-                                            prev ? { ...prev, postMatchReview: e.target.value } : null
-                                        )
-                                    }
-                                    placeholder="e.g. Their LB #3 struggled badly against pace in the 2nd half — target him early in the return game..."
-                                    className="w-full min-h-[85px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-brand outline-none resize-y"
-                                />
+                                <div className="space-y-2">
+                                    {renderSectionQuickPills("postMatchReview", "brand")}
+                                    <textarea
+                                        value={editedReport?.postMatchReview || ""}
+                                        onChange={(e) =>
+                                            setEditedReport((prev) =>
+                                                prev ? { ...prev, postMatchReview: e.target.value } : null
+                                            )
+                                        }
+                                        placeholder="e.g. Their LB #3 struggled badly against pace in the 2nd half — target him early in the return game..."
+                                        className="w-full min-h-[85px] rounded-xl border border-border bg-surface-2 p-3 text-xs text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-brand outline-none resize-y"
+                                    />
+                                </div>
                             ) : (
                                 <p
                                     onClick={handleEditReport}
