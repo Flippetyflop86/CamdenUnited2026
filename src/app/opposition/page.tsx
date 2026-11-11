@@ -99,6 +99,8 @@ interface VoiceNoteItem {
     targetSection: VoiceNoteTargetSection;
     durationSec: number;
     createdAt: string;
+    audioDataUrl?: string;
+    transcriptionEngine?: string;
 }
 
 interface ScoutingReport {
@@ -703,12 +705,15 @@ export default function OppositionReportsPage() {
     };
 
     // =========================================================================
-    // CONTINUOUS LONG-FORM LIVE VOICE-TO-TEXT SCOUTING ENGINE
-    // Supports multi-minute coaching monologues with natural pauses, Pause/Resume,
-    // live elapsed timer, and Smart Multi-Section Auto-Routing.
+    // CONTINUOUS LONG-FORM LIVE VOICE-TO-TEXT SCOUTING ENGINE (UPGRADED)
+    // 1. Football Domain Multi-Alternative Scorer + Real-Time Phonetic Normalizer
+    // 2. 1-Tap Phone Keyboard Mic Mode (Apple Dictation / Gboard Voice)
+    // 3. Quick-Tap Pitchside Shirt Numbers (#1–#11) & Tactical Chips
+    // 4. Hardware Noise-Suppressed Audio Recorder + Playable Voice Memo + AI Whisper Hook
     // =========================================================================
     const [isVoiceRecording, setIsVoiceRecording] = useState(false);
     const [isVoicePaused, setIsVoicePaused] = useState(false);
+    const [isKeyboardDictationMode, setIsKeyboardDictationMode] = useState(false);
     const [voiceTranscript, setVoiceTranscript] = useState("");
     const [voiceInterimText, setVoiceInterimText] = useState("");
     const [voiceTargetSection, setVoiceTargetSection] = useState<VoiceNoteTargetSection>("smart");
@@ -716,10 +721,18 @@ export default function OppositionReportsPage() {
     const [isSavingVoiceNote, setIsSavingVoiceNote] = useState(false);
     const [voiceStatusToast, setVoiceStatusToast] = useState<string | null>(null);
     const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+    const [voiceAudioPreviewUrl, setVoiceAudioPreviewUrl] = useState<string | null>(null);
+    const [voiceAudioDataUrl, setVoiceAudioDataUrl] = useState<string | undefined>(undefined);
+    const [isAiTranscribing, setIsAiTranscribing] = useState(false);
+    const [voiceTranscriptionEngine, setVoiceTranscriptionEngine] = useState<string | undefined>(undefined);
 
     const speechRecRef = useRef<any>(null);
     const keepListeningRef = useRef<boolean>(false);
     const voiceTimerRef = useRef<any>(null);
+    const voiceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const mediaStreamRef = useRef<MediaStream | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
 
     const formatVoiceTimer = (totalSec: number) => {
         const mins = Math.floor(totalSec / 60);
@@ -727,6 +740,169 @@ export default function OppositionReportsPage() {
         return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
     };
     const formatVoiceDuration = formatVoiceTimer;
+
+    // #1: Football Domain Vocabulary Scorer & Phonetic Auto-Corrector
+    const FOOTBALL_VOCAB_PATTERNS =
+        /\b(corner|free kick|set piece|throw-in|long throw|goal kick|press|pressing|high line|low block|mid block|counter|transition|overlap|underlap|overload|pivot|centre-back|center-back|full-back|wing-back|winger|striker|keeper|goalkeeper|left-footed|right-footed|weak foot|in behind|near post|back post|number|shirt|formation|4-2-3-1|4-3-3|4-4-2|3-5-2|3-4-3|5-3-2)\b/gi;
+
+    const pickBestFootballAlternative = (resultItem: any): string => {
+        if (!resultItem || resultItem.length === 0) return "";
+        let bestTranscript = resultItem[0]?.transcript || "";
+        let bestScore = -1;
+
+        for (let idx = 0; idx < resultItem.length; idx++) {
+            const candidate = resultItem[idx]?.transcript || "";
+            if (!candidate.trim()) continue;
+            const confidence = typeof resultItem[idx]?.confidence === "number" ? resultItem[idx].confidence : 0.8 - idx * 0.05;
+            const normalizedCandidate = cleanAndNormalizeFootballSpeech(candidate);
+            const matches = normalizedCandidate.match(FOOTBALL_VOCAB_PATTERNS);
+            const footballBonus = (matches ? matches.length : 0) * 0.28;
+            const totalScore = confidence + footballBonus;
+            if (totalScore > bestScore) {
+                bestScore = totalScore;
+                bestTranscript = candidate;
+            }
+        }
+        return bestTranscript;
+    };
+
+    const cleanAndNormalizeFootballSpeech = (rawText: string): string => {
+        if (!rawText) return "";
+        let text = rawText;
+
+        // 1. Spoken formations -> hyphenated tactical notation
+        const formationMap: [RegExp, string][] = [
+            [/\b(?:four|for|4)[\s-]+(?:two|to|too|2)[\s-]+(?:three|free|tree|3)[\s-]+(?:one|won|1)\b/gi, "4-2-3-1"],
+            [/\b4231\b/g, "4-2-3-1"],
+            [/\b(?:four|for|4)[\s-]+(?:three|free|tree|3)[\s-]+(?:three|free|tree|3)\b/gi, "4-3-3"],
+            [/\b433\b/g, "4-3-3"],
+            [/\b(?:four|for|4)[\s-]+(?:four|for|4)[\s-]+(?:two|to|too|2)\b/gi, "4-4-2"],
+            [/\b442\b/g, "4-4-2"],
+            [/\b(?:three|free|tree|3)[\s-]+(?:five|5)[\s-]+(?:two|to|too|2)\b/gi, "3-5-2"],
+            [/\b352\b/g, "3-5-2"],
+            [/\b(?:three|free|tree|3)[\s-]+(?:four|for|4)[\s-]+(?:three|free|tree|3)\b/gi, "3-4-3"],
+            [/\b343\b/g, "3-4-3"],
+            [/\b(?:five|5)[\s-]+(?:three|free|tree|3)[\s-]+(?:two|to|too|2)\b/gi, "5-3-2"],
+            [/\b532\b/g, "5-3-2"],
+            [/\b(?:four|for|4)[\s-]+(?:one|won|1)[\s-]+(?:four|for|4)[\s-]+(?:one|won|1)\b/gi, "4-1-4-1"],
+            [/\b4141\b/g, "4-1-4-1"],
+            [/\b(?:four|for|4)[\s-]+(?:two|to|too|2)[\s-]+(?:two|to|too|2)[\s-]+(?:two|to|too|2)\b/gi, "4-2-2-2"],
+            [/\b4222\b/g, "4-2-2-2"]
+        ];
+        for (const [pattern, replacement] of formationMap) {
+            text = text.replace(pattern, replacement);
+        }
+
+        // 2. Spoken shirt numbers -> #X
+        const wordToNum: Record<string, string> = {
+            one: "1",
+            won: "1",
+            two: "2",
+            to: "2",
+            too: "2",
+            three: "3",
+            free: "3",
+            four: "4",
+            for: "4",
+            five: "5",
+            six: "6",
+            seven: "7",
+            eight: "8",
+            ate: "8",
+            nine: "9",
+            line: "9",
+            ten: "10",
+            eleven: "11",
+            twelve: "12",
+            thirteen: "13",
+            fourteen: "14",
+            fifteen: "15",
+            sixteen: "16",
+            seventeen: "17",
+            eighteen: "18",
+            nineteen: "19",
+            twenty: "20"
+        };
+
+        text = text.replace(
+            /\b(?:number|no\.?|shirt)\s+(one|won|two|to|too|three|free|four|for|five|six|seven|eight|ate|nine|line|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|[0-9]{1,2})\b/gi,
+            (_match, token) => {
+                const lower = String(token).toLowerCase();
+                const digit = wordToNum[lower] || lower;
+                return `#${digit}`;
+            }
+        );
+
+        // "their nine", "their ten", "their seven", "their eleven", "their six", "their eight"
+        text = text.replace(
+            /\b(their|the)\s+(six|seven|eight|nine|ten|eleven)\b/gi,
+            (_match, prefix, token) => {
+                const digit = wordToNum[String(token).toLowerCase()];
+                return digit ? `${prefix} #${digit}` : _match;
+            }
+        );
+
+        // 3. Common pitchside football homophones & misheard terms
+        const footballPhraseFixes: [RegExp, string | ((m: string) => string)][] = [
+            [/\b(?:set|said)\s+(?:peace|peaces|piece|pieces)\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "set pieces" : "set piece")],
+            [/\b(?:three|free)\s+kicks?\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "free kicks" : "free kick")],
+            [/\b(?:center|centre|send her|sent a)\s+backs?\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "centre-backs" : "centre-back")],
+            [/\b(?:center|centre|send her|sent a)\s+(?:half|halves)\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "centre-halves" : "centre-half")],
+            [/\b(left|right|their|two|both)\s+(?:full|fall)\s*backs?\b/gi, "$1 full-back"],
+            [/\bfull\s+backs?\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "full-backs" : "full-back")],
+            [/\bwing\s+backs?\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "wing-backs" : "wing-back")],
+            [/\b(?:hi|high)\s+press\b/gi, "high press"],
+            [/\b(?:no|low)\s+block\b/gi, "low block"],
+            [/\bmid\s+block\b/gi, "mid-block"],
+            [/\bcounter\s+attacks?\b/gi, (m: string) => (m.toLowerCase().endsWith("s") ? "counter-attacks" : "counter-attack")],
+            [/\bin\s+swinging\b/gi, "inswinging"],
+            [/\bout\s+swinging\b/gi, "outswinging"],
+            [/\bleft\s+footed\b/gi, "left-footed"],
+            [/\bright\s+footed\b/gi, "right-footed"],
+            [/\b(?:one|1)\s+(?:v|on|vs\.?)\s+(?:one|1)\b/gi, "1v1"],
+            [/\b(?:two|2)\s+(?:v|on|vs\.?)\s+(?:one|1)\b/gi, "2v1"]
+        ];
+
+        for (const [pattern, replacement] of footballPhraseFixes) {
+            text = text.replace(pattern, replacement as any);
+        }
+
+        return text.replace(/\s{2,}/g, " ").trim();
+    };
+
+    // Stitch mobile pause chunks without duplicating boundary words when SpeechRecognition restarts
+    const appendSpeechChunkCleanly = (existing: string, incomingRaw: string): string => {
+        const cleanedIncoming = cleanAndNormalizeFootballSpeech(incomingRaw);
+        if (!cleanedIncoming) return existing;
+
+        const prevTrimmed = existing.trim();
+        if (!prevTrimmed) {
+            const cap = cleanedIncoming.charAt(0).toUpperCase() + cleanedIncoming.slice(1);
+            return /[.!?]$/.test(cap) ? cap : `${cap}.`;
+        }
+
+        // Check if mobile browser repeated the last 1-4 words at the start of the new chunk
+        const prevWords = prevTrimmed.replace(/[.!?]+$/, "").split(/\s+/);
+        const nextWords = cleanedIncoming.split(/\s+/);
+        let overlapCount = 0;
+        const maxOverlap = Math.min(4, prevWords.length, nextWords.length);
+        for (let k = maxOverlap; k >= 1; k--) {
+            const tail = prevWords.slice(-k).join(" ").toLowerCase();
+            const head = nextWords.slice(0, k).join(" ").toLowerCase();
+            if (tail === head) {
+                overlapCount = k;
+                break;
+            }
+        }
+
+        const dedupedWords = overlapCount > 0 ? nextWords.slice(overlapCount) : nextWords;
+        if (dedupedWords.length === 0) return prevTrimmed;
+
+        const dedupedStr = dedupedWords.join(" ");
+        const capitalized = dedupedStr.charAt(0).toUpperCase() + dedupedStr.slice(1);
+        const withPunct = /[.!?]$/.test(capitalized) ? capitalized : `${capitalized}.`;
+        return `${prevTrimmed} ${withPunct}`;
+    };
 
     const voiceSectionMeta: Record<
         VoiceNoteTargetSection,
@@ -784,14 +960,127 @@ export default function OppositionReportsPage() {
         }
     };
 
+    // #4: Hardware Noise-Suppressed Audio Capture + Optional AI Transcription
+    const startHardwareAudioRecorder = async () => {
+        if (typeof window === "undefined" || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+            return;
+        }
+        try {
+            if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+                return;
+            }
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            });
+            mediaStreamRef.current = stream;
+            audioChunksRef.current = [];
+
+            const mimeType = MediaRecorder.isTypeSupported("audio/webm;codecs=opus")
+                ? "audio/webm;codecs=opus"
+                : MediaRecorder.isTypeSupported("audio/mp4")
+                    ? "audio/mp4"
+                    : "";
+            const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
+
+            recorder.ondataavailable = (ev) => {
+                if (ev.data && ev.data.size > 0) {
+                    audioChunksRef.current.push(ev.data);
+                }
+            };
+
+            recorder.start(1000);
+            mediaRecorderRef.current = recorder;
+        } catch {
+            // Non-blocking fallback if MediaRecorder isn't available
+        }
+    };
+
+    const finalizeHardwareAudioAndTranscribe = async () => {
+        const recorder = mediaRecorderRef.current;
+        if (!recorder) return;
+
+        await new Promise<void>((resolve) => {
+            if (recorder.state === "inactive") {
+                resolve();
+                return;
+            }
+            recorder.onstop = () => resolve();
+            try {
+                recorder.stop();
+            } catch {
+                resolve();
+            }
+        });
+
+        if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+            mediaStreamRef.current = null;
+        }
+        mediaRecorderRef.current = null;
+
+        if (audioChunksRef.current.length === 0) return;
+
+        const mimeType = audioChunksRef.current[0]?.type || "audio/webm";
+        const audioBlob = new Blob(audioChunksRef.current, { type: mimeType });
+        if (audioBlob.size < 500) return;
+
+        // 1. Set instant playable audio preview URL
+        const previewUrl = URL.createObjectURL(audioBlob);
+        setVoiceAudioPreviewUrl(previewUrl);
+
+        // Save compact data URL for voice notes under ~450KB so they remain playable in the log
+        if (audioBlob.size <= 450 * 1024) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                if (typeof reader.result === "string") {
+                    setVoiceAudioDataUrl(reader.result);
+                }
+            };
+            reader.readAsDataURL(audioBlob);
+        } else {
+            setVoiceAudioDataUrl(previewUrl);
+        }
+
+        // 2. Attempt Server AI Whisper / Gemini Audio Transcription if API key is configured
+        try {
+            setIsAiTranscribing(true);
+            const ext = mimeType.includes("mp4") ? "m4a" : "webm";
+            const form = new FormData();
+            form.append("audio", audioBlob, `scout-voice.${ext}`);
+
+            const res = await fetch("/api/transcribe", {
+                method: "POST",
+                body: form
+            });
+            if (res.ok) {
+                const payload = await res.json();
+                if (payload?.available && payload?.text) {
+                    const normalizedAiText = cleanAndNormalizeFootballSpeech(payload.text);
+                    setVoiceTranscript(normalizedAiText);
+                    setVoiceTranscriptionEngine(payload.engine || "AI Whisper");
+                    setVoiceStatusToast(`Decoded with ${payload.engine || "AI Audio"} + Football Vocabulary`);
+                    setTimeout(() => setVoiceStatusToast(null), 4000);
+                }
+            }
+        } catch {
+            // Silently fall back to the local football-normalized transcript
+        } finally {
+            setIsAiTranscribing(false);
+        }
+    };
+
     const startSpeechEngine = () => {
         if (typeof window === "undefined") return;
         const SpeechRecognitionCtor =
             (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
         if (!SpeechRecognitionCtor) {
-            alert(
-                "Live Speech-to-Text is supported in Chrome, Safari, and Edge. You can still type or use your phone keyboard's microphone button directly in the box."
-            );
+            setIsKeyboardDictationMode(true);
+            setIsVoiceRecording(false);
+            setTimeout(() => voiceTextareaRef.current?.focus(), 100);
             return;
         }
 
@@ -805,6 +1094,7 @@ export default function OppositionReportsPage() {
         const recognition = new SpeechRecognitionCtor();
         recognition.continuous = true;
         recognition.interimResults = true;
+        recognition.maxAlternatives = 5;
         recognition.lang = "en-GB";
 
         recognition.onresult = (event: any) => {
@@ -813,33 +1103,29 @@ export default function OppositionReportsPage() {
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 const res = event.results[i];
                 if (res.isFinal) {
-                    finalChunk += res[0].transcript + " ";
+                    finalChunk += pickBestFootballAlternative(res) + " ";
                 } else {
-                    interimChunk += res[0].transcript;
+                    interimChunk += res[0]?.transcript || "";
                 }
             }
             if (finalChunk.trim()) {
-                const cleaned = finalChunk.trim();
-                const capitalized = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-                const withPunct = /[.!?]$/.test(capitalized) ? capitalized : `${capitalized}.`;
-                setVoiceTranscript((prev) => (prev.trim() ? `${prev.trim()} ${withPunct}` : withPunct));
+                setVoiceTranscript((prev) => appendSpeechChunkCleanly(prev, finalChunk));
+                setVoiceTranscriptionEngine("Football Smart Decoder");
             }
-            setVoiceInterimText(interimChunk);
+            setVoiceInterimText(interimChunk ? cleanAndNormalizeFootballSpeech(interimChunk) : "");
         };
 
         recognition.onerror = (event: any) => {
-            // Ignore 'no-speech' timeouts during long monologues so continuous mode keeps listening across natural pauses
             if (event?.error === "not-allowed" || event?.error === "service-not-allowed") {
                 keepListeningRef.current = false;
                 setIsVoiceRecording(false);
                 setIsVoicePaused(false);
-                alert("Microphone access was blocked. Please allow microphone permissions in your browser.");
+                alert("Microphone access was blocked. Please allow microphone permissions in your browser, or tap 'Use Phone Keyboard Mic'.");
             }
         };
 
         recognition.onend = () => {
             setVoiceInterimText("");
-            // Auto-restart if the coach is still recording and simply paused to watch the match
             if (keepListeningRef.current) {
                 setTimeout(() => {
                     if (keepListeningRef.current) {
@@ -862,11 +1148,60 @@ export default function OppositionReportsPage() {
     const handleStartVoiceRecording = (sectionOverride?: VoiceNoteTargetSection) => {
         if (sectionOverride) setVoiceTargetSection(sectionOverride);
         setShowVoiceRecorder(true);
+        setIsKeyboardDictationMode(false);
         keepListeningRef.current = true;
         setIsVoiceRecording(true);
         setIsVoicePaused(false);
         setVoiceStatusToast(null);
         startSpeechEngine();
+        startHardwareAudioRecorder();
+    };
+
+    // #2: 1-Tap Phone Keyboard Mic Mode (Apple Dictation / Gboard Voice)
+    const handleActivateKeyboardDictation = () => {
+        keepListeningRef.current = false;
+        setIsVoiceRecording(false);
+        setIsVoicePaused(false);
+        setVoiceInterimText("");
+        if (speechRecRef.current) {
+            try {
+                speechRecRef.current.onend = null;
+                speechRecRef.current.stop();
+            } catch {}
+        }
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+            try {
+                mediaRecorderRef.current.stop();
+            } catch {}
+        }
+        if (mediaStreamRef.current) {
+            mediaStreamRef.current.getTracks().forEach((t) => t.stop());
+            mediaStreamRef.current = null;
+        }
+        setShowVoiceRecorder(true);
+        setIsKeyboardDictationMode(true);
+        setVoiceTranscriptionEngine("Phone Keyboard Mic");
+        setTimeout(() => {
+            if (voiceTextareaRef.current) {
+                voiceTextareaRef.current.focus();
+                const len = voiceTextareaRef.current.value.length;
+                voiceTextareaRef.current.setSelectionRange(len, len);
+            }
+        }, 80);
+    };
+
+    // #3: Quick-Tap Pitchside Chip Inserter
+    const handleInsertVoiceQuickChip = (chipText: string) => {
+        setShowVoiceRecorder(true);
+        setVoiceTranscript((prev) => {
+            const cleanPrev = prev.trim();
+            if (!cleanPrev) return `${chipText} `;
+            const needsSpace = !/\s$/.test(prev);
+            return `${prev}${needsSpace ? " " : ""}${chipText} `;
+        });
+        if (isKeyboardDictationMode && voiceTextareaRef.current) {
+            setTimeout(() => voiceTextareaRef.current?.focus(), 40);
+        }
     };
 
     const handlePauseVoiceRecording = () => {
@@ -879,18 +1214,31 @@ export default function OppositionReportsPage() {
                 speechRecRef.current.stop();
             } catch {}
         }
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+            try {
+                mediaRecorderRef.current.pause();
+            } catch {}
+        }
     };
 
     const handleResumeVoiceRecording = () => {
         keepListeningRef.current = true;
         setIsVoicePaused(false);
         startSpeechEngine();
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state === "paused") {
+            try {
+                mediaRecorderRef.current.resume();
+            } catch {}
+        }
     };
 
     const handleStopVoiceRecording = () => {
         keepListeningRef.current = false;
         setIsVoiceRecording(false);
         setIsVoicePaused(false);
+        if (voiceInterimText.trim()) {
+            setVoiceTranscript((prev) => appendSpeechChunkCleanly(prev, voiceInterimText));
+        }
         setVoiceInterimText("");
         if (speechRecRef.current) {
             try {
@@ -898,6 +1246,7 @@ export default function OppositionReportsPage() {
                 speechRecRef.current.stop();
             } catch {}
         }
+        finalizeHardwareAudioAndTranscribe();
     };
 
     // Elapsed second counter while actively recording (and not paused)
@@ -915,7 +1264,7 @@ export default function OppositionReportsPage() {
         };
     }, [isVoiceRecording, isVoicePaused]);
 
-    // Cleanup speech engine on unmount
+    // Cleanup speech and media streams on unmount
     useEffect(() => {
         return () => {
             keepListeningRef.current = false;
@@ -924,6 +1273,9 @@ export default function OppositionReportsPage() {
                     speechRecRef.current.onend = null;
                     speechRecRef.current.stop();
                 } catch {}
+            }
+            if (mediaStreamRef.current) {
+                mediaStreamRef.current.getTracks().forEach((t) => t.stop());
             }
         };
     }, []);
@@ -949,8 +1301,15 @@ export default function OppositionReportsPage() {
             lineup: [...(base.lineup || [])]
         };
         const routedLabels: string[] = [];
-        const text = rawText.trim();
+        const text = cleanAndNormalizeFootballSpeech(rawText);
         if (!text) return { updated: next, routedLabels };
+
+        // Auto-detect formation mentions (e.g. "4-3-3", "3-5-2", "4-2-3-1")
+        const formationMatch = text.match(/\b(4-2-3-1|4-3-3|4-4-2|3-5-2|3-4-3|5-3-2|4-1-4-1|4-2-2-2)\b/);
+        if (formationMatch && FORMATION_NAMES.includes(formationMatch[1])) {
+            next.formation = formationMatch[1];
+            routedLabels.push(`Formation (${formationMatch[1]})`);
+        }
 
         if (target !== "smart") {
             if (target === "voiceLog") {
@@ -994,7 +1353,7 @@ export default function OppositionReportsPage() {
         for (const sentence of sentences) {
             let matchedSentence = false;
             if (
-                /\b(corner|corners|free kick|free-kick|throw-in|long throw|set piece|set-piece|near post|back post|delivery|dead ball)\b/i.test(
+                /\b(corner|corners|free kick|free-kick|throw-in|long throw|set piece|set-piece|near post|back post|delivery|dead ball|inswinging|outswinging)\b/i.test(
                     sentence
                 )
             ) {
@@ -1021,7 +1380,7 @@ export default function OppositionReportsPage() {
                 matchedSentence = true;
             }
             if (
-                /\b(in possession|build up|build-up|play out|playing out|goal kick|pivot|overload|overlap|rotate|shape|possession)\b/i.test(
+                /\b(in possession|build up|build-up|play out|playing out|goal kick|pivot|overload|overlap|underlap|rotate|shape|possession)\b/i.test(
                     sentence
                 )
             ) {
@@ -1039,7 +1398,7 @@ export default function OppositionReportsPage() {
                 matchedSentence = true;
             }
             if (
-                /\b(strong|strength|dangerous|quality|athletic|physical|technical|good on the ball|sharp|clinical|dominant|pace|rapid)\b/i.test(
+                /\b(strong|strength|dangerous|quality|athletic|physical|technical|good on the ball|sharp|clinical|dominant|pace|rapid|1v1)\b/i.test(
                     sentence
                 )
             ) {
@@ -1068,7 +1427,8 @@ export default function OppositionReportsPage() {
     };
 
     const handleSaveVoiceNote = async () => {
-        const combinedText = `${voiceTranscript} ${voiceInterimText}`.trim();
+        const rawCombined = `${voiceTranscript} ${voiceInterimText}`.trim();
+        const combinedText = cleanAndNormalizeFootballSpeech(rawCombined);
         if (!combinedText) return;
 
         handleStopVoiceRecording();
@@ -1080,7 +1440,9 @@ export default function OppositionReportsPage() {
                 text: combinedText,
                 targetSection: voiceTargetSection,
                 durationSec: voiceElapsedSec,
-                createdAt: new Date().toISOString()
+                createdAt: new Date().toISOString(),
+                audioDataUrl: voiceAudioDataUrl,
+                transcriptionEngine: voiceTranscriptionEngine
             };
 
             const { updated, routedLabels } = routeTextIntoReportSections(
@@ -1095,6 +1457,10 @@ export default function OppositionReportsPage() {
                 setVoiceTranscript("");
                 setVoiceInterimText("");
                 setVoiceElapsedSec(0);
+                setVoiceAudioPreviewUrl(null);
+                setVoiceAudioDataUrl(undefined);
+                setVoiceTranscriptionEngine(undefined);
+                setIsKeyboardDictationMode(false);
                 setVoiceStatusToast(
                     routedLabels.length > 0
                         ? `Saved to Voice Log & routed to: ${routedLabels.join(", ")}`
@@ -1131,6 +1497,33 @@ export default function OppositionReportsPage() {
         };
         await persistReportSnapshot(updated, false);
     };
+
+    const VOICE_QUICK_SHIRT_CHIPS = [
+        { label: "#1 GK", insert: "Their #1 (GK)" },
+        { label: "#2 RB", insert: "Their #2 (RB)" },
+        { label: "#3 LB", insert: "Their #3 (LB)" },
+        { label: "#4 CB", insert: "Their #4 (CB)" },
+        { label: "#5 CB", insert: "Their #5 (CB)" },
+        { label: "#6 CDM", insert: "Their #6 (pivot)" },
+        { label: "#7 RW", insert: "Their #7 (winger)" },
+        { label: "#8 CM", insert: "Their #8 (CM)" },
+        { label: "#9 ST", insert: "Their #9 (striker)" },
+        { label: "#10 CAM", insert: "Their #10" },
+        { label: "#11 LW", insert: "Their #11 (winger)" }
+    ];
+
+    const VOICE_QUICK_TACTICAL_CHIPS = [
+        { label: "4-2-3-1", insert: "Playing 4-2-3-1." },
+        { label: "4-3-3", insert: "Playing 4-3-3." },
+        { label: "3-5-2", insert: "Playing 3-5-2." },
+        { label: "High Press", insert: "They press high from goal kicks." },
+        { label: "Low Block", insert: "They sit in a compact low block." },
+        { label: "Pace in Behind", insert: "rapid pace in behind" },
+        { label: "Weak Left Foot", insert: "weak on their left foot" },
+        { label: "Slow to Turn", insert: "slow to turn when pressed" },
+        { label: "Set-Piece Threat", insert: "dangerous delivery on corners and set pieces." },
+        { label: "Space in Behind", insert: "leaves space in behind when full-backs push on." }
+    ];
 
     const VOICE_SECTION_OPTIONS: {
         id: VoiceNoteTargetSection;
@@ -1176,7 +1569,7 @@ export default function OppositionReportsPage() {
         },
         {
             id: "outOfPossession",
-            label: "🟣 Out ofPossession",
+            label: "🟣 Out of Possession",
             shortLabel: "🟣 Out of Poss",
             badgeClass: "bg-purple-500/15 text-purple-400 border-purple-500/40"
         },
@@ -1215,7 +1608,9 @@ export default function OppositionReportsPage() {
                         ? "border-rose-500/60 ring-2 ring-rose-500/20"
                         : isVoicePaused
                             ? "border-amber-500/60 ring-1 ring-amber-500/20"
-                            : "border-brand/35 border-l-4 border-l-brand"
+                            : isKeyboardDictationMode
+                                ? "border-emerald-500/60 ring-2 ring-emerald-500/20"
+                                : "border-brand/35 border-l-4 border-l-brand"
                 } ${isMobileLayout ? "p-3.5 space-y-3" : "p-4 space-y-3.5"}`}
             >
                 {/* Top Header Row */}
@@ -1227,7 +1622,9 @@ export default function OppositionReportsPage() {
                                     ? "bg-rose-500/20 border-rose-500/40 text-rose-500 animate-pulse"
                                     : isVoicePaused
                                         ? "bg-amber-500/20 border-amber-500/40 text-amber-400"
-                                        : "bg-brand/15 border-brand/30 text-brand"
+                                        : isKeyboardDictationMode
+                                            ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                                            : "bg-brand/15 border-brand/30 text-brand"
                             }`}
                         >
                             {isVoiceRecording ? (
@@ -1254,6 +1651,16 @@ export default function OppositionReportsPage() {
                                         PAUSED {formatVoiceDuration(voiceElapsedSec)}
                                     </span>
                                 )}
+                                {isKeyboardDictationMode && !isVoiceRecording && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-400 text-[10px] font-black">
+                                        ⌨️🎙️ Phone Keyboard Mic Ready
+                                    </span>
+                                )}
+                                {isAiTranscribing && (
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-brand/20 border border-brand/40 text-brand text-[10px] font-black animate-pulse">
+                                        ✨ Enhancing Audio...
+                                    </span>
+                                )}
                                 {!isVoiceRecording && !isVoicePaused && savedNotes.length > 0 && (
                                     <span className="px-2 py-0.5 rounded-full bg-surface-2 border border-border text-[10px] font-extrabold text-muted-foreground">
                                         {savedNotes.length} saved {savedNotes.length === 1 ? "note" : "notes"}
@@ -1261,23 +1668,39 @@ export default function OppositionReportsPage() {
                                 )}
                             </div>
                             <p className="text-[11px] text-muted-foreground leading-snug">
-                                Continuous multi-minute voice-to-text — pause &amp; resume anytime while watching play, then auto-sort into the dossier
+                                Football-smart voice decoder (`4-2-3-1`, `#9`, `set piece`) + Phone Keyboard Mic mode + playable audio memo
                             </p>
                         </div>
                     </div>
 
                     {/* Primary Action Controls */}
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 flex-wrap shrink-0">
                         {!isVoiceRecording && !isVoicePaused ? (
-                            <Button
-                                type="button"
-                                size="sm"
-                                onClick={() => handleStartVoiceRecording()}
-                                className="h-9 px-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-sm"
-                            >
-                                <Mic className="h-3.5 w-3.5 mr-1.5" />
-                                {hasDraftText ? "Continue Dictating" : "Start Live Voice Note"}
-                            </Button>
+                            <>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    onClick={() => handleStartVoiceRecording()}
+                                    className="h-9 px-3.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs shadow-sm"
+                                >
+                                    <Mic className="h-3.5 w-3.5 mr-1.5" />
+                                    {hasDraftText ? "Continue Live Mic" : "Start Live Mic"}
+                                </Button>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleActivateKeyboardDictation}
+                                    className={`h-9 px-3 rounded-xl font-extrabold text-xs transition-all ${
+                                        isKeyboardDictationMode
+                                            ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400"
+                                            : "border-border bg-surface-2 hover:bg-surface-2/80 text-foreground"
+                                    }`}
+                                    title="Use your phone keyboard's built-in microphone button for maximum noise cancellation in wind & crowd noise"
+                                >
+                                    ⌨️🎙️ Phone Keyboard Mic
+                                </Button>
+                            </>
                         ) : (
                             <>
                                 {isVoiceRecording ? (
@@ -1340,8 +1763,71 @@ export default function OppositionReportsPage() {
                     </div>
                 )}
 
-                {(showVoiceRecorder || isVoiceRecording || isVoicePaused || hasDraftText) && (
+                {(showVoiceRecorder || isVoiceRecording || isVoicePaused || isKeyboardDictationMode || hasDraftText) && (
                     <div className="space-y-3 pt-1 border-t border-border/60">
+                        {/* Phone Keyboard Mic Tip Banner (#2) */}
+                        {isKeyboardDictationMode && (
+                            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-[11px] text-emerald-300 flex items-center justify-between gap-2">
+                                <span>
+                                    💡 <strong>High-Accuracy Phone Dictation:</strong> Tap the <strong>🎤 microphone key</strong> on your iPhone/Android keyboard below. It uses hardware wind &amp; crowd noise cancellation!
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setIsKeyboardDictationMode(false)}
+                                    className="text-[10px] font-bold text-emerald-400 hover:underline shrink-0"
+                                >
+                                    Got it
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Quick-Tap Pitchside Shirt Numbers & Tactical Chips (#3) */}
+                        <div className="space-y-1.5">
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                    ⚡ 1-Tap Pitchside Insert (Tap while speaking or typing — never mishears numbers)
+                                </span>
+                                {hasDraftText && (
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setVoiceTranscript((prev) => cleanAndNormalizeFootballSpeech(prev))
+                                        }
+                                        className="px-2 py-0.5 rounded-md bg-brand/15 hover:bg-brand/25 border border-brand/35 text-[10px] font-extrabold text-brand transition-colors shrink-0"
+                                        title="Normalize spoken numbers ('number ten' -> '#10') and formations ('four three three' -> '4-3-3')"
+                                    >
+                                        ✨ Fix Football Terms
+                                    </button>
+                                )}
+                            </div>
+                            {/* Row 1: Shirt Numbers #1 - #11 */}
+                            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar">
+                                {VOICE_QUICK_SHIRT_CHIPS.map((chip) => (
+                                    <button
+                                        key={chip.label}
+                                        type="button"
+                                        onClick={() => handleInsertVoiceQuickChip(chip.insert)}
+                                        className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-black whitespace-nowrap shrink-0 transition-colors"
+                                    >
+                                        {chip.label}
+                                    </button>
+                                ))}
+                            </div>
+                            {/* Row 2: Tactical & Formation Phrases */}
+                            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar">
+                                {VOICE_QUICK_TACTICAL_CHIPS.map((chip) => (
+                                    <button
+                                        key={chip.label}
+                                        type="button"
+                                        onClick={() => handleInsertVoiceQuickChip(chip.insert)}
+                                        className="px-2 py-1 rounded-lg bg-surface-2 hover:bg-brand/15 border border-border hover:border-brand/40 text-muted-foreground hover:text-foreground text-[10px] font-bold whitespace-nowrap shrink-0 transition-colors"
+                                    >
+                                        + {chip.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
                         {/* Target Section Routing Pills */}
                         <div className="space-y-1.5">
                             <div className="flex items-center justify-between">
@@ -1351,7 +1837,7 @@ export default function OppositionReportsPage() {
                                 </span>
                                 {voiceTargetSection === "smart" && (
                                     <span className="text-[10px] font-semibold text-brand hidden sm:inline">
-                                        Splits sentences automatically into Strengths, Weaknesses, Set Pieces, etc.
+                                        Splits sentences automatically into Formation, Danger Men, Strengths, Weaknesses, Set Pieces
                                     </span>
                                 )}
                             </div>
@@ -1380,6 +1866,7 @@ export default function OppositionReportsPage() {
                         <div className="space-y-2">
                             <div className="relative">
                                 <textarea
+                                    ref={voiceTextareaRef}
                                     rows={isMobileLayout ? 4 : 4}
                                     value={
                                         voiceInterimText
@@ -1390,20 +1877,48 @@ export default function OppositionReportsPage() {
                                         setVoiceTranscript(e.target.value);
                                         setVoiceInterimText("");
                                     }}
-                                    placeholder="Tap 'Start Live Voice Note' and speak naturally for as long as you need (e.g. 'Their #9 is rapid in behind, left-footed, but their two centre-backs struggle when pressed high. On corners they crowd the keeper...'). You can pause & resume anytime or type/edit directly here..."
+                                    onBlur={() => {
+                                        if (voiceTranscript.trim()) {
+                                            setVoiceTranscript((prev) => cleanAndNormalizeFootballSpeech(prev));
+                                        }
+                                    }}
+                                    placeholder="Speak with 'Start Live Mic', tap 'Phone Keyboard Mic' to use your phone's built-in voice key, or tap any #shirt / tactical chip above (e.g. 'Playing 4-2-3-1. Their #9 is rapid in behind, left-footed, but their centre-backs struggle when pressed high...')"
                                     className={`w-full rounded-xl border p-3 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground outline-none resize-y leading-relaxed transition-colors ${
                                         isVoiceRecording
                                             ? "bg-rose-500/5 border-rose-500/40 focus:ring-2 focus:ring-rose-500"
-                                            : "bg-surface-2 border-border focus:ring-2 focus:ring-brand"
+                                            : isKeyboardDictationMode
+                                                ? "bg-emerald-500/5 border-emerald-500/40 focus:ring-2 focus:ring-emerald-500"
+                                                : "bg-surface-2 border-border focus:ring-2 focus:ring-brand"
                                     }`}
                                 />
                                 {voiceInterimText && (
                                     <div className="mt-1 text-[11px] font-medium text-rose-400 italic flex items-center gap-1.5">
                                         <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping" />
-                                        Listening live: &ldquo;{voiceInterimText}&rdquo;
+                                        Decoding football speech: &ldquo;{voiceInterimText}&rdquo;
                                     </div>
                                 )}
                             </div>
+
+                            {/* Playable Hardware Audio Memo Bar (#4) */}
+                            {voiceAudioPreviewUrl && (
+                                <div className="rounded-xl bg-surface-2/90 border border-border px-3 py-2 flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-brand">
+                                            🎧 Recorded Touchline Audio Clip
+                                        </span>
+                                        {voiceTranscriptionEngine && (
+                                            <span className="px-1.5 py-0.5 rounded bg-brand/15 border border-brand/30 text-[9px] font-black text-brand">
+                                                {voiceTranscriptionEngine}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <audio
+                                        controls
+                                        src={voiceAudioPreviewUrl}
+                                        className="h-8 max-w-full sm:w-64"
+                                    />
+                                </div>
+                            )}
 
                             {/* Bottom Bar: Word count + Clear + Save & Route */}
                             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -1417,7 +1932,7 @@ export default function OppositionReportsPage() {
                                 </div>
 
                                 <div className="flex items-center gap-2">
-                                    {hasDraftText && (
+                                    {(hasDraftText || voiceAudioPreviewUrl) && (
                                         <Button
                                             type="button"
                                             size="sm"
@@ -1427,6 +1942,9 @@ export default function OppositionReportsPage() {
                                                 setVoiceTranscript("");
                                                 setVoiceInterimText("");
                                                 setVoiceElapsedSec(0);
+                                                setVoiceAudioPreviewUrl(null);
+                                                setVoiceAudioDataUrl(undefined);
+                                                setVoiceTranscriptionEngine(undefined);
                                             }}
                                             className="h-8 px-2.5 text-xs font-bold text-muted-foreground hover:text-rose-500"
                                         >
@@ -1461,7 +1979,7 @@ export default function OppositionReportsPage() {
                                 🎙️ Saved Voice Scouting Log ({savedNotes.length})
                             </span>
                             <span className="text-[10px] text-muted-foreground">
-                                Timestamped touchline audio transcripts
+                                Timestamped touchline transcripts &amp; audio
                             </span>
                         </div>
                         <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
@@ -1484,6 +2002,11 @@ export default function OppositionReportsPage() {
                                                 {note.durationSec > 0 && (
                                                     <span className="px-1.5 py-0.5 rounded bg-surface-1 border border-border text-[10px] font-bold text-muted-foreground tabular-nums">
                                                         ⏱ {formatVoiceDuration(note.durationSec)}
+                                                    </span>
+                                                )}
+                                                {note.transcriptionEngine && (
+                                                    <span className="px-1.5 py-0.5 rounded bg-brand/10 border border-brand/25 text-[9px] font-bold text-brand">
+                                                        {note.transcriptionEngine}
                                                     </span>
                                                 )}
                                                 <span className="text-[10px] text-muted-foreground font-medium">
@@ -1531,6 +2054,15 @@ export default function OppositionReportsPage() {
                                         <p className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed">
                                             {note.text}
                                         </p>
+                                        {note.audioDataUrl && (
+                                            <div className="pt-1">
+                                                <audio
+                                                    controls
+                                                    src={note.audioDataUrl}
+                                                    className="h-7 w-full max-w-xs"
+                                                />
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })}
