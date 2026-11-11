@@ -221,8 +221,14 @@ export default function OppositionReportsPage() {
                 weaknesses = rawNotes.weaknesses || "";
                 dangerMen = rawNotes.dangerMen || rawNotes.keyPersonnel || "";
                 dangerMenList = Array.isArray(rawNotes.dangerMenList) ? rawNotes.dangerMenList : [];
-                postMatchReview = rawNotes.postMatchReview || "";
-                generalNotes = rawNotes.generalNotes || rawNotes.text || "";
+                const rawPostMatch = (rawNotes.postMatchReview || "").trim();
+                const rawGeneral = (rawNotes.generalNotes || rawNotes.text || "").trim();
+                if (rawPostMatch && rawGeneral && rawPostMatch !== rawGeneral) {
+                    postMatchReview = `${rawPostMatch}\n${rawGeneral}`;
+                } else {
+                    postMatchReview = rawPostMatch || rawGeneral;
+                }
+                generalNotes = "";
                 playerProfiles = Array.isArray(rawNotes.playerProfiles) ? rawNotes.playerProfiles : [];
                 voiceNotes = Array.isArray(rawNotes.voiceNotes) ? rawNotes.voiceNotes : [];
                 showPitch = rawNotes.showPitch !== undefined ? Boolean(rawNotes.showPitch) : true;
@@ -792,10 +798,128 @@ export default function OppositionReportsPage() {
         setEditedReport((prev) => (prev ? { ...prev, [field]: nextValue } : null));
     };
 
+    type NoteSectionField = QuickPillSectionKey | "dangerMen";
+
+    const handleDeleteNoteLine = async (
+        field: NoteSectionField,
+        lineIndex: number,
+        e?: React.MouseEvent
+    ) => {
+        if (e) e.stopPropagation();
+        const base =
+            isEditing && editedReport
+                ? editedReport
+                : selectedReport || editedReport || createBlankReport();
+        const currentRaw =
+            field === "postMatchReview"
+                ? base.postMatchReview || base.generalNotes || ""
+                : base[field] || "";
+        const lines = currentRaw
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter(Boolean);
+        if (lineIndex < 0 || lineIndex >= lines.length) return;
+        lines.splice(lineIndex, 1);
+        const nextValue = lines.join("\n");
+
+        const updated: ScoutingReport = {
+            ...base,
+            [field]: nextValue,
+            ...(field === "postMatchReview" ? { generalNotes: "" } : {}),
+            dangerMenList: [...(base.dangerMenList || [])],
+            playerProfiles: [...(base.playerProfiles || [])],
+            lineup: [...(base.lineup || [])]
+        };
+
+        if (isEditing) {
+            setEditedReport(updated);
+        } else {
+            setSelectedReport(updated);
+            if (updated.id && updated.id !== "new" && updated.name.trim()) {
+                await persistReportSnapshot(updated, false);
+            }
+        }
+    };
+
+    const handleClearSectionNotes = async (field: NoteSectionField, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        const base =
+            isEditing && editedReport
+                ? editedReport
+                : selectedReport || editedReport || createBlankReport();
+        const updated: ScoutingReport = {
+            ...base,
+            [field]: "",
+            ...(field === "postMatchReview" ? { generalNotes: "" } : {}),
+            dangerMenList: [...(base.dangerMenList || [])],
+            playerProfiles: [...(base.playerProfiles || [])],
+            lineup: [...(base.lineup || [])]
+        };
+
+        if (isEditing) {
+            setEditedReport(updated);
+        } else {
+            setSelectedReport(updated);
+            if (updated.id && updated.id !== "new" && updated.name.trim()) {
+                await persistReportSnapshot(updated, false);
+            }
+        }
+    };
+
+    const renderSectionNotesView = (field: QuickPillSectionKey, emptyPlaceholder: string) => {
+        const rawText =
+            field === "postMatchReview"
+                ? activeReport.postMatchReview || activeReport.generalNotes || ""
+                : activeReport[field] || "";
+        const lines = rawText
+            .split(/\r?\n/)
+            .map((l) => l.trim())
+            .filter(Boolean);
+
+        if (lines.length === 0) {
+            return (
+                <p
+                    onClick={handleEditReport}
+                    className="text-xs text-muted-foreground italic cursor-text py-1 rounded-xl hover:bg-surface-2/60 transition-colors"
+                >
+                    {emptyPlaceholder}
+                </p>
+            );
+        }
+
+        return (
+            <div className="space-y-1.5">
+                {lines.map((line, idx) => (
+                    <div
+                        key={idx}
+                        onClick={handleEditReport}
+                        className="group flex items-start justify-between gap-2 rounded-xl bg-surface-2/50 hover:bg-surface-2 border border-border/60 px-2.5 py-1.5 cursor-text transition-colors"
+                    >
+                        <span className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed flex-1">
+                            {line}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={(e) => handleDeleteNoteLine(field, idx, e)}
+                            className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 shrink-0 transition-colors"
+                            title="Delete this note"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                    </div>
+                ))}
+            </div>
+        );
+    };
+
     const renderSectionQuickPills = (field: QuickPillSectionKey, accentColor = "brand") => {
         if (!isEditing || !editedReport) return null;
         const pills = SECTION_QUICK_PILLS[field] || [];
-        const currentText = (editedReport[field] || "").toLowerCase();
+        const rawFieldVal =
+            field === "postMatchReview"
+                ? editedReport.postMatchReview || editedReport.generalNotes || ""
+                : editedReport[field] || "";
+        const currentText = rawFieldVal.toLowerCase();
 
         const activeStyles: Record<string, string> = {
             emerald: "bg-emerald-500/20 border-emerald-500/50 text-emerald-400",
@@ -808,7 +932,7 @@ export default function OppositionReportsPage() {
         };
 
         return (
-            <div className="flex flex-wrap gap-1 pb-1">
+            <div className="flex flex-wrap items-center gap-1 pb-1">
                 {pills.map((phrase) => {
                     const isAdded = currentText.includes(phrase.toLowerCase());
                     return (
@@ -826,6 +950,17 @@ export default function OppositionReportsPage() {
                         </button>
                     );
                 })}
+                {rawFieldVal.trim().length > 0 && (
+                    <button
+                        type="button"
+                        onClick={(e) => handleClearSectionNotes(field, e)}
+                        className="ml-auto px-2 py-1 rounded-lg text-[10px] font-bold border border-rose-500/40 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 flex items-center gap-1 transition-all shrink-0"
+                        title="Clear all notes in this section"
+                    >
+                        <Trash2 className="h-3 w-3" />
+                        Clear All
+                    </button>
+                )}
             </div>
         );
     };
@@ -860,12 +995,26 @@ export default function OppositionReportsPage() {
         });
     };
 
-    const handleRemoveDangerMan = (id: string) => {
-        if (!isEditing || !editedReport) return;
-        setEditedReport({
-            ...editedReport,
-            dangerMenList: (editedReport.dangerMenList || []).filter((item) => item.id !== id)
-        });
+    const handleRemoveDangerMan = async (id: string, e?: React.MouseEvent) => {
+        if (e) e.stopPropagation();
+        const base =
+            isEditing && editedReport
+                ? editedReport
+                : selectedReport || editedReport || createBlankReport();
+        const updated: ScoutingReport = {
+            ...base,
+            dangerMenList: (base.dangerMenList || []).filter((item) => item.id !== id),
+            playerProfiles: [...(base.playerProfiles || [])],
+            lineup: [...(base.lineup || [])]
+        };
+        if (isEditing) {
+            setEditedReport(updated);
+        } else {
+            setSelectedReport(updated);
+            if (updated.id && updated.id !== "new" && updated.name.trim()) {
+                await persistReportSnapshot(updated, false);
+            }
+        }
     };
 
     const [sentDangerManIds, setSentDangerManIds] = useState<Set<string>>(new Set());
@@ -2380,6 +2529,14 @@ export default function OppositionReportsPage() {
                                                                 <UserPlus className="h-2.5 w-2.5" />
                                                                 {sentDangerManIds.has(dm.id) ? "In Black Book ✓" : "+ Black Book"}
                                                             </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={(e) => handleRemoveDangerMan(dm.id, e)}
+                                                                className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                                                                title="Delete this player"
+                                                            >
+                                                                <Trash2 className="h-3 w-3" />
+                                                            </button>
                                                         </div>
                                                     </div>
                                                     {(dm.strengths || dm.weaknesses) && (
@@ -2428,22 +2585,42 @@ export default function OppositionReportsPage() {
                                         item.subject ? (
                                             <div
                                                 key={idx}
-                                                className="flex items-start gap-2 rounded-lg bg-surface-2/80 border border-border p-2"
+                                                className="flex items-start justify-between gap-2 rounded-lg bg-surface-2/80 border border-border p-2"
                                             >
-                                                <span className="px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/35 text-amber-400 text-[10px] font-extrabold shrink-0">
-                                                    {item.subject}
-                                                </span>
-                                                <span className="text-xs text-foreground leading-snug break-words">
-                                                    {item.detail}
-                                                </span>
+                                                <div className="flex items-start gap-2 min-w-0 flex-1">
+                                                    <span className="px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/35 text-amber-400 text-[10px] font-extrabold shrink-0">
+                                                        {item.subject}
+                                                    </span>
+                                                    <span className="text-xs text-foreground leading-snug break-words">
+                                                        {item.detail}
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDeleteNoteLine("dangerMen", idx, e)}
+                                                    className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 shrink-0 transition-colors"
+                                                    title="Delete this note"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
                                             </div>
                                         ) : (
-                                            <p
+                                            <div
                                                 key={idx}
-                                                className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed"
+                                                className="flex items-start justify-between gap-2 rounded-lg bg-surface-2/50 border border-border/60 px-2.5 py-1.5"
                                             >
-                                                {item.detail}
-                                            </p>
+                                                <span className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed flex-1">
+                                                    {item.detail}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDeleteNoteLine("dangerMen", idx, e)}
+                                                    className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 shrink-0 transition-colors"
+                                                    title="Delete this note"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
                                         )
                                     )}
                                 </div>
@@ -2459,10 +2636,21 @@ export default function OppositionReportsPage() {
 
                         {/* Strengths Card (Mobile) */}
                         <div className="rounded-2xl bg-surface-1 border border-border border-l-4 border-l-emerald-500 p-3.5 space-y-2 shadow-xs">
-                            <h3 className="text-xs font-black uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
-                                <Sparkles className="h-3.5 w-3.5" />
-                                Their Strengths
-                            </h3>
+                            <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
+                                    <Sparkles className="h-3.5 w-3.5" />
+                                    Their Strengths
+                                </h3>
+                                {!isEditing && activeReport.strengths?.trim() && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleClearSectionNotes("strengths", e)}
+                                        className="text-[10px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                                    >
+                                        <Trash2 className="h-3 w-3" /> Clear
+                                    </button>
+                                )}
+                            </div>
                             {isEditing ? (
                                 <div className="space-y-1.5">
                                     {renderSectionQuickPills("strengths", "emerald")}
@@ -2478,25 +2666,30 @@ export default function OppositionReportsPage() {
                                     />
                                 </div>
                             ) : (
-                                <p
-                                    onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
-                                >
-                                    {activeReport.strengths || (
-                                        <span className="text-muted-foreground italic">
-                                            No strengths logged yet. Tap here to type...
-                                        </span>
-                                    )}
-                                </p>
+                                renderSectionNotesView(
+                                    "strengths",
+                                    "No strengths logged yet. Tap here to type..."
+                                )
                             )}
                         </div>
 
                         {/* Weaknesses Card (Mobile) */}
                         <div className="rounded-2xl bg-surface-1 border border-border border-l-4 border-l-rose-500 p-3.5 space-y-2 shadow-xs">
-                            <h3 className="text-xs font-black uppercase tracking-wider text-rose-500 flex items-center gap-1.5">
-                                <Target className="h-3.5 w-3.5" />
-                                Their Weaknesses (How We Hurt Them)
-                            </h3>
+                            <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-rose-500 flex items-center gap-1.5">
+                                    <Target className="h-3.5 w-3.5" />
+                                    Their Weaknesses (How We Hurt Them)
+                                </h3>
+                                {!isEditing && activeReport.weaknesses?.trim() && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleClearSectionNotes("weaknesses", e)}
+                                        className="text-[10px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                                    >
+                                        <Trash2 className="h-3 w-3" /> Clear
+                                    </button>
+                                )}
+                            </div>
                             {isEditing ? (
                                 <div className="space-y-1.5">
                                     {renderSectionQuickPills("weaknesses", "rose")}
@@ -2512,16 +2705,10 @@ export default function OppositionReportsPage() {
                                     />
                                 </div>
                             ) : (
-                                <p
-                                    onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
-                                >
-                                    {activeReport.weaknesses || (
-                                        <span className="text-muted-foreground italic">
-                                            No weaknesses logged yet. Tap here to type...
-                                        </span>
-                                    )}
-                                </p>
+                                renderSectionNotesView(
+                                    "weaknesses",
+                                    "No weaknesses logged yet. Tap here to type..."
+                                )
                             )}
                         </div>
                     </div>
@@ -2532,10 +2719,21 @@ export default function OppositionReportsPage() {
                     <div className="space-y-3">
                         {/* In Possession */}
                         <div className="rounded-2xl bg-surface-1 border border-border border-l-4 border-l-blue-500 p-3.5 space-y-2 shadow-xs">
-                            <h3 className="text-xs font-black uppercase tracking-wider text-blue-500 flex items-center gap-1.5">
-                                <Users className="h-3.5 w-3.5" />
-                                In Possession (Build-Up &amp; Shape)
-                            </h3>
+                            <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-blue-500 flex items-center gap-1.5">
+                                    <Users className="h-3.5 w-3.5" />
+                                    In Possession (Build-Up &amp; Shape)
+                                </h3>
+                                {!isEditing && activeReport.inPossession?.trim() && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleClearSectionNotes("inPossession", e)}
+                                        className="text-[10px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                                    >
+                                        <Trash2 className="h-3 w-3" /> Clear
+                                    </button>
+                                )}
+                            </div>
                             {isEditing ? (
                                 <div className="space-y-1.5">
                                     {renderSectionQuickPills("inPossession", "blue")}
@@ -2551,25 +2749,30 @@ export default function OppositionReportsPage() {
                                     />
                                 </div>
                             ) : (
-                                <p
-                                    onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
-                                >
-                                    {activeReport.inPossession || (
-                                        <span className="text-muted-foreground italic">
-                                            No in-possession notes logged yet. Tap here to type...
-                                        </span>
-                                    )}
-                                </p>
+                                renderSectionNotesView(
+                                    "inPossession",
+                                    "No in-possession notes logged yet. Tap here to type..."
+                                )
                             )}
                         </div>
 
                         {/* Out of Possession */}
                         <div className="rounded-2xl bg-surface-1 border border-border border-l-4 border-l-purple-500 p-3.5 space-y-2 shadow-xs">
-                            <h3 className="text-xs font-black uppercase tracking-wider text-purple-500 flex items-center gap-1.5">
-                                <Swords className="h-3.5 w-3.5" />
-                                Out of Possession (Defensive Shape &amp; Press)
-                            </h3>
+                            <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-purple-500 flex items-center gap-1.5">
+                                    <Swords className="h-3.5 w-3.5" />
+                                    Out of Possession (Defensive Shape &amp; Press)
+                                </h3>
+                                {!isEditing && activeReport.outOfPossession?.trim() && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleClearSectionNotes("outOfPossession", e)}
+                                        className="text-[10px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                                    >
+                                        <Trash2 className="h-3 w-3" /> Clear
+                                    </button>
+                                )}
+                            </div>
                             {isEditing ? (
                                 <div className="space-y-1.5">
                                     {renderSectionQuickPills("outOfPossession", "purple")}
@@ -2585,25 +2788,30 @@ export default function OppositionReportsPage() {
                                     />
                                 </div>
                             ) : (
-                                <p
-                                    onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
-                                >
-                                    {activeReport.outOfPossession || (
-                                        <span className="text-muted-foreground italic">
-                                            No out-of-possession notes logged yet. Tap here to type...
-                                        </span>
-                                    )}
-                                </p>
+                                renderSectionNotesView(
+                                    "outOfPossession",
+                                    "No out-of-possession notes logged yet. Tap here to type..."
+                                )
                             )}
                         </div>
 
                         {/* Transition */}
                         <div className="rounded-2xl bg-surface-1 border border-border border-l-4 border-l-orange-500 p-3.5 space-y-2 shadow-xs">
-                            <h3 className="text-xs font-black uppercase tracking-wider text-orange-500 flex items-center gap-1.5">
-                                <Zap className="h-3.5 w-3.5" />
-                                Transition (Attacking &amp; Defensive)
-                            </h3>
+                            <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-orange-500 flex items-center gap-1.5">
+                                    <Zap className="h-3.5 w-3.5" />
+                                    Transition (Attacking &amp; Defensive)
+                                </h3>
+                                {!isEditing && activeReport.transition?.trim() && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleClearSectionNotes("transition", e)}
+                                        className="text-[10px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                                    >
+                                        <Trash2 className="h-3 w-3" /> Clear
+                                    </button>
+                                )}
+                            </div>
                             {isEditing ? (
                                 <div className="space-y-1.5">
                                     {renderSectionQuickPills("transition", "orange")}
@@ -2619,25 +2827,30 @@ export default function OppositionReportsPage() {
                                     />
                                 </div>
                             ) : (
-                                <p
-                                    onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
-                                >
-                                    {activeReport.transition || (
-                                        <span className="text-muted-foreground italic">
-                                            No transition notes logged yet. Tap here to type...
-                                        </span>
-                                    )}
-                                </p>
+                                renderSectionNotesView(
+                                    "transition",
+                                    "No transition notes logged yet. Tap here to type..."
+                                )
                             )}
                         </div>
 
                         {/* Set Pieces */}
                         <div className="rounded-2xl bg-surface-1 border border-border border-l-4 border-l-cyan-500 p-3.5 space-y-2 shadow-xs">
-                            <h3 className="text-xs font-black uppercase tracking-wider text-cyan-500 flex items-center gap-1.5">
-                                <Flag className="h-3.5 w-3.5" />
-                                Set Pieces (Corners, Free Kicks &amp; Throws)
-                            </h3>
+                            <div className="flex items-center justify-between gap-2">
+                                <h3 className="text-xs font-black uppercase tracking-wider text-cyan-500 flex items-center gap-1.5">
+                                    <Flag className="h-3.5 w-3.5" />
+                                    Set Pieces (Corners, Free Kicks &amp; Throws)
+                                </h3>
+                                {!isEditing && activeReport.setPieces?.trim() && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => handleClearSectionNotes("setPieces", e)}
+                                        className="text-[10px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                                    >
+                                        <Trash2 className="h-3 w-3" /> Clear
+                                    </button>
+                                )}
+                            </div>
                             {isEditing ? (
                                 <div className="space-y-1.5">
                                     {renderSectionQuickPills("setPieces", "cyan")}
@@ -2653,16 +2866,10 @@ export default function OppositionReportsPage() {
                                     />
                                 </div>
                             ) : (
-                                <p
-                                    onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
-                                >
-                                    {activeReport.setPieces || (
-                                        <span className="text-muted-foreground italic">
-                                            No set-piece notes logged yet. Tap here to type...
-                                        </span>
-                                    )}
-                                </p>
+                                renderSectionNotesView(
+                                    "setPieces",
+                                    "No set-piece notes logged yet. Tap here to type..."
+                                )
                             )}
                         </div>
                     </div>
@@ -2850,15 +3057,26 @@ export default function OppositionReportsPage() {
                                     <ClipboardCheck className="h-4 w-4 text-brand" />
                                     Post-Match Review &amp; Notes for Next Time
                                 </h3>
-                                {!isEditing && (
-                                    <button
-                                        type="button"
-                                        onClick={handleEditReport}
-                                        className="text-[11px] font-bold text-brand"
-                                    >
-                                        + Add Note
-                                    </button>
-                                )}
+                                <div className="flex items-center gap-2">
+                                    {!isEditing && (activeReport.postMatchReview || activeReport.generalNotes)?.trim() && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleClearSectionNotes("postMatchReview", e)}
+                                            className="text-[10px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1"
+                                        >
+                                            <Trash2 className="h-3 w-3" /> Clear
+                                        </button>
+                                    )}
+                                    {!isEditing && (
+                                        <button
+                                            type="button"
+                                            onClick={handleEditReport}
+                                            className="text-[11px] font-bold text-brand"
+                                        >
+                                            + Add Note
+                                        </button>
+                                    )}
+                                </div>
                             </div>
                             {isEditing ? (
                                 <div className="space-y-2">
@@ -2867,7 +3085,7 @@ export default function OppositionReportsPage() {
                                         value={editedReport?.postMatchReview || ""}
                                         onChange={(e) =>
                                             setEditedReport((prev) =>
-                                                prev ? { ...prev, postMatchReview: e.target.value } : null
+                                                prev ? { ...prev, postMatchReview: e.target.value, generalNotes: "" } : null
                                             )
                                         }
                                         placeholder="Log what worked after full-time so you have it ready for the reverse fixture..."
@@ -2875,16 +3093,10 @@ export default function OppositionReportsPage() {
                                     />
                                 </div>
                             ) : (
-                                <p
-                                    onClick={handleEditReport}
-                                    className="text-xs text-foreground whitespace-pre-wrap break-words leading-relaxed cursor-text py-1"
-                                >
-                                    {activeReport.postMatchReview || activeReport.generalNotes || (
-                                        <span className="text-muted-foreground italic">
-                                            No post-match notes recorded yet. Tap here to type...
-                                        </span>
-                                    )}
-                                </p>
+                                renderSectionNotesView(
+                                    "postMatchReview",
+                                    "No post-match notes recorded yet. Tap here to type..."
+                                )
                             )}
                         </div>
 
@@ -3676,20 +3888,30 @@ export default function OppositionReportsPage() {
                                                             </p>
                                                         )}
                                                     </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => handleSendDangerManToBlackBook(dm, e)}
-                                                        disabled={sentDangerManIds.has(dm.id)}
-                                                        className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-colors flex items-center gap-1 shrink-0 ${
-                                                            sentDangerManIds.has(dm.id)
-                                                                ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
-                                                                : "bg-surface-1 hover:bg-brand/10 text-brand border-brand/30"
-                                                        }`}
-                                                        title="Send this opposition standout to your Recruitment Black Book"
-                                                    >
-                                                        <UserPlus className="h-3 w-3" />
-                                                        {sentDangerManIds.has(dm.id) ? "In Black Book ✓" : "+ Black Book"}
-                                                    </button>
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => handleSendDangerManToBlackBook(dm, e)}
+                                                            disabled={sentDangerManIds.has(dm.id)}
+                                                            className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-colors flex items-center gap-1 shrink-0 ${
+                                                                sentDangerManIds.has(dm.id)
+                                                                    ? "bg-emerald-500/15 text-emerald-500 border-emerald-500/30"
+                                                                    : "bg-surface-1 hover:bg-brand/10 text-brand border-brand/30"
+                                                            }`}
+                                                            title="Send this opposition standout to your Recruitment Black Book"
+                                                        >
+                                                            <UserPlus className="h-3 w-3" />
+                                                            {sentDangerManIds.has(dm.id) ? "In Black Book ✓" : "+ Black Book"}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => handleRemoveDangerMan(dm.id, e)}
+                                                            className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 transition-colors"
+                                                            title="Delete this player"
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>
@@ -3718,22 +3940,42 @@ export default function OppositionReportsPage() {
                                         item.subject ? (
                                             <div
                                                 key={idx}
-                                                className="flex items-start gap-2.5 rounded-xl bg-surface-2/70 hover:bg-surface-2 border border-border p-2.5 transition-colors"
+                                                className="flex items-start justify-between gap-2.5 rounded-xl bg-surface-2/70 hover:bg-surface-2 border border-border p-2.5 transition-colors"
                                             >
-                                                <span className="px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/35 text-amber-400 text-[11px] font-extrabold shrink-0">
-                                                    {item.subject}
-                                                </span>
-                                                <span className="text-xs md:text-sm text-foreground leading-snug break-words">
-                                                    {item.detail}
-                                                </span>
+                                                <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                                    <span className="px-2 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/35 text-amber-400 text-[11px] font-extrabold shrink-0">
+                                                        {item.subject}
+                                                    </span>
+                                                    <span className="text-xs md:text-sm text-foreground leading-snug break-words">
+                                                        {item.detail}
+                                                    </span>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDeleteNoteLine("dangerMen", idx, e)}
+                                                    className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 shrink-0 transition-colors"
+                                                    title="Delete this note"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
                                             </div>
                                         ) : (
-                                            <p
+                                            <div
                                                 key={idx}
-                                                className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed bg-surface-2/60 hover:bg-surface-2 rounded-xl p-3 border border-border transition-colors"
+                                                className="flex items-start justify-between gap-2.5 bg-surface-2/60 hover:bg-surface-2 rounded-xl px-3 py-2 border border-border transition-colors"
                                             >
-                                                {item.detail}
-                                            </p>
+                                                <span className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed flex-1">
+                                                    {item.detail}
+                                                </span>
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => handleDeleteNoteLine("dangerMen", idx, e)}
+                                                    className="h-6 w-6 rounded-md flex items-center justify-center text-muted-foreground hover:text-rose-500 hover:bg-rose-500/10 shrink-0 transition-colors"
+                                                    title="Delete this note"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
                                         )
                                     )}
                                 </div>
@@ -3762,6 +4004,16 @@ export default function OppositionReportsPage() {
                                     Their Strengths
                                 </CardTitle>
                                 <div className="flex items-center gap-2">
+                                    {!isEditing && activeReport.strengths?.trim() && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleClearSectionNotes("strengths", e)}
+                                            className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                            title="Clear all Strengths notes"
+                                        >
+                                            <Trash2 className="h-3 w-3" /> Clear
+                                        </button>
+                                    )}
                                     {!isEditing && (
                                         <button
                                             type="button"
@@ -3789,16 +4041,10 @@ export default function OppositionReportsPage() {
                                         />
                                     </div>
                                 ) : (
-                                    <p
-                                        onClick={handleEditReport}
-                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
-                                    >
-                                        {activeReport.strengths || (
-                                            <span className="text-muted-foreground italic">
-                                                No strengths logged yet. Click here to type...
-                                            </span>
-                                        )}
-                                    </p>
+                                    renderSectionNotesView(
+                                        "strengths",
+                                        "No strengths logged yet. Click here to type..."
+                                    )
                                 )}
                             </CardContent>
                         </Card>
@@ -3811,6 +4057,16 @@ export default function OppositionReportsPage() {
                                     Their Weaknesses (How We Hurt Them)
                                 </CardTitle>
                                 <div className="flex items-center gap-2">
+                                    {!isEditing && activeReport.weaknesses?.trim() && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleClearSectionNotes("weaknesses", e)}
+                                            className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                            title="Clear all Weaknesses notes"
+                                        >
+                                            <Trash2 className="h-3 w-3" /> Clear
+                                        </button>
+                                    )}
                                     {!isEditing && (
                                         <button
                                             type="button"
@@ -3838,16 +4094,10 @@ export default function OppositionReportsPage() {
                                         />
                                     </div>
                                 ) : (
-                                    <p
-                                        onClick={handleEditReport}
-                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
-                                    >
-                                        {activeReport.weaknesses || (
-                                            <span className="text-muted-foreground italic">
-                                                No weaknesses logged yet. Click here to type...
-                                            </span>
-                                        )}
-                                    </p>
+                                    renderSectionNotesView(
+                                        "weaknesses",
+                                        "No weaknesses logged yet. Click here to type..."
+                                    )
                                 )}
                             </CardContent>
                         </Card>
@@ -3860,6 +4110,16 @@ export default function OppositionReportsPage() {
                                     In Possession (Build-Up &amp; Shape)
                                 </CardTitle>
                                 <div className="flex items-center gap-2">
+                                    {!isEditing && activeReport.inPossession?.trim() && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleClearSectionNotes("inPossession", e)}
+                                            className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                            title="Clear all In Possession notes"
+                                        >
+                                            <Trash2 className="h-3 w-3" /> Clear
+                                        </button>
+                                    )}
                                     {!isEditing && (
                                         <button
                                             type="button"
@@ -3887,16 +4147,10 @@ export default function OppositionReportsPage() {
                                         />
                                     </div>
                                 ) : (
-                                    <p
-                                        onClick={handleEditReport}
-                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
-                                    >
-                                        {activeReport.inPossession || (
-                                            <span className="text-muted-foreground italic">
-                                                No in-possession notes logged yet. Click here to type...
-                                            </span>
-                                        )}
-                                    </p>
+                                    renderSectionNotesView(
+                                        "inPossession",
+                                        "No in-possession notes logged yet. Click here to type..."
+                                    )
                                 )}
                             </CardContent>
                         </Card>
@@ -3909,6 +4163,16 @@ export default function OppositionReportsPage() {
                                     Out of Possession (Defensive Shape &amp; Press)
                                 </CardTitle>
                                 <div className="flex items-center gap-2">
+                                    {!isEditing && activeReport.outOfPossession?.trim() && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleClearSectionNotes("outOfPossession", e)}
+                                            className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                            title="Clear all Out of Possession notes"
+                                        >
+                                            <Trash2 className="h-3 w-3" /> Clear
+                                        </button>
+                                    )}
                                     {!isEditing && (
                                         <button
                                             type="button"
@@ -3936,16 +4200,10 @@ export default function OppositionReportsPage() {
                                         />
                                     </div>
                                 ) : (
-                                    <p
-                                        onClick={handleEditReport}
-                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
-                                    >
-                                        {activeReport.outOfPossession || (
-                                            <span className="text-muted-foreground italic">
-                                                No out-of-possession notes logged yet. Click here to type...
-                                            </span>
-                                        )}
-                                    </p>
+                                    renderSectionNotesView(
+                                        "outOfPossession",
+                                        "No out-of-possession notes logged yet. Click here to type..."
+                                    )
                                 )}
                             </CardContent>
                         </Card>
@@ -3958,6 +4216,16 @@ export default function OppositionReportsPage() {
                                     Transition (Attacking &amp; Defensive)
                                 </CardTitle>
                                 <div className="flex items-center gap-2">
+                                    {!isEditing && activeReport.transition?.trim() && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleClearSectionNotes("transition", e)}
+                                            className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                            title="Clear all Transition notes"
+                                        >
+                                            <Trash2 className="h-3 w-3" /> Clear
+                                        </button>
+                                    )}
                                     {!isEditing && (
                                         <button
                                             type="button"
@@ -3985,16 +4253,10 @@ export default function OppositionReportsPage() {
                                         />
                                     </div>
                                 ) : (
-                                    <p
-                                        onClick={handleEditReport}
-                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
-                                    >
-                                        {activeReport.transition || (
-                                            <span className="text-muted-foreground italic">
-                                                No transition notes logged yet. Click here to type...
-                                            </span>
-                                        )}
-                                    </p>
+                                    renderSectionNotesView(
+                                        "transition",
+                                        "No transition notes logged yet. Click here to type..."
+                                    )
                                 )}
                             </CardContent>
                         </Card>
@@ -4007,6 +4269,16 @@ export default function OppositionReportsPage() {
                                     Set Pieces (Corners, Free Kicks &amp; Throws)
                                 </CardTitle>
                                 <div className="flex items-center gap-2">
+                                    {!isEditing && activeReport.setPieces?.trim() && (
+                                        <button
+                                            type="button"
+                                            onClick={(e) => handleClearSectionNotes("setPieces", e)}
+                                            className="text-[11px] font-bold text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors"
+                                            title="Clear all Set Pieces notes"
+                                        >
+                                            <Trash2 className="h-3 w-3" /> Clear
+                                        </button>
+                                    )}
                                     {!isEditing && (
                                         <button
                                             type="button"
@@ -4034,16 +4306,10 @@ export default function OppositionReportsPage() {
                                         />
                                     </div>
                                 ) : (
-                                    <p
-                                        onClick={handleEditReport}
-                                        className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[60px] cursor-text rounded-xl p-2 -m-2 hover:bg-surface-2/60 transition-colors"
-                                    >
-                                        {activeReport.setPieces || (
-                                            <span className="text-muted-foreground italic">
-                                                No set-piece notes logged yet. Click here to type...
-                                            </span>
-                                        )}
-                                    </p>
+                                    renderSectionNotesView(
+                                        "setPieces",
+                                        "No set-piece notes logged yet. Click here to type..."
+                                    )
                                 )}
                             </CardContent>
                         </Card>
@@ -4063,28 +4329,42 @@ export default function OppositionReportsPage() {
                                     Log what worked after full-time so you have it ready for the reverse fixture
                                 </p>
                             </div>
-                            {isEditing ? (
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    onClick={handleSaveReport}
-                                    className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"
-                                >
-                                    <Save className="h-3.5 w-3.5 mr-1.5" />
-                                    Save Notes
-                                </Button>
-                            ) : (
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={handleEditReport}
-                                    className="h-8 text-xs font-bold border-border bg-surface-2 text-foreground"
-                                >
-                                    <Edit2 className="h-3.5 w-3.5 mr-1.5 text-brand" />
-                                    Add / Edit Notes
-                                </Button>
-                            )}
+                            <div className="flex items-center gap-2">
+                                {!isEditing && (activeReport.postMatchReview || activeReport.generalNotes)?.trim() && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={(e) => handleClearSectionNotes("postMatchReview", e)}
+                                        className="h-8 text-xs font-bold border-rose-500/40 text-rose-400 hover:bg-rose-500/10"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                        Clear All
+                                    </Button>
+                                )}
+                                {isEditing ? (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={handleSaveReport}
+                                        className="h-8 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold"
+                                    >
+                                        <Save className="h-3.5 w-3.5 mr-1.5" />
+                                        Save Notes
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleEditReport}
+                                        className="h-8 text-xs font-bold border-border bg-surface-2 text-foreground"
+                                    >
+                                        <Edit2 className="h-3.5 w-3.5 mr-1.5 text-brand" />
+                                        Add / Edit Notes
+                                    </Button>
+                                )}
+                            </div>
                         </CardHeader>
                         <CardContent className="p-4 pt-1 space-y-2">
                             {isEditing ? (
@@ -4094,7 +4374,7 @@ export default function OppositionReportsPage() {
                                         value={editedReport?.postMatchReview || ""}
                                         onChange={(e) =>
                                             setEditedReport((prev) =>
-                                                prev ? { ...prev, postMatchReview: e.target.value } : null
+                                                prev ? { ...prev, postMatchReview: e.target.value, generalNotes: "" } : null
                                             )
                                         }
                                         placeholder="e.g. Their LB #3 struggled badly against pace in the 2nd half — target him early in the return game..."
@@ -4102,16 +4382,10 @@ export default function OppositionReportsPage() {
                                     />
                                 </div>
                             ) : (
-                                <p
-                                    onClick={handleEditReport}
-                                    className="text-xs md:text-sm text-foreground whitespace-pre-wrap break-words leading-relaxed min-h-[48px] cursor-text rounded-xl p-2.5 -m-2.5 hover:bg-surface-2/60 transition-colors"
-                                >
-                                    {activeReport.postMatchReview || activeReport.generalNotes || (
-                                        <span className="text-muted-foreground italic">
-                                            No post-match notes recorded yet. Click here to type...
-                                        </span>
-                                    )}
-                                </p>
+                                renderSectionNotesView(
+                                    "postMatchReview",
+                                    "No post-match notes recorded yet. Click here to type..."
+                                )
                             )}
                         </CardContent>
                     </Card>
