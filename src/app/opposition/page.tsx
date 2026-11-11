@@ -720,7 +720,7 @@ export default function OppositionReportsPage() {
     const [voiceElapsedSec, setVoiceElapsedSec] = useState(0);
     const [isSavingVoiceNote, setIsSavingVoiceNote] = useState(false);
     const [voiceStatusToast, setVoiceStatusToast] = useState<string | null>(null);
-    const [showVoiceRecorder, setShowVoiceRecorder] = useState(false);
+    const [showVoiceRecorder, setShowVoiceRecorder] = useState(true);
     const [voiceAudioPreviewUrl, setVoiceAudioPreviewUrl] = useState<string | null>(null);
     const [voiceAudioDataUrl, setVoiceAudioDataUrl] = useState<string | undefined>(undefined);
     const [isAiTranscribing, setIsAiTranscribing] = useState(false);
@@ -729,10 +729,55 @@ export default function OppositionReportsPage() {
     const speechRecRef = useRef<any>(null);
     const keepListeningRef = useRef<boolean>(false);
     const voiceTimerRef = useRef<any>(null);
-    const voiceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const mobileVoiceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+    const desktopVoiceTextareaRef = useRef<HTMLTextAreaElement | null>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
     const mediaStreamRef = useRef<MediaStream | null>(null);
     const audioChunksRef = useRef<Blob[]>([]);
+
+    const getKeyboardDictationDeviceGuide = () => {
+        if (typeof navigator === "undefined") {
+            return {
+                deviceLabel: "Phone Keyboard Mic",
+                instruction:
+                    "Your keyboard is open below — tap the 🎤 microphone key on your phone's keyboard to dictate with hardware noise cancellation."
+            };
+        }
+        const ua = navigator.userAgent || "";
+        if (/iPhone|iPad|iPod/i.test(ua)) {
+            return {
+                deviceLabel: "iPhone / iOS Dictation",
+                instruction:
+                    "Your iPhone keyboard is open at the bottom of the screen — tap the 🎤 microphone icon in the bottom-right corner (right under the Return key) to speak."
+            };
+        }
+        if (/Samsung|SM-|GT-/i.test(ua)) {
+            return {
+                deviceLabel: "Samsung Keyboard Voice",
+                instruction:
+                    "Your Samsung keyboard is open at the bottom of the screen — tap the 🎤 microphone icon in the top toolbar strip of your Samsung keyboard to speak."
+            };
+        }
+        if (/Android/i.test(ua)) {
+            return {
+                deviceLabel: "Android / Gboard Voice",
+                instruction:
+                    "Your Android keyboard is open at the bottom of the screen — tap the 🎤 microphone icon in the top-right corner of the keyboard strip to speak."
+            };
+        }
+        if (/Mac/i.test(ua)) {
+            return {
+                deviceLabel: "Mac Voice Dictation",
+                instruction:
+                    "Cursor is ready in the box below — press the 🎤 Dictation key (F5) or press Fn twice on your Mac keyboard to dictate."
+            };
+        }
+        return {
+            deviceLabel: "Device Voice Typing",
+            instruction:
+                "Cursor is ready in the box below — tap the 🎤 key on your touch keyboard (or press Win + H on Windows) to dictate."
+        };
+    };
 
     const formatVoiceTimer = (totalSec: number) => {
         const mins = Math.floor(totalSec / 60);
@@ -1080,7 +1125,8 @@ export default function OppositionReportsPage() {
         if (!SpeechRecognitionCtor) {
             setIsKeyboardDictationMode(true);
             setIsVoiceRecording(false);
-            setTimeout(() => voiceTextareaRef.current?.focus(), 100);
+            const activeEl = mobileVoiceTextareaRef.current || desktopVoiceTextareaRef.current;
+            activeEl?.focus();
             return;
         }
 
@@ -1157,8 +1203,21 @@ export default function OppositionReportsPage() {
         startHardwareAudioRecorder();
     };
 
-    // #2: 1-Tap Phone Keyboard Mic Mode (Apple Dictation / Gboard Voice)
-    const handleActivateKeyboardDictation = () => {
+    // #2: 1-Tap Phone Keyboard Mic Mode (iOS Dictation / Samsung Keyboard / Gboard Voice)
+    const handleActivateKeyboardDictation = (isMobileLayout?: boolean) => {
+        const targetTextarea = isMobileLayout
+            ? mobileVoiceTextareaRef.current || desktopVoiceTextareaRef.current
+            : desktopVoiceTextareaRef.current || mobileVoiceTextareaRef.current;
+
+        // CRITICAL FOR iOS SAFARI & SAMSUNG/ANDROID: call .focus() synchronously inside the tap gesture!
+        if (targetTextarea) {
+            targetTextarea.focus();
+            try {
+                const len = targetTextarea.value.length;
+                targetTextarea.setSelectionRange(len, len);
+            } catch {}
+        }
+
         keepListeningRef.current = false;
         setIsVoiceRecording(false);
         setIsVoicePaused(false);
@@ -1180,18 +1239,12 @@ export default function OppositionReportsPage() {
         }
         setShowVoiceRecorder(true);
         setIsKeyboardDictationMode(true);
-        setVoiceTranscriptionEngine("Phone Keyboard Mic");
-        setTimeout(() => {
-            if (voiceTextareaRef.current) {
-                voiceTextareaRef.current.focus();
-                const len = voiceTextareaRef.current.value.length;
-                voiceTextareaRef.current.setSelectionRange(len, len);
-            }
-        }, 80);
+        const guide = getKeyboardDictationDeviceGuide();
+        setVoiceTranscriptionEngine(guide.deviceLabel);
     };
 
     // #3: Quick-Tap Pitchside Chip Inserter
-    const handleInsertVoiceQuickChip = (chipText: string) => {
+    const handleInsertVoiceQuickChip = (chipText: string, isMobileLayout?: boolean) => {
         setShowVoiceRecorder(true);
         setVoiceTranscript((prev) => {
             const cleanPrev = prev.trim();
@@ -1199,8 +1252,11 @@ export default function OppositionReportsPage() {
             const needsSpace = !/\s$/.test(prev);
             return `${prev}${needsSpace ? " " : ""}${chipText} `;
         });
-        if (isKeyboardDictationMode && voiceTextareaRef.current) {
-            setTimeout(() => voiceTextareaRef.current?.focus(), 40);
+        if (isKeyboardDictationMode) {
+            const targetTextarea = isMobileLayout
+                ? mobileVoiceTextareaRef.current || desktopVoiceTextareaRef.current
+                : desktopVoiceTextareaRef.current || mobileVoiceTextareaRef.current;
+            targetTextarea?.focus();
         }
     };
 
@@ -1600,6 +1656,17 @@ export default function OppositionReportsPage() {
             .trim()
             .split(/\s+/)
             .filter(Boolean).length;
+        const textareaId = isMobileLayout
+            ? "pitchside-voice-textarea-mobile"
+            : "pitchside-voice-textarea-desktop";
+        const textareaRef = isMobileLayout ? mobileVoiceTextareaRef : desktopVoiceTextareaRef;
+        const deviceGuide = getKeyboardDictationDeviceGuide();
+        const isStudioExpanded =
+            showVoiceRecorder ||
+            isVoiceRecording ||
+            isVoicePaused ||
+            isKeyboardDictationMode ||
+            hasDraftText;
 
         return (
             <div
@@ -1653,7 +1720,7 @@ export default function OppositionReportsPage() {
                                 )}
                                 {isKeyboardDictationMode && !isVoiceRecording && (
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/35 text-emerald-400 text-[10px] font-black">
-                                        ⌨️🎙️ Phone Keyboard Mic Ready
+                                        ⌨️🎙️ {deviceGuide.deviceLabel} Active
                                     </span>
                                 )}
                                 {isAiTranscribing && (
@@ -1686,20 +1753,18 @@ export default function OppositionReportsPage() {
                                     <Mic className="h-3.5 w-3.5 mr-1.5" />
                                     {hasDraftText ? "Continue Live Mic" : "Start Live Mic"}
                                 </Button>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={handleActivateKeyboardDictation}
-                                    className={`h-9 px-3 rounded-xl font-extrabold text-xs transition-all ${
+                                <label
+                                    htmlFor={textareaId}
+                                    onClick={() => handleActivateKeyboardDictation(isMobileLayout)}
+                                    className={`h-9 px-3 rounded-xl border font-extrabold text-xs inline-flex items-center justify-center cursor-pointer select-none transition-all ${
                                         isKeyboardDictationMode
-                                            ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400"
+                                            ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400 shadow-xs"
                                             : "border-border bg-surface-2 hover:bg-surface-2/80 text-foreground"
                                     }`}
-                                    title="Use your phone keyboard's built-in microphone button for maximum noise cancellation in wind & crowd noise"
+                                    title="Opens your phone keyboard immediately (iPhone, Samsung, or Android) so you can tap its built-in 🎤 microphone key"
                                 >
                                     ⌨️🎙️ Phone Keyboard Mic
-                                </Button>
+                                </label>
                             </>
                         ) : (
                             <>
@@ -1763,141 +1828,141 @@ export default function OppositionReportsPage() {
                     </div>
                 )}
 
-                {(showVoiceRecorder || isVoiceRecording || isVoicePaused || isKeyboardDictationMode || hasDraftText) && (
-                    <div className="space-y-3 pt-1 border-t border-border/60">
-                        {/* Phone Keyboard Mic Tip Banner (#2) */}
-                        {isKeyboardDictationMode && (
-                            <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-[11px] text-emerald-300 flex items-center justify-between gap-2">
-                                <span>
-                                    💡 <strong>High-Accuracy Phone Dictation:</strong> Tap the <strong>🎤 microphone key</strong> on your iPhone/Android keyboard below. It uses hardware wind &amp; crowd noise cancellation!
-                                </span>
+                <div className={isStudioExpanded ? "space-y-3 pt-1 border-t border-border/60" : "sr-only"}>
+                    {/* Phone Keyboard Mic Device-Aware Banner (#2) */}
+                    {isKeyboardDictationMode && (
+                        <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-[11px] text-emerald-300 flex items-center justify-between gap-2">
+                            <span>
+                                💡 <strong>{deviceGuide.deviceLabel}:</strong> {deviceGuide.instruction}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => setIsKeyboardDictationMode(false)}
+                                className="text-[10px] font-bold text-emerald-400 hover:underline shrink-0"
+                            >
+                                Got it
+                            </button>
+                        </div>
+                    )}
+
+                    {/* Quick-Tap Pitchside Shirt Numbers & Tactical Chips (#3) */}
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                ⚡ 1-Tap Pitchside Insert (Tap while speaking or typing — never mishears numbers)
+                            </span>
+                            {hasDraftText && (
                                 <button
                                     type="button"
-                                    onClick={() => setIsKeyboardDictationMode(false)}
-                                    className="text-[10px] font-bold text-emerald-400 hover:underline shrink-0"
-                                >
-                                    Got it
-                                </button>
-                            </div>
-                        )}
-
-                        {/* Quick-Tap Pitchside Shirt Numbers & Tactical Chips (#3) */}
-                        <div className="space-y-1.5">
-                            <div className="flex items-center justify-between gap-2">
-                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
-                                    ⚡ 1-Tap Pitchside Insert (Tap while speaking or typing — never mishears numbers)
-                                </span>
-                                {hasDraftText && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            setVoiceTranscript((prev) => cleanAndNormalizeFootballSpeech(prev))
-                                        }
-                                        className="px-2 py-0.5 rounded-md bg-brand/15 hover:bg-brand/25 border border-brand/35 text-[10px] font-extrabold text-brand transition-colors shrink-0"
-                                        title="Normalize spoken numbers ('number ten' -> '#10') and formations ('four three three' -> '4-3-3')"
-                                    >
-                                        ✨ Fix Football Terms
-                                    </button>
-                                )}
-                            </div>
-                            {/* Row 1: Shirt Numbers #1 - #11 */}
-                            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar">
-                                {VOICE_QUICK_SHIRT_CHIPS.map((chip) => (
-                                    <button
-                                        key={chip.label}
-                                        type="button"
-                                        onClick={() => handleInsertVoiceQuickChip(chip.insert)}
-                                        className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-black whitespace-nowrap shrink-0 transition-colors"
-                                    >
-                                        {chip.label}
-                                    </button>
-                                ))}
-                            </div>
-                            {/* Row 2: Tactical & Formation Phrases */}
-                            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar">
-                                {VOICE_QUICK_TACTICAL_CHIPS.map((chip) => (
-                                    <button
-                                        key={chip.label}
-                                        type="button"
-                                        onClick={() => handleInsertVoiceQuickChip(chip.insert)}
-                                        className="px-2 py-1 rounded-lg bg-surface-2 hover:bg-brand/15 border border-border hover:border-brand/40 text-muted-foreground hover:text-foreground text-[10px] font-bold whitespace-nowrap shrink-0 transition-colors"
-                                    >
-                                        + {chip.label}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Target Section Routing Pills */}
-                        <div className="space-y-1.5">
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
-                                    <Wand2 className="h-3 w-3 text-brand" />
-                                    Where should this voice note go when saved?
-                                </span>
-                                {voiceTargetSection === "smart" && (
-                                    <span className="text-[10px] font-semibold text-brand hidden sm:inline">
-                                        Splits sentences automatically into Formation, Danger Men, Strengths, Weaknesses, Set Pieces
-                                    </span>
-                                )}
-                            </div>
-                            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                                {VOICE_SECTION_OPTIONS.map((opt) => {
-                                    const active = voiceTargetSection === opt.id;
-                                    return (
-                                        <button
-                                            key={opt.id}
-                                            type="button"
-                                            onClick={() => setVoiceTargetSection(opt.id)}
-                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border transition-all whitespace-nowrap shrink-0 ${
-                                                active
-                                                    ? `${opt.badgeClass} shadow-xs scale-[1.01]`
-                                                    : "bg-surface-2/70 border-border text-muted-foreground hover:text-foreground"
-                                            }`}
-                                        >
-                                            {isMobileLayout ? opt.shortLabel : opt.label}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Live Streaming & Editable Transcript Box */}
-                        <div className="space-y-2">
-                            <div className="relative">
-                                <textarea
-                                    ref={voiceTextareaRef}
-                                    rows={isMobileLayout ? 4 : 4}
-                                    value={
-                                        voiceInterimText
-                                            ? `${voiceTranscript}${voiceTranscript ? " " : ""}${voiceInterimText}`
-                                            : voiceTranscript
+                                    onClick={() =>
+                                        setVoiceTranscript((prev) => cleanAndNormalizeFootballSpeech(prev))
                                     }
-                                    onChange={(e) => {
-                                        setVoiceTranscript(e.target.value);
-                                        setVoiceInterimText("");
-                                    }}
-                                    onBlur={() => {
-                                        if (voiceTranscript.trim()) {
-                                            setVoiceTranscript((prev) => cleanAndNormalizeFootballSpeech(prev));
-                                        }
-                                    }}
-                                    placeholder="Speak with 'Start Live Mic', tap 'Phone Keyboard Mic' to use your phone's built-in voice key, or tap any #shirt / tactical chip above (e.g. 'Playing 4-2-3-1. Their #9 is rapid in behind, left-footed, but their centre-backs struggle when pressed high...')"
-                                    className={`w-full rounded-xl border p-3 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground outline-none resize-y leading-relaxed transition-colors ${
-                                        isVoiceRecording
-                                            ? "bg-rose-500/5 border-rose-500/40 focus:ring-2 focus:ring-rose-500"
-                                            : isKeyboardDictationMode
-                                                ? "bg-emerald-500/5 border-emerald-500/40 focus:ring-2 focus:ring-emerald-500"
-                                                : "bg-surface-2 border-border focus:ring-2 focus:ring-brand"
-                                    }`}
-                                />
-                                {voiceInterimText && (
-                                    <div className="mt-1 text-[11px] font-medium text-rose-400 italic flex items-center gap-1.5">
-                                        <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping" />
-                                        Decoding football speech: &ldquo;{voiceInterimText}&rdquo;
-                                    </div>
-                                )}
-                            </div>
+                                    className="px-2 py-0.5 rounded-md bg-brand/15 hover:bg-brand/25 border border-brand/35 text-[10px] font-extrabold text-brand transition-colors shrink-0"
+                                    title="Normalize spoken numbers ('number ten' -> '#10') and formations ('four three three' -> '4-3-3')"
+                                >
+                                    ✨ Fix Football Terms
+                                </button>
+                            )}
+                        </div>
+                        {/* Row 1: Shirt Numbers #1 - #11 */}
+                        <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar">
+                            {VOICE_QUICK_SHIRT_CHIPS.map((chip) => (
+                                <button
+                                    key={chip.label}
+                                    type="button"
+                                    onClick={() => handleInsertVoiceQuickChip(chip.insert, isMobileLayout)}
+                                    className="px-2 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-[10px] font-black whitespace-nowrap shrink-0 transition-colors"
+                                >
+                                    {chip.label}
+                                </button>
+                            ))}
+                        </div>
+                        {/* Row 2: Tactical & Formation Phrases */}
+                        <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar">
+                            {VOICE_QUICK_TACTICAL_CHIPS.map((chip) => (
+                                <button
+                                    key={chip.label}
+                                    type="button"
+                                    onClick={() => handleInsertVoiceQuickChip(chip.insert, isMobileLayout)}
+                                    className="px-2 py-1 rounded-lg bg-surface-2 hover:bg-brand/15 border border-border hover:border-brand/40 text-muted-foreground hover:text-foreground text-[10px] font-bold whitespace-nowrap shrink-0 transition-colors"
+                                >
+                                    + {chip.label}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Target Section Routing Pills */}
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1">
+                                <Wand2 className="h-3 w-3 text-brand" />
+                                Where should this voice note go when saved?
+                            </span>
+                            {voiceTargetSection === "smart" && (
+                                <span className="text-[10px] font-semibold text-brand hidden sm:inline">
+                                    Splits sentences automatically into Formation, Danger Men, Strengths, Weaknesses, Set Pieces
+                                </span>
+                            )}
+                        </div>
+                        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                            {VOICE_SECTION_OPTIONS.map((opt) => {
+                                const active = voiceTargetSection === opt.id;
+                                return (
+                                    <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => setVoiceTargetSection(opt.id)}
+                                        className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold border transition-all whitespace-nowrap shrink-0 ${
+                                            active
+                                                ? `${opt.badgeClass} shadow-xs scale-[1.01]`
+                                                : "bg-surface-2/70 border-border text-muted-foreground hover:text-foreground"
+                                        }`}
+                                    >
+                                        {isMobileLayout ? opt.shortLabel : opt.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    {/* Live Streaming & Editable Transcript Box */}
+                    <div className="space-y-2">
+                        <div className="relative">
+                            <textarea
+                                id={textareaId}
+                                ref={textareaRef}
+                                rows={isMobileLayout ? 4 : 4}
+                                value={
+                                    voiceInterimText
+                                        ? `${voiceTranscript}${voiceTranscript ? " " : ""}${voiceInterimText}`
+                                        : voiceTranscript
+                                }
+                                onChange={(e) => {
+                                    setVoiceTranscript(e.target.value);
+                                    setVoiceInterimText("");
+                                }}
+                                onBlur={() => {
+                                    if (voiceTranscript.trim()) {
+                                        setVoiceTranscript((prev) => cleanAndNormalizeFootballSpeech(prev));
+                                    }
+                                }}
+                                placeholder="Speak with 'Start Live Mic', tap 'Phone Keyboard Mic' to pop up your phone's keyboard mic, or tap any #shirt / tactical chip above (e.g. 'Playing 4-2-3-1. Their #9 is rapid in behind, left-footed, but their centre-backs struggle when pressed high...')"
+                                className={`w-full rounded-xl border p-3 text-xs sm:text-sm text-foreground placeholder:text-muted-foreground outline-none resize-y leading-relaxed transition-colors ${
+                                    isVoiceRecording
+                                        ? "bg-rose-500/5 border-rose-500/40 focus:ring-2 focus:ring-rose-500"
+                                        : isKeyboardDictationMode
+                                            ? "bg-emerald-500/5 border-emerald-500/40 focus:ring-2 focus:ring-emerald-500"
+                                            : "bg-surface-2 border-border focus:ring-2 focus:ring-brand"
+                                }`}
+                            />
+                            {voiceInterimText && (
+                                <div className="mt-1 text-[11px] font-medium text-rose-400 italic flex items-center gap-1.5">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-ping" />
+                                    Decoding football speech: &ldquo;{voiceInterimText}&rdquo;
+                                </div>
+                            )}
+                        </div>
 
                             {/* Playable Hardware Audio Memo Bar (#4) */}
                             {voiceAudioPreviewUrl && (
@@ -1969,7 +2034,6 @@ export default function OppositionReportsPage() {
                             </div>
                         </div>
                     </div>
-                )}
 
                 {/* Saved Voice Scouting Log Feed */}
                 {savedNotes.length > 0 && (
