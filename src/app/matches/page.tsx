@@ -1595,7 +1595,21 @@ export default function MatchesPage() {
         const isSelectedForBulk = selectedMatchIds.has(match.id);
 
         const localDate = getLocalDateString(match.date);
-        const dayWeather = weatherForecast[localDate];
+        const hasResultLogged = Boolean(
+            (match.scoreline && match.scoreline.trim() !== "") ||
+            (match.result && match.result !== "Pending")
+        );
+        const isKickoffFinished = (() => {
+            if (!localDate) return false;
+            const koStr = (match.time || "15:00").slice(0, 5);
+            const [hh, mm] = koStr.split(":").map(Number);
+            const matchDay = new Date(`${localDate}T00:00:00`);
+            if (isNaN(matchDay.getTime())) return false;
+            matchDay.setHours(isNaN(hh) ? 15 : hh, isNaN(mm) ? 0 : mm, 0, 0);
+            return Date.now() > matchDay.getTime() + 150 * 60 * 1000;
+        })();
+        const isMatchFinished = Boolean(isPast || hasResultLogged || isKickoffFinished);
+        const dayWeather = isMatchFinished ? undefined : weatherForecast[localDate];
 
         let weatherIcon = <Sun className="h-4 w-4 text-amber-500" />;
         let weatherLabel = "Sunny / Clear";
@@ -1812,7 +1826,7 @@ export default function MatchesPage() {
                         )}
 
                         {/* Weather Warning */}
-                        {isWarning && warningText && (
+                        {!isMatchFinished && isWarning && warningText && (
                             <div className="p-2 bg-amber-500/10 border border-amber-500/30 rounded-lg text-[10px] text-amber-500 font-semibold flex items-center gap-1.5">
                                 <AlertCircle className="h-3.5 w-3.5 shrink-0" />
                                 <span>{warningText}</span>
@@ -2253,7 +2267,7 @@ export default function MatchesPage() {
                     )}
 
                     {/* Weather Warning Banner */}
-                    {isWarning && warningText && (
+                    {!isMatchFinished && isWarning && warningText && (
                         <div className="mt-4 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg text-xs text-amber-400 font-semibold flex items-center gap-2">
                             <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 animate-pulse" />
                             <span>{warningText}</span>
