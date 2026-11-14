@@ -53,7 +53,7 @@ import { useAuth } from "@/context/auth-context";
 import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
 import { calculateMeetTime, resolveFixtureKickoffTime, resolveFullMatchAddress } from "@/lib/whatsapp-utils";
-import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, computeMatchOutcome, extractLineupFromRawNotes, computeLineupParticipation } from "@/lib/match-stats-sync";
+import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, computeMatchOutcome, formatClubScoreline, extractLineupFromRawNotes, computeLineupParticipation } from "@/lib/match-stats-sync";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 
@@ -2693,7 +2693,7 @@ export default function MatchdayXIPage() {
             ctx.fillStyle = "#ffffff";
             ctx.font = "900 44px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif";
             const fixtureTitle = nextMatch
-                ? `${settings.name.toUpperCase()} vs ${nextMatch.opponent.toUpperCase()}`
+                ? `${(nextMatch.isHome ? settings.name : nextMatch.opponent).toUpperCase()} vs ${(nextMatch.isHome ? nextMatch.opponent : settings.name).toUpperCase()}`
                 : `${settings.name.toUpperCase()} — ${activeSquadTab.toUpperCase()}`;
             ctx.fillText(fixtureTitle, W / 2, 108);
 
@@ -3948,7 +3948,7 @@ export default function MatchdayXIPage() {
                                     const formattedDate = new Date(m.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
                                     return (
                                         <option key={m.id} value={m.id} className="bg-surface-1 text-foreground">
-                                            {m.isHome ? "🏠" : "🚌"} vs {m.opponent} ({formattedDate}) {m.scoreline ? `[${m.scoreline}]` : (m.result !== "Pending" ? `[${m.result}]` : "")}
+                                            {m.isHome ? "🏠 vs" : "🚌 @"} {m.opponent} ({formattedDate}) {m.scoreline ? `[${formatClubScoreline(m.scoreline, Boolean(m.isHome), { includeOutcome: true })}]` : (m.result !== "Pending" ? `[${m.result}]` : "")}
                                         </option>
                                     );
                                 })}
@@ -3983,13 +3983,21 @@ export default function MatchdayXIPage() {
                                 <div className="flex items-center justify-between gap-2">
                                     <div className="flex flex-wrap items-center gap-1.5 text-base sm:text-lg font-black tracking-tight leading-snug min-w-0">
                                         <span className={nextMatch.isHome ? "text-foreground" : "text-muted-foreground"}>
-                                            {settings.name}
+                                            {nextMatch.isHome ? settings.name : nextMatch.opponent}
                                         </span>
                                         {nextMatch.scoreline ? (
                                             <button
                                                 type="button"
                                                 onClick={() => setShowLogisticsEditor(prev => !prev)}
-                                                className="text-emerald-400 text-xs font-black px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30"
+                                                className={`text-xs font-black px-2 py-0.5 rounded-md border ${
+                                                    computeMatchOutcome(nextMatch.scoreline, Boolean(nextMatch.isHome)) === "Win"
+                                                        ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border-emerald-500/30"
+                                                        : computeMatchOutcome(nextMatch.scoreline, Boolean(nextMatch.isHome)) === "Draw"
+                                                            ? "text-amber-600 dark:text-amber-400 bg-amber-500/15 border-amber-500/30"
+                                                            : computeMatchOutcome(nextMatch.scoreline, Boolean(nextMatch.isHome)) === "Loss"
+                                                                ? "text-rose-600 dark:text-rose-400 bg-rose-500/15 border-rose-500/30"
+                                                                : "text-foreground bg-surface-2 border-border"
+                                                }`}
                                             >
                                                 {nextMatch.scoreline}
                                             </button>
@@ -3999,7 +4007,7 @@ export default function MatchdayXIPage() {
                                             </span>
                                         )}
                                         <span className={!nextMatch.isHome ? "text-foreground" : "text-muted-foreground"}>
-                                            {nextMatch.opponent}
+                                            {nextMatch.isHome ? nextMatch.opponent : settings.name}
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-1.5 shrink-0 text-[10px] font-bold uppercase text-muted-foreground">
@@ -4186,14 +4194,22 @@ export default function MatchdayXIPage() {
                                 <>
                                     <div className="flex items-center gap-2 text-lg md:text-2xl font-black tracking-tight leading-tight">
                                         <span className={nextMatch.isHome ? "text-foreground" : "text-muted-foreground"}>
-                                            {settings.name}
+                                            {nextMatch.isHome ? settings.name : nextMatch.opponent}
                                         </span>
                                         {nextMatch.scoreline ? (
                                             <button
                                                 type="button"
                                                 onClick={() => setShowLogisticsEditor(prev => !prev)}
                                                 title="Click to edit match scoreline"
-                                                className="text-emerald-400 text-sm md:text-base font-black px-2 py-0.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 hover:bg-emerald-500/25 transition-colors"
+                                                className={`text-sm md:text-base font-black px-2 py-0.5 rounded-lg border transition-colors ${
+                                                    computeMatchOutcome(nextMatch.scoreline, Boolean(nextMatch.isHome)) === "Win"
+                                                        ? "text-emerald-600 dark:text-emerald-400 bg-emerald-500/15 border-emerald-500/30 hover:bg-emerald-500/25"
+                                                        : computeMatchOutcome(nextMatch.scoreline, Boolean(nextMatch.isHome)) === "Draw"
+                                                            ? "text-amber-600 dark:text-amber-400 bg-amber-500/15 border-amber-500/30 hover:bg-amber-500/25"
+                                                            : computeMatchOutcome(nextMatch.scoreline, Boolean(nextMatch.isHome)) === "Loss"
+                                                                ? "text-rose-600 dark:text-rose-400 bg-rose-500/15 border-rose-500/30 hover:bg-rose-500/25"
+                                                                : "text-foreground bg-surface-2 border-border hover:bg-surface-3"
+                                                }`}
                                             >
                                                 {nextMatch.scoreline}
                                             </button>
@@ -4201,7 +4217,7 @@ export default function MatchdayXIPage() {
                                             <span className="text-muted-foreground text-xs font-extrabold uppercase px-1.5 py-0.5 rounded bg-surface-2">vs</span>
                                         )}
                                         <span className={!nextMatch.isHome ? "text-foreground" : "text-muted-foreground"}>
-                                            {nextMatch.opponent}
+                                            {nextMatch.isHome ? nextMatch.opponent : settings.name}
                                         </span>
                                     </div>
                                     <div className="flex flex-wrap items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
@@ -4411,7 +4427,7 @@ export default function MatchdayXIPage() {
                                     const formattedDate = new Date(m.date).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: '2-digit' });
                                     return (
                                         <option key={m.id} value={m.id} className="bg-surface-1 text-foreground">
-                                            {m.isHome ? "🏠" : "🚌"} vs {m.opponent} ({formattedDate}) {m.scoreline ? `[${m.scoreline}]` : (m.result !== "Pending" ? `[${m.result}]` : "")}
+                                            {m.isHome ? "🏠 vs" : "🚌 @"} {m.opponent} ({formattedDate}) {m.scoreline ? `[${formatClubScoreline(m.scoreline, Boolean(m.isHome), { includeOutcome: true })}]` : (m.result !== "Pending" ? `[${m.result}]` : "")}
                                         </option>
                                     );
                                 })}
@@ -4424,23 +4440,51 @@ export default function MatchdayXIPage() {
                         <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-border/60 text-xs animate-in fade-in duration-150">
                             <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1">
                                 <Trophy className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Score (H-A):</span>
+                                <span className="text-[10px] font-bold text-muted-foreground truncate max-w-[95px]" title={nextMatch.isHome ? settings.name : nextMatch.opponent}>
+                                    {nextMatch.isHome ? settings.name : nextMatch.opponent}
+                                </span>
                                 <input
-                                    type="text"
-                                    placeholder="e.g. 3-1"
-                                    value={nextMatch.scoreline || ""}
+                                    type="number"
+                                    min={0}
+                                    placeholder="H"
+                                    value={nextMatch.scoreline?.includes("-") ? nextMatch.scoreline.split("-")[0].trim() : ""}
                                     onChange={async (e) => {
-                                        const rawVal = e.target.value;
-                                        const nextOutcome = computeMatchOutcome(rawVal.trim(), Boolean(nextMatch.isHome));
-                                        setNextMatch(prev => prev ? { ...prev, scoreline: rawVal, result: nextOutcome } : prev);
-                                        setMatches(prev => prev.map(m => m.id === nextMatch.id ? { ...m, scoreline: rawVal, result: nextOutcome } : m));
-                                        await supabase.from("matches").update({ scoreline: rawVal.trim(), result: nextOutcome }).eq("id", nextMatch.id);
+                                        const homeVal = e.target.value.replace(/[^0-9]/g, "");
+                                        const awayVal = nextMatch.scoreline?.includes("-") ? nextMatch.scoreline.split("-")[1].trim() : "";
+                                        const nextScore = (!homeVal && !awayVal) ? "" : `${homeVal || "0"}-${awayVal || "0"}`;
+                                        const nextOutcome = computeMatchOutcome(nextScore, Boolean(nextMatch.isHome));
+                                        setNextMatch(prev => prev ? { ...prev, scoreline: nextScore, result: nextOutcome } : prev);
+                                        setMatches(prev => prev.map(m => m.id === nextMatch.id ? { ...m, scoreline: nextScore, result: nextOutcome } : m));
+                                        await supabase.from("matches").update({ scoreline: nextScore, result: nextOutcome }).eq("id", nextMatch.id);
                                         if (nextOutcome !== "Pending" && lineup) {
                                             await syncLineupAppearancesToDatabase(nextMatch.id, lineup);
                                         }
                                     }}
-                                    className="w-16 bg-transparent text-xs font-extrabold text-emerald-600 dark:text-emerald-400 placeholder-muted-foreground focus:outline-none text-center"
+                                    className="w-8 bg-surface-1 border border-border rounded px-1 py-0.5 text-xs font-extrabold text-foreground focus:outline-none text-center tabular-nums"
                                 />
+                                <span className="text-muted-foreground font-black">:</span>
+                                <input
+                                    type="number"
+                                    min={0}
+                                    placeholder="A"
+                                    value={nextMatch.scoreline?.includes("-") ? nextMatch.scoreline.split("-")[1].trim() : ""}
+                                    onChange={async (e) => {
+                                        const homeVal = nextMatch.scoreline?.includes("-") ? nextMatch.scoreline.split("-")[0].trim() : "";
+                                        const awayVal = e.target.value.replace(/[^0-9]/g, "");
+                                        const nextScore = (!homeVal && !awayVal) ? "" : `${homeVal || "0"}-${awayVal || "0"}`;
+                                        const nextOutcome = computeMatchOutcome(nextScore, Boolean(nextMatch.isHome));
+                                        setNextMatch(prev => prev ? { ...prev, scoreline: nextScore, result: nextOutcome } : prev);
+                                        setMatches(prev => prev.map(m => m.id === nextMatch.id ? { ...m, scoreline: nextScore, result: nextOutcome } : m));
+                                        await supabase.from("matches").update({ scoreline: nextScore, result: nextOutcome }).eq("id", nextMatch.id);
+                                        if (nextOutcome !== "Pending" && lineup) {
+                                            await syncLineupAppearancesToDatabase(nextMatch.id, lineup);
+                                        }
+                                    }}
+                                    className="w-8 bg-surface-1 border border-border rounded px-1 py-0.5 text-xs font-extrabold text-foreground focus:outline-none text-center tabular-nums"
+                                />
+                                <span className="text-[10px] font-bold text-muted-foreground truncate max-w-[95px]" title={nextMatch.isHome ? nextMatch.opponent : settings.name}>
+                                    {nextMatch.isHome ? nextMatch.opponent : settings.name}
+                                </span>
                             </div>
 
                             <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1">

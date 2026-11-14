@@ -5,6 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Trophy, Dumbbell, Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { formatClubScoreline } from "@/lib/match-stats-sync";
 
 interface CalendarProps {
     matches?: any[];
@@ -93,7 +94,9 @@ export function WeeklyFootballCalendar({
 
         dayMatches.forEach(m => {
             const isHome = m.isHome !== undefined ? m.isHome : m.is_home;
-            const score = m.scoreline !== undefined ? m.scoreline : (m.result && m.result !== "Pending" ? m.result : "");
+            const score = m.scoreline
+                ? formatClubScoreline(m.scoreline, Boolean(isHome), { includeOutcome: true })
+                : (m.result && m.result !== "Pending" ? m.result : "");
             events.push({
                 type: 'match',
                 id: m.id,

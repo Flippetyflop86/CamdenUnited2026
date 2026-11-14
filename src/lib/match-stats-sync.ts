@@ -206,6 +206,29 @@ export function computeMatchOutcome(
 }
 
 /**
+ * Formats a stored `Home - Away` scoreline from our club's perspective (`clubGoals-opponentGoals`, e.g. `"2-1"` or `"W 2-1"`).
+ * Use whenever displaying a scoreline alongside a single opponent (`vs/@ Opponent`) or a club outcome badge (`W`/`D`/`L`),
+ * so away wins (stored as `"1-2"` Home-Away) always read as `"2-1"` (`"W 2-1"`) rather than `"1-2"`.
+ * When both teams are displayed side-by-side, always put the Home team on the left and Away team on the right with the `Home - Away` scoreline.
+ */
+export function formatClubScoreline(
+    scoreline: string | null | undefined,
+    isHome: boolean,
+    options?: { includeOutcome?: boolean; spaced?: boolean }
+): string {
+    if (!scoreline || !scoreline.trim()) return "";
+    const parsed = parseMatchScoreline(scoreline, isHome);
+    if (!parsed) return scoreline.trim();
+    const sep = options?.spaced ? " - " : "-";
+    const formatted = `${parsed.clubGoals}${sep}${parsed.opponentGoals}`;
+    if (options?.includeOutcome) {
+        const outcome = parsed.clubGoals > parsed.opponentGoals ? "W" : parsed.clubGoals < parsed.opponentGoals ? "L" : "D";
+        return `${outcome} ${formatted}`;
+    }
+    return formatted;
+}
+
+/**
  * Synchronizes a match's player goals & assists across:
  * 1. `match_player_stats` rows in Supabase
  * 2. `matches.goalscorers` & `matches.assists` text columns

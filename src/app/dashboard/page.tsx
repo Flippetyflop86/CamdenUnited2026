@@ -32,7 +32,7 @@ import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer } from "@/lib/utils";
-import { parseStatTextString } from "@/lib/match-stats-sync";
+import { parseStatTextString, formatClubScoreline } from "@/lib/match-stats-sync";
 import { resolveFixtureKickoffTime, resolveFullMatchAddress } from "@/lib/whatsapp-utils";
 
 type StandingsRow = {
@@ -1012,7 +1012,7 @@ export default function DashboardPage() {
                                                 return (
                                                     <span
                                                         key={m.id}
-                                                        title={`${m.result} (${m.scoreline || ""}) vs ${m.opponent}`}
+                                                        title={`${m.result} (${formatClubScoreline(m.scoreline, Boolean(m.isHome))}) ${m.isHome ? "vs" : "@"} ${m.opponent}`}
                                                         className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-black ${badgeStyle}`}
                                                     >
                                                         {m.result?.[0]}
@@ -1353,7 +1353,7 @@ export default function DashboardPage() {
                                         <div className="flex items-baseline justify-between gap-2">
                                             <div className="flex items-center gap-1.5 min-w-0">
                                                 <span className="text-lg md:text-xl font-black text-foreground truncate">
-                                                    vs {lastMatch.opponent}
+                                                    {lastMatch.isHome ? "vs" : "@"} {lastMatch.opponent}
                                                 </span>
                                                 {lastOppPos && (
                                                     <span className="text-[11px] font-extrabold px-1.5 py-0.5 rounded bg-surface-2 border border-border text-muted-foreground shrink-0">
@@ -1362,7 +1362,7 @@ export default function DashboardPage() {
                                                 )}
                                             </div>
                                             <span className="text-xl md:text-2xl font-black text-foreground font-mono shrink-0">
-                                                {lastMatch.scoreline || "—"}
+                                                {formatClubScoreline(lastMatch.scoreline, Boolean(lastMatch.isHome)) || "—"}
                                             </span>
                                         </div>
 

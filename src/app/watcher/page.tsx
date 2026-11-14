@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useClub } from "@/context/club-context";
 import { Save, AlertCircle, TrendingUp, Activity, RotateCcw, Target } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { formatClubScoreline } from "@/lib/match-stats-sync";
 
 const initialHalfStats: WatcherHalfStats = {
     deliveries: 0,
@@ -477,7 +478,7 @@ export default function WatcherPage() {
                             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
                             .map(match => (
                                 <option key={match.id} value={match.id}>
-                                    {match.isHome ? 'vs' : '@'} {match.opponent} ({match.scoreline || 'N/A'})
+                                    {match.isHome ? 'vs' : '@'} {match.opponent} ({match.scoreline ? formatClubScoreline(match.scoreline, Boolean(match.isHome), { includeOutcome: true }) : 'N/A'})
                                 </option>
                             ))
                         }

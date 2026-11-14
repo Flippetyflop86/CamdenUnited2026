@@ -60,6 +60,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
 import { serializeRecruitForDb, normalizeRecruitPosition } from "@/lib/recruitment-utils";
+import { formatClubScoreline } from "@/lib/match-stats-sync";
 
 interface DangerManItem {
     id: string;
@@ -2340,7 +2341,7 @@ export default function OppositionReportsPage() {
                                             <span className="text-rose-500">{h2hData.losses}L</span>
                                         </div>
                                         <div className="text-[10px] text-muted-foreground break-words">
-                                            Last: {h2hData.past[0].result?.[0]} {h2hData.past[0].scoreline} (
+                                            Last: {formatClubScoreline(h2hData.past[0].scoreline, Boolean(h2hData.past[0].isHome), { includeOutcome: true }) || `${h2hData.past[0].result?.[0] || ""} ${h2hData.past[0].scoreline || ""}`.trim()} (
                                             {formatDateShort(h2hData.past[0].date)})
                                         </div>
                                     </>
@@ -3126,7 +3127,7 @@ export default function OppositionReportsPage() {
                                                 </span>
                                                 <div className="min-w-0">
                                                     <div className="text-xs font-black text-foreground">
-                                                        {m.scoreline} ({m.isHome ? "Home" : "Away"})
+                                                        {formatClubScoreline(m.scoreline, Boolean(m.isHome)) || m.scoreline} ({m.isHome ? "Home" : "Away"})
                                                     </div>
                                                     {m.goalscorers && (
                                                         <div className="text-[10px] text-muted-foreground truncate">
@@ -3701,7 +3702,7 @@ export default function OppositionReportsPage() {
                                                                 {m.result?.[0]}
                                                             </span>
                                                             <span className="font-bold text-foreground font-mono">
-                                                                {m.scoreline || "—"}
+                                                                {formatClubScoreline(m.scoreline, Boolean(m.isHome)) || "—"}
                                                             </span>
                                                             <span className="text-[10px] text-muted-foreground">
                                                                 ({m.isHome ? "H" : "A"}) • {formatDateShort(m.date)}
