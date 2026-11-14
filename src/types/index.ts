@@ -200,6 +200,10 @@ export interface MatchdayXI {
     venueNotes?: string;
     motmPlayerId?: string;
     matchEvents?: { [playerId: string]: MatchdayPlayerEventStats };
+    inPossessionPositions?: { [slotIndex: string]: { x: number; y: number } };
+    restDefenceSlots?: number[];
+    showInPossessionArrows?: boolean;
+    inPossessionPreset?: string;
     squad?: string;
     createdAt: string;
     updatedAt: string;

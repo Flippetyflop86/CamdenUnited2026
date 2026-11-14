@@ -171,8 +171,10 @@ export default function MatchdayXIPage() {
     const [showRolesAndNotes, setShowRolesAndNotes] = useState<boolean>(false);
     const [modalTab, setModalTab] = useState<"swap" | "details">("swap");
     const [mobileActiveTab, setMobileActiveTab] = useState<"pitch" | "bench" | "squad" | "roles">("pitch");
-    const [pitchMode, setPitchMode] = useState<"standard" | "lanes5" | "thirds" | "zones18" | "setPieces" | "compactness">("standard");
-    const [pressLineHeight, setPressLineHeight] = useState<"high" | "mid" | "low">("high");
+    const [pitchMode, setPitchMode] = useState<"standard" | "lanes5" | "zones18">("standard");
+    const pitchBoardRef = useRef<HTMLDivElement | null>(null);
+    const [draggingTacticalSlot, setDraggingTacticalSlot] = useState<{ index: number; x: number; y: number } | null>(null);
+    const tacticalPointerRef = useRef<{ index: number; startClientX: number; startClientY: number; moved: boolean } | null>(null);
     const [openActionDropdown, setOpenActionDropdown] = useState<"autofill" | "share" | null>(null);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
     const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -668,6 +670,10 @@ export default function MatchdayXIPage() {
                 venueNotes: resolvedVenue,
                 motmPlayerId: parsed.motmPlayerId || "",
                 matchEvents: parsed.matchEvents || {},
+                inPossessionPositions: parsed.inPossessionPositions || {},
+                restDefenceSlots: Array.isArray(parsed.restDefenceSlots) ? parsed.restDefenceSlots : [],
+                showInPossessionArrows: typeof parsed.showInPossessionArrows === "boolean" ? parsed.showInPossessionArrows : true,
+                inPossessionPreset: parsed.inPossessionPreset || "",
                 squad: activeSquadTab,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
@@ -710,6 +716,10 @@ export default function MatchdayXIPage() {
             venueNotes: notesLocation,
             motmPlayerId: "",
             matchEvents: {},
+            inPossessionPositions: {},
+            restDefenceSlots: [],
+            showInPossessionArrows: true,
+            inPossessionPreset: "",
             squad: activeSquadTab,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
@@ -899,7 +909,11 @@ export default function MatchdayXIPage() {
             meetTime: effectiveMeetTime,
             venueNotes: newLineup.venueNotes || "",
             motmPlayerId: newLineup.motmPlayerId || "",
-            matchEvents: newLineup.matchEvents || {}
+            matchEvents: newLineup.matchEvents || {},
+            inPossessionPositions: newLineup.inPossessionPositions || {},
+            restDefenceSlots: newLineup.restDefenceSlots || [],
+            showInPossessionArrows: typeof newLineup.showInPossessionArrows === "boolean" ? newLineup.showInPossessionArrows : true,
+            inPossessionPreset: newLineup.inPossessionPreset || ""
         };
 
         const strippedNotes = stripLineupFromNotes(currentMatch.notes);
@@ -1465,6 +1479,9 @@ export default function MatchdayXIPage() {
             matchDurationMinutes: nextDuration,
             starters: nextStarters,
             substitutes: nextSubs,
+            inPossessionPositions: {},
+            restDefenceSlots: [],
+            inPossessionPreset: "",
             updatedAt: new Date().toISOString(),
         };
         setLineup(updated);
@@ -1707,11 +1724,199 @@ export default function MatchdayXIPage() {
             substitutes: Array(lineup.substitutes.length).fill(""),
             usedSubstitutes: [],
             substitutions: [],
+            inPossessionPositions: {},
+            restDefenceSlots: [],
+            inPossessionPreset: "",
             updatedAt: new Date().toISOString()
         };
         setLineup(cleared);
         saveLineup(cleared);
         showToast("Pitch and bench cleared", "info");
+    };
+
+    const handleApplyInPossessionPreset = (preset: "rb_jumps_325" | "lb_jumps_325" | "inverted_fb_325" | "reset") => {
+        if (!lineup) return;
+        if (preset === "reset") {
+            const resetUpdated: MatchdayXI = {
+                ...lineup,
+                inPossessionPositions: {},
+                restDefenceSlots: [],
+                inPossessionPreset: "",
+                updatedAt: new Date().toISOString()
+            };
+            setLineup(resetUpdated);
+            saveLineup(resetUpdated);
+            showToast("Reset in-possession positions to Base XI", "info");
+            return;
+        }
+
+        const currentSlots = FORMATIONS[lineup.formation] || [];
+        if (currentSlots.length === 0) return;
+
+        const nextPositions: { [slotKey: string]: { x: number; y: number } } = {};
+        let nextRestDefence: number[] = [];
+
+        if (currentSlots.length === 11) {
+            nextPositions[0] = { x: 50, y: 7 };
+            const outfield = currentSlots.map((s, idx) => ({ ...s, idx })).filter(s => s.idx > 0);
+            const deepDefenders = outfield.filter(s => s.y <= 36).sort((a, b) => a.x - b.x);
+
+            if (deepDefenders.length === 4) {
+                const [rb, rcb, lcb, lb] = deepDefenders;
+                const upper6 = outfield.filter(s => s.y > 36);
+                const rw = [...upper6].sort((a, b) => (a.x - a.y * 0.25) - (b.x - b.y * 0.25))[0];
+                const lw = [...upper6].filter(s => s.idx !== rw.idx).sort((a, b) => (b.x + b.y * 0.25) - (a.x + a.y * 0.25))[0];
+                const central4 = upper6.filter(s => s.idx !== rw.idx && s.idx !== lw.idx);
+                const st = [...central4].sort((a, b) => b.y - a.y)[0];
+                const mids3 = central4.filter(s => s.idx !== st.idx).sort((a, b) => {
+                    const aAttackRank = ["CAM", "AM", "LAM", "RAM", "CF", "ST"].includes(a.label.toUpperCase()) ? 1 : 0;
+                    const bAttackRank = ["CAM", "AM", "LAM", "RAM", "CF", "ST"].includes(b.label.toUpperCase()) ? 1 : 0;
+                    if (aAttackRank !== bAttackRank) return aAttackRank - bAttackRank;
+                    return a.y - b.y;
+                });
+
+                const [pivotA, pivotB, attackingMid] = mids3;
+                const [rightPivot, leftPivot] = pivotA.x <= pivotB.x ? [pivotA, pivotB] : [pivotB, pivotA];
+
+                if (preset === "rb_jumps_325") {
+                    // Back 3: RCB, LCB, and LB tucking around
+                    nextPositions[rcb.idx] = { x: 25, y: 31 };
+                    nextPositions[lcb.idx] = { x: 50, y: 29 };
+                    nextPositions[lb.idx] = { x: 75, y: 31 };
+                    // Pivot 2: DM + holding CM
+                    nextPositions[rightPivot.idx] = { x: 38, y: 46 };
+                    nextPositions[leftPivot.idx] = { x: 62, y: 46 };
+                    // Front 5 across the 5 lanes (Right -> Left on pitch = Left -> Right on screen)
+                    nextPositions[rb.idx] = { x: 10, y: 74 };          // Wide R (RB overlaps high)
+                    nextPositions[rw.idx] = { x: 29, y: 78 };          // Half-Space R (RW tucks inside)
+                    nextPositions[st.idx] = { x: 50, y: 84 };          // Central (#9 pins CBs)
+                    nextPositions[attackingMid.idx] = { x: 71, y: 77 }; // Half-Space L (#10/AM steps high)
+                    nextPositions[lw.idx] = { x: 90, y: 74 };          // Wide L (LW holds width)
+
+                    nextRestDefence = [rcb.idx, lcb.idx, lb.idx, rightPivot.idx, leftPivot.idx];
+                } else if (preset === "lb_jumps_325") {
+                    // Back 3: RB tucking around, RCB, LCB
+                    nextPositions[rb.idx] = { x: 25, y: 31 };
+                    nextPositions[rcb.idx] = { x: 50, y: 29 };
+                    nextPositions[lcb.idx] = { x: 75, y: 31 };
+                    // Pivot 2
+                    nextPositions[rightPivot.idx] = { x: 38, y: 46 };
+                    nextPositions[leftPivot.idx] = { x: 62, y: 46 };
+                    // Front 5 across the 5 lanes
+                    nextPositions[rw.idx] = { x: 10, y: 74 };          // Wide R
+                    nextPositions[attackingMid.idx] = { x: 29, y: 77 }; // Half-Space R
+                    nextPositions[st.idx] = { x: 50, y: 84 };          // Central
+                    nextPositions[lw.idx] = { x: 71, y: 78 };          // Half-Space L (LW tucks inside)
+                    nextPositions[lb.idx] = { x: 90, y: 74 };          // Wide L (LB overlaps high)
+
+                    nextRestDefence = [rb.idx, rcb.idx, lcb.idx, rightPivot.idx, leftPivot.idx];
+                } else if (preset === "inverted_fb_325") {
+                    // Back 3: RCB, LCB, LB tucked
+                    nextPositions[rcb.idx] = { x: 25, y: 31 };
+                    nextPositions[lcb.idx] = { x: 50, y: 29 };
+                    nextPositions[lb.idx] = { x: 75, y: 31 };
+                    // Pivot 2: Inverted RB steps inside next to deepest DM
+                    const deepestMid = pivotA;
+                    const secondMid = pivotB;
+                    nextPositions[rb.idx] = { x: 38, y: 46 };
+                    nextPositions[deepestMid.idx] = { x: 62, y: 46 };
+                    // Front 5: Wingers stay wide, both #8 & #10 attack Half-Spaces
+                    const [rightPocketMid, leftPocketMid] = secondMid.x <= attackingMid.x
+                        ? [secondMid, attackingMid]
+                        : [attackingMid, secondMid];
+                    nextPositions[rw.idx] = { x: 10, y: 75 };
+                    nextPositions[rightPocketMid.idx] = { x: 29, y: 78 };
+                    nextPositions[st.idx] = { x: 50, y: 84 };
+                    nextPositions[leftPocketMid.idx] = { x: 71, y: 78 };
+                    nextPositions[lw.idx] = { x: 90, y: 75 };
+
+                    nextRestDefence = [rcb.idx, lcb.idx, lb.idx, rb.idx, deepestMid.idx];
+                }
+            } else {
+                // Generic 3-2-5 mapping for 3-at-the-back or 5-at-the-back formations
+                const byDepth = [...outfield].sort((a, b) => a.y - b.y);
+                const back3 = byDepth.slice(0, 3).sort((a, b) => a.x - b.x);
+                const rest7 = byDepth.slice(3);
+                const wideRight = [...rest7].sort((a, b) => a.x - b.x)[0];
+                const wideLeft = [...rest7].filter(s => s.idx !== wideRight.idx).sort((a, b) => b.x - a.x)[0];
+                const mid5 = rest7.filter(s => s.idx !== wideRight.idx && s.idx !== wideLeft.idx).sort((a, b) => a.y - b.y);
+                const pivots2 = mid5.slice(0, 2).sort((a, b) => a.x - b.x);
+                const frontCentral3 = mid5.slice(2).sort((a, b) => a.x - b.x);
+
+                nextPositions[back3[0].idx] = { x: 25, y: 31 };
+                nextPositions[back3[1].idx] = { x: 50, y: 29 };
+                nextPositions[back3[2].idx] = { x: 75, y: 31 };
+                nextPositions[pivots2[0].idx] = { x: 38, y: 46 };
+                nextPositions[pivots2[1].idx] = { x: 62, y: 46 };
+                nextPositions[wideRight.idx] = { x: 10, y: 74 };
+                nextPositions[frontCentral3[0].idx] = { x: 29, y: 78 };
+                nextPositions[frontCentral3[1].idx] = { x: 50, y: 84 };
+                nextPositions[frontCentral3[2].idx] = { x: 71, y: 78 };
+                nextPositions[wideLeft.idx] = { x: 90, y: 74 };
+
+                nextRestDefence = [back3[0].idx, back3[1].idx, back3[2].idx, pivots2[0].idx, pivots2[1].idx];
+            }
+        } else {
+            // Small-sided fallback: push front unit into lanes & mark deepest half as Rest Defence
+            const outfield = currentSlots.map((s, idx) => ({ ...s, idx })).filter(s => s.idx > 0).sort((a, b) => a.y - b.y);
+            const rdCount = Math.max(1, Math.floor(outfield.length / 2));
+            outfield.forEach((s, i) => {
+                if (i < rdCount) {
+                    nextRestDefence.push(s.idx);
+                    nextPositions[s.idx] = { x: s.x, y: Math.min(46, s.y + 4) };
+                } else {
+                    nextPositions[s.idx] = { x: s.x, y: Math.max(72, s.y) };
+                }
+            });
+        }
+
+        const updated: MatchdayXI = {
+            ...lineup,
+            inPossessionPositions: nextPositions,
+            restDefenceSlots: nextRestDefence,
+            showInPossessionArrows: true,
+            inPossessionPreset: preset,
+            updatedAt: new Date().toISOString()
+        };
+        setLineup(updated);
+        saveLineup(updated);
+        const labelMap = {
+            rb_jumps_325: "3-2-5 applied: RB jumps wide right • LB tucks into back 3",
+            lb_jumps_325: "3-2-5 applied: LB jumps wide left • RB tucks into back 3",
+            inverted_fb_325: "3-2-5 applied: RB inverts into pivot • Wingers hold width"
+        };
+        showToast(labelMap[preset]);
+    };
+
+    const handleToggleRestDefenceSlot = (slotIdx: number) => {
+        if (!lineup || slotIdx === 0) return;
+        const current = new Set<number>(lineup.restDefenceSlots || []);
+        const added = !current.has(slotIdx);
+        if (added) current.add(slotIdx);
+        else current.delete(slotIdx);
+
+        const updated: MatchdayXI = {
+            ...lineup,
+            restDefenceSlots: Array.from(current).sort((a, b) => a - b),
+            updatedAt: new Date().toISOString()
+        };
+        setLineup(updated);
+        saveLineup(updated);
+        const p = resolvePlayerOrTrialist(lineup.starters[slotIdx]);
+        const name = p ? getPitchPlayerDisplayName(p) : `Slot #${slotIdx + 1}`;
+        showToast(added ? `🛡️ ${name} added to Rest Defence` : `${name} removed from Rest Defence`, "info");
+    };
+
+    const handleToggleInPossessionArrows = () => {
+        if (!lineup) return;
+        const nextVal = !(lineup.showInPossessionArrows ?? true);
+        const updated: MatchdayXI = {
+            ...lineup,
+            showInPossessionArrows: nextVal,
+            updatedAt: new Date().toISOString()
+        };
+        setLineup(updated);
+        saveLineup(updated);
     };
 
     const handleAutoFillLastLineup = async () => {
@@ -2474,9 +2679,15 @@ export default function MatchdayXIPage() {
             ctx.fillStyle = "#94a3b8";
             ctx.font = "bold 20px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif";
             ctx.textAlign = "center";
+            const isExportingTacticalShape = pitchMode === "lanes5" || pitchMode === "zones18";
+            const shapeHeaderTag = pitchMode === "lanes5"
+                ? "IN-POSSESSION & REST DEFENCE"
+                : pitchMode === "zones18"
+                    ? "ATTACKING ZONES (ZONE 14)"
+                    : `${activeFmt} STARTING ${romanLbl}`;
             const compText = nextMatch
-                ? `${(nextMatch.competition || "MATCHDAY").toUpperCase()} • ${activeFmt} STARTING ${romanLbl} • ${new Date(nextMatch.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).toUpperCase()}`
-                : `MATCHDAY STARTING ${romanLbl} (${activeFmt})`;
+                ? `${(nextMatch.competition || "MATCHDAY").toUpperCase()} • ${shapeHeaderTag} • ${new Date(nextMatch.date).toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short", year: "numeric" }).toUpperCase()}`
+                : `MATCHDAY — ${shapeHeaderTag} (${activeFmt})`;
             ctx.fillText(compText, W / 2, 56);
 
             ctx.fillStyle = "#ffffff";
@@ -2546,128 +2757,172 @@ export default function MatchdayXIPage() {
             ctx.strokeRect(pitchX + (pitchW - boxW) / 2, pitchY + 24, boxW, boxH);
             ctx.strokeRect(pitchX + (pitchW - boxW) / 2, pitchY + pitchH - 24 - boxH, boxW, boxH);
 
-            // 3B. Tactical Pitch Overlay on Exported PNG (when active)
+            // 3B. Tactical Pitch Overlay on Exported PNG (Attacking Half Only + Rest Defence + Movement Arrows)
             const innerX = pitchX + 24;
             const innerY = pitchY + 24;
             const innerW = pitchW - 48;
             const innerH = pitchH - 48;
+            const attackStartY = midY;
+            const attackH = (innerY + innerH) - attackStartY;
 
             if (pitchMode === "lanes5") {
                 const laneWidths = [0.19, 0.19, 0.24, 0.19, 0.19];
-                const laneLabels = ["WIDE L", "HALF-SPACE L", "CENTRAL ZONE", "HALF-SPACE R", "WIDE R"];
+                // Attacking downwards: screen-left is Right Flank (WIDE R), screen-right is Left Flank (WIDE L)
+                const laneLabels = ["WIDE R", "HALF-SPACE R", "CENTRAL", "HALF-SPACE L", "WIDE L"];
                 let curX = innerX;
                 laneWidths.forEach((ratio, idx) => {
                     const lw = innerW * ratio;
                     if (idx === 1 || idx === 3) {
-                        ctx.fillStyle = "rgba(251, 191, 36, 0.15)";
-                        ctx.fillRect(curX, innerY, lw, innerH);
+                        ctx.fillStyle = "rgba(251, 191, 36, 0.16)";
+                        ctx.fillRect(curX, attackStartY, lw, attackH);
                     } else if (idx === 2) {
-                        ctx.fillStyle = "rgba(56, 189, 248, 0.08)";
-                        ctx.fillRect(curX, innerY, lw, innerH);
+                        ctx.fillStyle = "rgba(56, 189, 248, 0.10)";
+                        ctx.fillRect(curX, attackStartY, lw, attackH);
                     }
                     if (idx > 0) {
                         ctx.save();
                         ctx.setLineDash([12, 10]);
-                        ctx.strokeStyle = "rgba(251, 191, 36, 0.65)";
+                        ctx.strokeStyle = "rgba(251, 191, 36, 0.7)";
                         ctx.lineWidth = 2.5;
                         ctx.beginPath();
-                        ctx.moveTo(curX, innerY);
-                        ctx.lineTo(curX, innerY + innerH);
+                        ctx.moveTo(curX, attackStartY);
+                        ctx.lineTo(curX, attackStartY + attackH);
                         ctx.stroke();
                         ctx.restore();
                     }
-                    ctx.fillStyle = idx === 1 || idx === 3 ? "#fde68a" : "rgba(255,255,255,0.8)";
+                    ctx.fillStyle = idx === 1 || idx === 3 ? "#fde68a" : idx === 2 ? "#bae6fd" : "rgba(255,255,255,0.88)";
                     ctx.font = "900 15px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif";
                     ctx.textAlign = "center";
-                    ctx.fillText(laneLabels[idx], curX + lw / 2, innerY + 26);
-                    ctx.fillText(laneLabels[idx], curX + lw / 2, innerY + innerH - 14);
+                    ctx.fillText(laneLabels[idx], curX + lw / 2, innerY + innerH - 16);
                     curX += lw;
                 });
-            } else if (pitchMode === "thirds") {
-                const t1 = innerY + innerH / 3;
-                const t2 = innerY + (innerH * 2) / 3;
-                ctx.fillStyle = "rgba(244, 63, 94, 0.12)";
-                ctx.fillRect(innerX, innerY, innerW, innerH / 3);
-                ctx.fillStyle = "rgba(56, 189, 248, 0.08)";
-                ctx.fillRect(innerX, t1, innerW, innerH / 3);
-                ctx.fillStyle = "rgba(16, 185, 129, 0.10)";
-                ctx.fillRect(innerX, t2, innerW, innerH / 3);
-
-                ctx.save();
-                ctx.setLineDash([14, 10]);
-                ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
-                ctx.lineWidth = 3;
-                ctx.beginPath();
-                ctx.moveTo(innerX, t1);
-                ctx.lineTo(innerX + innerW, t1);
-                ctx.moveTo(innerX, t2);
-                ctx.lineTo(innerX + innerW, t2);
-                ctx.stroke();
-
-                const pressY =
-                    pressLineHeight === "high"
-                        ? innerY + innerH * 0.24
-                        : pressLineHeight === "mid"
-                            ? innerY + innerH * 0.45
-                            : innerY + innerH * 0.64;
-                ctx.setLineDash([8, 6]);
-                ctx.strokeStyle = "#fbbf24";
-                ctx.lineWidth = 4;
-                ctx.beginPath();
-                ctx.moveTo(innerX, pressY);
-                ctx.lineTo(innerX + innerW, pressY);
-                ctx.stroke();
-                ctx.restore();
             } else if (pitchMode === "zones18") {
+                // Attacking half 9 zones (Z10–Z18 scoring downwards into bottom goal)
                 const cols = 3;
-                const rows = 6;
+                const rows = 3;
                 const cw = innerW / cols;
-                const rh = innerH / rows;
+                const rh = attackH / rows;
+                const zoneGrid = [
+                    [{ num: 10, tag: "BUILD R" }, { num: 11, tag: "PROGRESSION" }, { num: 12, tag: "BUILD L" }],
+                    [{ num: 13, tag: "HALF-SPACE R" }, { num: 14, tag: "★ GOLDEN ZONE" }, { num: 15, tag: "HALF-SPACE L" }],
+                    [{ num: 16, tag: "BYLINE R" }, { num: 17, tag: "FINISH BOX" }, { num: 18, tag: "BYLINE L" }]
+                ];
                 for (let r = 0; r < rows; r++) {
                     for (let c = 0; c < cols; c++) {
-                        const zoneNum = (rows - 1 - r) * cols + (c + 1);
+                        const cell = zoneGrid[r][c];
                         const zx = innerX + c * cw;
-                        const zy = innerY + r * rh;
-                        if (zoneNum === 14) {
+                        const zy = attackStartY + r * rh;
+                        if (cell.num === 14) {
                             ctx.fillStyle = "rgba(251, 191, 36, 0.28)";
                             ctx.fillRect(zx, zy, cw, rh);
-                        } else if (zoneNum === 13 || zoneNum === 15) {
+                        } else if (cell.num === 13 || cell.num === 15) {
                             ctx.fillStyle = "rgba(56, 189, 248, 0.16)";
                             ctx.fillRect(zx, zy, cw, rh);
-                        } else if (zoneNum === 5) {
-                            ctx.fillStyle = "rgba(16, 185, 129, 0.16)";
+                        } else if (cell.num === 17) {
+                            ctx.fillStyle = "rgba(244, 63, 94, 0.16)";
                             ctx.fillRect(zx, zy, cw, rh);
                         }
                         ctx.save();
                         ctx.setLineDash([8, 8]);
-                        ctx.strokeStyle = "rgba(255,255,255,0.4)";
-                        ctx.lineWidth = 2;
+                        ctx.strokeStyle = cell.num === 14 ? "#fcd34d" : "rgba(255,255,255,0.4)";
+                        ctx.lineWidth = cell.num === 14 ? 3 : 2;
                         ctx.strokeRect(zx, zy, cw, rh);
                         ctx.restore();
-                        ctx.fillStyle = zoneNum === 14 ? "#fde68a" : "rgba(255,255,255,0.75)";
-                        ctx.font = "900 16px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif";
+                        ctx.fillStyle = cell.num === 14 ? "#fde68a" : "rgba(255,255,255,0.82)";
+                        ctx.font = "900 15px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif";
                         ctx.textAlign = "left";
-                        ctx.fillText(zoneNum === 14 ? "Z14 ★ GOLDEN" : `Z${zoneNum}`, zx + 10, zy + 24);
+                        ctx.fillText(`Z${cell.num} • ${cell.tag}`, zx + 12, zy + 24);
                     }
                 }
-            } else if (pitchMode === "setPieces") {
-                ctx.fillStyle = "rgba(251, 191, 36, 0.22)";
-                ctx.fillRect(pitchX + (pitchW - boxW) / 2, innerY, boxW, boxH);
-                ctx.fillStyle = "rgba(56, 189, 248, 0.18)";
-                ctx.fillRect(pitchX + (pitchW - boxW) / 2, innerY + boxH, boxW, 75);
-            } else if (pitchMode === "compactness") {
-                const compX = innerX + innerW * 0.19;
-                const compY = innerY + innerH * 0.30;
-                const compW = innerW * 0.62;
-                const compH = innerH * 0.42;
-                ctx.fillStyle = "rgba(16, 185, 129, 0.22)";
-                ctx.fillRect(compX, compY, compW, compH);
-                ctx.save();
-                ctx.setLineDash([12, 8]);
-                ctx.strokeStyle = "#34d399";
-                ctx.lineWidth = 4;
-                ctx.strokeRect(compX, compY, compW, compH);
-                ctx.restore();
+            }
+
+            // Draw Rest-Defence Shield Box & Movement Arrows when exporting Tactical Shape
+            const rdSlotSet = new Set<number>(isExportingTacticalShape ? (lineup.restDefenceSlots || []) : []);
+            const resolveExportCoords = (idx: number, basePos: { x: number; y: number }) => {
+                if (isExportingTacticalShape && lineup.inPossessionPositions?.[idx]) {
+                    return lineup.inPossessionPositions[idx];
+                }
+                return { x: basePos.x, y: basePos.y };
+            };
+
+            if (isExportingTacticalShape && rdSlotSet.size >= 2) {
+                const rdPts = currentFormation
+                    .map((pos, idx) => ({ idx, ...resolveExportCoords(idx, pos) }))
+                    .filter(p => rdSlotSet.has(p.idx));
+                if (rdPts.length >= 2) {
+                    const minX = Math.max(innerX + 12, Math.min(...rdPts.map(p => pitchX + (p.x / 100) * pitchW)) - 68);
+                    const maxX = Math.min(innerX + innerW - 12, Math.max(...rdPts.map(p => pitchX + (p.x / 100) * pitchW)) + 68);
+                    const minY = Math.max(innerY + 12, Math.min(...rdPts.map(p => pitchY + (p.y / 100) * pitchH)) - 58);
+                    const maxY = Math.min(innerY + innerH - 12, Math.max(...rdPts.map(p => pitchY + (p.y / 100) * pitchH)) + 66);
+
+                    ctx.save();
+                    ctx.fillStyle = "rgba(16, 185, 129, 0.18)";
+                    ctx.strokeStyle = "rgba(52, 211, 153, 0.85)";
+                    ctx.lineWidth = 3;
+                    ctx.setLineDash([12, 8]);
+                    ctx.beginPath();
+                    ctx.roundRect(minX, minY, maxX - minX, maxY - minY, 24);
+                    ctx.fill();
+                    ctx.stroke();
+                    ctx.restore();
+
+                    ctx.fillStyle = "#10b981";
+                    ctx.font = "900 14px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif";
+                    const rdLabel = rdPts.length === 5 ? "REST DEFENCE (3-2)" : `REST DEFENCE (${rdPts.length})`;
+                    const lblW = ctx.measureText(rdLabel).width + 26;
+                    ctx.beginPath();
+                    ctx.roundRect((minX + maxX) / 2 - lblW / 2, minY - 13, lblW, 26, 13);
+                    ctx.fill();
+                    ctx.fillStyle = "#022c22";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(rdLabel, (minX + maxX) / 2, minY);
+                }
+            }
+
+            if (isExportingTacticalShape && (lineup.showInPossessionArrows ?? true)) {
+                currentFormation.forEach((basePos, idx) => {
+                    const target = resolveExportCoords(idx, basePos);
+                    const dxPct = target.x - basePos.x;
+                    const dyPct = target.y - basePos.y;
+                    if (Math.hypot(dxPct, dyPct) < 4.5) return;
+
+                    const sx = pitchX + (basePos.x / 100) * pitchW;
+                    const sy = pitchY + (basePos.y / 100) * pitchH - 10;
+                    const exFull = pitchX + (target.x / 100) * pitchW;
+                    const eyFull = pitchY + (target.y / 100) * pitchH - 10;
+                    const distPx = Math.hypot(exFull - sx, eyFull - sy);
+                    if (distPx < 55) return;
+                    const ux = (exFull - sx) / distPx;
+                    const uy = (eyFull - sy) / distPx;
+                    const ex = exFull - ux * 44;
+                    const ey = eyFull - uy * 44;
+
+                    ctx.save();
+                    ctx.fillStyle = "rgba(255,255,255,0.5)";
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 7, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.strokeStyle = "rgba(253, 224, 71, 0.85)";
+                    ctx.lineWidth = 3.5;
+                    ctx.setLineDash([10, 7]);
+                    ctx.beginPath();
+                    ctx.moveTo(sx, sy);
+                    ctx.lineTo(ex, ey);
+                    ctx.stroke();
+
+                    ctx.setLineDash([]);
+                    ctx.fillStyle = "rgba(253, 224, 71, 0.95)";
+                    const angle = Math.atan2(ey - sy, ex - sx);
+                    ctx.beginPath();
+                    ctx.moveTo(ex, ey);
+                    ctx.lineTo(ex - 14 * Math.cos(angle - Math.PI / 6), ey - 14 * Math.sin(angle - Math.PI / 6));
+                    ctx.lineTo(ex - 14 * Math.cos(angle + Math.PI / 6), ey - 14 * Math.sin(angle + Math.PI / 6));
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.restore();
+                });
             }
 
             // 4. Draw Players on Pitch
@@ -2681,9 +2936,21 @@ export default function MatchdayXIPage() {
                 const fillCol = isGK ? gkColor : outfieldColor;
                 const txtCol = getContrastTextColor(fillCol);
                 const isCapt = Boolean(pid && lineup.captainId === pid);
+                const isRestDef = rdSlotSet.has(idx);
+                const renderedPos = resolveExportCoords(idx, pos);
 
-                const cx = pitchX + (pos.x / 100) * pitchW;
-                const cy = pitchY + (pos.y / 100) * pitchH;
+                const cx = pitchX + (renderedPos.x / 100) * pitchW;
+                const cy = pitchY + (renderedPos.y / 100) * pitchH;
+
+                if (isRestDef) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(cx, cy - 10, badgeRadius + 7, 0, Math.PI * 2);
+                    ctx.strokeStyle = "#34d399";
+                    ctx.lineWidth = 4;
+                    ctx.stroke();
+                    ctx.restore();
+                }
 
                 // Circle Jersey Badge
                 ctx.save();
@@ -4763,15 +5030,12 @@ export default function MatchdayXIPage() {
 
                     {/* Tactical Pitch Mode Switcher Bar */}
                     <div className="flex flex-col gap-1.5 pb-2 z-10 shrink-0">
-                        <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+                        <div className="flex flex-wrap items-center justify-between gap-1.5">
                             <div className="inline-flex items-center gap-1 p-0.5 rounded-xl bg-surface-1 border border-border shadow-sm shrink-0">
                                 {([
-                                    { id: "standard", label: "Standard" },
-                                    { id: "lanes5", label: "5 Lanes (Half-Spaces)" },
-                                    { id: "thirds", label: "Thirds & Press" },
-                                    { id: "zones18", label: "18-Zone (Zone 14)" },
-                                    { id: "setPieces", label: "Set-Piece Zones" },
-                                    { id: "compactness", label: "Compact Block" }
+                                    { id: "standard", label: "Base XI" },
+                                    { id: "lanes5", label: "In-Possession & Rest Defence" },
+                                    { id: "zones18", label: "Attacking Zones (Zone 14)" }
                                 ] as const).map((mode) => {
                                     const isActive = pitchMode === mode.id;
                                     return (
@@ -4791,57 +5055,79 @@ export default function MatchdayXIPage() {
                                 })}
                             </div>
 
-                            {pitchMode === "thirds" && (
-                                <div className="inline-flex items-center gap-1 p-0.5 rounded-xl bg-surface-1 border border-amber-500/30 shadow-sm shrink-0">
+                            {(pitchMode === "lanes5" || pitchMode === "zones18") && (
+                                <div className="flex flex-wrap items-center gap-1">
                                     {([
-                                        { id: "high", label: "High Press" },
-                                        { id: "mid", label: "Mid-Block" },
-                                        { id: "low", label: "Low Block" }
-                                    ] as const).map((p) => (
+                                        { id: "rb_jumps_325", label: "RB Jumps → 3-2-5", title: "RB pushes into Wide R, LB tucks into Back 3, #6 & #8 form Pivot 2" },
+                                        { id: "lb_jumps_325", label: "LB Jumps → 3-2-5", title: "LB pushes into Wide L, RB tucks into Back 3, #6 & #8 form Pivot 2" },
+                                        { id: "inverted_fb_325", label: "Inverted FB → 3-2-5", title: "RB steps inside alongside #6 in Pivot 2, Wingers hold width" }
+                                    ] as const).map((preset) => {
+                                        const isPresetActive = lineup.inPossessionPreset === preset.id;
+                                        return (
+                                            <button
+                                                key={preset.id}
+                                                type="button"
+                                                title={preset.title}
+                                                onClick={() => handleApplyInPossessionPreset(preset.id)}
+                                                className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-all whitespace-nowrap ${
+                                                    isPresetActive
+                                                        ? "bg-amber-400 text-slate-950 border-amber-300 shadow-xs"
+                                                        : "bg-surface-1 hover:bg-surface-2 text-foreground border-border"
+                                                }`}
+                                            >
+                                                {preset.label}
+                                            </button>
+                                        );
+                                    })}
+                                    <button
+                                        type="button"
+                                        onClick={handleToggleInPossessionArrows}
+                                        title="Show or hide dashed movement arrows from Base XI positions"
+                                        className={`px-2 py-1 rounded-lg text-[10px] font-extrabold border transition-all whitespace-nowrap ${
+                                            (lineup.showInPossessionArrows ?? true)
+                                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/40"
+                                                : "bg-surface-1 text-muted-foreground border-border"
+                                        }`}
+                                    >
+                                        Arrows {(lineup.showInPossessionArrows ?? true) ? "ON" : "OFF"}
+                                    </button>
+                                    {(Object.keys(lineup.inPossessionPositions || {}).length > 0 || (lineup.restDefenceSlots || []).length > 0) && (
                                         <button
-                                            key={p.id}
                                             type="button"
-                                            onClick={() => setPressLineHeight(p.id)}
-                                            className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-all whitespace-nowrap ${
-                                                pressLineHeight === p.id
-                                                    ? "bg-amber-500 text-slate-950"
-                                                    : "text-amber-500/80 hover:text-amber-400"
-                                            }`}
+                                            onClick={() => handleApplyInPossessionPreset("reset")}
+                                            title="Reset In-Possession shape back to Base XI coordinates"
+                                            className="px-2 py-1 rounded-lg text-[10px] font-extrabold border border-border bg-surface-1 hover:bg-rose-500/10 hover:text-rose-500 hover:border-rose-500/30 text-muted-foreground transition-all whitespace-nowrap"
                                         >
-                                            {p.label}
+                                            Reset Shape
                                         </button>
-                                    ))}
+                                    )}
                                 </div>
                             )}
                         </div>
 
                         {pitchMode !== "standard" && (
-                            <div className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-[10px] sm:text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center justify-between gap-2">
+                            <div className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-[10px] sm:text-[11px] font-bold text-emerald-700 dark:text-emerald-300 flex items-center justify-between gap-2">
                                 <span className="truncate">
-                                    {pitchMode === "lanes5" &&
-                                        "5 Vertical Lanes: Occupy all 5 corridors in attack • Wingers hold width so #8/#10 attack the Half-Spaces • Never 3 players in the same lane."}
-                                    {pitchMode === "thirds" &&
-                                        `Horizontal Thirds (${pressLineHeight === "high" ? "High Press Trigger" : pressLineHeight === "mid" ? "Compact Mid-Block" : "Deep Low-Block"}): Build-Up (bottom) → Progression (middle) → Final Third (top).`}
-                                    {pitchMode === "zones18" &&
-                                        "18-Zone Grid: Target Zone 14 (Golden Zone) & Half-Space Zones 13/15 in attack • Protect Zone 5 (#6 screen) defensively."}
-                                    {pitchMode === "setPieces" &&
-                                        "Set-Piece Target Zones: Attack Near Post (1), 6-Yard Box (2), Back Post (3), Penalty Spot (4) & Edge of Box 2nd Ball (5) + Rest Defence."}
-                                    {pitchMode === "compactness" &&
-                                        "Out-of-Possession Compact Block: Lock the central funnel (width of 18-yd box, 25–30m vertical distance) & force play into wide traps."}
+                                    {pitchMode === "lanes5"
+                                        ? "Drag any shirt freely to set your offensive & rest-defence shape • Tap a shirt to toggle 🛡️ Rest Defence • Base XI stays intact."
+                                        : "Attacking Zones (Scoring ↓): Target Zone 14 (Golden Zone) & Half-Space Pockets Z13/Z15 • Drag shirts freely."}
                                 </span>
                                 <button
                                     type="button"
                                     onClick={() => setPitchMode("standard")}
                                     className="text-[10px] font-extrabold underline shrink-0 hover:opacity-80"
                                 >
-                                    Reset
+                                    Back to Base XI
                                 </button>
                             </div>
                         )}
                     </div>
 
                     <div className="flex-1 flex items-center justify-center min-h-0">
-                        <div className="relative w-full h-[460px] sm:h-[540px] lg:h-full max-w-[680px] mx-auto bg-[#2b7c3d] rounded-2xl shadow-xl overflow-hidden">
+                        <div
+                            ref={pitchBoardRef}
+                            className="relative w-full h-[460px] sm:h-[540px] lg:h-full max-w-[680px] mx-auto bg-[#2b7c3d] rounded-2xl shadow-xl overflow-hidden select-none"
+                        >
                             {/* Pitch markings */}
                             <div className="absolute inset-0 overflow-hidden rounded-sm pointer-events-none">
                                 <div className="absolute inset-2 border-2 border-white/40"></div>
@@ -4861,303 +5147,219 @@ export default function MatchdayXIPage() {
                                 <div className="absolute left-1/2 -translate-x-1/2 bottom-2 w-12 h-5 sm:w-14 sm:h-6 border-2 border-white/40 border-b-0"></div>
 
                                 {/* ========================================================= */}
-                                {/* TACTICAL PITCH OVERLAYS                                   */}
+                                {/* ATTACKING-HALF ONLY OVERLAYS (SCORING DOWNWARDS ↓)        */}
                                 {/* ========================================================= */}
 
-                                {/* 1. 5 VERTICAL LANES (WIDE • HALF-SPACE • CENTRAL • HALF-SPACE • WIDE) */}
+                                {/* 1. 5 ATTACKING LANES (WIDE R • HALF-SPACE R • CENTRAL • HALF-SPACE L • WIDE L) */}
                                 {pitchMode === "lanes5" && (
-                                    <div className="absolute inset-2 grid grid-cols-[19fr_19fr_24fr_19fr_19fr] pointer-events-none">
-                                        {/* Left Wing */}
-                                        <div className="relative h-full border-r border-dashed border-amber-300/60 bg-black/5 flex flex-col justify-between items-center py-1.5">
-                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] sm:text-[9px] font-black tracking-wider text-white/90 uppercase">
-                                                Wide L
-                                            </span>
-                                            <span className="text-[8px] font-extrabold text-white/45 uppercase tracking-widest rotate-180 sm:rotate-0">
-                                                Wing Channel
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] sm:text-[9px] font-black tracking-wider text-white/90 uppercase">
-                                                Wide L
-                                            </span>
-                                        </div>
-
-                                        {/* Left Half-Space */}
-                                        <div className="relative h-full border-r border-dashed border-amber-300/75 bg-amber-400/18 flex flex-col justify-between items-center py-1.5">
-                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
-                                                Half-Space L
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-300/50 text-[8px] font-black text-amber-200 uppercase">
-                                                #8 / #10 Pocket
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
-                                                Half-Space L
-                                            </span>
-                                        </div>
-
-                                        {/* Central Corridor */}
-                                        <div className="relative h-full border-r border-dashed border-amber-300/75 bg-sky-400/10 flex flex-col justify-between items-center py-1.5">
-                                            <span className="px-1.5 py-0.5 rounded bg-sky-500/85 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
-                                                Central Zone
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-sky-500/20 border border-sky-300/40 text-[8px] font-black text-sky-100 uppercase">
-                                                Spine (#9 • #6 • CB)
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-sky-500/85 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
-                                                Central Zone
+                                    <div className="absolute left-2 right-2 top-1/2 bottom-2 grid grid-cols-[19fr_19fr_24fr_19fr_19fr] pointer-events-none">
+                                        {/* Right Wing (Screen Left when attacking downwards) */}
+                                        <div className="relative h-full border-r border-dashed border-amber-300/65 bg-black/5 flex flex-col justify-end items-center pb-1.5">
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/75 text-[8px] sm:text-[9px] font-black tracking-wider text-white/95 uppercase shadow-xs">
+                                                Wide R
                                             </span>
                                         </div>
 
                                         {/* Right Half-Space */}
-                                        <div className="relative h-full border-r border-dashed border-amber-300/60 bg-amber-400/18 flex flex-col justify-between items-center py-1.5">
-                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
-                                                Half-Space R
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-300/50 text-[8px] font-black text-amber-200 uppercase">
-                                                #8 / #10 Pocket
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
+                                        <div className="relative h-full border-r border-dashed border-amber-300/80 bg-amber-400/18 flex flex-col justify-end items-center pb-1.5">
+                                            <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
                                                 Half-Space R
                                             </span>
                                         </div>
 
-                                        {/* Right Wing */}
-                                        <div className="relative h-full bg-black/5 flex flex-col justify-between items-center py-1.5">
-                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] sm:text-[9px] font-black tracking-wider text-white/90 uppercase">
-                                                Wide R
+                                        {/* Central Attacking Zone */}
+                                        <div className="relative h-full border-r border-dashed border-amber-300/80 bg-sky-400/12 flex flex-col justify-end items-center pb-1.5">
+                                            <span className="px-1.5 py-0.5 rounded bg-sky-400 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
+                                                Central
                                             </span>
-                                            <span className="text-[8px] font-extrabold text-white/45 uppercase tracking-widest">
-                                                Wing Channel
+                                        </div>
+
+                                        {/* Left Half-Space */}
+                                        <div className="relative h-full border-r border-dashed border-amber-300/65 bg-amber-400/18 flex flex-col justify-end items-center pb-1.5">
+                                            <span className="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
+                                                Half-Space L
                                             </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] sm:text-[9px] font-black tracking-wider text-white/90 uppercase">
-                                                Wide R
+                                        </div>
+
+                                        {/* Left Wing (Screen Right when attacking downwards) */}
+                                        <div className="relative h-full bg-black/5 flex flex-col justify-end items-center pb-1.5">
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/75 text-[8px] sm:text-[9px] font-black tracking-wider text-white/95 uppercase shadow-xs">
+                                                Wide L
                                             </span>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* 2. HORIZONTAL THIRDS & LINE OF ENGAGEMENT (HIGH PRESS / MID-BLOCK / LOW BLOCK) */}
-                                {pitchMode === "thirds" && (
-                                    <div className="absolute inset-2 flex flex-col pointer-events-none">
-                                        {/* Attacking / Final Third */}
-                                        <div className="relative flex-1 border-b-2 border-dashed border-white/65 bg-rose-500/12 flex items-start justify-between p-2">
-                                            <span className="px-2 py-0.5 rounded bg-rose-600/90 text-white text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-sm">
-                                                Final Third (Attack &amp; High Press)
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] font-bold text-rose-200">
-                                                Create &amp; Finish
-                                            </span>
-                                        </div>
-
-                                        {/* Midfield / Progression Third */}
-                                        <div className="relative flex-1 border-b-2 border-dashed border-white/65 bg-sky-500/10 flex items-start justify-between p-2">
-                                            <span className="px-2 py-0.5 rounded bg-sky-600/90 text-white text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-sm">
-                                                Middle Third (Progression &amp; Mid-Block)
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] font-bold text-sky-200">
-                                                Control &amp; Overload
-                                            </span>
-                                        </div>
-
-                                        {/* Defensive / Build-Up Third */}
-                                        <div className="relative flex-1 bg-emerald-500/12 flex items-end justify-between p-2">
-                                            <span className="px-2 py-0.5 rounded bg-emerald-600/90 text-white text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-sm">
-                                                Build-Up Third (Protect &amp; Play Out)
-                                            </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] font-bold text-emerald-200">
-                                                 Compact Box Protection
-                                            </span>
-                                        </div>
-
-                                        {/* Dynamic Line of Engagement (Press Trigger Line + Defensive Squeeze Line) */}
-                                        <div
-                                            className="absolute left-0 right-0 border-t-[3px] border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.8)] flex items-center justify-end pr-2 transition-all duration-300"
-                                            style={{
-                                                top:
-                                                    pressLineHeight === "high"
-                                                        ? "22%"
-                                                        : pressLineHeight === "mid"
-                                                            ? "44%"
-                                                            : "64%"
-                                            }}
-                                        >
-                                            <span className="-translate-y-1/2 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-md">
-                                                ⚡ {pressLineHeight === "high" ? "High Press Trigger Line" : pressLineHeight === "mid" ? "Mid-Block Line of Engagement" : "Low-Block Engagement Line"}
-                                            </span>
-                                        </div>
-
-                                        <div
-                                            className="absolute left-0 right-0 border-t-2 border-dashed border-cyan-300/85 flex items-center justify-start pl-2 transition-all duration-300"
-                                            style={{
-                                                top:
-                                                    pressLineHeight === "high"
-                                                        ? "52%"
-                                                        : pressLineHeight === "mid"
-                                                            ? "68%"
-                                                            : "80%"
-                                            }}
-                                        >
-                                            <span className="-translate-y-1/2 px-2 py-0.5 rounded-full bg-cyan-400/90 text-slate-950 text-[8px] font-black uppercase tracking-wider shadow-sm">
-                                                🛡️ Defensive Line Squeeze
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* 3. 18-ZONE TACTICAL GRID (HIGHLIGHTING ZONE 14, HALF-SPACE ZONES 13/15 & ZONE 5) */}
+                                {/* 2. ATTACKING HALF 9-ZONE GRID (Z10–Z18 SCORING DOWNWARDS ↓, HIGHLIGHTING ZONE 14) */}
                                 {pitchMode === "zones18" && (
-                                    <div className="absolute inset-2 grid grid-cols-3 grid-rows-6 pointer-events-none">
-                                        {Array.from({ length: 18 }).map((_, i) => {
-                                            const row = Math.floor(i / 3); // 0 (top) to 5 (bottom)
-                                            const col = i % 3; // 0 (left) to 2 (right)
-                                            const zoneNumber = (5 - row) * 3 + (col + 1); // Zone 1 (bottom-left) to Zone 18 (top-right)
-                                            const isZone14 = zoneNumber === 14;
-                                            const isAssistHalfSpace = zoneNumber === 13 || zoneNumber === 15;
-                                            const isZone17 = zoneNumber === 17;
-                                            const isZone5 = zoneNumber === 5;
-
+                                    <div className="absolute left-2 right-2 top-1/2 bottom-2 grid grid-cols-3 grid-rows-3 pointer-events-none">
+                                        {([
+                                            { num: 10, tag: "Right Entry" },
+                                            { num: 11, tag: "Central Prog" },
+                                            { num: 12, tag: "Left Entry" },
+                                            { num: 13, tag: "Half-Space R" },
+                                            { num: 14, tag: "★ Golden Zone" },
+                                            { num: 15, tag: "Half-Space L" },
+                                            { num: 16, tag: "Byline R" },
+                                            { num: 17, tag: "Finish Box" },
+                                            { num: 18, tag: "Byline L" }
+                                        ] as const).map((z) => {
+                                            const isZ14 = z.num === 14;
+                                            const isHalfSpace = z.num === 13 || z.num === 15;
+                                            const isFinishBox = z.num === 17;
                                             return (
                                                 <div
-                                                    key={zoneNumber}
-                                                    className={`relative border border-dashed border-white/30 flex flex-col justify-between p-1 ${
-                                                        isZone14
-                                                            ? "bg-amber-400/30 border-2 border-solid border-amber-300 shadow-[inset_0_0_16px_rgba(251,191,36,0.45)]"
-                                                            : isAssistHalfSpace
-                                                                ? "bg-sky-400/20 border-sky-300/60"
-                                                                : isZone17
-                                                                    ? "bg-rose-500/20"
-                                                                    : isZone5
-                                                                        ? "bg-emerald-400/20 border-emerald-300/60"
-                                                                        : ""
+                                                    key={z.num}
+                                                    className={`relative border border-dashed border-white/30 flex items-start justify-between p-1.5 ${
+                                                        isZ14
+                                                            ? "bg-amber-400/28 border-2 border-solid border-amber-300 shadow-[inset_0_0_16px_rgba(251,191,36,0.45)]"
+                                                            : isHalfSpace
+                                                                ? "bg-sky-400/18 border-sky-300/60"
+                                                                : isFinishBox
+                                                                    ? "bg-rose-500/18"
+                                                                    : ""
                                                     }`}
                                                 >
-                                                    <div className="flex items-center justify-between gap-1">
-                                                        <span
-                                                            className={`px-1 py-0.2 rounded text-[8px] sm:text-[9px] font-black leading-tight ${
-                                                                isZone14
-                                                                    ? "bg-amber-400 text-slate-950 shadow-xs"
-                                                                    : isAssistHalfSpace
-                                                                        ? "bg-sky-400/90 text-slate-950"
-                                                                        : isZone5
-                                                                            ? "bg-emerald-400/90 text-slate-950"
-                                                                            : "bg-slate-950/55 text-white/80"
-                                                            }`}
-                                                        >
-                                                            Z{zoneNumber}
-                                                        </span>
-                                                        {isZone14 && (
-                                                            <span className="px-1 py-0.2 rounded bg-amber-950/85 border border-amber-300/60 text-amber-200 text-[7px] sm:text-[8px] font-black uppercase">
-                                                                ★ Golden Zone
-                                                            </span>
-                                                        )}
-                                                        {isAssistHalfSpace && (
-                                                            <span className="hidden sm:inline-block px-1 py-0.2 rounded bg-slate-950/70 text-sky-200 text-[7px] font-extrabold uppercase">
-                                                                Half-Space
-                                                            </span>
-                                                        )}
-                                                        {isZone5 && (
-                                                            <span className="px-1 py-0.2 rounded bg-slate-950/75 text-emerald-200 text-[7px] sm:text-[8px] font-black uppercase">
-                                                                #6 Screen
-                                                            </span>
-                                                        )}
-                                                        {isZone17 && (
-                                                            <span className="hidden sm:inline-block px-1 py-0.2 rounded bg-rose-950/80 text-rose-200 text-[7px] font-black uppercase">
-                                                                Finish Box
-                                                            </span>
-                                                        )}
-                                                    </div>
+                                                    <span
+                                                        className={`px-1 py-0.2 rounded text-[8px] sm:text-[9px] font-black leading-tight ${
+                                                            isZ14
+                                                                ? "bg-amber-400 text-slate-950 shadow-xs"
+                                                                : isHalfSpace
+                                                                    ? "bg-sky-400/90 text-slate-950"
+                                                                    : "bg-slate-950/60 text-white/85"
+                                                        }`}
+                                                    >
+                                                        Z{z.num}
+                                                    </span>
+                                                    <span
+                                                        className={`px-1 py-0.2 rounded text-[7px] sm:text-[8px] font-black uppercase ${
+                                                            isZ14
+                                                                ? "bg-amber-950/85 border border-amber-300/60 text-amber-200"
+                                                                : isHalfSpace
+                                                                    ? "bg-slate-950/70 text-sky-200"
+                                                                    : isFinishBox
+                                                                        ? "bg-rose-950/80 text-rose-200"
+                                                                        : "text-white/60"
+                                                        }`}
+                                                    >
+                                                        {z.tag}
+                                                    </span>
                                                 </div>
                                             );
                                         })}
                                     </div>
                                 )}
 
-                                {/* 4. SET-PIECE TARGET ZONES (ATTACKING & DEFENSIVE PENALTY BOX GRID) */}
-                                {pitchMode === "setPieces" && (
-                                    <div className="absolute inset-2 pointer-events-none">
-                                        {/* Attacking Penalty Box Target Grid (Top) */}
-                                        <div className="absolute left-1/2 -translate-x-1/2 top-0 w-[62%] sm:w-[56%] h-[22%] grid grid-cols-3 grid-rows-2 gap-1 p-1 bg-amber-500/15 border-2 border-dashed border-amber-300/80 rounded-b-xl">
-                                            <div className="rounded bg-amber-500/30 border border-amber-300/60 flex flex-col items-center justify-center p-0.5 text-center">
-                                                <span className="text-[8px] sm:text-[9px] font-black text-white uppercase leading-none">1. Near Post</span>
-                                                <span className="text-[7px] font-bold text-amber-200">Flick-On Run</span>
-                                            </div>
-                                            <div className="rounded bg-rose-500/35 border border-rose-300/70 flex flex-col items-center justify-center p-0.5 text-center">
-                                                <span className="text-[8px] sm:text-[9px] font-black text-white uppercase leading-none">2. 6-Yard Box</span>
-                                                <span className="text-[7px] font-bold text-rose-100">Screen GK</span>
-                                            </div>
-                                            <div className="rounded bg-amber-500/30 border border-amber-300/60 flex flex-col items-center justify-center p-0.5 text-center">
-                                                <span className="text-[8px] sm:text-[9px] font-black text-white uppercase leading-none">3. Back Post</span>
-                                                <span className="text-[7px] font-bold text-amber-200">Attack Header</span>
-                                            </div>
-                                            <div className="col-span-3 rounded bg-sky-500/30 border border-sky-300/60 flex items-center justify-center gap-2 px-2">
-                                                <span className="text-[8px] sm:text-[9px] font-black text-white uppercase">4. Penalty Spot / Cutback Zone</span>
-                                            </div>
-                                        </div>
+                                {/* 3. REST-DEFENCE SHIELD BOX & TACTICAL MOVEMENT ARROWS SVG */}
+                                {(pitchMode === "lanes5" || pitchMode === "zones18") && (() => {
+                                    const rdSet = new Set<number>(lineup.restDefenceSlots || []);
+                                    const getEffectiveSlotCoords = (sIdx: number, bPos: { x: number; y: number }) => {
+                                        if (draggingTacticalSlot && draggingTacticalSlot.index === sIdx) {
+                                            return { x: draggingTacticalSlot.x, y: draggingTacticalSlot.y };
+                                        }
+                                        if (lineup.inPossessionPositions?.[sIdx]) {
+                                            return lineup.inPossessionPositions[sIdx];
+                                        }
+                                        return { x: bPos.x, y: bPos.y };
+                                    };
 
-                                        {/* Edge of Box 2nd Ball Zone */}
-                                        <div className="absolute left-1/2 -translate-x-1/2 top-[23%] w-[48%] h-[7%] rounded-lg bg-emerald-500/25 border border-dashed border-emerald-300/80 flex items-center justify-center">
-                                            <span className="text-[8px] sm:text-[9px] font-black text-emerald-100 uppercase tracking-wider">
-                                                5. Edge of Box (2nd Ball &amp; Counter-Stopper)
-                                            </span>
-                                        </div>
+                                    const rdCoords = formation
+                                        .map((bPos, sIdx) => ({ sIdx, ...getEffectiveSlotCoords(sIdx, bPos) }))
+                                        .filter(pt => rdSet.has(pt.sIdx));
 
-                                        {/* Rest Defence / Halfway Lock */}
-                                        <div className="absolute left-1/2 -translate-x-1/2 top-[44%] w-[58%] h-[9%] rounded-xl bg-purple-500/20 border border-dashed border-purple-300/70 flex items-center justify-center">
-                                            <span className="text-[8px] sm:text-[9px] font-black text-purple-100 uppercase tracking-wider">
-                                                🛡️ Rest Defence (2v1 Cover on Halfway)
-                                            </span>
-                                        </div>
+                                    const hasRdBox = rdCoords.length >= 2;
+                                    const minRdX = hasRdBox ? Math.max(4, Math.min(...rdCoords.map(p => p.x)) - 7.5) : 0;
+                                    const maxRdX = hasRdBox ? Math.min(96, Math.max(...rdCoords.map(p => p.x)) + 7.5) : 0;
+                                    const minRdY = hasRdBox ? Math.max(4, Math.min(...rdCoords.map(p => p.y)) - 6.5) : 0;
+                                    const maxRdY = hasRdBox ? Math.min(94, Math.max(...rdCoords.map(p => p.y)) + 7.5) : 0;
 
-                                        {/* Defensive Box Zonal / Man-Mark Guide (Bottom) */}
-                                        <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-[62%] sm:w-[56%] h-[18%] rounded-t-xl bg-sky-500/15 border-2 border-dashed border-sky-300/70 flex flex-col items-center justify-center p-1 text-center">
-                                            <span className="text-[8px] sm:text-[9px] font-black text-sky-100 uppercase">
-                                                Defensive Set-Piece Box (1st Contact + Edge Press)
-                                            </span>
-                                        </div>
-                                    </div>
-                                )}
+                                    // Sort RD coordinates by depth so back-line & pivot links look clean
+                                    const sortedByY = [...rdCoords].sort((a, b) => a.y - b.y);
+                                    const backUnit = sortedByY.length >= 4 ? sortedByY.slice(0, 3).sort((a, b) => a.x - b.x) : sortedByY.sort((a, b) => a.x - b.x);
+                                    const pivotUnit = sortedByY.length >= 4 ? sortedByY.slice(3).sort((a, b) => a.x - b.x) : [];
 
-                                {/* 5. COMPACTNESS & REST-DEFENCE CENTRAL FUNNEL */}
-                                {pitchMode === "compactness" && (
-                                    <div className="absolute inset-2 pointer-events-none">
-                                        {/* Left Wide Trap Channel */}
-                                        <div className="absolute left-0 top-[25%] bottom-[25%] w-[19%] bg-rose-500/15 border-r border-dashed border-rose-300/60 flex items-center justify-center p-1">
-                                            <span className="px-1 py-0.5 rounded bg-slate-950/75 text-rose-200 text-[8px] font-black uppercase text-center leading-tight">
-                                                Touchline Trap (Force Wide)
-                                            </span>
-                                        </div>
+                                    const showArrows = lineup.showInPossessionArrows ?? true;
 
-                                        {/* Right Wide Trap Channel */}
-                                        <div className="absolute right-0 top-[25%] bottom-[25%] w-[19%] bg-rose-500/15 border-l border-dashed border-rose-300/60 flex items-center justify-center p-1">
-                                            <span className="px-1 py-0.5 rounded bg-slate-950/75 text-rose-200 text-[8px] font-black uppercase text-center leading-tight">
-                                                Touchline Trap (Force Wide)
-                                            </span>
-                                        </div>
+                                    return (
+                                        <>
+                                            {hasRdBox && (
+                                                <div
+                                                    style={{
+                                                        left: `${minRdX}%`,
+                                                        top: `${minRdY}%`,
+                                                        width: `${maxRdX - minRdX}%`,
+                                                        height: `${maxRdY - minRdY}%`
+                                                    }}
+                                                    className="absolute rounded-2xl bg-emerald-400/18 border-2 border-dashed border-emerald-300/85 shadow-[inset_0_0_24px_rgba(16,185,129,0.28)] pointer-events-none transition-all duration-75"
+                                                >
+                                                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 px-2 py-0.5 rounded-full bg-emerald-400 text-slate-950 text-[8px] sm:text-[9px] font-black uppercase tracking-wider whitespace-nowrap shadow-sm">
+                                                        🛡️ {rdCoords.length === 5 ? "Rest Defence (3-2)" : `Rest Defence (${rdCoords.length})`}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
+                                                <defs>
+                                                    <marker id="ip-arrow" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="4.2" markerHeight="4.2" orient="auto-start-reverse">
+                                                        <path d="M 0 1 L 10 5 L 0 9 z" fill="#fde047" />
+                                                    </marker>
+                                                </defs>
 
-                                        {/* Central Compact Block (25m x 35m Compactness Box) */}
-                                        <div className="absolute left-[19%] right-[19%] top-[28%] bottom-[26%] rounded-2xl bg-emerald-400/22 border-2 border-dashed border-emerald-300 shadow-[inset_0_0_24px_rgba(16,185,129,0.35)] flex flex-col justify-between p-2">
-                                            <div className="flex items-center justify-between gap-1">
-                                                <span className="px-2 py-0.5 rounded bg-emerald-400 text-slate-950 text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-xs">
-                                                    🛡️ Compact Central Block
-                                                </span>
-                                                <span className="px-1.5 py-0.5 rounded bg-slate-950/75 text-emerald-200 text-[8px] font-extrabold">
-                                                    Max 25–30m ST to CB
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-center">
-                                                <span className="px-2 py-0.5 rounded-full bg-slate-950/70 border border-emerald-300/50 text-emerald-100 text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
-                                                    Protect Middle • Deny Passing Lanes into #10
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between gap-1">
-                                                <span className="px-1.5 py-0.5 rounded bg-slate-950/75 text-emerald-200 text-[8px] font-extrabold">
-                                                    Width of 18-Yd Box
-                                                </span>
-                                                <span className="px-1.5 py-0.5 rounded bg-slate-950/75 text-emerald-200 text-[8px] font-extrabold">
-                                                    10–12m Between Lines
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                                                {/* Subtle Rest-Defence unit connection links */}
+                                                {backUnit.length >= 2 && backUnit.slice(0, -1).map((pt, i) => (
+                                                    <line
+                                                        key={`rd-back-${i}`}
+                                                        x1={pt.x}
+                                                        y1={pt.y}
+                                                        x2={backUnit[i + 1].x}
+                                                        y2={backUnit[i + 1].y}
+                                                        stroke="rgba(110, 231, 183, 0.55)"
+                                                        strokeWidth="0.45"
+                                                        strokeDasharray="1.5 1.2"
+                                                    />
+                                                ))}
+                                                {pivotUnit.length >= 2 && pivotUnit.slice(0, -1).map((pt, i) => (
+                                                    <line
+                                                        key={`rd-piv-${i}`}
+                                                        x1={pt.x}
+                                                        y1={pt.y}
+                                                        x2={pivotUnit[i + 1].x}
+                                                        y2={pivotUnit[i + 1].y}
+                                                        stroke="rgba(110, 231, 183, 0.55)"
+                                                        strokeWidth="0.45"
+                                                        strokeDasharray="1.5 1.2"
+                                                    />
+                                                ))}
+
+                                                {/* Movement arrows from Base XI position -> In-Possession position */}
+                                                {showArrows && formation.map((bPos, sIdx) => {
+                                                    const cur = getEffectiveSlotCoords(sIdx, bPos);
+                                                    const dx = cur.x - bPos.x;
+                                                    const dy = cur.y - bPos.y;
+                                                    const dist = Math.hypot(dx, dy);
+                                                    if (dist < 4.5) return null;
+                                                    const shorten = 4.4;
+                                                    const endX = cur.x - (dx / dist) * Math.min(shorten, dist * 0.45);
+                                                    const endY = cur.y - (dy / dist) * Math.min(shorten, dist * 0.45);
+                                                    return (
+                                                        <g key={`move-arrow-${sIdx}`}>
+                                                            <circle cx={bPos.x} cy={bPos.y} r="1.15" fill="rgba(255,255,255,0.55)" />
+                                                            <line
+                                                                x1={bPos.x}
+                                                                y1={bPos.y}
+                                                                x2={endX}
+                                                                y2={endY}
+                                                                stroke="rgba(253, 224, 71, 0.85)"
+                                                                strokeWidth="0.55"
+                                                                strokeDasharray="1.8 1.2"
+                                                                markerEnd="url(#ip-arrow)"
+                                                            />
+                                                        </g>
+                                                    );
+                                                })}
+                                            </svg>
+                                        </>
+                                    );
+                                })()}
 
                                 {/* Watermark (#4 Clipped to circular center-circle frame so square image backgrounds disappear) */}
                                 {settings.logo && (
@@ -5171,6 +5373,14 @@ export default function MatchdayXIPage() {
 
                             {/* Player positions */}
                             {formation.map((pos, idx) => {
+                                const isTacticalShapeMode = pitchMode === "lanes5" || pitchMode === "zones18";
+                                const renderedPos = isTacticalShapeMode
+                                    ? (draggingTacticalSlot && draggingTacticalSlot.index === idx
+                                        ? { x: draggingTacticalSlot.x, y: draggingTacticalSlot.y }
+                                        : (lineup.inPossessionPositions?.[idx] || { x: pos.x, y: pos.y }))
+                                    : { x: pos.x, y: pos.y };
+                                const isRestDefencePlayer = isTacticalShapeMode && Boolean(lineup.restDefenceSlots?.includes(idx));
+
                                 const rawPlayerId = lineup.starters[idx];
                                 const player = resolvePlayerOrTrialist(rawPlayerId);
                                 const playerId = player ? rawPlayerId : null;
@@ -5204,14 +5414,16 @@ export default function MatchdayXIPage() {
 
                                 const isPitchSlotDragOver = dragOverSlot?.type === "pitch" && dragOverSlot.index === idx;
                                 const isPitchSlotBeingDragged = Boolean(playerId && draggedPlayer === playerId && draggedSource?.type === "pitch" && draggedSource.index === idx);
+                                const isActivelyPointerDragging = Boolean(draggingTacticalSlot && draggingTacticalSlot.index === idx);
 
                                 return (
                                 <div
                                     key={idx}
-                                    className="absolute -translate-x-1/2 -translate-y-1/2"
+                                    className={`absolute -translate-x-1/2 -translate-y-1/2 ${isActivelyPointerDragging ? "z-40 scale-110" : "z-10"}`}
                                     style={{
-                                        left: `${pos.x}%`,
-                                        top: `${pos.y}%`,
+                                        left: `${renderedPos.x}%`,
+                                        top: `${renderedPos.y}%`,
+                                        touchAction: isTacticalShapeMode ? "none" : undefined
                                     }}
                                     onDragOver={(e) => {
                                         handleDragOver(e);
@@ -5226,15 +5438,111 @@ export default function MatchdayXIPage() {
                                     }}
                                     onDrop={(e) => handleDropOnPitch(e, idx)}
                                 >
-                                    <div className={`flex flex-col items-center group relative cursor-pointer transition-all duration-150 ${
-                                        isPitchSlotDragOver ? "scale-110 z-30" : ""
-                                    } ${isPitchSlotBeingDragged ? "opacity-40 scale-95" : ""}`}
-                                            draggable={!!playerId && !isEditingThisNumber && editingNamePlayerId !== playerId}
-                                            onDragStart={(e) => playerId && handleDragStart(e, playerId, {type: 'pitch', index: idx}, displayedNumber)}
-                                            onDragEnd={handleDragEnd}
-                                            onClick={() => { setModalTab("swap"); setActiveSlot({ type: 'pitch', index: idx, label: pos.label }); }}
+                                    <div
+                                        className={`flex flex-col items-center group relative ${
+                                            isTacticalShapeMode ? "cursor-grab active:cursor-grabbing" : "cursor-pointer transition-all duration-150"
+                                        } ${isPitchSlotDragOver ? "scale-110 z-30" : ""} ${isPitchSlotBeingDragged ? "opacity-40 scale-95" : ""}`}
+                                        draggable={!isTacticalShapeMode && !!playerId && !isEditingThisNumber && editingNamePlayerId !== playerId}
+                                        onDragStart={(e) => {
+                                            if (isTacticalShapeMode) {
+                                                e.preventDefault();
+                                                return;
+                                            }
+                                            if (playerId) handleDragStart(e, playerId, { type: "pitch", index: idx }, displayedNumber);
+                                        }}
+                                        onDragEnd={handleDragEnd}
+                                        onPointerDown={(e) => {
+                                            if (!isTacticalShapeMode) return;
+                                            if (isEditingThisNumber || editingNamePlayerId === playerId) return;
+                                            if ((e.target as HTMLElement)?.closest("button, input")) return;
+                                            e.stopPropagation();
+                                            try {
+                                                e.currentTarget.setPointerCapture(e.pointerId);
+                                            } catch {}
+                                            tacticalPointerRef.current = {
+                                                index: idx,
+                                                startClientX: e.clientX,
+                                                startClientY: e.clientY,
+                                                moved: false
+                                            };
+                                        }}
+                                        onPointerMove={(e) => {
+                                            if (!isTacticalShapeMode) return;
+                                            const ptr = tacticalPointerRef.current;
+                                            if (!ptr || ptr.index !== idx || !pitchBoardRef.current) return;
+                                            const dxPx = e.clientX - ptr.startClientX;
+                                            const dyPx = e.clientY - ptr.startClientY;
+                                            if (!ptr.moved && Math.hypot(dxPx, dyPx) < 5) return;
+                                            ptr.moved = true;
+                                            const rect = pitchBoardRef.current.getBoundingClientRect();
+                                            const rawX = ((e.clientX - rect.left) / Math.max(1, rect.width)) * 100;
+                                            const rawY = ((e.clientY - rect.top) / Math.max(1, rect.height)) * 100;
+                                            const clampedX = Math.round(Math.min(94, Math.max(6, rawX)) * 10) / 10;
+                                            const clampedY = Math.round(Math.min(92, Math.max(5, rawY)) * 10) / 10;
+                                            setDraggingTacticalSlot({ index: idx, x: clampedX, y: clampedY });
+                                        }}
+                                        onPointerUp={(e) => {
+                                            if (!isTacticalShapeMode) return;
+                                            const ptr = tacticalPointerRef.current;
+                                            if (!ptr || ptr.index !== idx) return;
+                                            try {
+                                                if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+                                                    e.currentTarget.releasePointerCapture(e.pointerId);
+                                                }
+                                            } catch {}
+                                            tacticalPointerRef.current = null;
+
+                                            if (ptr.moved && draggingTacticalSlot && draggingTacticalSlot.index === idx) {
+                                                const finalCoord = { x: draggingTacticalSlot.x, y: draggingTacticalSlot.y };
+                                                setDraggingTacticalSlot(null);
+                                                const nextIp = {
+                                                    ...(lineup.inPossessionPositions || {}),
+                                                    [idx]: finalCoord
+                                                };
+                                                const updated: MatchdayXI = {
+                                                    ...lineup,
+                                                    inPossessionPositions: nextIp,
+                                                    updatedAt: new Date().toISOString()
+                                                };
+                                                setLineup(updated);
+                                                saveLineup(updated);
+                                            } else {
+                                                setDraggingTacticalSlot(null);
+                                                if (!playerId || isGkSlot) {
+                                                    setModalTab("swap");
+                                                    setActiveSlot({ type: "pitch", index: idx, label: pos.label });
+                                                } else {
+                                                    handleToggleRestDefenceSlot(idx);
+                                                }
+                                            }
+                                        }}
+                                        onPointerCancel={() => {
+                                            if (!isTacticalShapeMode) return;
+                                            tacticalPointerRef.current = null;
+                                            setDraggingTacticalSlot(null);
+                                        }}
+                                        onClick={() => {
+                                            if (isTacticalShapeMode) return;
+                                            setModalTab("swap");
+                                            setActiveSlot({ type: "pitch", index: idx, label: pos.label });
+                                        }}
                                     >
-                                        <div className={`relative rounded-full transition-all ${isPitchSlotDragOver ? "ring-4 ring-emerald-400/90 bg-emerald-400/20 shadow-[0_0_20px_rgba(52,211,153,0.7)]" : ""}`}>
+                                        <div className={`relative rounded-full transition-all ${
+                                            isPitchSlotDragOver
+                                                ? "ring-4 ring-emerald-400/90 bg-emerald-400/20 shadow-[0_0_20px_rgba(52,211,153,0.7)]"
+                                                : isRestDefencePlayer
+                                                    ? "ring-2 ring-emerald-300 bg-emerald-400/15 shadow-[0_0_14px_rgba(52,211,153,0.55)] p-0.5"
+                                                    : ""
+                                        }`}>
+                                            {/* Rest-Defence Shield Badge in Tactical Mode */}
+                                            {isRestDefencePlayer && (
+                                                <span
+                                                    title="Rest-Defence Player (Tap shirt to toggle)"
+                                                    className="absolute -bottom-1 -left-2 z-20 px-1 rounded-full bg-emerald-400 text-slate-950 text-[8px] font-black shadow border border-white leading-tight"
+                                                >
+                                                    🛡️
+                                                </span>
+                                            )}
                                             {/* Jersey SVG Icon colored dynamically based on kit selector & GK slot (#4 Larger for 5v5/7v7) */}
                                             <svg 
                                                 className={`${activeFormat === "5v5" || activeFormat === "7v7" ? "w-10 h-10 sm:w-12 sm:h-12" : "w-9 h-9 sm:w-11 sm:h-11"} drop-shadow-[0_2px_4px_rgba(0,0,0,0.45)] mb-0.5 z-10 transition-transform group-hover:scale-105`}
@@ -5262,7 +5570,7 @@ export default function MatchdayXIPage() {
                                                 )}
                                             </svg>
 
-                                            {/* Clickable Shirt Number Overlay / Inline Editor right on the pitch (Desktop lg:block only so mobile taps open Assign Modal) */}
+                                            {/* Clickable Shirt Number Overlay / Inline Editor right on the pitch (Desktop Base XI only so Tactical Drag never gets intercepted) */}
                                             {isEditingThisNumber ? (
                                                 <input
                                                     type="text"
@@ -5291,7 +5599,7 @@ export default function MatchdayXIPage() {
                                                     }}
                                                     className="absolute inset-0 m-auto w-7 h-6 bg-slate-950/90 text-white text-center font-black text-xs rounded ring-2 ring-amber-400 outline-none z-30 p-0"
                                                 />
-                                            ) : (
+                                            ) : !isTacticalShapeMode ? (
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {
@@ -5302,7 +5610,7 @@ export default function MatchdayXIPage() {
                                                     title={`Shirt #${displayedNumber} — Click to change number manually (Default: ${pos.number})`}
                                                     className="hidden lg:block absolute inset-0 m-auto w-6 h-5 sm:w-7 sm:h-6 rounded z-20 hover:ring-1 hover:ring-amber-400 hover:bg-black/15 transition-all cursor-text"
                                                 />
-                                            )}
+                                            ) : null}
 
                                             {/* Captain / Vice-Captain Armband Badge */}
                                             {playerId && (isCaptain || isViceCaptain) && (
@@ -5318,8 +5626,8 @@ export default function MatchdayXIPage() {
                                                 </span>
                                             )}
 
-                                            {/* Quick hover Captain toggle button */}
-                                            {playerId && !isCaptain && (
+                                            {/* Quick hover Captain toggle button (Base XI mode only) */}
+                                            {!isTacticalShapeMode && playerId && !isCaptain && (
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {
@@ -5364,7 +5672,7 @@ export default function MatchdayXIPage() {
                                         <div
                                             title={
                                                 playerId
-                                                    ? `${fullPlayerName}${lineup.customNames?.[playerId]?.trim() && !isTrialistId(playerId) ? ` (Stats: ${player?.firstName} ${player?.lastName})` : ""} • ${pos.label}`
+                                                    ? `${fullPlayerName}${lineup.customNames?.[playerId]?.trim() && !isTrialistId(playerId) ? ` (Stats: ${player?.firstName} ${player?.lastName})` : ""} • ${isTacticalShapeMode ? "Drag to move / Tap to toggle Rest Defence" : pos.label}`
                                                     : pos.label
                                             }
                                             onDoubleClick={(e) => {
@@ -5405,8 +5713,8 @@ export default function MatchdayXIPage() {
                                                 </span>
                                             )}
 
-                                            {/* Edit Name Button (floating badge on hover so it takes 0px of pill width) */}
-                                            {playerId && editingNamePlayerId !== playerId && (
+                                            {/* Edit Name & Remove Buttons (Base XI mode only so Tactical Drag stays super clean) */}
+                                            {!isTacticalShapeMode && playerId && editingNamePlayerId !== playerId && (
                                                 <button
                                                     type="button"
                                                     onClick={(e) => {
@@ -5421,8 +5729,7 @@ export default function MatchdayXIPage() {
                                                 </button>
                                             )}
                                             
-                                            {/* Remove Button */}
-                                            {playerId && editingNamePlayerId !== playerId && (
+                                            {!isTacticalShapeMode && playerId && editingNamePlayerId !== playerId && (
                                                 <button 
                                                     onClick={(e) => { e.stopPropagation(); handleRemoveFromPitch(idx); }}
                                                     className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center opacity-0 md:group-hover:opacity-100 hover:bg-red-600 transition-opacity z-20 shadow"
