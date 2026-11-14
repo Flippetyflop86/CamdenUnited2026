@@ -433,12 +433,55 @@ export default function MatchesPage() {
 
         const mapped: Match[] = (data || []).map((m: any) => {
             const extracted = extractLineupBlock(m.notes || "");
-            if (extracted.wasRepaired && extracted.normalizedRawNotes) {
+            let parsedLineup = extracted.parsedLineup;
+            let effectiveRawNotes = extracted.normalizedRawNotes || m.notes || "";
+
+            if (parsedLineup && Array.isArray(parsedLineup.substitutes)) {
+                const starterIdSet = new Set<string>(
+                    Object.values(parsedLineup.starters || {}).filter((id: any): id is string => Boolean(id))
+                );
+                const benchIdSet = new Set<string>(
+                    parsedLineup.substitutes.filter((id: any): id is string => Boolean(id) && !starterIdSet.has(id))
+                );
+                const prevUsed: string[] = Array.isArray(parsedLineup.usedSubstitutes) ? parsedLineup.usedSubstitutes : [];
+                const prevSubs: any[] = Array.isArray(parsedLineup.substitutions) ? parsedLineup.substitutions : [];
+                const staleSubIds = Array.from(
+                    new Set<string>([
+                        ...prevUsed.filter((id: any): id is string => Boolean(id) && !starterIdSet.has(id) && !benchIdSet.has(id)),
+                        ...prevSubs
+                            .map((s: any) => s?.subId)
+                            .filter((id: any): id is string => Boolean(id) && !starterIdSet.has(id) && !benchIdSet.has(id))
+                    ])
+                );
+
+                if (staleSubIds.length > 0) {
+                    parsedLineup = {
+                        ...parsedLineup,
+                        usedSubstitutes: prevUsed.filter((id: any) => Boolean(id) && benchIdSet.has(id)),
+                        substitutions: prevSubs.filter((s: any) => Boolean(s?.subId) && benchIdSet.has(s.subId))
+                    };
+                    effectiveRawNotes = extracted.cleanNotes
+                        ? `[Lineup: ${JSON.stringify(parsedLineup)}]\n${extracted.cleanNotes}`
+                        : `[Lineup: ${JSON.stringify(parsedLineup)}]`;
+                    supabase.from("matches").update({ notes: effectiveRawNotes }).eq("id", m.id).then(() => {});
+                    supabase
+                        .from("match_player_stats")
+                        .delete()
+                        .eq("match_id", m.id)
+                        .in("player_id", staleSubIds)
+                        .eq("goals", 0)
+                        .eq("assists", 0)
+                        .eq("yellow_cards", 0)
+                        .eq("red_cards", 0)
+                        .then(() => {});
+                } else if (extracted.wasRepaired && extracted.normalizedRawNotes) {
+                    supabase.from("matches").update({ notes: extracted.normalizedRawNotes }).eq("id", m.id).then(() => {});
+                }
+            } else if (extracted.wasRepaired && extracted.normalizedRawNotes) {
                 supabase.from("matches").update({ notes: extracted.normalizedRawNotes }).eq("id", m.id).then(() => {});
             }
 
-            const parsedLineup = extracted.parsedLineup;
-            const notesToScan = extracted.normalizedRawNotes || m.notes || "";
+            const notesToScan = effectiveRawNotes;
             const confirmMatch = notesToScan ? notesToScan.match(/\[ConfirmDetails:\s*([^\]]*)\]/i) : null;
             let parsedConfirmDetails: Record<string, any> = {};
             if (confirmMatch && confirmMatch[1]) {
@@ -520,7 +563,7 @@ export default function MatchesPage() {
                 yellow_cards: m.yellow_cards,
                 red_cards: m.red_cards,
                 notes: cleanNotes,
-                rawNotes: extracted.normalizedRawNotes || m.notes || "",
+                rawNotes: effectiveRawNotes,
                 surface: surface,
                 location: location,
                 lineup: parsedLineup,

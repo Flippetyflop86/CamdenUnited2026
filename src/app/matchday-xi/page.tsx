@@ -171,6 +171,8 @@ export default function MatchdayXIPage() {
     const [showRolesAndNotes, setShowRolesAndNotes] = useState<boolean>(false);
     const [modalTab, setModalTab] = useState<"swap" | "details">("swap");
     const [mobileActiveTab, setMobileActiveTab] = useState<"pitch" | "bench" | "squad" | "roles">("pitch");
+    const [pitchMode, setPitchMode] = useState<"standard" | "lanes5" | "thirds" | "zones18" | "setPieces" | "compactness">("standard");
+    const [pressLineHeight, setPressLineHeight] = useState<"high" | "mid" | "low">("high");
     const [openActionDropdown, setOpenActionDropdown] = useState<"autofill" | "share" | null>(null);
     const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
     const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -618,6 +620,23 @@ export default function MatchdayXIPage() {
                 ? rawParsedFormation
                 : DEFAULT_FORMATION_BY_FORMAT[parsedFormat];
 
+            const loadedStarterIds = new Set<string>(
+                Object.values(parsed.starters || {}).filter((id): id is string => Boolean(id))
+            );
+            const hasParsedSubsArray = Array.isArray(parsed.substitutes);
+            const loadedBenchIds = new Set<string>(
+                (parsed.substitutes || []).filter((id: any): id is string => Boolean(id) && !loadedStarterIds.has(id))
+            );
+            const cleanedUsedSubstitutes = (parsed.usedSubstitutes || []).filter(
+                (id: any): id is string => Boolean(id) && (!hasParsedSubsArray ? !loadedStarterIds.has(id) : loadedBenchIds.has(id))
+            );
+            const cleanedSubstitutions = (parsed.substitutions || [])
+                .filter((s: any) => Boolean(s?.subId) && (!hasParsedSubsArray ? !loadedStarterIds.has(s.subId) : loadedBenchIds.has(s.subId)))
+                .map((s: any) => ({
+                    ...s,
+                    replacedId: s.replacedId && (loadedStarterIds.has(s.replacedId) || loadedBenchIds.has(s.replacedId)) ? s.replacedId : ""
+                }));
+
             setMeetInputValue(resolvedMeetTime);
             setLineup({
                 id: `match-lineup-${currentMatch.id}`,
@@ -631,8 +650,8 @@ export default function MatchdayXIPage() {
                 footwearNotes: parsed.footwearNotes || "",
                 starters: parsed.starters || {},
                 substitutes: parsed.substitutes || ["", "", "", "", ""],
-                usedSubstitutes: parsed.usedSubstitutes || [],
-                substitutions: parsed.substitutions || [],
+                usedSubstitutes: cleanedUsedSubstitutes,
+                substitutions: cleanedSubstitutions,
                 captainId: parsed.captainId || "",
                 viceCaptainId: parsed.viceCaptainId || "",
                 penaltyTakerId: parsed.penaltyTakerId || "",
@@ -796,18 +815,39 @@ export default function MatchdayXIPage() {
         setSaveStatus("saving");
 
         const starterIdSet = new Set(Object.values(newLineup.starters || {}).filter(Boolean));
+        const benchIdSet = new Set(
+            (newLineup.substitutes || []).filter((id): id is string => Boolean(id) && !starterIdSet.has(id))
+        );
         const validCaptainId = newLineup.captainId && starterIdSet.has(newLineup.captainId) ? newLineup.captainId : "";
         const validViceCaptainId = newLineup.viceCaptainId && starterIdSet.has(newLineup.viceCaptainId) ? newLineup.viceCaptainId : "";
         const validPenaltyTakerId = newLineup.penaltyTakerId && starterIdSet.has(newLineup.penaltyTakerId) ? newLineup.penaltyTakerId : "";
         const validCornerTakerId = newLineup.cornerTakerId && starterIdSet.has(newLineup.cornerTakerId) ? newLineup.cornerTakerId : "";
         const validFreeKickTakerId = newLineup.freeKickTakerId && starterIdSet.has(newLineup.freeKickTakerId) ? newLineup.freeKickTakerId : "";
 
+        const prevUsedSubs = newLineup.usedSubstitutes || [];
+        const validUsedSubstitutes = Array.from(
+            new Set(prevUsedSubs.filter((id): id is string => Boolean(id) && benchIdSet.has(id)))
+        );
+        const prevSubstitutions = newLineup.substitutions || [];
+        const validSubstitutions = prevSubstitutions
+            .filter(s => Boolean(s?.subId) && benchIdSet.has(s.subId))
+            .map(s => ({
+                ...s,
+                replacedId: s.replacedId && (starterIdSet.has(s.replacedId) || benchIdSet.has(s.replacedId)) ? s.replacedId : ""
+            }));
+
+        const subsMetadataChanged =
+            validUsedSubstitutes.length !== prevUsedSubs.length ||
+            validSubstitutions.length !== prevSubstitutions.length ||
+            validSubstitutions.some((s, idx) => s.replacedId !== (prevSubstitutions[idx]?.replacedId || ""));
+
         if (
             validCaptainId !== (newLineup.captainId || "") ||
             validViceCaptainId !== (newLineup.viceCaptainId || "") ||
             validPenaltyTakerId !== (newLineup.penaltyTakerId || "") ||
             validCornerTakerId !== (newLineup.cornerTakerId || "") ||
-            validFreeKickTakerId !== (newLineup.freeKickTakerId || "")
+            validFreeKickTakerId !== (newLineup.freeKickTakerId || "") ||
+            subsMetadataChanged
         ) {
             newLineup = {
                 ...newLineup,
@@ -816,6 +856,8 @@ export default function MatchdayXIPage() {
                 penaltyTakerId: validPenaltyTakerId,
                 cornerTakerId: validCornerTakerId,
                 freeKickTakerId: validFreeKickTakerId,
+                usedSubstitutes: validUsedSubstitutes,
+                substitutions: validSubstitutions,
             };
             lineupRef.current = newLineup;
             setLineup(newLineup);
@@ -840,8 +882,8 @@ export default function MatchdayXIPage() {
             footwearNotes: newLineup.footwearNotes || "",
             starters: newLineup.starters,
             substitutes: newLineup.substitutes,
-            usedSubstitutes: newLineup.usedSubstitutes || [],
-            substitutions: newLineup.substitutions || [],
+            usedSubstitutes: validUsedSubstitutes,
+            substitutions: validSubstitutions,
             captainId: validCaptainId,
             viceCaptainId: validViceCaptainId,
             penaltyTakerId: validPenaltyTakerId,
@@ -893,7 +935,7 @@ export default function MatchdayXIPage() {
         }
 
         // If this match has already been completed, automatically sync appearances directly to the squad page!
-        if (currentMatch.result && currentMatch.result !== "Pending") {
+        if ((currentMatch.result && currentMatch.result !== "Pending") || (currentMatch.scoreline && currentMatch.scoreline.includes("-"))) {
             await syncLineupAppearancesToDatabase(targetMatchId, newLineup);
         }
 
@@ -2503,6 +2545,130 @@ export default function MatchdayXIPage() {
             const boxH = 135;
             ctx.strokeRect(pitchX + (pitchW - boxW) / 2, pitchY + 24, boxW, boxH);
             ctx.strokeRect(pitchX + (pitchW - boxW) / 2, pitchY + pitchH - 24 - boxH, boxW, boxH);
+
+            // 3B. Tactical Pitch Overlay on Exported PNG (when active)
+            const innerX = pitchX + 24;
+            const innerY = pitchY + 24;
+            const innerW = pitchW - 48;
+            const innerH = pitchH - 48;
+
+            if (pitchMode === "lanes5") {
+                const laneWidths = [0.19, 0.19, 0.24, 0.19, 0.19];
+                const laneLabels = ["WIDE L", "HALF-SPACE L", "CENTRAL ZONE", "HALF-SPACE R", "WIDE R"];
+                let curX = innerX;
+                laneWidths.forEach((ratio, idx) => {
+                    const lw = innerW * ratio;
+                    if (idx === 1 || idx === 3) {
+                        ctx.fillStyle = "rgba(251, 191, 36, 0.15)";
+                        ctx.fillRect(curX, innerY, lw, innerH);
+                    } else if (idx === 2) {
+                        ctx.fillStyle = "rgba(56, 189, 248, 0.08)";
+                        ctx.fillRect(curX, innerY, lw, innerH);
+                    }
+                    if (idx > 0) {
+                        ctx.save();
+                        ctx.setLineDash([12, 10]);
+                        ctx.strokeStyle = "rgba(251, 191, 36, 0.65)";
+                        ctx.lineWidth = 2.5;
+                        ctx.beginPath();
+                        ctx.moveTo(curX, innerY);
+                        ctx.lineTo(curX, innerY + innerH);
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                    ctx.fillStyle = idx === 1 || idx === 3 ? "#fde68a" : "rgba(255,255,255,0.8)";
+                    ctx.font = "900 15px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif";
+                    ctx.textAlign = "center";
+                    ctx.fillText(laneLabels[idx], curX + lw / 2, innerY + 26);
+                    ctx.fillText(laneLabels[idx], curX + lw / 2, innerY + innerH - 14);
+                    curX += lw;
+                });
+            } else if (pitchMode === "thirds") {
+                const t1 = innerY + innerH / 3;
+                const t2 = innerY + (innerH * 2) / 3;
+                ctx.fillStyle = "rgba(244, 63, 94, 0.12)";
+                ctx.fillRect(innerX, innerY, innerW, innerH / 3);
+                ctx.fillStyle = "rgba(56, 189, 248, 0.08)";
+                ctx.fillRect(innerX, t1, innerW, innerH / 3);
+                ctx.fillStyle = "rgba(16, 185, 129, 0.10)";
+                ctx.fillRect(innerX, t2, innerW, innerH / 3);
+
+                ctx.save();
+                ctx.setLineDash([14, 10]);
+                ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(innerX, t1);
+                ctx.lineTo(innerX + innerW, t1);
+                ctx.moveTo(innerX, t2);
+                ctx.lineTo(innerX + innerW, t2);
+                ctx.stroke();
+
+                const pressY =
+                    pressLineHeight === "high"
+                        ? innerY + innerH * 0.24
+                        : pressLineHeight === "mid"
+                            ? innerY + innerH * 0.45
+                            : innerY + innerH * 0.64;
+                ctx.setLineDash([8, 6]);
+                ctx.strokeStyle = "#fbbf24";
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(innerX, pressY);
+                ctx.lineTo(innerX + innerW, pressY);
+                ctx.stroke();
+                ctx.restore();
+            } else if (pitchMode === "zones18") {
+                const cols = 3;
+                const rows = 6;
+                const cw = innerW / cols;
+                const rh = innerH / rows;
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        const zoneNum = (rows - 1 - r) * cols + (c + 1);
+                        const zx = innerX + c * cw;
+                        const zy = innerY + r * rh;
+                        if (zoneNum === 14) {
+                            ctx.fillStyle = "rgba(251, 191, 36, 0.28)";
+                            ctx.fillRect(zx, zy, cw, rh);
+                        } else if (zoneNum === 13 || zoneNum === 15) {
+                            ctx.fillStyle = "rgba(56, 189, 248, 0.16)";
+                            ctx.fillRect(zx, zy, cw, rh);
+                        } else if (zoneNum === 5) {
+                            ctx.fillStyle = "rgba(16, 185, 129, 0.16)";
+                            ctx.fillRect(zx, zy, cw, rh);
+                        }
+                        ctx.save();
+                        ctx.setLineDash([8, 8]);
+                        ctx.strokeStyle = "rgba(255,255,255,0.4)";
+                        ctx.lineWidth = 2;
+                        ctx.strokeRect(zx, zy, cw, rh);
+                        ctx.restore();
+                        ctx.fillStyle = zoneNum === 14 ? "#fde68a" : "rgba(255,255,255,0.75)";
+                        ctx.font = "900 16px -apple-system, BlinkMacSystemFont, Segoe UI, Arial, sans-serif";
+                        ctx.textAlign = "left";
+                        ctx.fillText(zoneNum === 14 ? "Z14 ★ GOLDEN" : `Z${zoneNum}`, zx + 10, zy + 24);
+                    }
+                }
+            } else if (pitchMode === "setPieces") {
+                ctx.fillStyle = "rgba(251, 191, 36, 0.22)";
+                ctx.fillRect(pitchX + (pitchW - boxW) / 2, innerY, boxW, boxH);
+                ctx.fillStyle = "rgba(56, 189, 248, 0.18)";
+                ctx.fillRect(pitchX + (pitchW - boxW) / 2, innerY + boxH, boxW, 75);
+            } else if (pitchMode === "compactness") {
+                const compX = innerX + innerW * 0.19;
+                const compY = innerY + innerH * 0.30;
+                const compW = innerW * 0.62;
+                const compH = innerH * 0.42;
+                ctx.fillStyle = "rgba(16, 185, 129, 0.22)";
+                ctx.fillRect(compX, compY, compW, compH);
+                ctx.save();
+                ctx.setLineDash([12, 8]);
+                ctx.strokeStyle = "#34d399";
+                ctx.lineWidth = 4;
+                ctx.strokeRect(compX, compY, compW, compH);
+                ctx.restore();
+            }
 
             // 4. Draw Players on Pitch
             const badgeRadius = activeFmt === "5v5" || activeFmt === "7v7" ? 36 : 32;
@@ -4595,6 +4761,85 @@ export default function MatchdayXIPage() {
                         </div>
                     )}
 
+                    {/* Tactical Pitch Mode Switcher Bar */}
+                    <div className="flex flex-col gap-1.5 pb-2 z-10 shrink-0">
+                        <div className="flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+                            <div className="inline-flex items-center gap-1 p-0.5 rounded-xl bg-surface-1 border border-border shadow-sm shrink-0">
+                                {([
+                                    { id: "standard", label: "Standard" },
+                                    { id: "lanes5", label: "5 Lanes (Half-Spaces)" },
+                                    { id: "thirds", label: "Thirds & Press" },
+                                    { id: "zones18", label: "18-Zone (Zone 14)" },
+                                    { id: "setPieces", label: "Set-Piece Zones" },
+                                    { id: "compactness", label: "Compact Block" }
+                                ] as const).map((mode) => {
+                                    const isActive = pitchMode === mode.id;
+                                    return (
+                                        <button
+                                            key={mode.id}
+                                            type="button"
+                                            onClick={() => setPitchMode(mode.id)}
+                                            className={`px-2.5 py-1 rounded-lg text-[10px] sm:text-[11px] font-extrabold transition-all whitespace-nowrap ${
+                                                isActive
+                                                    ? "bg-emerald-600 text-white shadow-sm"
+                                                    : "text-muted-foreground hover:text-foreground hover:bg-surface-2"
+                                            }`}
+                                        >
+                                            {mode.label}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {pitchMode === "thirds" && (
+                                <div className="inline-flex items-center gap-1 p-0.5 rounded-xl bg-surface-1 border border-amber-500/30 shadow-sm shrink-0">
+                                    {([
+                                        { id: "high", label: "High Press" },
+                                        { id: "mid", label: "Mid-Block" },
+                                        { id: "low", label: "Low Block" }
+                                    ] as const).map((p) => (
+                                        <button
+                                            key={p.id}
+                                            type="button"
+                                            onClick={() => setPressLineHeight(p.id)}
+                                            className={`px-2 py-0.5 rounded-lg text-[10px] font-black transition-all whitespace-nowrap ${
+                                                pressLineHeight === p.id
+                                                    ? "bg-amber-500 text-slate-950"
+                                                    : "text-amber-500/80 hover:text-amber-400"
+                                            }`}
+                                        >
+                                            {p.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {pitchMode !== "standard" && (
+                            <div className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-[10px] sm:text-[11px] font-bold text-emerald-600 dark:text-emerald-400 flex items-center justify-between gap-2">
+                                <span className="truncate">
+                                    {pitchMode === "lanes5" &&
+                                        "5 Vertical Lanes: Occupy all 5 corridors in attack • Wingers hold width so #8/#10 attack the Half-Spaces • Never 3 players in the same lane."}
+                                    {pitchMode === "thirds" &&
+                                        `Horizontal Thirds (${pressLineHeight === "high" ? "High Press Trigger" : pressLineHeight === "mid" ? "Compact Mid-Block" : "Deep Low-Block"}): Build-Up (bottom) → Progression (middle) → Final Third (top).`}
+                                    {pitchMode === "zones18" &&
+                                        "18-Zone Grid: Target Zone 14 (Golden Zone) & Half-Space Zones 13/15 in attack • Protect Zone 5 (#6 screen) defensively."}
+                                    {pitchMode === "setPieces" &&
+                                        "Set-Piece Target Zones: Attack Near Post (1), 6-Yard Box (2), Back Post (3), Penalty Spot (4) & Edge of Box 2nd Ball (5) + Rest Defence."}
+                                    {pitchMode === "compactness" &&
+                                        "Out-of-Possession Compact Block: Lock the central funnel (width of 18-yd box, 25–30m vertical distance) & force play into wide traps."}
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={() => setPitchMode("standard")}
+                                    className="text-[10px] font-extrabold underline shrink-0 hover:opacity-80"
+                                >
+                                    Reset
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="flex-1 flex items-center justify-center min-h-0">
                         <div className="relative w-full h-[460px] sm:h-[540px] lg:h-full max-w-[680px] mx-auto bg-[#2b7c3d] rounded-2xl shadow-xl overflow-hidden">
                             {/* Pitch markings */}
@@ -4614,6 +4859,305 @@ export default function MatchdayXIPage() {
                                 <div className="absolute left-1/2 -translate-x-1/2 bottom-2 w-20 h-10 sm:w-24 sm:h-12 border-2 border-white/40 border-b-0"></div>
                                 <div className="absolute left-1/2 -translate-x-1/2 top-2 w-12 h-5 sm:w-14 sm:h-6 border-2 border-white/40 border-t-0"></div>
                                 <div className="absolute left-1/2 -translate-x-1/2 bottom-2 w-12 h-5 sm:w-14 sm:h-6 border-2 border-white/40 border-b-0"></div>
+
+                                {/* ========================================================= */}
+                                {/* TACTICAL PITCH OVERLAYS                                   */}
+                                {/* ========================================================= */}
+
+                                {/* 1. 5 VERTICAL LANES (WIDE • HALF-SPACE • CENTRAL • HALF-SPACE • WIDE) */}
+                                {pitchMode === "lanes5" && (
+                                    <div className="absolute inset-2 grid grid-cols-[19fr_19fr_24fr_19fr_19fr] pointer-events-none">
+                                        {/* Left Wing */}
+                                        <div className="relative h-full border-r border-dashed border-amber-300/60 bg-black/5 flex flex-col justify-between items-center py-1.5">
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] sm:text-[9px] font-black tracking-wider text-white/90 uppercase">
+                                                Wide L
+                                            </span>
+                                            <span className="text-[8px] font-extrabold text-white/45 uppercase tracking-widest rotate-180 sm:rotate-0">
+                                                Wing Channel
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] sm:text-[9px] font-black tracking-wider text-white/90 uppercase">
+                                                Wide L
+                                            </span>
+                                        </div>
+
+                                        {/* Left Half-Space */}
+                                        <div className="relative h-full border-r border-dashed border-amber-300/75 bg-amber-400/18 flex flex-col justify-between items-center py-1.5">
+                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
+                                                Half-Space L
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-300/50 text-[8px] font-black text-amber-200 uppercase">
+                                                #8 / #10 Pocket
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
+                                                Half-Space L
+                                            </span>
+                                        </div>
+
+                                        {/* Central Corridor */}
+                                        <div className="relative h-full border-r border-dashed border-amber-300/75 bg-sky-400/10 flex flex-col justify-between items-center py-1.5">
+                                            <span className="px-1.5 py-0.5 rounded bg-sky-500/85 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
+                                                Central Zone
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-sky-500/20 border border-sky-300/40 text-[8px] font-black text-sky-100 uppercase">
+                                                Spine (#9 • #6 • CB)
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-sky-500/85 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
+                                                Central Zone
+                                            </span>
+                                        </div>
+
+                                        {/* Right Half-Space */}
+                                        <div className="relative h-full border-r border-dashed border-amber-300/60 bg-amber-400/18 flex flex-col justify-between items-center py-1.5">
+                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
+                                                Half-Space R
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/25 border border-amber-300/50 text-[8px] font-black text-amber-200 uppercase">
+                                                #8 / #10 Pocket
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-amber-500/90 text-slate-950 text-[8px] sm:text-[9px] font-black tracking-wider uppercase shadow-sm">
+                                                Half-Space R
+                                            </span>
+                                        </div>
+
+                                        {/* Right Wing */}
+                                        <div className="relative h-full bg-black/5 flex flex-col justify-between items-center py-1.5">
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] sm:text-[9px] font-black tracking-wider text-white/90 uppercase">
+                                                Wide R
+                                            </span>
+                                            <span className="text-[8px] font-extrabold text-white/45 uppercase tracking-widest">
+                                                Wing Channel
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] sm:text-[9px] font-black tracking-wider text-white/90 uppercase">
+                                                Wide R
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 2. HORIZONTAL THIRDS & LINE OF ENGAGEMENT (HIGH PRESS / MID-BLOCK / LOW BLOCK) */}
+                                {pitchMode === "thirds" && (
+                                    <div className="absolute inset-2 flex flex-col pointer-events-none">
+                                        {/* Attacking / Final Third */}
+                                        <div className="relative flex-1 border-b-2 border-dashed border-white/65 bg-rose-500/12 flex items-start justify-between p-2">
+                                            <span className="px-2 py-0.5 rounded bg-rose-600/90 text-white text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-sm">
+                                                Final Third (Attack &amp; High Press)
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] font-bold text-rose-200">
+                                                Create &amp; Finish
+                                            </span>
+                                        </div>
+
+                                        {/* Midfield / Progression Third */}
+                                        <div className="relative flex-1 border-b-2 border-dashed border-white/65 bg-sky-500/10 flex items-start justify-between p-2">
+                                            <span className="px-2 py-0.5 rounded bg-sky-600/90 text-white text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-sm">
+                                                Middle Third (Progression &amp; Mid-Block)
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] font-bold text-sky-200">
+                                                Control &amp; Overload
+                                            </span>
+                                        </div>
+
+                                        {/* Defensive / Build-Up Third */}
+                                        <div className="relative flex-1 bg-emerald-500/12 flex items-end justify-between p-2">
+                                            <span className="px-2 py-0.5 rounded bg-emerald-600/90 text-white text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-sm">
+                                                Build-Up Third (Protect &amp; Play Out)
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-slate-950/65 text-[8px] font-bold text-emerald-200">
+                                                 Compact Box Protection
+                                            </span>
+                                        </div>
+
+                                        {/* Dynamic Line of Engagement (Press Trigger Line + Defensive Squeeze Line) */}
+                                        <div
+                                            className="absolute left-0 right-0 border-t-[3px] border-amber-400 shadow-[0_0_12px_rgba(251,191,36,0.8)] flex items-center justify-end pr-2 transition-all duration-300"
+                                            style={{
+                                                top:
+                                                    pressLineHeight === "high"
+                                                        ? "22%"
+                                                        : pressLineHeight === "mid"
+                                                            ? "44%"
+                                                            : "64%"
+                                            }}
+                                        >
+                                            <span className="-translate-y-1/2 px-2 py-0.5 rounded-full bg-amber-400 text-slate-950 text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-md">
+                                                ⚡ {pressLineHeight === "high" ? "High Press Trigger Line" : pressLineHeight === "mid" ? "Mid-Block Line of Engagement" : "Low-Block Engagement Line"}
+                                            </span>
+                                        </div>
+
+                                        <div
+                                            className="absolute left-0 right-0 border-t-2 border-dashed border-cyan-300/85 flex items-center justify-start pl-2 transition-all duration-300"
+                                            style={{
+                                                top:
+                                                    pressLineHeight === "high"
+                                                        ? "52%"
+                                                        : pressLineHeight === "mid"
+                                                            ? "68%"
+                                                            : "80%"
+                                            }}
+                                        >
+                                            <span className="-translate-y-1/2 px-2 py-0.5 rounded-full bg-cyan-400/90 text-slate-950 text-[8px] font-black uppercase tracking-wider shadow-sm">
+                                                🛡️ Defensive Line Squeeze
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 3. 18-ZONE TACTICAL GRID (HIGHLIGHTING ZONE 14, HALF-SPACE ZONES 13/15 & ZONE 5) */}
+                                {pitchMode === "zones18" && (
+                                    <div className="absolute inset-2 grid grid-cols-3 grid-rows-6 pointer-events-none">
+                                        {Array.from({ length: 18 }).map((_, i) => {
+                                            const row = Math.floor(i / 3); // 0 (top) to 5 (bottom)
+                                            const col = i % 3; // 0 (left) to 2 (right)
+                                            const zoneNumber = (5 - row) * 3 + (col + 1); // Zone 1 (bottom-left) to Zone 18 (top-right)
+                                            const isZone14 = zoneNumber === 14;
+                                            const isAssistHalfSpace = zoneNumber === 13 || zoneNumber === 15;
+                                            const isZone17 = zoneNumber === 17;
+                                            const isZone5 = zoneNumber === 5;
+
+                                            return (
+                                                <div
+                                                    key={zoneNumber}
+                                                    className={`relative border border-dashed border-white/30 flex flex-col justify-between p-1 ${
+                                                        isZone14
+                                                            ? "bg-amber-400/30 border-2 border-solid border-amber-300 shadow-[inset_0_0_16px_rgba(251,191,36,0.45)]"
+                                                            : isAssistHalfSpace
+                                                                ? "bg-sky-400/20 border-sky-300/60"
+                                                                : isZone17
+                                                                    ? "bg-rose-500/20"
+                                                                    : isZone5
+                                                                        ? "bg-emerald-400/20 border-emerald-300/60"
+                                                                        : ""
+                                                    }`}
+                                                >
+                                                    <div className="flex items-center justify-between gap-1">
+                                                        <span
+                                                            className={`px-1 py-0.2 rounded text-[8px] sm:text-[9px] font-black leading-tight ${
+                                                                isZone14
+                                                                    ? "bg-amber-400 text-slate-950 shadow-xs"
+                                                                    : isAssistHalfSpace
+                                                                        ? "bg-sky-400/90 text-slate-950"
+                                                                        : isZone5
+                                                                            ? "bg-emerald-400/90 text-slate-950"
+                                                                            : "bg-slate-950/55 text-white/80"
+                                                            }`}
+                                                        >
+                                                            Z{zoneNumber}
+                                                        </span>
+                                                        {isZone14 && (
+                                                            <span className="px-1 py-0.2 rounded bg-amber-950/85 border border-amber-300/60 text-amber-200 text-[7px] sm:text-[8px] font-black uppercase">
+                                                                ★ Golden Zone
+                                                            </span>
+                                                        )}
+                                                        {isAssistHalfSpace && (
+                                                            <span className="hidden sm:inline-block px-1 py-0.2 rounded bg-slate-950/70 text-sky-200 text-[7px] font-extrabold uppercase">
+                                                                Half-Space
+                                                            </span>
+                                                        )}
+                                                        {isZone5 && (
+                                                            <span className="px-1 py-0.2 rounded bg-slate-950/75 text-emerald-200 text-[7px] sm:text-[8px] font-black uppercase">
+                                                                #6 Screen
+                                                            </span>
+                                                        )}
+                                                        {isZone17 && (
+                                                            <span className="hidden sm:inline-block px-1 py-0.2 rounded bg-rose-950/80 text-rose-200 text-[7px] font-black uppercase">
+                                                                Finish Box
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* 4. SET-PIECE TARGET ZONES (ATTACKING & DEFENSIVE PENALTY BOX GRID) */}
+                                {pitchMode === "setPieces" && (
+                                    <div className="absolute inset-2 pointer-events-none">
+                                        {/* Attacking Penalty Box Target Grid (Top) */}
+                                        <div className="absolute left-1/2 -translate-x-1/2 top-0 w-[62%] sm:w-[56%] h-[22%] grid grid-cols-3 grid-rows-2 gap-1 p-1 bg-amber-500/15 border-2 border-dashed border-amber-300/80 rounded-b-xl">
+                                            <div className="rounded bg-amber-500/30 border border-amber-300/60 flex flex-col items-center justify-center p-0.5 text-center">
+                                                <span className="text-[8px] sm:text-[9px] font-black text-white uppercase leading-none">1. Near Post</span>
+                                                <span className="text-[7px] font-bold text-amber-200">Flick-On Run</span>
+                                            </div>
+                                            <div className="rounded bg-rose-500/35 border border-rose-300/70 flex flex-col items-center justify-center p-0.5 text-center">
+                                                <span className="text-[8px] sm:text-[9px] font-black text-white uppercase leading-none">2. 6-Yard Box</span>
+                                                <span className="text-[7px] font-bold text-rose-100">Screen GK</span>
+                                            </div>
+                                            <div className="rounded bg-amber-500/30 border border-amber-300/60 flex flex-col items-center justify-center p-0.5 text-center">
+                                                <span className="text-[8px] sm:text-[9px] font-black text-white uppercase leading-none">3. Back Post</span>
+                                                <span className="text-[7px] font-bold text-amber-200">Attack Header</span>
+                                            </div>
+                                            <div className="col-span-3 rounded bg-sky-500/30 border border-sky-300/60 flex items-center justify-center gap-2 px-2">
+                                                <span className="text-[8px] sm:text-[9px] font-black text-white uppercase">4. Penalty Spot / Cutback Zone</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Edge of Box 2nd Ball Zone */}
+                                        <div className="absolute left-1/2 -translate-x-1/2 top-[23%] w-[48%] h-[7%] rounded-lg bg-emerald-500/25 border border-dashed border-emerald-300/80 flex items-center justify-center">
+                                            <span className="text-[8px] sm:text-[9px] font-black text-emerald-100 uppercase tracking-wider">
+                                                5. Edge of Box (2nd Ball &amp; Counter-Stopper)
+                                            </span>
+                                        </div>
+
+                                        {/* Rest Defence / Halfway Lock */}
+                                        <div className="absolute left-1/2 -translate-x-1/2 top-[44%] w-[58%] h-[9%] rounded-xl bg-purple-500/20 border border-dashed border-purple-300/70 flex items-center justify-center">
+                                            <span className="text-[8px] sm:text-[9px] font-black text-purple-100 uppercase tracking-wider">
+                                                🛡️ Rest Defence (2v1 Cover on Halfway)
+                                            </span>
+                                        </div>
+
+                                        {/* Defensive Box Zonal / Man-Mark Guide (Bottom) */}
+                                        <div className="absolute left-1/2 -translate-x-1/2 bottom-0 w-[62%] sm:w-[56%] h-[18%] rounded-t-xl bg-sky-500/15 border-2 border-dashed border-sky-300/70 flex flex-col items-center justify-center p-1 text-center">
+                                            <span className="text-[8px] sm:text-[9px] font-black text-sky-100 uppercase">
+                                                Defensive Set-Piece Box (1st Contact + Edge Press)
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* 5. COMPACTNESS & REST-DEFENCE CENTRAL FUNNEL */}
+                                {pitchMode === "compactness" && (
+                                    <div className="absolute inset-2 pointer-events-none">
+                                        {/* Left Wide Trap Channel */}
+                                        <div className="absolute left-0 top-[25%] bottom-[25%] w-[19%] bg-rose-500/15 border-r border-dashed border-rose-300/60 flex items-center justify-center p-1">
+                                            <span className="px-1 py-0.5 rounded bg-slate-950/75 text-rose-200 text-[8px] font-black uppercase text-center leading-tight">
+                                                Touchline Trap (Force Wide)
+                                            </span>
+                                        </div>
+
+                                        {/* Right Wide Trap Channel */}
+                                        <div className="absolute right-0 top-[25%] bottom-[25%] w-[19%] bg-rose-500/15 border-l border-dashed border-rose-300/60 flex items-center justify-center p-1">
+                                            <span className="px-1 py-0.5 rounded bg-slate-950/75 text-rose-200 text-[8px] font-black uppercase text-center leading-tight">
+                                                Touchline Trap (Force Wide)
+                                            </span>
+                                        </div>
+
+                                        {/* Central Compact Block (25m x 35m Compactness Box) */}
+                                        <div className="absolute left-[19%] right-[19%] top-[28%] bottom-[26%] rounded-2xl bg-emerald-400/22 border-2 border-dashed border-emerald-300 shadow-[inset_0_0_24px_rgba(16,185,129,0.35)] flex flex-col justify-between p-2">
+                                            <div className="flex items-center justify-between gap-1">
+                                                <span className="px-2 py-0.5 rounded bg-emerald-400 text-slate-950 text-[8px] sm:text-[9px] font-black uppercase tracking-wider shadow-xs">
+                                                    🛡️ Compact Central Block
+                                                </span>
+                                                <span className="px-1.5 py-0.5 rounded bg-slate-950/75 text-emerald-200 text-[8px] font-extrabold">
+                                                    Max 25–30m ST to CB
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-center">
+                                                <span className="px-2 py-0.5 rounded-full bg-slate-950/70 border border-emerald-300/50 text-emerald-100 text-[8px] sm:text-[9px] font-black uppercase tracking-wider">
+                                                    Protect Middle • Deny Passing Lanes into #10
+                                                </span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-1">
+                                                <span className="px-1.5 py-0.5 rounded bg-slate-950/75 text-emerald-200 text-[8px] font-extrabold">
+                                                    Width of 18-Yd Box
+                                                </span>
+                                                <span className="px-1.5 py-0.5 rounded bg-slate-950/75 text-emerald-200 text-[8px] font-extrabold">
+                                                    10–12m Between Lines
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Watermark (#4 Clipped to circular center-circle frame so square image backgrounds disappear) */}
                                 {settings.logo && (

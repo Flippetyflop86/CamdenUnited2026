@@ -90,6 +90,7 @@ export function QuickResultScorersModal({
         }
 
         const parsedLineup = extracted.parsedLineup || m.lineup;
+        const staleBenchIds = new Set<string>();
         if (parsedLineup) {
             Object.keys(parsedLineup.starters || {})
                 .sort((a, b) => Number(a) - Number(b))
@@ -100,21 +101,44 @@ export function QuickResultScorersModal({
                         starterOrder.push(id);
                     }
                 });
+            const hasSubstitutesArray = Array.isArray(parsedLineup.substitutes);
             (parsedLineup.substitutes || []).forEach((id: any) => {
-                if (id && typeof id === "string" && !id.startsWith("trialist-")) subSet.add(id);
+                if (id && typeof id === "string" && !id.startsWith("trialist-") && !starterSet.has(id)) {
+                    subSet.add(id);
+                }
             });
             (parsedLineup.usedSubstitutes || []).forEach((id: any) => {
                 if (id && typeof id === "string" && !id.startsWith("trialist-") && !starterSet.has(id)) {
-                    subSet.add(id);
-                    initialUsedSubs.add(id);
+                    if (!hasSubstitutesArray || subSet.has(id)) {
+                        subSet.add(id);
+                        initialUsedSubs.add(id);
+                    } else {
+                        staleBenchIds.add(id);
+                    }
                 }
             });
             (parsedLineup.substitutions || []).forEach((sub: any) => {
                 if (sub?.subId && typeof sub.subId === "string" && !sub.subId.startsWith("trialist-") && !starterSet.has(sub.subId)) {
-                    subSet.add(sub.subId);
-                    initialUsedSubs.add(sub.subId);
+                    if (!hasSubstitutesArray || subSet.has(sub.subId)) {
+                        subSet.add(sub.subId);
+                        initialUsedSubs.add(sub.subId);
+                    } else {
+                        staleBenchIds.add(sub.subId);
+                    }
                 }
             });
+
+            if (staleBenchIds.size > 0 && extracted.parsedLineup) {
+                const cleanedLineup = {
+                    ...extracted.parsedLineup,
+                    usedSubstitutes: (extracted.parsedLineup.usedSubstitutes || []).filter((id: any) => id && subSet.has(id)),
+                    substitutions: (extracted.parsedLineup.substitutions || []).filter((s: any) => s?.subId && subSet.has(s.subId))
+                };
+                const repairedNotes = extracted.cleanNotes
+                    ? `[Lineup: ${JSON.stringify(cleanedLineup)}]\n${extracted.cleanNotes}`
+                    : `[Lineup: ${JSON.stringify(cleanedLineup)}]`;
+                await supabase.from("matches").update({ notes: repairedNotes }).eq("id", m.id);
+            }
         }
         setLineupIds({ starters: starterSet, subs: subSet, starterOrder });
 
@@ -145,20 +169,40 @@ export function QuickResultScorersModal({
 
         const gMap: Record<string, number> = {};
         const aMap: Record<string, number> = {};
+        const staleStatRowIds: string[] = [];
         (sData || []).forEach((row: any) => {
-            if (row.player_id && (Number(row.goals) || 0) > 0) {
-                gMap[row.player_id] = Number(row.goals);
+            const rowGoals = Number(row.goals) || 0;
+            const rowAssists = Number(row.assists) || 0;
+            const rowCards = (Number(row.yellow_cards) || 0) + (Number(row.red_cards) || 0);
+            if (
+                row.id &&
+                row.player_id &&
+                staleBenchIds.has(row.player_id) &&
+                !starterSet.has(row.player_id) &&
+                !subSet.has(row.player_id) &&
+                rowGoals === 0 &&
+                rowAssists === 0 &&
+                rowCards === 0
+            ) {
+                staleStatRowIds.push(row.id);
+                return;
             }
-            if (row.player_id && (Number(row.assists) || 0) > 0) {
-                aMap[row.player_id] = Number(row.assists);
+            if (row.player_id && rowGoals > 0) {
+                gMap[row.player_id] = rowGoals;
+            }
+            if (row.player_id && rowAssists > 0) {
+                aMap[row.player_id] = rowAssists;
             }
             if (row.player_id && subSet.has(row.player_id)) {
                 const pt = String(row.participation_type || "").toUpperCase();
-                if (pt === "SUB" || (Number(row.goals) || 0) > 0 || (Number(row.assists) || 0) > 0) {
+                if (pt === "SUB" || rowGoals > 0 || rowAssists > 0) {
                     initialUsedSubs.add(row.player_id);
                 }
             }
         });
+        if (staleStatRowIds.length > 0) {
+            await supabase.from("match_player_stats").delete().in("id", staleStatRowIds);
+        }
         setUsedSubs(initialUsedSubs);
 
         // Check for manual/unmatched tokens (e.g. "Own Goal")
@@ -298,18 +342,26 @@ export function QuickResultScorersModal({
             if (freshMatchRow?.notes) {
                 const extracted = extractLineupFromRawNotes(freshMatchRow.notes);
                 if (extracted.parsedLineup) {
-                    const updatedUsedSubs = new Set<string>(Array.from(usedSubs));
+                    const updatedUsedSubs = new Set<string>(
+                        Array.from(usedSubs).filter(pid => lineupIds.subs.has(pid) && !lineupIds.starters.has(pid))
+                    );
                     lineupIds.subs.forEach(pid => {
-                        if ((playerGoals[pid] || 0) > 0 || (playerAssists[pid] || 0) > 0) {
+                        if (!lineupIds.starters.has(pid) && ((playerGoals[pid] || 0) > 0 || (playerAssists[pid] || 0) > 0)) {
                             updatedUsedSubs.add(pid);
                         }
                     });
+                    const cleanedSubstitutions = Array.isArray(extracted.parsedLineup.substitutions)
+                        ? extracted.parsedLineup.substitutions.filter(
+                              (s: any) => Boolean(s?.subId) && lineupIds.subs.has(s.subId) && !lineupIds.starters.has(s.subId)
+                          )
+                        : [];
                     const updatedLineup = {
                         ...extracted.parsedLineup,
-                        usedSubstitutes: Array.from(updatedUsedSubs)
+                        usedSubstitutes: Array.from(updatedUsedSubs),
+                        substitutions: cleanedSubstitutions
                     };
                     const newNotes = extracted.cleanNotes
-                        ? `${extracted.cleanNotes}\n\n[Lineup: ${JSON.stringify(updatedLineup)}]`
+                        ? `[Lineup: ${JSON.stringify(updatedLineup)}]\n${extracted.cleanNotes}`
                         : `[Lineup: ${JSON.stringify(updatedLineup)}]`;
                     await supabase.from("matches").update({ notes: newNotes }).eq("id", match.id);
                 }
@@ -322,6 +374,7 @@ export function QuickResultScorersModal({
                 .eq("match_id", match.id);
 
             const rows = existingRows || [];
+            const hasSavedLineup = lineupIds.starters.size > 0 || lineupIds.subs.size > 0;
             const allPlayerIdsToTouch = new Set<string>([
                 ...rows.map((r: any) => r.player_id),
                 ...Object.keys(playerGoals),
@@ -334,10 +387,19 @@ export function QuickResultScorersModal({
                 const g = playerGoals[pid] || 0;
                 const a = playerAssists[pid] || 0;
                 const existing = rows.find((r: any) => r.player_id === pid);
-                const isSub = lineupIds.subs.has(pid) && !lineupIds.starters.has(pid);
+                const isStarter = lineupIds.starters.has(pid);
+                const isSub = lineupIds.subs.has(pid) && !isStarter;
                 const isSubUsed = isSub && (usedSubs.has(pid) || g > 0 || a > 0);
 
                 if (existing) {
+                    const hasCards = (Number(existing.yellow_cards) || 0) > 0 || (Number(existing.red_cards) || 0) > 0;
+                    if (hasSavedLineup && !isStarter && !isSub && g === 0 && a === 0 && !hasCards) {
+                        await supabase
+                            .from("match_player_stats")
+                            .delete()
+                            .eq("id", existing.id);
+                        continue;
+                    }
                     const updatePayload: Record<string, any> = { goals: g, assists: a };
                     if (isSub) {
                         updatePayload.participation_type = isSubUsed ? "SUB" : "UNUSED_SUB";

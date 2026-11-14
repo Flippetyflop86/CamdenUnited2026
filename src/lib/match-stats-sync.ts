@@ -563,7 +563,8 @@ export function computeLineupParticipation(parsedLineup: any): Map<string, Lineu
         });
     }
 
-    if (Array.isArray(parsedLineup.substitutes)) {
+    const hasExplicitBenchArray = Array.isArray(parsedLineup.substitutes);
+    if (hasExplicitBenchArray) {
         parsedLineup.substitutes.forEach((id: any) => {
             if (isRealPlayerId(id) && !starterSet.has(id)) benchSubSet.add(id);
         });
@@ -571,15 +572,19 @@ export function computeLineupParticipation(parsedLineup: any): Map<string, Lineu
 
     if (Array.isArray(parsedLineup.usedSubstitutes)) {
         parsedLineup.usedSubstitutes.forEach((id: any) => {
-            if (isRealPlayerId(id) && !starterSet.has(id)) {
+            if (isRealPlayerId(id) && !starterSet.has(id) && (!hasExplicitBenchArray || benchSubSet.has(id))) {
                 usedSubSet.add(id);
                 benchSubSet.add(id);
             }
         });
     }
 
-    // Also treat any player with a substitution record (`subId`) as a used substitute
-    const rawSubs: any[] = Array.isArray(parsedLineup.substitutions) ? parsedLineup.substitutions : [];
+    // Also treat any bench player with a substitution record (`subId`) as a used substitute
+    const rawSubs: any[] = Array.isArray(parsedLineup.substitutions)
+        ? parsedLineup.substitutions.filter(
+              (sub: any) => isRealPlayerId(sub?.subId) && !starterSet.has(sub.subId) && (!hasExplicitBenchArray || benchSubSet.has(sub.subId))
+          )
+        : [];
     rawSubs.forEach((sub: any) => {
         if (isRealPlayerId(sub?.subId) && !starterSet.has(sub.subId)) {
             usedSubSet.add(sub.subId);
@@ -591,6 +596,7 @@ export function computeLineupParticipation(parsedLineup: any): Map<string, Lineu
     const matchEvents = parsedLineup.matchEvents || {};
     Object.entries(matchEvents).forEach(([pid, ev]: [string, any]) => {
         if (!isRealPlayerId(pid) || starterSet.has(pid)) return;
+        if (hasExplicitBenchArray && !benchSubSet.has(pid)) return;
         const hasEvent =
             (Number(ev?.goals) || 0) > 0 ||
             (Number(ev?.assists) || 0) > 0 ||
