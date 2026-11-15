@@ -802,8 +802,8 @@ function FullMatchdayXiPreview() {
                                 isCaptain
                             />
                             <PitchJerseyNode x={62} y={74} number={6} name="R. Bennett" />
-                            <PitchJerseyNode x={84} y={71} number={2} name="L. Vance" />
-                            <PitchJerseyNode x={50} y={54} number={4} name="T. Vance" />
+                            <PitchJerseyNode x={84} y={71} number={2} name="L. Reid" />
+                            <PitchJerseyNode x={50} y={54} number={4} name="T. Hughes" />
                             <PitchJerseyNode x={29} y={43} number={8} name="C. Gallagher" />
                             <PitchJerseyNode x={71} y={43} number={10} name="D. Sterling" />
                             <PitchJerseyNode x={20} y={20} number={11} name="E. Brooks" />
@@ -1160,7 +1160,7 @@ function FullFixturesPreview({
             score: "3 - 1",
             outcome: "W",
             scorers: "⚽ M. Vance (23', 67'), C. Gallagher (81')",
-            assists: "👟 D. Sterling (2), T. Vance",
+            assists: "👟 D. Sterling (2), T. Hughes",
             motm: "⭐ MOTM: M. Vance",
         },
         {
@@ -1310,7 +1310,7 @@ function FullRecruitmentPreview() {
 
     const targets = [
         {
-            name: "Jayden Clarke",
+            name: "Jayden Osei",
             age: 23,
             pos: "CB / LB",
             foot: "Left",
@@ -2188,14 +2188,14 @@ export default function LandingPage() {
                                                 x={83}
                                                 y={70}
                                                 number={2}
-                                                name="L. Vance"
+                                                name="L. Reid"
                                                 compact
                                             />
                                             <PitchJerseyNode
                                                 x={50}
                                                 y={53}
                                                 number={4}
-                                                name="T. Vance"
+                                                name="T. Hughes"
                                                 compact
                                             />
                                             <PitchJerseyNode
