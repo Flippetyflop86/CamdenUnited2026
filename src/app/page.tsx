@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import {
     ArrowRight,
@@ -24,9 +24,11 @@ import {
     CreditCard,
     Activity,
     Copy,
+    Check,
     Home,
     Plane,
     AlertCircle,
+    AlertTriangle,
     Settings,
     Coins,
     Target,
@@ -38,6 +40,10 @@ import {
     Flame,
     FileText,
     Swords,
+    Zap,
+    MessageCircle,
+    Palette,
+    Image as ImageIcon,
 } from "lucide-react";
 
 type ShowcaseTabId =
@@ -172,7 +178,7 @@ function PitchJerseyNode({
 }) {
     return (
         <div
-            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none"
+            className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center select-none transition-all duration-500 ease-out"
             style={{ left: `${x}%`, top: `${y}%` }}
         >
             <div className="relative flex flex-col items-center">
@@ -675,7 +681,32 @@ function FullDashboardPreview({
 /**
  * SCREEN 2: STREAMLINED MATCHDAY XI (~65% content height)
  */
+function getContrastText(hex: string): string {
+    const clean = hex.replace("#", "");
+    if (clean.length !== 6) return "#ffffff";
+    const r = parseInt(clean.slice(0, 2), 16);
+    const g = parseInt(clean.slice(2, 4), 16);
+    const b = parseInt(clean.slice(4, 6), 16);
+    const yiq = (r * 299 + g * 587 + b * 114) / 1000;
+    return yiq >= 155 ? "#0f172a" : "#ffffff";
+}
+
 function FullMatchdayXiPreview() {
+    const [kitChoice, setKitChoice] = useState<"home" | "away" | "third" | "custom">("home");
+    const [customKitHex, setCustomKitHex] = useState("#f59e0b");
+    const [tacticalShape, setTacticalShape] = useState<"base" | "inPossession">("base");
+
+    const kitConfig =
+        kitChoice === "home"
+            ? { fill: "#e11d48", text: "#ffffff", label: "Home Kit" }
+            : kitChoice === "away"
+            ? { fill: "#f8fafc", text: "#0f172a", label: "Away Kit" }
+            : kitChoice === "third"
+            ? { fill: "#2563eb", text: "#ffffff", label: "3rd Kit" }
+            : { fill: customKitHex, text: getContrastText(customKitHex), label: "Custom Kit" };
+
+    const isInPoss = tacticalShape === "inPossession";
+
     return (
         <div className="p-4 sm:p-5 bg-[#FCFCFD] text-neutral-900 select-none">
             {/* Top Bar */}
@@ -763,28 +794,149 @@ function FullMatchdayXiPreview() {
                     </div>
                 </div>
 
-                {/* Center Column: Controls + Green Pitch */}
+                {/* Center Column: Interactive Kit & Tactical Controls + Green Pitch */}
                 <div className="lg:col-span-6 space-y-2">
-                    <div className="bg-white p-2 rounded-xl border border-neutral-200 shadow-xs flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center bg-neutral-100 p-0.5 rounded-lg border border-neutral-200/60 text-[10px] font-bold">
-                            <span className="px-2 py-1 rounded-md bg-white text-neutral-900 shadow-2xs">
-                                1–11 Numbers
-                            </span>
-                            <span className="px-2 py-1 text-neutral-500">Squad Numbers</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <span className="text-[10px] font-bold text-neutral-500">Kit:</span>
-                            <span className="w-3.5 h-3.5 rounded-full bg-[#e11d48] ring-2 ring-offset-1 ring-neutral-900" />
-                            <span className="w-3.5 h-3.5 rounded-full bg-[#2563eb]" />
-                            <span className="w-3.5 h-3.5 rounded-full bg-[#10b981]" />
+                    <div className="bg-white p-2 rounded-xl border border-neutral-200 shadow-xs space-y-1.5">
+                        <div className="flex flex-wrap items-center justify-between gap-1.5">
+                            {/* Tactical Shape Toggle */}
+                            <div className="flex items-center bg-neutral-100 p-0.5 rounded-lg border border-neutral-200/60 text-[10px] font-bold">
+                                <button
+                                    type="button"
+                                    onClick={() => setTacticalShape("base")}
+                                    className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                                        !isInPoss
+                                            ? "bg-white text-neutral-900 shadow-2xs"
+                                            : "text-neutral-500 hover:text-neutral-800"
+                                    }`}
+                                >
+                                    Base XI (4-3-3)
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setTacticalShape("inPossession")}
+                                    className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                                        isInPoss
+                                            ? "bg-emerald-600 text-white shadow-2xs"
+                                            : "text-neutral-500 hover:text-neutral-800"
+                                    }`}
+                                >
+                                    In-Possession (3-2-5)
+                                </button>
+                            </div>
+
                             <span className="px-2 py-0.5 rounded-lg bg-neutral-100 border border-neutral-200 text-[10px] font-bold text-neutral-800">
-                                4-3-3
+                                {isInPoss ? "RB Jumps → 3-2-5" : "4-3-3"}
+                            </span>
+                        </div>
+
+                        {/* Interactive Home / Away / 3rd + Any Club Colour Switcher */}
+                        <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-neutral-100">
+                            <div className="flex flex-wrap items-center gap-1">
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-neutral-400 mr-0.5">
+                                    Try Kits:
+                                </span>
+                                {[
+                                    { id: "home" as const, label: "Home", dot: "#e11d48", border: "border-rose-700" },
+                                    { id: "away" as const, label: "Away", dot: "#f8fafc", border: "border-neutral-400" },
+                                    { id: "third" as const, label: "3rd", dot: "#2563eb", border: "border-blue-700" },
+                                ].map((k) => {
+                                    const active = kitChoice === k.id;
+                                    return (
+                                        <button
+                                            key={k.id}
+                                            type="button"
+                                            onClick={() => setKitChoice(k.id)}
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
+                                                active
+                                                    ? "bg-neutral-900 text-white border-neutral-900 shadow-2xs"
+                                                    : "bg-neutral-50 text-neutral-700 border-neutral-200 hover:bg-neutral-100"
+                                            }`}
+                                        >
+                                            <span
+                                                className={`w-2.5 h-2.5 rounded-full border ${k.border}`}
+                                                style={{ backgroundColor: k.dot }}
+                                            />
+                                            <span>{k.label}</span>
+                                        </button>
+                                    );
+                                })}
+
+                                {/* Custom Any-Colour Picker so visitors see any hex is supported */}
+                                <label
+                                    title="Pick any custom club kit colour"
+                                    className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all cursor-pointer ${
+                                        kitChoice === "custom"
+                                            ? "bg-neutral-900 text-white border-neutral-900 shadow-2xs"
+                                            : "bg-neutral-50 text-neutral-700 border-neutral-200 hover:bg-neutral-100"
+                                    }`}
+                                >
+                                    <span
+                                        className="w-2.5 h-2.5 rounded-full border border-black/20"
+                                        style={{
+                                            background:
+                                                kitChoice === "custom"
+                                                    ? customKitHex
+                                                    : "conic-gradient(#ef4444, #eab308, #22c55e, #3b82f6, #a855f7, #ef4444)",
+                                        }}
+                                    />
+                                    <span>Custom Colour</span>
+                                    <input
+                                        type="color"
+                                        value={customKitHex}
+                                        onChange={(e) => {
+                                            setCustomKitHex(e.target.value);
+                                            setKitChoice("custom");
+                                        }}
+                                        className="sr-only"
+                                    />
+                                </label>
+                            </div>
+                            <span className="text-[9px] font-semibold text-neutral-400 hidden sm:inline">
+                                Any club colours supported
                             </span>
                         </div>
                     </div>
 
                     <div className="h-[340px] w-full">
                         <RealisticPitchMarkings>
+                            {/* Attacking Half 5-Corridor & Rest-Defence Overlay when In-Possession (3-2-5) is active */}
+                            {isInPoss && (
+                                <div className="absolute inset-0 pointer-events-none z-0 animate-in fade-in duration-300">
+                                    {/* Attacking Half Lanes (Top 50% towards opponent goal) */}
+                                    <div className="absolute top-0 left-0 right-0 h-1/2">
+                                        <div className="absolute top-0 bottom-0 left-[20%] border-l border-dashed border-amber-200/65" />
+                                        <div className="absolute top-0 bottom-0 left-[40%] border-l border-dashed border-amber-200/65" />
+                                        <div className="absolute top-0 bottom-0 left-[60%] border-l border-dashed border-amber-200/65" />
+                                        <div className="absolute top-0 bottom-0 left-[80%] border-l border-dashed border-amber-200/65" />
+                                        {[
+                                            { lbl: "WIDE L", left: "10%" },
+                                            { lbl: "HALF-SPACE L", left: "30%" },
+                                            { lbl: "CENTRAL", left: "50%" },
+                                            { lbl: "HALF-SPACE R", left: "70%" },
+                                            { lbl: "WIDE R", left: "90%" },
+                                        ].map((c) => (
+                                            <span
+                                                key={c.lbl}
+                                                style={{ left: c.left }}
+                                                className="absolute top-1.5 -translate-x-1/2 px-1 py-0.2 rounded bg-black/55 text-[7px] font-black tracking-wider text-amber-200 whitespace-nowrap"
+                                            >
+                                                {c.lbl}
+                                            </span>
+                                        ))}
+                                    </div>
+
+                                    {/* 3-2 Rest-Defence Structural Shield */}
+                                    <div
+                                        className="absolute rounded-xl border border-dashed border-emerald-300/80 bg-emerald-950/25 flex items-end justify-center pb-0.5"
+                                        style={{ left: "16%", right: "16%", top: "48%", bottom: "18%" }}
+                                    >
+                                        <span className="px-1.5 py-0.2 rounded bg-emerald-950/85 text-[7px] font-black uppercase tracking-wider text-emerald-300 border border-emerald-400/30">
+                                            🛡️ 3-2 Rest Defence Unit
+                                        </span>
+                                    </div>
+                                </div>
+                            )}
+
                             <PitchJerseyNode
                                 x={50}
                                 y={89}
@@ -792,22 +944,88 @@ function FullMatchdayXiPreview() {
                                 name="J. Mercer"
                                 kitColor="#10b981"
                             />
-                            <PitchJerseyNode x={16} y={71} number={3} name="A. Clarke" />
                             <PitchJerseyNode
-                                x={38}
-                                y={74}
+                                x={isInPoss ? 26 : 16}
+                                y={isInPoss ? 69 : 71}
+                                number={3}
+                                name="A. Clarke"
+                                kitColor={kitConfig.fill}
+                                textColor={kitConfig.text}
+                            />
+                            <PitchJerseyNode
+                                x={isInPoss ? 50 : 38}
+                                y={isInPoss ? 71 : 74}
                                 number={5}
                                 name="D. Foster"
+                                kitColor={kitConfig.fill}
+                                textColor={kitConfig.text}
                                 isCaptain
                             />
-                            <PitchJerseyNode x={62} y={74} number={6} name="R. Bennett" />
-                            <PitchJerseyNode x={84} y={71} number={2} name="L. Reid" />
-                            <PitchJerseyNode x={50} y={54} number={4} name="T. Hughes" />
-                            <PitchJerseyNode x={29} y={43} number={8} name="C. Gallagher" />
-                            <PitchJerseyNode x={71} y={43} number={10} name="D. Sterling" />
-                            <PitchJerseyNode x={20} y={20} number={11} name="E. Brooks" />
-                            <PitchJerseyNode x={50} y={15} number={9} name="M. Vance" />
-                            <PitchJerseyNode x={80} y={20} number={7} name="O. Grant" />
+                            <PitchJerseyNode
+                                x={isInPoss ? 74 : 62}
+                                y={isInPoss ? 69 : 74}
+                                number={6}
+                                name="R. Bennett"
+                                kitColor={kitConfig.fill}
+                                textColor={kitConfig.text}
+                            />
+                            <PitchJerseyNode
+                                x={isInPoss ? 90 : 84}
+                                y={isInPoss ? 22 : 71}
+                                number={2}
+                                name="L. Reid"
+                                kitColor={kitConfig.fill}
+                                textColor={kitConfig.text}
+                                badge={isInPoss ? "JUMP" : undefined}
+                            />
+                            <PitchJerseyNode
+                                x={isInPoss ? 61 : 50}
+                                y={isInPoss ? 55 : 54}
+                                number={4}
+                                name="T. Hughes"
+                                kitColor={kitConfig.fill}
+                                textColor={kitConfig.text}
+                            />
+                            <PitchJerseyNode
+                                x={isInPoss ? 39 : 29}
+                                y={isInPoss ? 55 : 43}
+                                number={8}
+                                name="C. Gallagher"
+                                kitColor={kitConfig.fill}
+                                textColor={kitConfig.text}
+                            />
+                            <PitchJerseyNode
+                                x={isInPoss ? 30 : 71}
+                                y={isInPoss ? 26 : 43}
+                                number={10}
+                                name="D. Sterling"
+                                kitColor={kitConfig.fill}
+                                textColor={kitConfig.text}
+                            />
+                            <PitchJerseyNode
+                                x={isInPoss ? 10 : 20}
+                                y={isInPoss ? 22 : 20}
+                                number={11}
+                                name="E. Brooks"
+                                kitColor={kitConfig.fill}
+                                textColor={kitConfig.text}
+                            />
+                            <PitchJerseyNode
+                                x={50}
+                                y={15}
+                                number={9}
+                                name="M. Vance"
+                                kitColor={kitConfig.fill}
+                                textColor={kitConfig.text}
+                            />
+                            <PitchJerseyNode
+                                x={isInPoss ? 70 : 80}
+                                y={isInPoss ? 25 : 20}
+                                number={7}
+                                name="O. Grant"
+                                kitColor={kitConfig.fill}
+                                textColor={kitConfig.text}
+                            />
                         </RealisticPitchMarkings>
                     </div>
                 </div>
@@ -1632,10 +1850,98 @@ function FullOppositionPreview() {
     );
 }
 
+const WHATSAPP_SAMPLES: Record<
+    "matchday" | "training" | "result",
+    { label: string; title: string; timestamp: string; body: string }
+> = {
+    matchday: {
+        label: "Matchday Squad Briefing",
+        title: "Northbrook First Team • Players Chat",
+        timestamp: "Fri 19:15",
+        body: `🔴⚪ *NORTHBROOK UNITED — MATCHDAY SQUAD*
+🏆 Premier Division vs Kingswood Rovers (H)
+📅 Sat 14 Nov • 🕑 KO: 14:00 • ⏱ Meet: 12:45 Sharp
+📍 Northbrook Community Ground, Mill Lane, NW4 2AA
+👕 Kit: Home Crimson / White (GK: Emerald)
+
+*STARTING XI (4-3-3):*
+1 J. Mercer | 2 L. Reid, 5 D. Foster (C), 6 R. Bennett, 3 A. Clarke | 4 T. Hughes, 8 C. Gallagher, 10 D. Sterling | 7 O. Grant, 9 M. Vance, 11 E. Brooks
+
+*BENCH:* 12 S. Henderson, 14 H. Cole, 15 N. Palmer
+🎯 Pens: M. Vance • FK: D. Sterling • Corners: O. Grant
+
+React ✅ once seen. £5 match subs via ClubFlow link.`,
+    },
+    training: {
+        label: "Mid-Week Training Poll",
+        title: "Northbrook First Team • Players Chat",
+        timestamp: "Tue 10:30",
+        body: `⚽ *THURSDAY TRAINING — AVAILABILITY POLL*
+📅 Thu 12 Nov • 🕢 19:30 – 21:00 (Arrive 19:15)
+📍 Northbrook 3G Pitch 1 (Moulded / Astro boots only)
+📋 Focus: Set Pieces & Out-of-Possession Rest Defence
+
+✅ Currently Going (18): H. Cole, D. Foster, J. Mercer, M. Vance, D. Sterling, C. Gallagher +12 others.
+
+Tap your availability link to confirm IN or OUT before Wed 20:00.`,
+    },
+    result: {
+        label: "Full-Time Result Recap",
+        title: "Northbrook First Team • Players Chat",
+        timestamp: "Sat 16:12",
+        body: `✅ *FULL TIME: Northbrook United 3 – 1 Millbrook Town*
+🏆 Premier Division • #1st in Table (35 Pts • 2.50 PPG)
+
+⚽ *Goals:* M. Vance (23', 67'), C. Gallagher (81')
+👟 *Assists:* D. Sterling (2), T. Hughes
+⭐ *Man of the Match:* Marcus Vance
+
+Appearances, minutes & season leaderboards updated on ClubFlow.`,
+    },
+};
+
 export default function LandingPage() {
     const [activeTab, setActiveTab] = useState<ShowcaseTabId>("dashboard");
+    const [autoCyclePaused, setAutoCyclePaused] = useState(false);
+    const [isHoveringShowcase, setIsHoveringShowcase] = useState(false);
+    const [cycleProgress, setCycleProgress] = useState(0);
+    const [whatsappTab, setWhatsappTab] = useState<"matchday" | "training" | "result">("matchday");
+    const [copiedWhatsapp, setCopiedWhatsapp] = useState(false);
+    const [activeRoleView, setActiveRoleView] = useState<"coaches" | "secretaries">("coaches");
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
+
+    useEffect(() => {
+        if (autoCyclePaused || isHoveringShowcase) return;
+        const interval = setInterval(() => {
+            setCycleProgress((prev) => {
+                if (prev >= 100) {
+                    setActiveTab((current) => {
+                        const idx = SHOWCASE_TABS.findIndex((t) => t.id === current);
+                        const nextIdx = (idx + 1) % SHOWCASE_TABS.length;
+                        return SHOWCASE_TABS[nextIdx].id;
+                    });
+                    return 0;
+                }
+                return prev + 1.5;
+            });
+        }, 95);
+        return () => clearInterval(interval);
+    }, [autoCyclePaused, isHoveringShowcase]);
+
+    const handleManualTabSelect = (tab: ShowcaseTabId) => {
+        setActiveTab(tab);
+        setAutoCyclePaused(true);
+        setCycleProgress(0);
+    };
+
+    const handleCopySampleWhatsapp = () => {
+        if (typeof navigator !== "undefined" && navigator.clipboard) {
+            navigator.clipboard.writeText(WHATSAPP_SAMPLES[whatsappTab].body).catch(() => {});
+        }
+        setCopiedWhatsapp(true);
+        setTimeout(() => setCopiedWhatsapp(false), 2200);
+    };
 
     const currentShowcase =
         SHOWCASE_TABS.find((t) => t.id === activeTab) || SHOWCASE_TABS[0];
@@ -1798,7 +2104,7 @@ export default function LandingPage() {
                         </p>
 
                         {/* Primary CTA */}
-                        <div className="mt-7 flex items-center justify-center">
+                        <div className="mt-7 flex flex-col items-center justify-center gap-3.5">
                             <Link
                                 href="/signup"
                                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-base shadow-xl shadow-red-600/25 transition-all hover:-translate-y-0.5"
@@ -1806,17 +2112,46 @@ export default function LandingPage() {
                                 <span>Start Your Club</span>
                                 <ArrowRight className="w-4 h-4" />
                             </Link>
+
+                            {/* #6 Instant League & Fixture Auto-Sync Friction-Killer Strip */}
+                            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-neutral-400 font-medium">
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                                    <span>Set up in under 2 minutes</span>
+                                </span>
+                                <span className="hidden sm:inline text-white/20">•</span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span>Auto-sync league table & fixtures</span>
+                                </span>
+                                <span className="hidden sm:inline text-white/20">•</span>
+                                <span className="inline-flex items-center gap-1.5">
+                                    <FileSpreadsheet className="w-3.5 h-3.5 text-sky-400" />
+                                    <span>1-click Excel / CSV squad import</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
 
                     {/* =============================================================
                         INTERACTIVE FULL-SCALE PRODUCT SHOWCASE (#preview)
                     ============================================================= */}
-                    <div id="preview" className="mt-9 sm:mt-11 scroll-mt-24">
-                        {/* Screen Selector Tabs */}
+                    <div
+                        id="preview"
+                        className="mt-9 sm:mt-11 scroll-mt-24"
+                        onMouseEnter={() => setIsHoveringShowcase(true)}
+                        onMouseLeave={() => setIsHoveringShowcase(false)}
+                    >
+                        {/* Screen Selector Tabs with #8 Auto-Cycle Progress Bar */}
                         <div className="flex flex-col items-center">
-                            <div className="text-[11px] font-bold uppercase tracking-widest text-neutral-400 mb-3">
-                                Click any module below — or use the sidebar inside the app — to explore the real interface
+                            <div className="text-[11px] font-bold uppercase tracking-widest text-neutral-400 mb-3 flex items-center gap-2">
+                                <span>Click any module below — or use the sidebar inside the app — to explore</span>
+                                {!autoCyclePaused && (
+                                    <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[9px] text-neutral-300">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                        {isHoveringShowcase ? "Paused on hover" : "Auto-touring"}
+                                    </span>
+                                )}
                             </div>
                             <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-[#0d1322] border border-white/10 shadow-xl">
                                 {SHOWCASE_TABS.map((tab) => {
@@ -1825,8 +2160,8 @@ export default function LandingPage() {
                                         <button
                                             key={tab.id}
                                             type="button"
-                                            onClick={() => setActiveTab(tab.id)}
-                                            className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                                            onClick={() => handleManualTabSelect(tab.id)}
+                                            className={`relative overflow-hidden px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
                                                 isSelected
                                                     ? "bg-red-600 text-white shadow-md shadow-red-600/30"
                                                     : "text-neutral-400 hover:text-white hover:bg-white/5"
@@ -1834,6 +2169,12 @@ export default function LandingPage() {
                                         >
                                             <span className="hidden sm:inline">{tab.label}</span>
                                             <span className="sm:hidden">{tab.shortLabel}</span>
+                                            {isSelected && !autoCyclePaused && (
+                                                <span
+                                                    className="absolute bottom-0 left-0 h-[3px] bg-white/80 transition-all duration-100 ease-linear"
+                                                    style={{ width: `${cycleProgress}%` }}
+                                                />
+                                            )}
                                         </button>
                                     );
                                 })}
@@ -1877,17 +2218,17 @@ export default function LandingPage() {
                             <div className="flex min-h-[410px] bg-[#FCFCFD]">
                                 <RealAppSidebar
                                     activeNav={activeTab}
-                                    onSelectTab={(tab) => setActiveTab(tab)}
+                                    onSelectTab={handleManualTabSelect}
                                 />
 
                                 <div className="flex-1 min-w-0 overflow-x-hidden">
                                     {activeTab === "dashboard" && (
-                                        <FullDashboardPreview onNavigate={setActiveTab} />
+                                        <FullDashboardPreview onNavigate={handleManualTabSelect} />
                                     )}
                                     {activeTab === "matchday-xi" && <FullMatchdayXiPreview />}
                                     {activeTab === "training" && <FullTrainingPreview />}
                                     {activeTab === "fixtures" && (
-                                        <FullFixturesPreview onNavigate={setActiveTab} />
+                                        <FullFixturesPreview onNavigate={handleManualTabSelect} />
                                     )}
                                     {activeTab === "recruitment" && <FullRecruitmentPreview />}
                                     {activeTab === "opposition" && <FullOppositionPreview />}
@@ -1899,6 +2240,51 @@ export default function LandingPage() {
                         <p className="mt-4 text-center text-xs sm:text-sm text-neutral-400 max-w-3xl mx-auto">
                             {currentShowcase.description}
                         </p>
+
+                        {/* #10 Real-Football Operational Credibility Strip */}
+                        <div className="mt-10 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                            {[
+                                {
+                                    badge: "BATTLE-TESTED WEEKLY",
+                                    title: "Built in Real League Football",
+                                    desc: "Designed by active grassroots & semi-pro coaching staff for real Saturday pressures.",
+                                    accent: "text-red-400",
+                                },
+                                {
+                                    badge: "EVERY PITCH FORMAT",
+                                    title: "11v11 • 9v9 • 7v7 • 5v5",
+                                    desc: "Full formation libraries, custom kit colours, and multi-squad support from U9s to First Team.",
+                                    accent: "text-emerald-400",
+                                },
+                                {
+                                    badge: "ZERO MANUAL TALLIES",
+                                    title: "Starts, Sub Mins & Cards Synced",
+                                    desc: "Log a result once — appearances, minutes, goals, assists & yellow cards update everywhere.",
+                                    accent: "text-amber-400",
+                                },
+                                {
+                                    badge: "INSTANT ONBOARDING",
+                                    title: "League Table & Fixture Sync",
+                                    desc: "Pull in division standings, PPG splits, and squad lists without typing everything from scratch.",
+                                    accent: "text-sky-400",
+                                },
+                            ].map((item) => (
+                                <div
+                                    key={item.title}
+                                    className="rounded-2xl bg-[#0b101d]/90 border border-white/10 p-4 text-left"
+                                >
+                                    <div className={`text-[9px] font-black uppercase tracking-widest ${item.accent}`}>
+                                        {item.badge}
+                                    </div>
+                                    <div className="text-sm font-black text-white mt-1">
+                                        {item.title}
+                                    </div>
+                                    <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
+                                        {item.desc}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </section>
 
@@ -1940,7 +2326,7 @@ export default function LandingPage() {
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            setActiveTab("matchday-xi");
+                                            handleManualTabSelect("matchday-xi");
                                             document
                                                 .getElementById("preview")
                                                 ?.scrollIntoView({ behavior: "smooth" });
@@ -1969,7 +2355,7 @@ export default function LandingPage() {
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            setActiveTab("training");
+                                            handleManualTabSelect("training");
                                             document
                                                 .getElementById("preview")
                                                 ?.scrollIntoView({ behavior: "smooth" });
@@ -1998,7 +2384,7 @@ export default function LandingPage() {
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            setActiveTab("recruitment");
+                                            handleManualTabSelect("recruitment");
                                             document
                                                 .getElementById("preview")
                                                 ?.scrollIntoView({ behavior: "smooth" });
@@ -2007,6 +2393,496 @@ export default function LandingPage() {
                                     >
                                         Preview →
                                     </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* =================================================================
+                    #2 BEFORE VS. AFTER + SQUAD APPEARANCES, MINUTES, ASSISTS & YELLOWS
+                ================================================================= */}
+                <section className="py-16 sm:py-24 border-t border-white/[0.07] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-14">
+                        <div className="text-xs font-bold uppercase tracking-widest text-red-500 mb-2">
+                            Stop Guessing. Know Your Numbers.
+                        </div>
+                        <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
+                            Most managers guess minutes, assists, and yellow cards. ClubFlow tracks them automatically.
+                        </h2>
+                        <p className="mt-3 text-base text-neutral-400">
+                            Without a proper system, keeping tabs on sub appearances, playing time, assists, and disciplinary cautions across a 22-man squad is almost impossible by November.
+                        </p>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                        {/* Left 5 Cols: The Old Way (Guesswork) */}
+                        <div className="lg:col-span-5 rounded-2xl bg-[#0d1323] border border-white/10 p-6 flex flex-col justify-between">
+                            <div>
+                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[11px] font-bold mb-4">
+                                    <X className="w-3.5 h-3.5" />
+                                    <span>How Most Clubs Manage It Now</span>
+                                </div>
+                                <h3 className="text-xl font-black text-white">
+                                    Guesswork, Notes apps & forgotten stats
+                                </h3>
+                                <ul className="mt-4 space-y-3.5 text-sm text-neutral-300">
+                                    {[
+                                        {
+                                            title: "Guessing player minutes & bench time",
+                                            desc: "No clear picture of who has only played 15-minute cameos over the last month until a player complains.",
+                                        },
+                                        {
+                                            title: "Blindsided by yellow-card suspensions",
+                                            desc: "Losing track of who is sitting on 4 bookings and one caution away from a mandatory league ban.",
+                                        },
+                                        {
+                                            title: "Untracked assists & sub appearances",
+                                            desc: "League websites rarely log assists or sub minutes accurately — leaving half your squad's contributions invisible.",
+                                        },
+                                        {
+                                            title: "Scattered across 4 WhatsApp chats",
+                                            desc: "Scrolling back through hundreds of messages to remember who started three Saturdays ago.",
+                                        },
+                                    ].map((pain) => (
+                                        <li
+                                            key={pain.title}
+                                            className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]"
+                                        >
+                                            <div className="font-bold text-white text-xs sm:text-sm flex items-center gap-2">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                                                <span>{pain.title}</span>
+                                            </div>
+                                            <p className="text-xs text-neutral-400 mt-1 leading-relaxed pl-3.5">
+                                                {pain.desc}
+                                            </p>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+
+                        {/* Right 7 Cols: Visual Squad Appearances, Minutes, Assists & Discipline Table */}
+                        <div className="lg:col-span-7 rounded-2xl bg-[#FCFCFD] text-neutral-900 border border-white/20 shadow-2xl overflow-hidden flex flex-col justify-between select-none">
+                            <div>
+                                {/* Mini App Header */}
+                                <div className="bg-[#171717] text-white px-4 py-3 flex flex-wrap items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2">
+                                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-black uppercase">
+                                            With ClubFlow
+                                        </span>
+                                        <span className="text-xs sm:text-sm font-black">
+                                            Squad Appearances, Minutes & Discipline
+                                        </span>
+                                    </div>
+                                    <span className="text-[10px] font-semibold text-neutral-400">
+                                        Synced from Matchday Planner • 14 Games
+                                    </span>
+                                </div>
+
+                                {/* Summary Strip */}
+                                <div className="px-4 py-2.5 bg-white border-b border-neutral-200 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                                    <div className="flex flex-wrap items-center gap-1.5 font-bold">
+                                        <span className="px-2.5 py-0.5 rounded-full bg-neutral-900 text-white text-[10px]">
+                                            All Squad (21)
+                                        </span>
+                                        <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] flex items-center gap-1">
+                                            <AlertTriangle className="w-3 h-3 text-amber-600" />
+                                            1 Suspension Risk (4 YC)
+                                        </span>
+                                    </div>
+                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                        <FileSpreadsheet className="w-3 h-3" /> Export Squad Stats
+                                    </span>
+                                </div>
+
+                                {/* Squad Stats Table */}
+                                <div className="p-3 sm:p-4 overflow-x-auto">
+                                    <table className="w-full text-left border-collapse">
+                                        <thead>
+                                            <tr className="border-b border-neutral-200 text-[9px] font-black uppercase tracking-wider text-neutral-400">
+                                                <th className="py-2 px-2">Player</th>
+                                                <th className="py-2 px-2 text-center">Apps (Sub)</th>
+                                                <th className="py-2 px-2 text-center">Minutes</th>
+                                                <th className="py-2 px-2 text-center">Goals</th>
+                                                <th className="py-2 px-2 text-center">Assists</th>
+                                                <th className="py-2 px-2 text-right">Cards</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-neutral-100 text-xs">
+                                            {[
+                                                {
+                                                    num: 9,
+                                                    name: "Marcus Vance",
+                                                    pos: "ST",
+                                                    apps: "14",
+                                                    subs: "0",
+                                                    mins: "1,215'",
+                                                    goals: 14,
+                                                    assists: 4,
+                                                    yc: 1,
+                                                    rc: 0,
+                                                },
+                                                {
+                                                    num: 10,
+                                                    name: "Declan Sterling",
+                                                    pos: "CAM",
+                                                    apps: "14",
+                                                    subs: "0",
+                                                    mins: "1,190'",
+                                                    goals: 7,
+                                                    assists: 11,
+                                                    yc: 2,
+                                                    rc: 0,
+                                                },
+                                                {
+                                                    num: 8,
+                                                    name: "Callum Gallagher",
+                                                    pos: "CM",
+                                                    apps: "13",
+                                                    subs: "1",
+                                                    mins: "1,145'",
+                                                    goals: 5,
+                                                    assists: 6,
+                                                    yc: 2,
+                                                    rc: 0,
+                                                },
+                                                {
+                                                    num: 4,
+                                                    name: "Tom Hughes",
+                                                    pos: "CDM",
+                                                    apps: "12",
+                                                    subs: "2",
+                                                    mins: "1,060'",
+                                                    goals: 1,
+                                                    assists: 3,
+                                                    yc: 4,
+                                                    rc: 0,
+                                                    cautionAlert: true,
+                                                },
+                                                {
+                                                    num: 5,
+                                                    name: "Dan Foster (C)",
+                                                    pos: "CB",
+                                                    apps: "14",
+                                                    subs: "0",
+                                                    mins: "1,260'",
+                                                    goals: 2,
+                                                    assists: 1,
+                                                    yc: 1,
+                                                    rc: 0,
+                                                },
+                                                {
+                                                    num: 14,
+                                                    name: "Harrison Cole",
+                                                    pos: "MID",
+                                                    apps: "6",
+                                                    subs: "8",
+                                                    mins: "685'",
+                                                    goals: 3,
+                                                    assists: 5,
+                                                    yc: 0,
+                                                    rc: 0,
+                                                },
+                                                {
+                                                    num: 12,
+                                                    name: "Sam Henderson",
+                                                    pos: "DEF",
+                                                    apps: "4",
+                                                    subs: "7",
+                                                    mins: "440'",
+                                                    goals: 0,
+                                                    assists: 2,
+                                                    yc: 1,
+                                                    rc: 0,
+                                                },
+                                            ].map((p) => (
+                                                <tr key={p.num} className="hover:bg-neutral-50">
+                                                    <td className="py-2.5 px-2">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="w-5 h-5 rounded bg-neutral-900 text-white font-black text-[9px] flex items-center justify-center shrink-0">
+                                                                {p.num}
+                                                            </span>
+                                                            <div>
+                                                                <div className="font-bold text-neutral-900 leading-tight">
+                                                                    {p.name}
+                                                                </div>
+                                                                <div className="text-[9px] font-extrabold text-neutral-400">
+                                                                    {p.pos}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-2.5 px-2 text-center font-bold text-neutral-800 tabular-nums">
+                                                        {p.apps}{" "}
+                                                        <span className="text-neutral-400 font-semibold text-[10px]">
+                                                            ({p.subs})
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2.5 px-2 text-center">
+                                                        <span className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-800 font-bold text-[11px] tabular-nums">
+                                                            {p.mins}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-2.5 px-2 text-center font-black text-emerald-700 tabular-nums">
+                                                        {p.goals}
+                                                    </td>
+                                                    <td className="py-2.5 px-2 text-center font-black text-sky-700 tabular-nums">
+                                                        {p.assists}
+                                                    </td>
+                                                    <td className="py-2.5 px-2 text-right">
+                                                        <div className="inline-flex items-center justify-end gap-1">
+                                                            {p.yc > 0 ? (
+                                                                <span
+                                                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black border ${
+                                                                        p.cautionAlert
+                                                                            ? "bg-amber-100 text-amber-900 border-amber-400"
+                                                                            : "bg-yellow-50 text-yellow-800 border-yellow-300"
+                                                                    }`}
+                                                                >
+                                                                    <span className="w-2 h-2.5 rounded-[1px] bg-amber-400 border border-amber-600 inline-block" />
+                                                                    <span>
+                                                                        {p.yc}
+                                                                        {p.cautionAlert ? " • 1 off ban" : ""}
+                                                                    </span>
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-[10px] text-neutral-300 font-bold">
+                                                                    0
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div className="px-4 py-2.5 bg-neutral-50 border-t border-neutral-200 flex flex-wrap items-center justify-between gap-2 text-[10px] text-neutral-500 font-semibold">
+                                <span>Starts, unused bench slots, sub minutes, goals, assists & cards all stay in sync.</span>
+                                <span className="text-red-600 font-bold">Zero manual spreadsheets</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                {/* =================================================================
+                    #3 & #4 WHATSAPP BRIEFING + EXPORTABLE MATCHDAY GRAPHICS & SCOUTING PDFS
+                ================================================================= */}
+                <section className="py-16 sm:py-24 border-t border-white/[0.07] bg-[#080c17]/70">
+                    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                        <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-14">
+                            <div className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-2">
+                                Ready for the Players’ Group Chat
+                            </div>
+                            <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
+                                One-click WhatsApp briefings, Matchday XI graphics & Scouting PDFs.
+                            </h2>
+                            <p className="mt-3 text-base text-neutral-400">
+                                Every club runs communication on WhatsApp — ClubFlow generates formatted briefings, starting lineup graphics, and opposition dossiers you can drop straight into your players’ or staff chat.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+                            {/* #3 Left 5 Cols: Live 1-Click WhatsApp Briefing Generator */}
+                            <div className="lg:col-span-5 rounded-2xl bg-[#0d1323] border border-white/10 p-5 sm:p-6 flex flex-col justify-between">
+                                <div>
+                                    <div className="flex items-center justify-between gap-2 mb-3">
+                                        <span className="inline-flex items-center gap-1.5 text-xs font-black text-emerald-400 uppercase tracking-wider">
+                                            <MessageCircle className="w-4 h-4" />
+                                            1-Click WhatsApp Generator
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={handleCopySampleWhatsapp}
+                                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold transition-colors cursor-pointer"
+                                        >
+                                            {copiedWhatsapp ? (
+                                                <>
+                                                    <Check className="w-3 h-3" />
+                                                    <span>Copied ✓</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Copy className="w-3 h-3" />
+                                                    <span>Copy Sample</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+
+                                    {/* Template Switcher */}
+                                    <div className="grid grid-cols-3 gap-1 p-1 rounded-xl bg-[#070b14] border border-white/10 mb-3.5 text-[10px] font-bold">
+                                        {(
+                                            [
+                                                { id: "matchday", label: "Matchday XI" },
+                                                { id: "training", label: "Training Poll" },
+                                                { id: "result", label: "FT Result" },
+                                            ] as const
+                                        ).map((t) => (
+                                            <button
+                                                key={t.id}
+                                                type="button"
+                                                onClick={() => setWhatsappTab(t.id)}
+                                                className={`py-1.5 px-2 rounded-lg transition-all cursor-pointer ${
+                                                    whatsappTab === t.id
+                                                        ? "bg-emerald-600 text-white shadow-xs"
+                                                        : "text-neutral-400 hover:text-white"
+                                                }`}
+                                            >
+                                                {t.label}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Authentic WhatsApp Chat Card */}
+                                    <div className="rounded-2xl bg-[#0b141a] border border-emerald-500/20 p-3.5 shadow-inner">
+                                        <div className="flex items-center justify-between pb-2 mb-2.5 border-b border-white/10 text-[10px]">
+                                            <span className="font-bold text-emerald-400">
+                                                {WHATSAPP_SAMPLES[whatsappTab].title}
+                                            </span>
+                                            <span className="text-neutral-400">
+                                                {WHATSAPP_SAMPLES[whatsappTab].timestamp}
+                                            </span>
+                                        </div>
+                                        <div className="rounded-xl bg-[#005c4b]/35 border border-emerald-500/25 p-3 text-[11px] text-neutral-100 whitespace-pre-line leading-relaxed font-sans">
+                                            {WHATSAPP_SAMPLES[whatsappTab].body}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <p className="mt-3 text-[11px] text-neutral-400">
+                                    Automatically pulls kick-off, meet time, full venue postcode, kit colours, lineup & set-piece takers.
+                                </p>
+                            </div>
+
+                            {/* #4 Right 7 Cols: Exported Matchday XI PNG Graphic + Opposition Scouting PDF */}
+                            <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* Card A: Exported Matchday XI Pitch Graphic */}
+                                <div className="rounded-2xl bg-gradient-to-b from-[#131926] to-[#0b0f18] border border-white/15 p-4 shadow-2xl flex flex-col justify-between select-none">
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2.5">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 text-[9px] font-black uppercase">
+                                                <ImageIcon className="w-3 h-3" /> PNG Pitch Graphic
+                                            </span>
+                                            <span className="text-[9px] font-bold text-neutral-400">
+                                                1-Click Download
+                                            </span>
+                                        </div>
+
+                                        {/* Stadium Graphic Poster Frame */}
+                                        <div className="rounded-xl bg-[#090d16] border border-white/10 p-3 text-center">
+                                            <div className="text-[8px] font-black uppercase tracking-widest text-red-400">
+                                                Premier Division • Starting XI
+                                            </div>
+                                            <div className="text-xs font-black text-white mt-0.5 tracking-tight">
+                                                NORTHBROOK UTD vs KINGSWOOD
+                                            </div>
+                                            <div className="text-[8px] font-bold text-neutral-400 mt-0.5 mb-2">
+                                                KO 14:00 • MEET 12:45 • HOME (4-3-3)
+                                            </div>
+
+                                            <div className="h-[195px] w-full">
+                                                <RealisticPitchMarkings>
+                                                    <PitchJerseyNode x={50} y={88} number={1} name="Mercer" kitColor="#10b981" compact />
+                                                    <PitchJerseyNode x={16} y={70} number={3} name="Clarke" compact />
+                                                    <PitchJerseyNode x={38} y={73} number={5} name="Foster" isCaptain compact />
+                                                    <PitchJerseyNode x={62} y={73} number={6} name="Bennett" compact />
+                                                    <PitchJerseyNode x={84} y={70} number={2} name="Reid" compact />
+                                                    <PitchJerseyNode x={50} y={53} number={4} name="Hughes" compact />
+                                                    <PitchJerseyNode x={28} y={40} number={8} name="Gallagher" compact />
+                                                    <PitchJerseyNode x={72} y={40} number={10} name="Sterling" compact />
+                                                    <PitchJerseyNode x={20} y={18} number={11} name="Brooks" compact />
+                                                    <PitchJerseyNode x={50} y={14} number={9} name="Vance" compact />
+                                                    <PitchJerseyNode x={80} y={18} name="Grant" number={7} compact />
+                                                </RealisticPitchMarkings>
+                                            </div>
+
+                                            <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between text-[8px] text-neutral-300 font-bold">
+                                                <span>BENCH: 12 Henderson • 14 Cole • 15 Palmer</span>
+                                                <span className="text-amber-400">C: Foster</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <p className="mt-2.5 text-[11px] text-neutral-400">
+                                        Export crisp Base XI or In-Possession tactical graphics for your changing room or social feed.
+                                    </p>
+                                </div>
+
+                                {/* Card B: Exported Opposition Scouting Dossier PDF */}
+                                <div className="rounded-2xl bg-[#0d1323] border border-white/15 p-4 shadow-2xl flex flex-col justify-between select-none">
+                                    <div>
+                                        <div className="flex items-center justify-between mb-2.5">
+                                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 text-[9px] font-black uppercase">
+                                                <FileText className="w-3 h-3" /> Scouting Report PDF
+                                            </span>
+                                            <span className="text-[9px] font-bold text-neutral-400">
+                                                Staff & Players Brief
+                                            </span>
+                                        </div>
+
+                                        {/* Crisp White PDF Sheet Mockup */}
+                                        <div className="rounded-xl bg-white text-neutral-900 p-3.5 shadow-md border border-neutral-200 space-y-2.5">
+                                            <div className="flex items-start justify-between border-b border-neutral-200 pb-2">
+                                                <div>
+                                                    <div className="text-[8px] font-black uppercase tracking-widest text-red-600">
+                                                        Opposition Dossier • Matchweek 15
+                                                    </div>
+                                                    <div className="text-xs font-black text-neutral-900">
+                                                        Kingswood Rovers (#2nd)
+                                                    </div>
+                                                </div>
+                                                <span className="px-1.5 py-0.5 rounded bg-neutral-900 text-white text-[8px] font-black">
+                                                    4-2-3-1
+                                                </span>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-1.5 text-[9px]">
+                                                <div className="p-2 rounded-lg bg-emerald-50/70 border border-emerald-200">
+                                                    <div className="font-black text-emerald-800 uppercase text-[8px]">
+                                                        Build-Up Pattern
+                                                    </div>
+                                                    <p className="text-neutral-700 mt-0.5 leading-snug">
+                                                        Direct diagonals to #9 Bradshaw; #10 Pennant attacks second balls.
+                                                    </p>
+                                                </div>
+                                                <div className="p-2 rounded-lg bg-rose-50/70 border border-rose-200">
+                                                    <div className="font-black text-rose-800 uppercase text-[8px]">
+                                                        Key Area to Exploit
+                                                    </div>
+                                                    <p className="text-neutral-700 mt-0.5 leading-snug">
+                                                        Space in behind advancing full-backs on quick wide transitions.
+                                                    </p>
+                                                </div>
+                                            </div>
+
+                                            <div className="rounded-lg bg-neutral-50 border border-neutral-200 p-2 space-y-1">
+                                                <div className="text-[8px] font-black uppercase tracking-wider text-neutral-500">
+                                                    Flagged Danger Men
+                                                </div>
+                                                <div className="flex items-center justify-between text-[9px] font-bold">
+                                                    <span className="text-neutral-900">#9 C. Bradshaw (ST)</span>
+                                                    <span className="text-red-600 font-black">11 Goals • Aerial</span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-[9px] font-bold">
+                                                    <span className="text-neutral-900">#10 L. Pennant (CAM)</span>
+                                                    <span className="text-amber-700 font-black">8 Assists • Set Pieces</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="pt-1 border-t border-neutral-100 flex items-center justify-between text-[8px] font-bold text-neutral-400">
+                                                <span>H2H: 2W - 1D - 0L</span>
+                                                <span>Generated by ClubFlow</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <p className="mt-2.5 text-[11px] text-neutral-400">
+                                        Share structured 1-page PDF scouting dossiers with your coaching staff ahead of training.
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -2345,50 +3221,110 @@ export default function LandingPage() {
                         </div>
                     </div>
 
-                    {/* Additional Capabilities Grid */}
+                    {/* #9 Role-Based Capabilities Switcher: Managers & Coaches vs Secretaries & Treasurers */}
                     <div className="mt-20">
-                        <div className="text-center max-w-2xl mx-auto mb-10">
+                        <div className="text-center max-w-2xl mx-auto mb-8">
                             <h3 className="text-2xl sm:text-3xl font-black text-white">
-                                Every module your club needs included as standard
+                                Built for the dugout and the clubhouse
                             </h3>
                             <p className="mt-2 text-sm text-neutral-400">
-                                No bloated add-ons — just the practical tools football managers use every week.
+                                Switch roles below to see how ClubFlow supports both your coaching staff and your club operations team.
                             </p>
+
+                            {/* Role Pill Switcher */}
+                            <div className="mt-5 inline-flex flex-wrap items-center justify-center gap-1.5 p-1.5 rounded-2xl bg-[#0d1322] border border-white/10">
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveRoleView("coaches")}
+                                    className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                                        activeRoleView === "coaches"
+                                            ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                                            : "text-neutral-400 hover:text-white"
+                                    }`}
+                                >
+                                    For Managers & Coaches
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setActiveRoleView("secretaries")}
+                                    className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                                        activeRoleView === "secretaries"
+                                            ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                                            : "text-neutral-400 hover:text-white"
+                                    }`}
+                                >
+                                    For Secretaries & Treasurers
+                                </button>
+                            </div>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {[
-                                {
-                                    icon: Users,
-                                    title: "Squad & Appearances",
-                                    desc: "Track starts, sub appearances, goals, assists, yellow/red cards, medical statuses, and loan or dual-registration players.",
-                                },
-                                {
-                                    icon: ClipboardCheck,
-                                    title: "Training & Attendance",
-                                    desc: "Plan sessions on a 7-day football calendar, monitor active streaks, log late arrivals, and share attendance graphics.",
-                                },
-                                {
-                                    icon: Trophy,
-                                    title: "League Table & Form Guide",
-                                    desc: "View division standings alongside Points Per Game (PPG), home and away splits, and recent 5-match form guides.",
-                                },
-                                {
-                                    icon: Shield,
-                                    title: "Opposition Scouting Reports",
-                                    desc: "Record tactical notes in and out of possession, set-piece routines, expected lineups, and key opposition threats.",
-                                },
-                                {
-                                    icon: Target,
-                                    title: "Player Recruitment",
-                                    desc: "Manage scouting targets across 5 stages, rate trialists in training, and export your shortlist to Excel or PDF.",
-                                },
-                                {
-                                    icon: Coins,
-                                    title: "Match Subs, Payments & Fines",
-                                    desc: "Keep a clear ledger of weekly match subs, annual membership fees, club expenses, and dressing-room fines.",
-                                },
-                            ].map((item) => {
+                            {(activeRoleView === "coaches"
+                                ? [
+                                      {
+                                          icon: Shirt,
+                                          title: "Tactical Matchday XI & Rest Defence",
+                                          desc: "Pick your starting XI from fit players, map In-Possession 3-2-5 shapes & attacking lanes, and assign set-piece roles.",
+                                      },
+                                      {
+                                          icon: Activity,
+                                          title: "Minutes, Assists & Card Tracking",
+                                          desc: "Automatically track starts, sub minutes, goals, assists, MOTM awards, and yellow-card suspension thresholds.",
+                                      },
+                                      {
+                                          icon: ClipboardCheck,
+                                          title: "Training Streaks & Commitment %",
+                                          desc: "See every player's seasonal attendance percentage, active streaks, and last 5 sessions before naming the squad.",
+                                      },
+                                      {
+                                          icon: Shield,
+                                          title: "Opposition Reports & Danger Men",
+                                          desc: "Break down how opponents build up, where they are vulnerable, and flag standout threats for your players.",
+                                      },
+                                      {
+                                          icon: Target,
+                                          title: "Trialists & Recruitment Pipeline",
+                                          desc: "Move watched players from Scouted to On Trial and Signed, with star ratings and coach notes in one place.",
+                                      },
+                                      {
+                                          icon: MessageCircle,
+                                          title: "1-Click WhatsApp & Pitch Graphics",
+                                          desc: "Copy formatted matchday briefings and export crisp lineup PNGs and scouting PDFs straight to your group chat.",
+                                      },
+                                  ]
+                                : [
+                                      {
+                                          icon: RefreshCw,
+                                          title: "League Table & Fixture Auto-Sync",
+                                          desc: "Sync division standings, Points Per Game (PPG) splits, and upcoming league & cup schedules in seconds.",
+                                      },
+                                      {
+                                          icon: Coins,
+                                          title: "Match Subs & Membership Ledgers",
+                                          desc: "Track weekly matchday subs, annual signing-on fees, and outstanding player balances without chasing spreadsheets.",
+                                      },
+                                      {
+                                          icon: Gavel,
+                                          title: "Dressing-Room Fines & Club Expenses",
+                                          desc: "Log referee fees, pitch hire, equipment costs, and player fines with clear paid/unpaid status tracking.",
+                                      },
+                                      {
+                                          icon: Users,
+                                          title: "Registrations, Loans & Medical Status",
+                                          desc: "Maintain clean squad records across First Team, Reserves, dual-registration players, and injury return dates.",
+                                      },
+                                      {
+                                          icon: FileSpreadsheet,
+                                          title: "Instant Excel, CSV & PDF Exports",
+                                          desc: "Import existing player lists in one click and export attendance, squad stats, or financial ledgers whenever needed.",
+                                      },
+                                      {
+                                          icon: Settings,
+                                          title: "Multi-Staff Roles & Custom Branding",
+                                          desc: "Configure your club crest, custom Home/Away/3rd kit colours, home ground postcode, and staff access.",
+                                      },
+                                  ]
+                            ).map((item) => {
                                 const Icon = item.icon;
                                 return (
                                     <div
