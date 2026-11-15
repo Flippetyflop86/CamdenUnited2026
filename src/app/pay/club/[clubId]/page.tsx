@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, use, useMemo } from "react";
-import { supabase } from "@/lib/supabase";
+import { unproxiedSupabase } from "@/lib/supabase";
 import { isFormerPlayer } from "@/lib/utils";
 import { calculateClubFlowFee, parsePaymentDescription } from "@/lib/clubflow-pay";
 import { Button } from "@/components/ui/button";
@@ -19,7 +19,7 @@ import {
     Calendar,
     Coins,
     Sparkles,
-    RefreshCw,
+    XCircle,
 } from "lucide-react";
 
 interface ClubPayPortalProps {
@@ -29,8 +29,8 @@ interface ClubPayPortalProps {
 const QUICK_PAY_PRESETS = [
     { label: "⚽ Matchday Sub", amount: 5 },
     { label: "🏃 Training Sub", amount: 3 },
-    { label: "🍻 Social / Fines Pot", amount: 10 },
-    { label: "👕 Kit / Signing-On Fee", amount: 25 },
+    { label: "📅 Monthly Subs", amount: 25 },
+    { label: "👕 Kit / Signing-On Fee", amount: 30 },
 ];
 
 export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) {
@@ -41,6 +41,7 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
     const [selectedPlayerId, setSelectedPlayerId] = useState<string>("");
     const [loading, setLoading] = useState(true);
     const [payingId, setPayingId] = useState<string | null>(null);
+    const [decliningId, setDecliningId] = useState<string | null>(null);
     const [payingAll, setPayingAll] = useState(false);
     const [portalTab, setPortalTab] = useState<"fines" | "quickpay">("fines");
     const [paymentBanner, setPaymentBanner] = useState<"success" | "cancelled" | null>(null);
@@ -90,7 +91,7 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                             body: JSON.stringify({ paymentIds: ids }),
                         }).catch(() => {});
 
-                        await supabase
+                        await unproxiedSupabase
                             .from("player_payment_requests")
                             .update({ status: "Paid", paid_at: new Date().toISOString() })
                             .in("id", ids);
@@ -99,14 +100,14 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                     setPaymentBanner("cancelled");
                 }
 
-                const { data: clubData } = await supabase
+                const { data: clubData } = await unproxiedSupabase
                     .from("clubs")
                     .select("id, name, logo, primary_color")
                     .eq("id", clubId)
                     .single();
                 setClub(clubData);
 
-                const { data: playersData } = await supabase
+                const { data: playersData } = await unproxiedSupabase
                     .from("players")
                     .select("id, first_name, last_name, position, notes")
                     .eq("club_id", clubId)
@@ -116,7 +117,7 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                     setPlayers(playersData.filter(p => !isFormerPlayer(p.notes)));
                 }
 
-                const { data: paymentsData } = await supabase
+                const { data: paymentsData } = await unproxiedSupabase
                     .from("player_payment_requests")
                     .select("*")
                     .eq("club_id", clubId)
@@ -193,7 +194,28 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
         }
     };
 
-    const handlePayAllFines = async () => {
+    const handleDeclineOptional = async (paymentId: string) => {
+        setDecliningId(paymentId);
+        try {
+            const res = await fetch("/api/payments/respond", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ paymentId, action: "decline" }),
+            });
+            const data = await res.json();
+            if (data.payment) {
+                setPayments(prev => prev.map(p => (p.id === paymentId ? data.payment : p)));
+            } else {
+                alert(data.error || "Could not decline payment.");
+            }
+        } catch {
+            alert("An error occurred updating this payment.");
+        } finally {
+            setDecliningId(null);
+        }
+    };
+
+    const handlePayAllPayments = async () => {
         if (unpaidPayments.length === 0) return;
         if (unpaidPayments.length === 1) {
             await handlePayNow(unpaidPayments[0].id);
@@ -267,13 +289,14 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
 
     const primaryColor = club?.primary_color || "#dc2626";
     const selectedPlayer = players.find(p => p.id === selectedPlayerId);
+    const todayStr = new Date().toISOString().split("T")[0];
 
     if (loading) {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
                 <div className="flex flex-col items-center gap-3">
                     <div className="h-8 w-8 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin" />
-                    <p className="text-slate-400 text-sm font-medium">Loading ClubFlow Pay Hub...</p>
+                    <p className="text-slate-400 text-sm font-medium">Loading Club Payments...</p>
                 </div>
             </div>
         );
@@ -287,9 +310,9 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                     <div className="rounded-2xl bg-emerald-500/15 border border-emerald-500/40 p-4 flex items-start gap-3">
                         <CheckCircle2 className="h-5 w-5 text-emerald-400 shrink-0 mt-0.5" />
                         <div>
-                            <h4 className="text-sm font-bold text-emerald-300">Payment Settled via Stripe!</h4>
+                            <h4 className="text-sm font-bold text-emerald-300">Payment Complete!</h4>
                             <p className="text-xs text-slate-300 mt-0.5">
-                                Thank you — your club ledger has been automatically marked as Paid.
+                                Thank you — your payment has been settled and marked as Paid.
                             </p>
                         </div>
                     </div>
@@ -309,7 +332,7 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                             <Landmark className="h-12 w-12 text-slate-400 mx-auto mb-2" />
                         )}
                         <Badge className="mx-auto mb-1 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold">
-                            ClubFlow Pay • Instant Apple Pay, Google Pay &amp; Card
+                            1-Tap Checkout • Link, Apple Pay, Google Pay &amp; Card
                         </Badge>
                         <CardTitle className="text-xl font-bold">{club?.name || "Football Club"}</CardTitle>
                         <CardDescription className="text-slate-400 text-xs">
@@ -342,7 +365,7 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                                     return (
                                         <option key={p.id} value={p.id}>
                                             {p.first_name} {p.last_name}
-                                            {unpaidCount > 0 ? ` (${unpaidCount} due)` : ""}
+                                            {unpaidCount > 0 ? ` (${unpaidCount} unanswered)` : ""}
                                         </option>
                                     );
                                 })}
@@ -362,7 +385,7 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                                     }`}
                                 >
                                     <Receipt className="h-3.5 w-3.5" />
-                                    My Fines ({unpaidPayments.length})
+                                    My Payments ({unpaidPayments.length})
                                 </button>
                                 <button
                                     type="button"
@@ -381,43 +404,42 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                     </CardContent>
                 </Card>
 
-                {/* TAB 1: SELECTED PLAYER'S FINES & REQUESTS */}
+                {/* TAB 1: SELECTED PLAYER'S UNANSWERED PAYMENTS */}
                 {selectedPlayer && portalTab === "fines" && (
                     <div className="space-y-4">
                         <Card className="border-slate-800 bg-slate-900/90 text-white">
                             <CardHeader className="pb-3 border-b border-slate-800">
                                 <div className="flex items-center justify-between gap-2">
                                     <CardTitle className="text-base font-bold">
-                                        Outstanding Fines &amp; Requests ({unpaidPayments.length})
+                                        Unanswered Payments ({unpaidPayments.length})
                                     </CardTitle>
                                     {unpaidPayments.length > 0 && (
                                         <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/40 text-xs font-bold">
-                                            £{payAllSummary.baseTotal.toFixed(2)} Base Total
+                                            £{payAllSummary.baseTotal.toFixed(2)} Total
                                         </Badge>
                                     )}
                                 </div>
                             </CardHeader>
                             <CardContent className="pt-4 space-y-3">
-                                {/* 1-Tap Pay All Banner when player has 2+ unpaid fines */}
                                 {unpaidPayments.length > 1 && (
                                     <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 space-y-2.5">
                                         <div className="flex items-center justify-between text-xs">
                                             <span className="font-bold text-emerald-300 flex items-center gap-1.5">
-                                                <Sparkles className="h-3.5 w-3.5" /> Settle All {unpaidPayments.length} Fines in One Go
+                                                <Sparkles className="h-3.5 w-3.5" /> Settle All {unpaidPayments.length} Payments Together
                                             </span>
                                             <span className="font-black text-white text-sm">
                                                 £{payAllSummary.payableTotal.toFixed(2)}
                                             </span>
                                         </div>
                                         <Button
-                                            onClick={handlePayAllFines}
+                                            onClick={handlePayAllPayments}
                                             disabled={payingAll}
                                             className="w-full h-10 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md"
                                         >
                                             <CreditCard className="h-4 w-4 mr-1.5" />
                                             {payingAll
-                                                ? "Opening Stripe Checkout..."
-                                                : `Pay All ${unpaidPayments.length} Fines (£${payAllSummary.payableTotal.toFixed(2)})`}
+                                                ? "Opening Checkout..."
+                                                : `Pay All ${unpaidPayments.length} (£${payAllSummary.payableTotal.toFixed(2)})`}
                                         </Button>
                                     </div>
                                 )}
@@ -425,9 +447,9 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                                 {unpaidPayments.length === 0 ? (
                                     <div className="text-center py-8 text-slate-400 space-y-2">
                                         <CheckCircle2 className="h-10 w-10 text-emerald-500 mx-auto" />
-                                        <p className="text-sm font-bold text-white">You&apos;re all settled!</p>
+                                        <p className="text-sm font-bold text-white">No unanswered payments!</p>
                                         <p className="text-xs text-slate-400">
-                                            No unpaid fines for {selectedPlayer.first_name}. Need to pay match subs or another fee?
+                                            You&apos;re all up to date, {selectedPlayer.first_name}. Need to send an ad-hoc sub or club fee?
                                         </p>
                                         <Button
                                             variant="outline"
@@ -435,13 +457,14 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                                             onClick={() => setPortalTab("quickpay")}
                                             className="mt-1 border-slate-700 bg-slate-950 text-emerald-400 hover:bg-slate-800 text-xs font-bold"
                                         >
-                                            <Coins className="h-3.5 w-3.5 mr-1.5" /> Pay Match Sub / Custom Amount →
+                                            <Coins className="h-3.5 w-3.5 mr-1.5" /> Pay Custom Amount →
                                         </Button>
                                     </div>
                                 ) : (
                                     unpaidPayments.map(pay => {
                                         const meta = parsePaymentDescription(pay.description);
                                         const breakdown = calculateClubFlowFee(Number(pay.amount), meta.feeCoverage);
+                                        const isOverdue = Boolean(meta.dueDate && meta.dueDate < todayStr);
 
                                         return (
                                             <div
@@ -454,33 +477,54 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                                                             {meta.cleanDescription}
                                                         </h4>
                                                         <p className="text-[11px] text-slate-400 mt-0.5">
-                                                            Direct to:{" "}
+                                                            Account:{" "}
                                                             <span className="text-slate-300 font-medium">
-                                                                {meta.payoutAccountLabel || `${club?.name} Bank Account`}
+                                                                {meta.payoutAccountLabel || `${club?.name} Account`}
                                                             </span>
                                                         </p>
                                                     </div>
-                                                    <Badge className="bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px]">
-                                                        Unpaid
-                                                    </Badge>
+                                                    <div className="flex items-center gap-1.5 shrink-0">
+                                                        <Badge
+                                                            className={`text-[10px] ${
+                                                                meta.requirement === "optional"
+                                                                    ? "bg-sky-500/15 text-sky-300 border-sky-500/30"
+                                                                    : "bg-slate-800 text-slate-300 border-slate-700"
+                                                            }`}
+                                                        >
+                                                            {meta.requirement === "optional" ? "Optional" : "Required"}
+                                                        </Badge>
+                                                        <Badge
+                                                            className={
+                                                                isOverdue
+                                                                    ? "bg-rose-500/15 text-rose-400 border-rose-500/30 text-[10px]"
+                                                                    : "bg-amber-500/15 text-amber-400 border-amber-500/30 text-[10px]"
+                                                            }
+                                                        >
+                                                            {isOverdue ? "Overdue" : "Unanswered"}
+                                                        </Badge>
+                                                    </div>
                                                 </div>
 
                                                 <div className="flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
                                                     <span className="flex items-center gap-1">
-                                                        <Calendar className="h-3 w-3" /> Issued{" "}
+                                                        <Calendar className="h-3 w-3" /> Requested{" "}
                                                         {new Date(pay.created_at).toLocaleDateString("en-GB")}
                                                     </span>
                                                     {meta.dueDate && (
-                                                        <span className="flex items-center gap-1 text-amber-400 font-semibold">
+                                                        <span
+                                                            className={`flex items-center gap-1 font-semibold ${
+                                                                isOverdue ? "text-rose-400" : "text-amber-400"
+                                                            }`}
+                                                        >
                                                             <Clock className="h-3 w-3" /> Due{" "}
-                                                            {new Date(meta.dueDate).toLocaleDateString("en-GB")}
+                                                            {new Date(meta.dueDate + "T12:00:00Z").toLocaleDateString("en-GB")}
                                                         </span>
                                                     )}
                                                 </div>
 
                                                 <div className="border-t border-slate-800/80 pt-2.5 space-y-1 text-xs">
                                                     <div className="flex justify-between text-slate-300">
-                                                        <span>Base Amount:</span>
+                                                        <span>Price:</span>
                                                         <span className="font-semibold">
                                                             £{breakdown.basePrice.toFixed(2)}
                                                         </span>
@@ -501,17 +545,33 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                                                     </div>
                                                 </div>
 
-                                                <Button
-                                                    onClick={() => handlePayNow(pay.id)}
-                                                    disabled={payingId === pay.id}
-                                                    className="w-full h-10 text-xs font-bold text-white"
-                                                    style={{ backgroundColor: primaryColor }}
-                                                >
-                                                    <CreditCard className="h-3.5 w-3.5 mr-1.5" />
-                                                    {payingId === pay.id
-                                                        ? "Opening Stripe..."
-                                                        : `Pay £${breakdown.playerTotalPayable.toFixed(2)} Now`}
-                                                </Button>
+                                                <div className="space-y-1.5">
+                                                    <Button
+                                                        onClick={() => handlePayNow(pay.id)}
+                                                        disabled={payingId === pay.id}
+                                                        className="w-full h-10 text-xs font-bold text-white"
+                                                        style={{ backgroundColor: primaryColor }}
+                                                    >
+                                                        <CreditCard className="h-3.5 w-3.5 mr-1.5" />
+                                                        {payingId === pay.id
+                                                            ? "Opening Checkout..."
+                                                            : `Pay £${breakdown.playerTotalPayable.toFixed(2)} Now`}
+                                                    </Button>
+                                                    {meta.requirement === "optional" && (
+                                                        <Button
+                                                            type="button"
+                                                            variant="ghost"
+                                                            onClick={() => handleDeclineOptional(pay.id)}
+                                                            disabled={decliningId === pay.id}
+                                                            className="w-full h-8 text-[11px] text-slate-400 hover:text-white hover:bg-slate-900"
+                                                        >
+                                                            <XCircle className="h-3 w-3 mr-1" />
+                                                            {decliningId === pay.id
+                                                                ? "Declining..."
+                                                                : "Decline Optional Payment"}
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
                                         );
                                     })
@@ -524,7 +584,7 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                             <Card className="border-slate-800 bg-slate-900/60 text-white">
                                 <CardHeader className="pb-2 border-b border-slate-800">
                                     <CardTitle className="text-sm font-bold text-slate-300">
-                                        Your Settled Payments ({paidPayments.length})
+                                        Settled Payments ({paidPayments.length})
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="pt-3 space-y-2">
@@ -558,7 +618,7 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                     </div>
                 )}
 
-                {/* TAB 2: QUICK PAY INTO CLUB (Match Subs / Social Pot / Any Amount) */}
+                {/* TAB 2: QUICK PAY INTO CLUB */}
                 {selectedPlayer && portalTab === "quickpay" && (
                     <Card className="border-slate-800 bg-slate-900/90 text-white">
                         <CardHeader className="pb-3 border-b border-slate-800">
@@ -566,7 +626,7 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                                 <Coins className="h-4 w-4 text-emerald-400" /> Pay Directly Into {club?.name || "Club"}
                             </CardTitle>
                             <CardDescription className="text-slate-400 text-xs">
-                                Pick a quick preset or enter any amount to pay straight into the club bank account via Apple Pay, Google Pay, or Card.
+                                Pick a quick preset or enter any amount to pay straight into the club bank account via Link, Apple Pay, Google Pay, or Card.
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="pt-4">
@@ -623,7 +683,7 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                                             type="text"
                                             value={quickReason}
                                             onChange={e => setQuickReason(e.target.value)}
-                                            placeholder="e.g. Match Sub / Fines Pot"
+                                            placeholder="e.g. Match Sub / Monthly Subs"
                                             className="h-10 bg-slate-950 border-slate-700 text-white text-xs"
                                             required
                                         />
@@ -657,7 +717,7 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
                                 >
                                     <CreditCard className="h-4 w-4 mr-1.5" />
                                     {submittingQuickPay
-                                        ? "Opening Stripe Checkout..."
+                                        ? "Opening Checkout..."
                                         : `Pay £${quickPayBreakdown.playerTotalPayable.toFixed(2)} to ${club?.name || "Club"}`}
                                 </Button>
                             </form>
@@ -667,7 +727,7 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
 
                 <div className="flex items-center justify-center gap-2 text-[11px] text-slate-500 pt-2">
                     <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                    <span>Powered by ClubFlow Pay &amp; Stripe • Direct Club Bank Payouts</span>
+                    <span>Powered by ClubFlow &amp; Stripe • Direct Club Bank Payouts</span>
                 </div>
             </div>
         </div>

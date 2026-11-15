@@ -75,7 +75,7 @@ const navItems: NavItem[] = [
     { label: "League Table", href: "/league", icon: Trophy },
     { label: "Opposition Reports", href: "/opposition", icon: Target },
     { label: "Recruitment", href: "/recruitment", icon: UserPlus },
-    { label: "Fines & Payments", href: "/player-payments", icon: Coins },
+    { label: "Subs & Payments", href: "/player-payments", icon: CreditCard },
     {
         label: "Administration",
         icon: Settings,

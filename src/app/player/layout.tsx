@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { supabase } from "@/lib/supabase";
-import { Calendar, User, ShieldCheck, LogOut, CheckSquare, RefreshCw } from "lucide-react";
+import { supabase, unproxiedSupabase } from "@/lib/supabase";
+import { Calendar, User, ShieldCheck, LogOut, CheckSquare, RefreshCw, CreditCard } from "lucide-react";
 import Link from "next/link";
 
 export default function PlayerLayout({ children }: { children: React.ReactNode }) {
@@ -12,6 +12,7 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
     
     const [loading, setLoading] = useState(true);
     const [playerName, setPlayerName] = useState("");
+    const [paymentsHref, setPaymentsHref] = useState<string | null>(null);
 
     useEffect(() => {
         async function checkSession() {
@@ -22,9 +23,9 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
                     return;
                 }
 
-                const { data: player, error } = await supabase
+                const { data: player, error } = await unproxiedSupabase
                     .from("players")
-                    .select("id, first_name, last_name")
+                    .select("id, club_id, first_name, last_name")
                     .eq("user_id", session.user.id)
                     .single();
 
@@ -32,6 +33,9 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
                     setPlayerName(session.user.user_metadata?.first_name || "Player");
                 } else {
                     setPlayerName(`${player.first_name} ${player.last_name}`);
+                    if (player.club_id) {
+                        setPaymentsHref(`/pay/club/${player.club_id}?player=${player.id}`);
+                    }
                 }
                 setLoading(false);
             } catch (err) {
@@ -63,6 +67,7 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
         { name: "Home", href: "/player", icon: ShieldCheck },
         { name: "Availability", href: "/player/availability", icon: CheckSquare },
         { name: "Fixtures", href: "/player/fixtures", icon: Calendar },
+        ...(paymentsHref ? [{ name: "Payments", href: paymentsHref, icon: CreditCard }] : []),
         { name: "Profile", href: "/player/profile", icon: User },
     ];
 
@@ -99,7 +104,7 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
 
             {/* Bottom Mobile Tab Bar */}
             <nav className="fixed bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-800 z-40 sm:hidden">
-                <div className="grid grid-cols-4 h-14">
+                <div className={`grid ${navigation.length === 5 ? "grid-cols-5" : "grid-cols-4"} h-14`}>
                     {navigation.map((item) => {
                         const Icon = item.icon;
                         const active = pathname === item.href;

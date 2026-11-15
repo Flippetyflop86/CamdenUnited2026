@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { supabase, unproxiedSupabase } from "@/lib/supabase";
+import { calculateClubFlowFee, parsePaymentDescription } from "@/lib/clubflow-pay";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Clock, MapPin, CheckCircle, XCircle, AlertCircle, RefreshCw } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { CalendarDays, Clock, MapPin, AlertCircle, RefreshCw, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -14,6 +16,7 @@ export default function PlayerDashboard() {
     const [playerId, setPlayerId] = useState("");
     const [upcomingMatches, setUpcomingMatches] = useState<any[]>([]);
     const [upcomingTraining, setUpcomingTraining] = useState<any[]>([]);
+    const [unansweredPayments, setUnansweredPayments] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -25,7 +28,7 @@ export default function PlayerDashboard() {
                     return;
                 }
 
-                const { data: player, error: playerErr } = await supabase
+                const { data: player, error: playerErr } = await unproxiedSupabase
                     .from("players")
                     .select("*")
                     .eq("user_id", session.user.id)
@@ -36,6 +39,17 @@ export default function PlayerDashboard() {
                 } else {
                     setPlayerId(player.id);
                     setPlayerName(player.first_name);
+
+                    const { data: openPayments } = await unproxiedSupabase
+                        .from("player_payment_requests")
+                        .select("*")
+                        .eq("player_id", player.id)
+                        .eq("status", "Unpaid")
+                        .order("created_at", { ascending: false });
+
+                    if (openPayments) {
+                        setUnansweredPayments(openPayments);
+                    }
                 }
 
                 const today = new Date().toISOString().split("T")[0];
@@ -66,7 +80,6 @@ export default function PlayerDashboard() {
         fetchPlayerAndUpcoming();
     }, [router]);
 
-    // Get availability status for a match
     const getMatchRsvp = (match: any) => {
         const currentNotes = match.notes || "";
         const matchRaw = currentNotes.match(/\[AVAILABILITY:\s*(.*?)\s*\]/);
@@ -75,14 +88,13 @@ export default function PlayerDashboard() {
                 const list = JSON.parse(matchRaw[1]);
                 const record = list.find((a: any) => a.playerId === playerId);
                 return record?.status || "Unanswered";
-            } catch (e) {
+            } catch {
                 return "Unanswered";
             }
         }
         return "Unanswered";
     };
 
-    // Get RSVP status for training
     const getTrainingRsvp = (session: any) => {
         const attendance = session.attendance || [];
         const record = attendance.find((a: any) => a.playerId === playerId);
@@ -111,13 +123,83 @@ export default function PlayerDashboard() {
         return rsvp === "Unanswered";
     });
 
+    const todayStr = new Date().toISOString().split("T")[0];
+
     return (
         <div className="space-y-6 sm:ml-44">
             {/* Header Welcomer */}
             <div>
                 <h1 className="text-2xl font-black tracking-tight text-white">Welcome, {playerName}!</h1>
-                <p className="text-xs text-slate-400">Here are your upcoming matches, trainings, and outstanding RSVPs.</p>
+                <p className="text-xs text-slate-400">
+                    Your unanswered payments, upcoming fixtures, training sessions, and RSVPs.
+                </p>
             </div>
+
+            {/* Spond-Style Unanswered Payments Card */}
+            {unansweredPayments.length > 0 && (
+                <Card className="border-amber-500/40 bg-amber-950/15 shadow-lg">
+                    <CardHeader className="py-4 border-b border-amber-500/20 flex flex-row items-center gap-2.5">
+                        <CreditCard className="h-5 w-5 text-amber-400 shrink-0" />
+                        <div>
+                            <CardTitle className="text-sm font-bold text-white">
+                                Unanswered Payment{unansweredPayments.length === 1 ? "" : "s"} ({unansweredPayments.length})
+                            </CardTitle>
+                            <CardDescription className="text-[11px] text-slate-300">
+                                Pay in 1 tap via Link, Apple Pay, Google Pay, or Card.
+                            </CardDescription>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="divide-y divide-amber-500/15 py-0">
+                        {unansweredPayments.map(pay => {
+                            const meta = parsePaymentDescription(pay.description);
+                            const breakdown = calculateClubFlowFee(Number(pay.amount || 0), meta.feeCoverage);
+                            const isOverdue = Boolean(meta.dueDate && meta.dueDate < todayStr);
+                            return (
+                                <div key={pay.id} className="py-3.5 flex items-center justify-between gap-4">
+                                    <div className="space-y-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="text-xs font-bold text-white truncate">
+                                                {meta.cleanDescription}
+                                            </p>
+                                            <Badge
+                                                className={`text-[9px] font-bold px-1.5 py-0 ${
+                                                    meta.requirement === "optional"
+                                                        ? "bg-sky-500/15 text-sky-300 border-sky-500/30"
+                                                        : "bg-amber-500/15 text-amber-300 border-amber-500/30"
+                                                }`}
+                                            >
+                                                {meta.requirement === "optional" ? "Optional" : "Required"}
+                                            </Badge>
+                                        </div>
+                                        <p className="text-[11px] text-slate-300 flex items-center gap-2 flex-wrap">
+                                            <span className="font-bold text-emerald-400">
+                                                £{breakdown.basePrice.toFixed(2)}
+                                            </span>
+                                            {meta.dueDate && (
+                                                <span className={isOverdue ? "text-rose-400 font-semibold" : "text-slate-400"}>
+                                                    • Due{" "}
+                                                    {new Date(meta.dueDate + "T12:00:00Z").toLocaleDateString("en-GB", {
+                                                        day: "numeric",
+                                                        month: "short",
+                                                    })}
+                                                </span>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <Link href={`/pay/${pay.id}`}>
+                                        <Button
+                                            size="sm"
+                                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs h-8 px-4 rounded-lg shrink-0"
+                                        >
+                                            Pay £{breakdown.playerTotalPayable.toFixed(2)}
+                                        </Button>
+                                    </Link>
+                                </div>
+                            );
+                        })}
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Outstanding RSVPs */}
             {pendingEvents.length > 0 && (

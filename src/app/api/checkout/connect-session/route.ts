@@ -112,6 +112,7 @@ export async function POST(request: Request) {
                 {
                     line_items: lineItems,
                     mode: 'payment',
+                    ...(player?.email ? { customer_email: player.email } : {}),
                     success_url: `${origin}/pay/club/${clubId}?player=${playerId}&payment=success&ids=${createdPayment.id}`,
                     cancel_url: `${origin}/pay/club/${clubId}?player=${playerId}&payment=cancelled`,
                     metadata: {
@@ -223,6 +224,7 @@ export async function POST(request: Request) {
                 {
                     line_items: lineItems,
                     mode: 'payment',
+                    ...(player?.email ? { customer_email: player.email } : {}),
                     success_url: `${origin}/pay/club/${club.id}?player=${firstPayment.player_id}&payment=success&ids=${activeIds.join(',')}`,
                     cancel_url: `${origin}/pay/club/${club.id}?player=${firstPayment.player_id}&payment=cancelled`,
                     metadata: {
@@ -333,6 +335,7 @@ export async function POST(request: Request) {
             {
                 line_items: lineItems,
                 mode: 'payment',
+                ...(player?.email ? { customer_email: player.email } : {}),
                 success_url: `${origin}/pay/${singleId}?payment=success`,
                 cancel_url: `${origin}/pay/${singleId}?payment=cancelled`,
                 metadata: {
