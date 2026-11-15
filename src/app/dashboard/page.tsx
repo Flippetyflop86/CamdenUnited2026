@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Match, Player } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
@@ -13,7 +14,10 @@ import {
     RefreshCw,
     Check,
     Clock,
+    Shield,
     ShieldAlert,
+    Shirt,
+    Target,
     MapPin,
     Award,
     AlertCircle,
@@ -32,8 +36,14 @@ import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer } from "@/lib/utils";
-import { parseStatTextString, formatClubScoreline } from "@/lib/match-stats-sync";
+import {
+    parseStatTextString,
+    formatClubScoreline,
+    parseMatchScoreline,
+    extractLineupFromRawNotes
+} from "@/lib/match-stats-sync";
 import { resolveFixtureKickoffTime, resolveFullMatchAddress } from "@/lib/whatsapp-utils";
+import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 
 type StandingsRow = {
     position: number;
@@ -51,6 +61,7 @@ type StandingsRow = {
 };
 
 export default function DashboardPage() {
+    const router = useRouter();
     const { settings, updateSettings } = useClub();
     const { clubId } = useAuth();
 
@@ -70,14 +81,27 @@ export default function DashboardPage() {
     const [copiedWhatsApp, setCopiedWhatsApp] = useState<"match" | "training" | null>(null);
     const [hideSetupChecklist, setHideSetupChecklist] = useState<boolean>(false);
     const [oppositionTeams, setOppositionTeams] = useState<any[]>([]);
+    const [leagueTeams, setLeagueTeams] = useState<any[]>([]);
 
     useEffect(() => {
         if (!clubId) return;
-        let q = supabase.from("opposition_teams").select("*");
-        q = q.eq("club_id", clubId);
-        q.then(({ data }) => {
-            if (data) setOppositionTeams(data);
-        });
+        supabase
+            .from("opposition_teams")
+            .select("*")
+            .eq("club_id", clubId)
+            .then(({ data }) => {
+                if (data) setOppositionTeams(data);
+            });
+        supabase
+            .from("league_teams")
+            .select("*")
+            .eq("club_id", clubId)
+            .then(({ data }) => {
+                if (data) {
+                    setLeagueTeams(data);
+                    if (data.length > 0) setHasLeagueTeamsInDb(true);
+                }
+            });
     }, [clubId]);
 
     useEffect(() => {
@@ -515,7 +539,17 @@ export default function DashboardPage() {
             const l = p - w - d;
             const pts = w * 3 + d;
             const ppg = p > 0 ? (pts / p).toFixed(2) : "0.00";
-            return { p, w, d, l, pts, ppg };
+            let gf = 0;
+            let ga = 0;
+            list.forEach(m => {
+                const parsed = parseMatchScoreline(m.scoreline, Boolean(m.isHome));
+                if (parsed) {
+                    gf += parsed.clubGoals;
+                    ga += parsed.opponentGoals;
+                }
+            });
+            const gd = gf - ga;
+            return { p, w, d, l, pts, ppg, gf, ga, gd };
         };
         return {
             overall: calc(completedMatches),
@@ -676,13 +710,18 @@ export default function DashboardPage() {
         return {
             topScorer: topScorers[0] || null,
             secondScorer: topScorers[1] || null,
+            topScorersList: topScorers.slice(0, 3),
             topAssister: topAssisters[0] || null,
             secondAssister: topAssisters[1] || null,
+            topAssistersList: topAssisters.slice(0, 3),
             topContributor: topContributors[0] || null,
             secondContributor: topContributors[1] || null,
+            topContributorsList: topContributors.slice(0, 3),
             topMotm: motmSorted[0] ? { name: motmSorted[0][0], count: motmSorted[0][1] } : null,
             secondMotm: motmSorted[1] ? { name: motmSorted[1][0], count: motmSorted[1][1] } : null,
+            motmList: motmSorted.slice(0, 3).map(([name, count]) => ({ name, count })),
             topTrainingPlayer: playerTrainingStats[0] || null,
+            trainingList: playerTrainingStats.slice(0, 3),
             teamAvgAttendance
         };
     }, [players, matches, matchPlayerStats, trainingSessions]);
@@ -844,6 +883,107 @@ export default function DashboardPage() {
         };
     }, [nextMatch?.opponent, oppositionTeams]);
 
+    const getClubInitials = (name?: string | null) => {
+        if (!name) return "FC";
+        const words = name
+            .replace(/\b(fc|afc|sc|1st|first|xi)\b/gi, "")
+            .trim()
+            .split(/\s+/)
+            .filter(Boolean);
+        if (words.length === 0) return name.slice(0, 2).toUpperCase();
+        if (words.length === 1) return words[0].slice(0, 2).toUpperCase();
+        return (words[0][0] + words[1][0]).toUpperCase();
+    };
+
+    const getOpponentBadgeUrl = (teamName?: string | null): string | null => {
+        if (!teamName) return null;
+        const norm = (s: string) =>
+            (s || "")
+                .toLowerCase()
+                .replace(/\b(fc|afc|united|utd|city|town|athletic|ath|rovers|wanderers|albion|sc|1st|first|xi|reserves|res)\b/gi, "")
+                .replace(/[^a-z0-9]/g, "")
+                .trim();
+        const target = norm(teamName);
+        const matchInLeague = leagueTeams.find(t => {
+            const candidateName = String(t.name || t.team_name || "");
+            if (candidateName.toLowerCase().trim() === teamName.toLowerCase().trim()) return true;
+            const c = norm(candidateName);
+            return c.length >= 3 && target.length >= 3 && (c === target || c.includes(target) || target.includes(c));
+        });
+        if (matchInLeague?.badge_url || matchInLeague?.logo_url) {
+            return matchInLeague.badge_url || matchInLeague.logo_url;
+        }
+        const matchInOpp = oppositionTeams.find(t => {
+            const candidateName = String(t.name || "");
+            if (candidateName.toLowerCase().trim() === teamName.toLowerCase().trim()) return true;
+            const c = norm(candidateName);
+            return c.length >= 3 && target.length >= 3 && (c === target || c.includes(target) || target.includes(c));
+        });
+        return matchInOpp?.badge_url || matchInOpp?.logo_url || null;
+    };
+
+    const nextOppBadgeUrl = useMemo(
+        () => getOpponentBadgeUrl(nextMatch?.opponent),
+        [nextMatch?.opponent, leagueTeams, oppositionTeams]
+    );
+
+    const nextMatchReadiness = useMemo(() => {
+        if (!nextMatch) return { startersCount: 0, subsCount: 0, formation: null as string | null, scoutReady: false };
+        const extracted = extractLineupFromRawNotes(nextMatch.rawNotes || "");
+        const parsed = extracted.parsedLineup;
+        let startersCount = 0;
+        let subsCount = 0;
+        let formation: string | null = null;
+        if (parsed && typeof parsed === "object") {
+            formation = parsed.formation || null;
+            if (parsed.starters && typeof parsed.starters === "object") {
+                startersCount = Object.values(parsed.starters).filter((v: any) => Boolean(v && String(v).trim())).length;
+            }
+            if (Array.isArray(parsed.substitutes)) {
+                subsCount = parsed.substitutes.filter((v: any) => Boolean(v && String(v).trim())).length;
+            } else if (parsed.substitutes && typeof parsed.substitutes === "object") {
+                subsCount = Object.values(parsed.substitutes).filter((v: any) => Boolean(v && String(v).trim())).length;
+            }
+        }
+        return {
+            startersCount: Math.min(11, startersCount),
+            subsCount,
+            formation,
+            scoutReady: Boolean(nextOpponentScoutBrief),
+        };
+    }, [nextMatch, nextOpponentScoutBrief]);
+
+    const seasonSummaryRecord = useMemo(() => {
+        if (ourStandingsRow && ourStandingsRow.played > 0) {
+            return {
+                played: ourStandingsRow.played,
+                won: ourStandingsRow.won,
+                drawn: ourStandingsRow.drawn,
+                lost: ourStandingsRow.lost,
+                gd: ourStandingsRow.goal_difference,
+                pts: ourStandingsRow.points,
+            };
+        }
+        if (homeAwayStats.overall.p > 0) {
+            return {
+                played: homeAwayStats.overall.p,
+                won: homeAwayStats.overall.w,
+                drawn: homeAwayStats.overall.d,
+                lost: homeAwayStats.overall.l,
+                gd: homeAwayStats.overall.gd,
+                pts: homeAwayStats.overall.pts,
+            };
+        }
+        return null;
+    }, [ourStandingsRow, homeAwayStats.overall]);
+
+    const clubAccentHex = /^#[0-9A-Fa-f]{6}$/.test(settings.primaryColor || "")
+        ? settings.primaryColor
+        : "#e11d48";
+    const clubShirtHex = /^#[0-9A-Fa-f]{6}$/.test(settings.homeKitShirt || "")
+        ? settings.homeKitShirt
+        : clubAccentHex;
+
     const getRowStreakBadges = (row: StandingsRow) => {
         const fullForm = Array.isArray(row.form) ? row.form : [];
         let trailingWins = 0;
@@ -968,22 +1108,63 @@ export default function DashboardPage() {
                 )}
 
                 {/* ========================================================= */}
-                {/* TOP HEADER: CLUB PULSE & HOME/AWAY SPLIT PILL             */}
+                {/* TOP HEADER: CLUB-BRANDED HERO BANNER & SEASON PULSE       */}
                 {/* ========================================================= */}
-                <div className="bg-surface-1 border border-border rounded-2xl p-4 md:p-6 shadow-xs">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                        {/* Club Identity + Standing + Recent Form */}
-                        <div className="flex items-center gap-3.5 min-w-0">
+                <div
+                    className="relative overflow-hidden bg-surface-1 border border-border rounded-2xl p-4 md:p-6 shadow-xs"
+                    style={{
+                        backgroundImage: `radial-gradient(ellipse at top left, ${clubAccentHex}1c 0%, transparent 58%)`,
+                    }}
+                >
+                    {/* Top Club-Colour Accent Strip */}
+                    <div
+                        className="absolute inset-x-0 top-0 h-1"
+                        style={{
+                            background: `linear-gradient(90deg, ${clubAccentHex} 0%, ${clubAccentHex}66 45%, transparent 100%)`,
+                        }}
+                    />
+
+                    <div className="relative flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+                        {/* Club Identity + Season Record + Recent Form */}
+                        <div className="flex items-start sm:items-center gap-3.5 md:gap-4 min-w-0">
                             {settings.logo ? (
-                                <img src={settings.logo} alt={settings.name} className="h-12 w-12 md:h-14 md:w-14 object-contain shrink-0 rounded-xl bg-surface-2 p-1 border border-border" />
+                                <div className="relative shrink-0">
+                                    <img
+                                        src={settings.logo}
+                                        alt={settings.name}
+                                        className="h-14 w-14 md:h-16 md:w-16 object-contain rounded-2xl bg-surface-2/90 p-1.5 border border-border shadow-sm"
+                                    />
+                                </div>
                             ) : (
-                                <div className="h-12 w-12 md:h-14 md:w-14 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center shrink-0">
-                                    <Trophy className="h-6 w-6 text-brand" />
+                                <div
+                                    className="h-14 w-14 md:h-16 md:w-16 rounded-2xl border border-brand/30 flex items-center justify-center shrink-0 shadow-sm font-black text-base md:text-lg text-brand bg-brand/10"
+                                >
+                                    {getClubInitials(settings.name)}
                                 </div>
                             )}
+
                             <div className="min-w-0 flex-1">
+                                {/* Matchweek / Countdown Kicker */}
+                                <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                                    <span className="text-[10px] font-extrabold uppercase tracking-widest text-brand">
+                                        {nextMatch
+                                            ? timeLeft
+                                                ? timeLeft.days === 0
+                                                    ? `Matchday Today • ${nextMatch.isHome ? "Home vs" : "Away at"} ${nextMatch.opponent}`
+                                                    : `${timeLeft.days}d ${timeLeft.hours}h until ${nextMatch.opponent} (${nextMatch.isHome ? "H" : "A"})`
+                                                : `Next Up • ${nextMatch.isHome ? "vs" : "@"} ${nextMatch.opponent}`
+                                            : "Club Command Centre"}
+                                    </span>
+                                    {settings.homeGround && (
+                                        <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground">
+                                            • <MapPin className="h-2.5 w-2.5 text-muted-foreground" /> {settings.homeGround}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* Club Title + Position + Season Record Pill */}
                                 <div className="flex items-center gap-2 flex-wrap">
-                                    <h1 className="text-lg md:text-2xl font-black text-foreground tracking-tight truncate">
+                                    <h1 className="text-xl md:text-2xl font-black text-foreground tracking-tight truncate">
                                         {settings.name || "ClubFlow"}
                                     </h1>
                                     <Link
@@ -993,27 +1174,46 @@ export default function DashboardPage() {
                                         <Trophy className="h-3 w-3" />
                                         {displayLeaguePosition}
                                     </Link>
+                                    {seasonSummaryRecord && (
+                                        <Link
+                                            href="/league"
+                                            className="inline-flex items-center gap-1.5 rounded-full bg-surface-2/90 border border-border px-2.5 py-0.5 text-[11px] font-bold text-foreground hover:border-brand/40 transition-colors"
+                                        >
+                                            <span className="text-muted-foreground">{seasonSummaryRecord.played}P</span>
+                                            <span>•</span>
+                                            <span>
+                                                {seasonSummaryRecord.won}W {seasonSummaryRecord.drawn}D {seasonSummaryRecord.lost}L
+                                            </span>
+                                            <span>•</span>
+                                            <span className={seasonSummaryRecord.gd > 0 ? "text-emerald-500 font-extrabold" : seasonSummaryRecord.gd < 0 ? "text-rose-500 font-extrabold" : "text-muted-foreground"}>
+                                                {seasonSummaryRecord.gd > 0 ? `+${seasonSummaryRecord.gd}` : seasonSummaryRecord.gd} GD
+                                            </span>
+                                            <span>•</span>
+                                            <span className="font-black text-brand">{seasonSummaryRecord.pts} Pts</span>
+                                        </Link>
+                                    )}
                                 </div>
 
                                 {/* Recent 5 Form Pills */}
-                                <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                        Form:
+                                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                        Last 5:
                                     </span>
                                     <div className="inline-flex items-center gap-1">
                                         {recentForm.length > 0 ? (
-                                            recentForm.map(m => {
+                                            recentForm.map((m, idx) => {
                                                 const badgeStyle =
                                                     m.result === "Win"
-                                                        ? "bg-emerald-500 text-white"
+                                                        ? "bg-emerald-500 text-white shadow-xs"
                                                         : m.result === "Draw"
-                                                            ? "bg-amber-500 text-white"
-                                                            : "bg-rose-500 text-white";
+                                                            ? "bg-amber-500 text-white shadow-xs"
+                                                            : "bg-rose-500 text-white shadow-xs";
+                                                const isLatest = idx === recentForm.length - 1;
                                                 return (
                                                     <span
                                                         key={m.id}
                                                         title={`${m.result} (${formatClubScoreline(m.scoreline, Boolean(m.isHome))}) ${m.isHome ? "vs" : "@"} ${m.opponent}`}
-                                                        className={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] font-black ${badgeStyle}`}
+                                                        className={`inline-flex items-center justify-center w-5 h-5 md:w-6 md:h-6 rounded-md text-[10px] font-black transition-transform hover:scale-105 ${badgeStyle} ${isLatest ? "ring-2 ring-offset-1 ring-offset-background ring-foreground/25" : ""}`}
                                                     >
                                                         {m.result?.[0]}
                                                     </span>
@@ -1023,38 +1223,49 @@ export default function DashboardPage() {
                                             <span className="text-xs text-muted-foreground">No competitive results yet</span>
                                         )}
                                     </div>
+                                    <span className="hidden md:inline text-[11px] text-muted-foreground font-medium">
+                                        • <strong className="text-emerald-500">{availablePlayers.length}</strong>/{players.length} squad fit
+                                    </span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Home vs Away Split Pill (Addition #4) */}
-                        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 pt-3 lg:pt-0 border-t lg:border-t-0 border-border">
-                            <div className="flex items-center gap-2 bg-surface-2/80 border border-border rounded-xl px-3 py-2 min-w-0">
-                                <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-500 flex items-center justify-center shrink-0">
-                                    <Home className="h-3.5 w-3.5" />
+                        {/* Home vs Away Split Cards */}
+                        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2.5 pt-3 xl:pt-0 border-t xl:border-t-0 border-border shrink-0">
+                            <div className="flex items-center gap-2.5 bg-surface-2/85 border border-border rounded-xl px-3 py-2.5 min-w-0">
+                                <div className="h-8 w-8 rounded-lg bg-emerald-500/15 border border-emerald-500/25 text-emerald-500 flex items-center justify-center shrink-0">
+                                    <Home className="h-4 w-4" />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                        Home Split
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                            Home
+                                        </span>
+                                        <span className="text-[10px] font-black px-1.5 py-0 rounded bg-emerald-500/15 text-emerald-500">
+                                            {homeAwayStats.home.ppg} PPG
+                                        </span>
                                     </div>
-                                    <div className="text-xs font-extrabold text-foreground truncate">
-                                        {homeAwayStats.home.w}W-{homeAwayStats.home.d}D-{homeAwayStats.home.l}L{" "}
-                                        <span className="text-emerald-500 font-bold">({homeAwayStats.home.ppg} PPG)</span>
+                                    <div className="text-xs md:text-sm font-black text-foreground truncate mt-0.5">
+                                        {homeAwayStats.home.w}W – {homeAwayStats.home.d}D – {homeAwayStats.home.l}L
                                     </div>
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-2 bg-surface-2/80 border border-border rounded-xl px-3 py-2 min-w-0">
-                                <div className="h-7 w-7 rounded-lg bg-sky-500/10 text-sky-500 flex items-center justify-center shrink-0">
-                                    <Plane className="h-3.5 w-3.5" />
+                            <div className="flex items-center gap-2.5 bg-surface-2/85 border border-border rounded-xl px-3 py-2.5 min-w-0">
+                                <div className="h-8 w-8 rounded-lg bg-sky-500/15 border border-sky-500/25 text-sky-500 flex items-center justify-center shrink-0">
+                                    <Plane className="h-4 w-4" />
                                 </div>
                                 <div className="min-w-0">
-                                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                                        Away Split
+                                    <div className="flex items-center gap-1.5">
+                                        <span className="text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground">
+                                            Away
+                                        </span>
+                                        <span className="text-[10px] font-black px-1.5 py-0 rounded bg-sky-500/15 text-sky-500">
+                                            {homeAwayStats.away.ppg} PPG
+                                        </span>
                                     </div>
-                                    <div className="text-xs font-extrabold text-foreground truncate">
-                                        {homeAwayStats.away.w}W-{homeAwayStats.away.d}D-{homeAwayStats.away.l}L{" "}
-                                        <span className="text-sky-500 font-bold">({homeAwayStats.away.ppg} PPG)</span>
+                                    <div className="text-xs md:text-sm font-black text-foreground truncate mt-0.5">
+                                        {homeAwayStats.away.w}W – {homeAwayStats.away.d}D – {homeAwayStats.away.l}L
                                     </div>
                                 </div>
                             </div>
@@ -1118,28 +1329,45 @@ export default function DashboardPage() {
                 )}
 
                 {/* ========================================================= */}
+                {/* COLLAPSIBLE 7-DAY "THIS WEEK AT A GLANCE" STRIP           */}
+                {/* ========================================================= */}
+                <WeeklyFootballCalendar
+                    matches={matches}
+                    trainings={trainingSessions}
+                    title="This Week at a Glance"
+                    daysToShow={7}
+                    onSelectMatch={(id) => router.push(`/matchday-xi?match=${id}`)}
+                />
+
+                {/* ========================================================= */}
                 {/* MATCHDAY & TRAINING BRIEFING ROW (3 CARDS)                */}
                 {/* Next Match + Next Training + Last Match Quick Recap       */}
                 {/* ========================================================= */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-                    {/* CARD A: NEXT MATCH + WHATSAPP COPY */}
-                    <Card className="border-border bg-surface-1 shadow-xs flex flex-col justify-between overflow-hidden">
-                        <CardContent className="p-4 md:p-5 flex flex-col justify-between h-full gap-4">
+                    {/* CARD A: BROADCAST-STYLE NEXT MATCH + READINESS BAR */}
+                    <Card
+                        className="relative border-brand/30 bg-surface-1 shadow-xs flex flex-col justify-between overflow-hidden"
+                        style={{
+                            backgroundImage: `radial-gradient(ellipse at top right, ${clubAccentHex}14 0%, transparent 65%)`,
+                        }}
+                    >
+                        <CardContent className="p-4 md:p-5 flex flex-col justify-between h-full gap-3.5">
                             <div>
+                                {/* Header Row */}
                                 <div className="flex items-center justify-between gap-2 mb-3">
                                     <span className="text-[11px] font-extrabold uppercase tracking-wider text-brand flex items-center gap-1.5">
                                         <Zap className="h-3.5 w-3.5 fill-brand text-brand" />
-                                        Next Match
+                                        Next Matchday
                                     </span>
                                     {nextMatch && (
                                         <div className="flex items-center gap-1.5">
                                             {timeLeft && (
-                                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20">
+                                                <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-brand/15 text-brand border border-brand/30">
                                                     {timeLeft.days > 0 ? `${timeLeft.days}d ${timeLeft.hours}h` : `${timeLeft.hours}h ${timeLeft.minutes}m`}
                                                 </span>
                                             )}
-                                            <Badge variant="outline" className="text-[10px] font-bold px-2 py-0">
+                                            <Badge variant="outline" className="text-[10px] font-bold px-2 py-0 bg-surface-2/60">
                                                 {nextMatch.competition || "League"}
                                             </Badge>
                                         </div>
@@ -1147,40 +1375,181 @@ export default function DashboardPage() {
                                 </div>
 
                                 {nextMatch ? (
-                                    <div className="space-y-2.5">
-                                        <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="text-xl md:text-2xl font-black text-foreground tracking-tight truncate">
-                                                vs {nextMatch.opponent}
-                                            </span>
-                                            {nextOppPos && (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-extrabold bg-surface-2 border border-border text-muted-foreground">
-                                                    #{nextOppPos}
-                                                </span>
-                                            )}
-                                            <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md ${
-                                                nextMatch.isHome
-                                                    ? "bg-emerald-500/15 text-emerald-500 border border-emerald-500/30"
-                                                    : "bg-sky-500/15 text-sky-500 border border-sky-500/30"
-                                            }`}>
-                                                {nextMatch.isHome ? "Home" : "Away"}
-                                            </span>
-                                        </div>
+                                    <div className="space-y-3">
+                                        {/* Broadcast Crest-vs-Crest Box (Strict Home Left vs Away Right) */}
+                                        {(() => {
+                                            const ourTeamSide = {
+                                                name: settings.name || "Our Club",
+                                                logo: settings.logo,
+                                                initials: getClubInitials(settings.name),
+                                                pos: currentPosNumber,
+                                                isOurs: true,
+                                            };
+                                            const oppTeamSide = {
+                                                name: nextMatch.opponent,
+                                                logo: nextOppBadgeUrl,
+                                                initials: getClubInitials(nextMatch.opponent),
+                                                pos: nextOppPos,
+                                                isOurs: false,
+                                            };
+                                            const homeSide = nextMatch.isHome ? ourTeamSide : oppTeamSide;
+                                            const awaySide = nextMatch.isHome ? oppTeamSide : ourTeamSide;
 
-                                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground font-medium">
-                                            <span className="inline-flex items-center gap-1.5">
-                                                <Calendar className="h-3.5 w-3.5 text-brand" />
-                                                {formatDate(nextMatch.date)}
-                                            </span>
-                                            <span className="inline-flex items-center gap-1.5">
-                                                <Clock className="h-3.5 w-3.5 text-brand" />
-                                                KO {nextMatch.time || "TBC"}
-                                            </span>
-                                            {nextMatch.location && (
-                                                <span className="inline-flex items-center gap-1.5 truncate max-w-full">
-                                                    <MapPin className="h-3.5 w-3.5 text-brand shrink-0" />
-                                                    <span className="truncate">{nextMatch.location}</span>
+                                            return (
+                                                <div className="rounded-xl border border-border bg-surface-2/65 p-3">
+                                                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                                                        {/* HOME TEAM (ALWAYS LEFT) */}
+                                                        <div className="flex flex-col items-center text-center min-w-0">
+                                                            <span className="text-[9px] font-extrabold uppercase tracking-widest text-emerald-500 mb-1">
+                                                                Home
+                                                            </span>
+                                                            {homeSide.logo ? (
+                                                                <img
+                                                                    src={homeSide.logo}
+                                                                    alt={homeSide.name}
+                                                                    className={`h-10 w-10 object-contain rounded-xl bg-surface-1 p-1 border ${
+                                                                        homeSide.isOurs ? "border-brand/40 ring-2 ring-brand/15" : "border-border"
+                                                                    }`}
+                                                                />
+                                                            ) : (
+                                                                <div
+                                                                    className={`h-10 w-10 rounded-xl flex items-center justify-center text-xs font-black border ${
+                                                                        homeSide.isOurs
+                                                                            ? "bg-brand/15 text-brand border-brand/35"
+                                                                            : "bg-surface-1 text-muted-foreground border-border"
+                                                                    }`}
+                                                                >
+                                                                    {homeSide.initials}
+                                                                </div>
+                                                            )}
+                                                            <span className={`text-xs font-black truncate max-w-full mt-1.5 ${homeSide.isOurs ? "text-brand" : "text-foreground"}`}>
+                                                                {homeSide.name}
+                                                            </span>
+                                                            {homeSide.pos && (
+                                                                <span className="text-[10px] font-bold text-muted-foreground">
+                                                                    #{homeSide.pos}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        {/* CENTRE KICKOFF / VS */}
+                                                        <div className="flex flex-col items-center justify-center px-1.5 text-center">
+                                                            <span className="text-[10px] font-extrabold uppercase tracking-widest text-muted-foreground">
+                                                                {formatDate(nextMatch.date)}
+                                                            </span>
+                                                            <span className="my-1 px-2.5 py-1 rounded-lg bg-surface-1 border border-border text-sm font-black font-mono text-foreground shadow-2xs">
+                                                                {nextMatch.time || "TBC"}
+                                                            </span>
+                                                            <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                                                                {nextMatch.surface || "4G"}
+                                                            </span>
+                                                        </div>
+
+                                                        {/* AWAY TEAM (ALWAYS RIGHT) */}
+                                                        <div className="flex flex-col items-center text-center min-w-0">
+                                                            <span className="text-[9px] font-extrabold uppercase tracking-widest text-sky-500 mb-1">
+                                                                Away
+                                                            </span>
+                                                            {awaySide.logo ? (
+                                                                <img
+                                                                    src={awaySide.logo}
+                                                                    alt={awaySide.name}
+                                                                    className={`h-10 w-10 object-contain rounded-xl bg-surface-1 p-1 border ${
+                                                                        awaySide.isOurs ? "border-brand/40 ring-2 ring-brand/15" : "border-border"
+                                                                    }`}
+                                                                />
+                                                            ) : (
+                                                                <div
+                                                                    className={`h-10 w-10 rounded-xl flex items-center justify-center text-xs font-black border ${
+                                                                        awaySide.isOurs
+                                                                            ? "bg-brand/15 text-brand border-brand/35"
+                                                                            : "bg-surface-1 text-muted-foreground border-border"
+                                                                    }`}
+                                                                >
+                                                                    {awaySide.initials}
+                                                                </div>
+                                                            )}
+                                                            <span className={`text-xs font-black truncate max-w-full mt-1.5 ${awaySide.isOurs ? "text-brand" : "text-foreground"}`}>
+                                                                {awaySide.name}
+                                                            </span>
+                                                            {awaySide.pos && (
+                                                                <span className="text-[10px] font-bold text-muted-foreground">
+                                                                    #{awaySide.pos}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+
+                                                    {nextMatch.location && (
+                                                        <div className="mt-2.5 pt-2 border-t border-border/70 flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground">
+                                                            <MapPin className="h-3 w-3 text-brand shrink-0" />
+                                                            <span className="truncate">{nextMatch.location}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
+
+                                        {/* Matchday Readiness Strip (XI / Bench / Scout Brief) */}
+                                        <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between text-[10px] font-extrabold uppercase tracking-wider text-muted-foreground px-0.5">
+                                                <span>Matchday Readiness</span>
+                                                <span className="text-foreground">
+                                                    {[
+                                                        nextMatchReadiness.startersCount >= 11,
+                                                        nextMatchReadiness.subsCount >= 3,
+                                                        nextMatchReadiness.scoutReady,
+                                                    ].filter(Boolean).length}
+                                                    /3 Ready
                                                 </span>
-                                            )}
+                                            </div>
+                                            <div className="grid grid-cols-3 gap-1.5">
+                                                <Link
+                                                    href={`/matchday-xi?match=${nextMatch.id}`}
+                                                    className={`rounded-lg border px-2 py-1.5 text-center transition-colors ${
+                                                        nextMatchReadiness.startersCount >= 11
+                                                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                                                            : nextMatchReadiness.startersCount > 0
+                                                                ? "bg-amber-500/10 border-amber-500/30 text-amber-500"
+                                                                : "bg-surface-2 border-border text-muted-foreground hover:border-brand/40"
+                                                    }`}
+                                                >
+                                                    <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">Starting XI</div>
+                                                    <div className="text-xs font-black mt-0.5">
+                                                        {nextMatchReadiness.startersCount}/11 {nextMatchReadiness.startersCount >= 11 ? "✓" : ""}
+                                                    </div>
+                                                </Link>
+
+                                                <Link
+                                                    href={`/matchday-xi?match=${nextMatch.id}`}
+                                                    className={`rounded-lg border px-2 py-1.5 text-center transition-colors ${
+                                                        nextMatchReadiness.subsCount >= 5
+                                                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                                                            : nextMatchReadiness.subsCount > 0
+                                                                ? "bg-sky-500/10 border-sky-500/30 text-sky-500"
+                                                                : "bg-surface-2 border-border text-muted-foreground hover:border-brand/40"
+                                                    }`}
+                                                >
+                                                    <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">Bench</div>
+                                                    <div className="text-xs font-black mt-0.5">
+                                                        {nextMatchReadiness.subsCount}/5 {nextMatchReadiness.subsCount >= 5 ? "✓" : ""}
+                                                    </div>
+                                                </Link>
+
+                                                <Link
+                                                    href={`/opposition?team=${encodeURIComponent(nextMatch.opponent)}`}
+                                                    className={`rounded-lg border px-2 py-1.5 text-center transition-colors ${
+                                                        nextMatchReadiness.scoutReady
+                                                            ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-500"
+                                                            : "bg-surface-2 border-border text-muted-foreground hover:border-brand/40"
+                                                    }`}
+                                                >
+                                                    <div className="text-[9px] font-bold uppercase tracking-wider opacity-80">Scout</div>
+                                                    <div className="text-xs font-black mt-0.5">
+                                                        {nextMatchReadiness.scoutReady ? "Ready ✓" : "+ Add"}
+                                                    </div>
+                                                </Link>
+                                            </div>
                                         </div>
                                     </div>
                                 ) : (
@@ -1195,26 +1564,6 @@ export default function DashboardPage() {
 
                             {nextMatch && (
                                 <div className="space-y-2 pt-3 border-t border-border">
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={copyMatchForWhatsApp}
-                                            className="h-8 text-xs font-semibold w-full truncate"
-                                        >
-                                            <Copy className="h-3.5 w-3.5 mr-1.5 shrink-0 text-emerald-500" />
-                                            <span className="truncate">
-                                                {copiedWhatsApp === "match" ? "Copied for WhatsApp!" : "WhatsApp Copy"}
-                                            </span>
-                                        </Button>
-                                        <Link
-                                            href="/matchday-xi"
-                                            className="h-8 px-3 rounded-md bg-brand hover:bg-brand/90 text-white text-xs font-bold inline-flex items-center justify-center gap-1 transition-colors"
-                                        >
-                                            Matchday Planner <ArrowRight className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </div>
                                     {nextOpponentScoutBrief && (
                                         <div className="rounded-lg bg-surface-2/80 border border-brand/25 p-2.5 text-[11px] space-y-1">
                                             <div className="flex items-center justify-between gap-2">
@@ -1244,12 +1593,26 @@ export default function DashboardPage() {
                                             )}
                                         </div>
                                     )}
-                                    <Link
-                                        href={`/opposition?team=${encodeURIComponent(nextMatch.opponent)}`}
-                                        className="h-7 w-full px-3 rounded-md bg-surface-2 hover:bg-accent border border-border text-foreground text-[11px] font-bold inline-flex items-center justify-center gap-1.5 transition-colors"
-                                    >
-                                        📋 Opposition Scouting Report: {nextMatch.opponent}
-                                    </Link>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={copyMatchForWhatsApp}
+                                            className="h-8 text-xs font-semibold w-full truncate"
+                                        >
+                                            <Copy className="h-3.5 w-3.5 mr-1.5 shrink-0 text-emerald-500" />
+                                            <span className="truncate">
+                                                {copiedWhatsApp === "match" ? "Copied!" : "WhatsApp Copy"}
+                                            </span>
+                                        </Button>
+                                        <Link
+                                            href={`/matchday-xi?match=${nextMatch.id}`}
+                                            className="h-8 px-3 rounded-md bg-brand hover:bg-brand/90 text-white text-xs font-bold inline-flex items-center justify-center gap-1 transition-colors"
+                                        >
+                                            Matchday Planner <ArrowRight className="h-3.5 w-3.5" />
+                                        </Link>
+                                    </div>
                                 </div>
                             )}
                         </CardContent>
@@ -1419,124 +1782,296 @@ export default function DashboardPage() {
                         </Link>
                     </div>
 
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 md:gap-4">
-                        {/* Top Goalscorer */}
-                        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-3.5 md:p-4">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-brand truncate">
-                                Top Goalscorer
-                            </p>
-                            {leaderboards.topScorer ? (
-                                <>
-                                    <div className="flex items-baseline justify-between gap-2 mt-1">
-                                        <span className="text-sm md:text-base font-extrabold text-foreground truncate">
-                                            {formatPlayerName(leaderboards.topScorer)}
-                                        </span>
-                                        <span className="text-xl md:text-2xl font-black text-brand shrink-0">
-                                            {leaderboards.topScorer.goals}
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-muted-foreground mt-1 truncate">
-                                        {leaderboards.secondScorer
-                                            ? `2nd: ${formatPlayerName(leaderboards.secondScorer)} (${leaderboards.secondScorer.goals})`
-                                            : `${leaderboards.topScorer.appearances || 0} apps`}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                        {/* Top Goalscorer Podium Card */}
+                        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-4 flex flex-col justify-between gap-3">
+                            <div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-brand truncate flex items-center gap-1.5">
+                                        <Target className="h-3.5 w-3.5 text-brand shrink-0" />
+                                        Golden Boot
                                     </p>
-                                </>
-                            ) : (
-                                <p className="text-xs text-muted-foreground mt-2">No goals logged yet</p>
-                            )}
+                                    <span className="text-[10px] font-bold text-muted-foreground">Goals</span>
+                                </div>
+                                {leaderboards.topScorer ? (
+                                    <div className="mt-2.5 space-y-2.5">
+                                        <div className="flex items-center justify-between gap-2 rounded-xl bg-brand/5 border border-brand/20 px-2.5 py-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <div
+                                                    className="h-7 w-7 rounded-lg border border-border flex items-center justify-center shrink-0 shadow-2xs"
+                                                    style={{ backgroundColor: `${clubShirtHex}22` }}
+                                                >
+                                                    <Shirt className="h-4 w-4 text-brand" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs md:text-sm font-black text-foreground truncate">
+                                                        {formatPlayerName(leaderboards.topScorer)}
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        {leaderboards.topScorer.position} • {leaderboards.topScorer.appearances || 0} apps
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span className="text-xl md:text-2xl font-black text-brand shrink-0">
+                                                {leaderboards.topScorer.goals}
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            {leaderboards.topScorersList.map((p, idx) => {
+                                                const maxG = Math.max(1, leaderboards.topScorer?.goals || 1);
+                                                const pct = Math.max(12, Math.round(((p.goals || 0) / maxG) * 100));
+                                                return (
+                                                    <div key={p.id} className="space-y-0.5">
+                                                        <div className="flex items-center justify-between text-[11px]">
+                                                            <span className="truncate text-muted-foreground font-medium">
+                                                                <strong className={idx === 0 ? "text-brand" : "text-foreground"}>{idx + 1}.</strong>{" "}
+                                                                {formatPlayerName(p)}
+                                                            </span>
+                                                            <span className="font-extrabold text-foreground shrink-0 ml-2">{p.goals}</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full ${idx === 0 ? "bg-brand" : "bg-brand/45"}`}
+                                                                style={{ width: `${pct}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground mt-3">No goals logged yet</p>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Most Assists */}
-                        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-3.5 md:p-4">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-sky-500 truncate">
-                                Most Assists
-                            </p>
-                            {leaderboards.topAssister ? (
-                                <>
-                                    <div className="flex items-baseline justify-between gap-2 mt-1">
-                                        <span className="text-sm md:text-base font-extrabold text-foreground truncate">
-                                            {formatPlayerName(leaderboards.topAssister)}
-                                        </span>
-                                        <span className="text-xl md:text-2xl font-black text-sky-500 shrink-0">
-                                            {leaderboards.topAssister.assists}
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-muted-foreground mt-1 truncate">
-                                        {leaderboards.secondAssister
-                                            ? `2nd: ${formatPlayerName(leaderboards.secondAssister)} (${leaderboards.secondAssister.assists})`
-                                            : `${leaderboards.topAssister.appearances || 0} apps`}
+                        {/* Most Assists Podium Card */}
+                        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-4 flex flex-col justify-between gap-3">
+                            <div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-sky-500 truncate flex items-center gap-1.5">
+                                        <Sparkles className="h-3.5 w-3.5 text-sky-500 shrink-0" />
+                                        Playmaker
                                     </p>
-                                </>
-                            ) : (
-                                <p className="text-xs text-muted-foreground mt-2">No assists logged yet</p>
-                            )}
+                                    <span className="text-[10px] font-bold text-muted-foreground">Assists</span>
+                                </div>
+                                {leaderboards.topAssister ? (
+                                    <div className="mt-2.5 space-y-2.5">
+                                        <div className="flex items-center justify-between gap-2 rounded-xl bg-sky-500/5 border border-sky-500/20 px-2.5 py-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <div className="h-7 w-7 rounded-lg bg-sky-500/15 border border-sky-500/25 flex items-center justify-center shrink-0">
+                                                    <Shirt className="h-4 w-4 text-sky-500" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs md:text-sm font-black text-foreground truncate">
+                                                        {formatPlayerName(leaderboards.topAssister)}
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        {leaderboards.topAssister.position} • {leaderboards.topAssister.appearances || 0} apps
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span className="text-xl md:text-2xl font-black text-sky-500 shrink-0">
+                                                {leaderboards.topAssister.assists}
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            {leaderboards.topAssistersList.map((p, idx) => {
+                                                const maxA = Math.max(1, leaderboards.topAssister?.assists || 1);
+                                                const pct = Math.max(12, Math.round(((p.assists || 0) / maxA) * 100));
+                                                return (
+                                                    <div key={p.id} className="space-y-0.5">
+                                                        <div className="flex items-center justify-between text-[11px]">
+                                                            <span className="truncate text-muted-foreground font-medium">
+                                                                <strong className={idx === 0 ? "text-sky-500" : "text-foreground"}>{idx + 1}.</strong>{" "}
+                                                                {formatPlayerName(p)}
+                                                            </span>
+                                                            <span className="font-extrabold text-foreground shrink-0 ml-2">{p.assists}</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full ${idx === 0 ? "bg-sky-500" : "bg-sky-500/45"}`}
+                                                                style={{ width: `${pct}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground mt-3">No assists logged yet</p>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Most MOTMs or Most Goal Contributions (G+A) */}
-                        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-3.5 md:p-4">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-amber-500 truncate">
-                                {leaderboards.topMotm ? "Man of the Match" : "Goal Contributions (G+A)"}
-                            </p>
-                            {leaderboards.topMotm ? (
-                                <>
-                                    <div className="flex items-baseline justify-between gap-2 mt-1">
-                                        <span className="text-sm md:text-base font-extrabold text-foreground truncate">
-                                            {leaderboards.topMotm.name}
-                                        </span>
-                                        <span className="text-xl md:text-2xl font-black text-amber-500 shrink-0">
-                                            {leaderboards.topMotm.count}
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-muted-foreground mt-1 truncate">
-                                        {leaderboards.secondMotm
-                                            ? `2nd: ${leaderboards.secondMotm.name} (${leaderboards.secondMotm.count})`
-                                            : "Season MOTM Leader"}
+                        {/* MOTM or Goal Contributions (G+A) Podium Card */}
+                        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-4 flex flex-col justify-between gap-3">
+                            <div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-amber-500 truncate flex items-center gap-1.5">
+                                        <Award className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                                        {leaderboards.topMotm ? "Man of the Match" : "Goal Contributions"}
                                     </p>
-                                </>
-                            ) : leaderboards.topContributor ? (
-                                <>
-                                    <div className="flex items-baseline justify-between gap-2 mt-1">
-                                        <span className="text-sm md:text-base font-extrabold text-foreground truncate">
-                                            {formatPlayerName(leaderboards.topContributor)}
-                                        </span>
-                                        <span className="text-xl md:text-2xl font-black text-amber-500 shrink-0">
-                                            {leaderboards.topContributor.totalGA}
-                                        </span>
+                                    <span className="text-[10px] font-bold text-muted-foreground">
+                                        {leaderboards.topMotm ? "Awards" : "G + A"}
+                                    </span>
+                                </div>
+
+                                {leaderboards.topMotm ? (
+                                    <div className="mt-2.5 space-y-2.5">
+                                        <div className="flex items-center justify-between gap-2 rounded-xl bg-amber-500/5 border border-amber-500/20 px-2.5 py-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <div className="h-7 w-7 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
+                                                    <Award className="h-4 w-4 text-amber-500" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs md:text-sm font-black text-foreground truncate">
+                                                        {leaderboards.topMotm.name}
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground">Season MOTM Leader</p>
+                                                </div>
+                                            </div>
+                                            <span className="text-xl md:text-2xl font-black text-amber-500 shrink-0">
+                                                {leaderboards.topMotm.count}
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            {leaderboards.motmList.map((entry, idx) => {
+                                                const maxM = Math.max(1, leaderboards.topMotm?.count || 1);
+                                                const pct = Math.max(12, Math.round((entry.count / maxM) * 100));
+                                                return (
+                                                    <div key={entry.name} className="space-y-0.5">
+                                                        <div className="flex items-center justify-between text-[11px]">
+                                                            <span className="truncate text-muted-foreground font-medium">
+                                                                <strong className={idx === 0 ? "text-amber-500" : "text-foreground"}>{idx + 1}.</strong>{" "}
+                                                                {entry.name}
+                                                            </span>
+                                                            <span className="font-extrabold text-foreground shrink-0 ml-2">{entry.count}</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full ${idx === 0 ? "bg-amber-500" : "bg-amber-500/45"}`}
+                                                                style={{ width: `${pct}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                    <p className="text-[11px] text-muted-foreground mt-1 truncate">
-                                        {leaderboards.topContributor.goals}G + {leaderboards.topContributor.assists}A
-                                        {leaderboards.secondContributor
-                                            ? ` • 2nd: ${formatPlayerName(leaderboards.secondContributor)} (${leaderboards.secondContributor.totalGA})`
-                                            : ""}
-                                    </p>
-                                </>
-                            ) : (
-                                <p className="text-xs text-muted-foreground mt-2">No contributions logged yet</p>
-                            )}
+                                ) : leaderboards.topContributor ? (
+                                    <div className="mt-2.5 space-y-2.5">
+                                        <div className="flex items-center justify-between gap-2 rounded-xl bg-amber-500/5 border border-amber-500/20 px-2.5 py-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <div className="h-7 w-7 rounded-lg bg-amber-500/15 border border-amber-500/25 flex items-center justify-center shrink-0">
+                                                    <Flame className="h-4 w-4 text-amber-500" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs md:text-sm font-black text-foreground truncate">
+                                                        {formatPlayerName(leaderboards.topContributor)}
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        {leaderboards.topContributor.goals}G + {leaderboards.topContributor.assists}A
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span className="text-xl md:text-2xl font-black text-amber-500 shrink-0">
+                                                {leaderboards.topContributor.totalGA}
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            {leaderboards.topContributorsList.map((p, idx) => {
+                                                const maxGA = Math.max(1, leaderboards.topContributor?.totalGA || 1);
+                                                const pct = Math.max(12, Math.round((p.totalGA / maxGA) * 100));
+                                                return (
+                                                    <div key={p.id} className="space-y-0.5">
+                                                        <div className="flex items-center justify-between text-[11px]">
+                                                            <span className="truncate text-muted-foreground font-medium">
+                                                                <strong className={idx === 0 ? "text-amber-500" : "text-foreground"}>{idx + 1}.</strong>{" "}
+                                                                {formatPlayerName(p)}
+                                                            </span>
+                                                            <span className="font-extrabold text-foreground shrink-0 ml-2">{p.totalGA}</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
+                                                            <div
+                                                                className={`h-full rounded-full ${idx === 0 ? "bg-amber-500" : "bg-amber-500/45"}`}
+                                                                style={{ width: `${pct}%` }}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground mt-3">No contributions logged yet</p>
+                                )}
+                            </div>
                         </div>
 
-                        {/* Highest Training Commitment */}
-                        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-3.5 md:p-4">
-                            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-500 truncate">
-                                Training Commitment
-                            </p>
-                            {leaderboards.topTrainingPlayer ? (
-                                <>
-                                    <div className="flex items-baseline justify-between gap-2 mt-1">
-                                        <span className="text-sm md:text-base font-extrabold text-foreground truncate">
-                                            {leaderboards.topTrainingPlayer.name}
-                                        </span>
-                                        <span className="text-xl md:text-2xl font-black text-emerald-500 shrink-0">
-                                            {leaderboards.topTrainingPlayer.rate}%
-                                        </span>
-                                    </div>
-                                    <p className="text-[11px] text-muted-foreground mt-1 truncate">
-                                        Squad avg: <strong className="text-foreground">{leaderboards.teamAvgAttendance}%</strong> attendance
+                        {/* Training Commitment Podium Card */}
+                        <div className="min-w-0 overflow-hidden rounded-2xl border border-border bg-surface-1 p-4 flex flex-col justify-between gap-3">
+                            <div>
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-500 truncate flex items-center gap-1.5">
+                                        <Users className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                        Training Leader
                                     </p>
-                                </>
-                            ) : (
-                                <p className="text-xs text-muted-foreground mt-2">Take register in Training</p>
-                            )}
+                                    <span className="text-[10px] font-bold text-muted-foreground">
+                                        Avg {leaderboards.teamAvgAttendance}%
+                                    </span>
+                                </div>
+                                {leaderboards.topTrainingPlayer ? (
+                                    <div className="mt-2.5 space-y-2.5">
+                                        <div className="flex items-center justify-between gap-2 rounded-xl bg-emerald-500/5 border border-emerald-500/20 px-2.5 py-2">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <div className="h-7 w-7 rounded-lg bg-emerald-500/15 border border-emerald-500/25 flex items-center justify-center shrink-0">
+                                                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-xs md:text-sm font-black text-foreground truncate">
+                                                        {leaderboards.topTrainingPlayer.name}
+                                                    </p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        {leaderboards.topTrainingPlayer.present}/{leaderboards.topTrainingPlayer.total} sessions
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span className="text-xl md:text-2xl font-black text-emerald-500 shrink-0">
+                                                {leaderboards.topTrainingPlayer.rate}%
+                                            </span>
+                                        </div>
+
+                                        <div className="space-y-1.5">
+                                            {leaderboards.trainingList.map((entry, idx) => (
+                                                <div key={entry.name} className="space-y-0.5">
+                                                    <div className="flex items-center justify-between text-[11px]">
+                                                        <span className="truncate text-muted-foreground font-medium">
+                                                            <strong className={idx === 0 ? "text-emerald-500" : "text-foreground"}>{idx + 1}.</strong>{" "}
+                                                            {entry.name}
+                                                        </span>
+                                                        <span className="font-extrabold text-foreground shrink-0 ml-2">{entry.rate}%</span>
+                                                    </div>
+                                                    <div className="h-1.5 w-full rounded-full bg-surface-2 overflow-hidden">
+                                                        <div
+                                                            className={`h-full rounded-full ${idx === 0 ? "bg-emerald-500" : "bg-emerald-500/45"}`}
+                                                            style={{ width: `${Math.max(12, entry.rate)}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground mt-3">Take register in Training</p>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1642,22 +2177,93 @@ export default function DashboardPage() {
                         </CardContent>
                     </Card>
 
-                    {/* #2: WHO'S UNAVAILABLE FOR NEXT MATCH */}
+                    {/* #2: WHO'S UNAVAILABLE FOR NEXT MATCH (SEGMENTED AVAILABILITY BAR) */}
                     <Card className="border-border bg-surface-1 shadow-xs overflow-hidden">
-                        <CardContent className="p-4 md:p-5 flex flex-col justify-between h-full gap-3">
-                            <div className="flex items-center justify-between gap-2">
-                                <div>
-                                    <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                                        <HeartPulse className="h-3.5 w-3.5 text-rose-500" />
-                                        Squad Availability & Absences
-                                    </h3>
-                                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                                        <strong className="text-emerald-500">{availablePlayers.length} Available</strong> • {injuredPlayers.length} Injured/Doubtful • {suspendedPlayers.length} Suspended • {holidayPlayers.length} Away
-                                    </p>
+                        <CardContent className="p-4 md:p-5 flex flex-col justify-between h-full gap-3.5">
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div>
+                                        <h3 className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                            <HeartPulse className="h-3.5 w-3.5 text-rose-500" />
+                                            Squad Availability & Absences
+                                        </h3>
+                                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                                            {players.length > 0
+                                                ? `${Math.round((availablePlayers.length / players.length) * 100)}% of active squad ready for selection`
+                                                : "Add squad members to track medical & matchday availability"}
+                                        </p>
+                                    </div>
+                                    <Link href="/squad" className="text-xs font-bold text-brand hover:underline shrink-0">
+                                        Manage Squad &rarr;
+                                    </Link>
                                 </div>
-                                <Link href="/squad" className="text-xs font-bold text-brand hover:underline shrink-0">
-                                    Manage Squad &rarr;
-                                </Link>
+
+                                {/* Multi-Segment Squad Availability Bar */}
+                                {players.length > 0 && (
+                                    <div className="space-y-2">
+                                        <div className="h-3 w-full rounded-full bg-surface-2 border border-border overflow-hidden flex p-0.5 gap-0.5">
+                                            {availablePlayers.length > 0 && (
+                                                <div
+                                                    className="h-full rounded-l-full first:rounded-l-full last:rounded-r-full bg-emerald-500 transition-all"
+                                                    style={{ width: `${(availablePlayers.length / players.length) * 100}%` }}
+                                                    title={`Available: ${availablePlayers.length}`}
+                                                />
+                                            )}
+                                            {injuredPlayers.length > 0 && (
+                                                <div
+                                                    className="h-full first:rounded-l-full last:rounded-r-full bg-rose-500 transition-all"
+                                                    style={{ width: `${(injuredPlayers.length / players.length) * 100}%` }}
+                                                    title={`Injured / Doubtful: ${injuredPlayers.length}`}
+                                                />
+                                            )}
+                                            {suspendedPlayers.length > 0 && (
+                                                <div
+                                                    className="h-full first:rounded-l-full last:rounded-r-full bg-amber-500 transition-all"
+                                                    style={{ width: `${(suspendedPlayers.length / players.length) * 100}%` }}
+                                                    title={`Suspended: ${suspendedPlayers.length}`}
+                                                />
+                                            )}
+                                            {holidayPlayers.length > 0 && (
+                                                <div
+                                                    className="h-full first:rounded-l-full last:rounded-r-full bg-sky-500 transition-all"
+                                                    style={{ width: `${(holidayPlayers.length / players.length) * 100}%` }}
+                                                    title={`Away / Holiday: ${holidayPlayers.length}`}
+                                                />
+                                            )}
+                                        </div>
+
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                                            <div className="flex items-center justify-between rounded-lg bg-emerald-500/10 border border-emerald-500/25 px-2 py-1 text-[11px]">
+                                                <span className="inline-flex items-center gap-1.5 font-bold text-emerald-500">
+                                                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                                                    Fit
+                                                </span>
+                                                <span className="font-black text-foreground">{availablePlayers.length}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between rounded-lg bg-rose-500/10 border border-rose-500/25 px-2 py-1 text-[11px]">
+                                                <span className="inline-flex items-center gap-1.5 font-bold text-rose-500">
+                                                    <span className="h-2 w-2 rounded-full bg-rose-500" />
+                                                    Injured
+                                                </span>
+                                                <span className="font-black text-foreground">{injuredPlayers.length}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between rounded-lg bg-amber-500/10 border border-amber-500/25 px-2 py-1 text-[11px]">
+                                                <span className="inline-flex items-center gap-1.5 font-bold text-amber-500">
+                                                    <span className="h-2 w-2 rounded-full bg-amber-500" />
+                                                    Suspended
+                                                </span>
+                                                <span className="font-black text-foreground">{suspendedPlayers.length}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between rounded-lg bg-sky-500/10 border border-sky-500/25 px-2 py-1 text-[11px]">
+                                                <span className="inline-flex items-center gap-1.5 font-bold text-sky-500">
+                                                    <span className="h-2 w-2 rounded-full bg-sky-500" />
+                                                    Away
+                                                </span>
+                                                <span className="font-black text-foreground">{holidayPlayers.length}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {unavailablePlayers.length > 0 ? (
