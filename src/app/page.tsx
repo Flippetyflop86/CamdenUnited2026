@@ -850,7 +850,7 @@ function FullSquadPreview() {
                     </button>
                 </div>
                 <span className="text-[10px] font-semibold text-neutral-400">
-                    23 Fit for Saturday • Zero manual spreadsheets
+                    23 Fit for Saturday
                 </span>
             </div>
 
