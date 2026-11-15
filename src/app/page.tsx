@@ -48,6 +48,7 @@ import {
 
 type ShowcaseTabId =
     | "dashboard"
+    | "squad"
     | "matchday-xi"
     | "training"
     | "fixtures"
@@ -72,6 +73,16 @@ const SHOWCASE_TABS: {
         headline: "Your entire week at a glance — form, home/away splits, next fixture, training & leaderboards.",
         description:
             "Log in whenever suits you and immediately see what needs attention, who is attending training, how your last match went, and who leads the squad in goals, assists, MOTM awards, and training commitment.",
+    },
+    {
+        id: "squad",
+        label: "Player Squad",
+        shortLabel: "Squad",
+        url: "app.clubflow.org.uk/squad",
+        badge: "Squad & Player Stats",
+        headline: "Every player’s appearances, sub minutes, goals, assists & yellow-card suspension risks in one table.",
+        description:
+            "Synced automatically from your Matchday Planner and logged results — see starts vs sub cameos, playing minutes, assists, medical availability, and who is one yellow card away from a ban.",
     },
     {
         id: "matchday-xi",
@@ -288,7 +299,7 @@ function RealAppSidebar({
         {
             group: "Football",
             items: [
-                { name: "Squad", icon: Users },
+                { name: "Squad", id: "squad", icon: Users },
                 { name: "Training", id: "training", icon: ClipboardCheck },
                 { name: "Fixtures", id: "fixtures", icon: Calendar },
                 { name: "Matchday Planner", id: "matchday-xi", icon: Shirt },
@@ -672,6 +683,263 @@ function FullDashboardPreview({
                             17/18 Sessions
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+/**
+ * SCREEN 1B: PLAYER SQUAD — APPEARANCES, MINUTES, ASSISTS & DISCIPLINE
+ */
+function FullSquadPreview() {
+    const [squadFilter, setSquadFilter] = useState<"all" | "caution" | "unavailable">("all");
+
+    const squadRows = [
+        {
+            num: 9,
+            name: "Marcus Vance",
+            pos: "ST",
+            status: "Available",
+            apps: "14",
+            subs: "0",
+            mins: "1,215'",
+            goals: 14,
+            assists: 4,
+            yc: 1,
+        },
+        {
+            num: 10,
+            name: "Declan Sterling",
+            pos: "CAM",
+            status: "Available",
+            apps: "14",
+            subs: "0",
+            mins: "1,190'",
+            goals: 7,
+            assists: 11,
+            yc: 2,
+        },
+        {
+            num: 8,
+            name: "Callum Gallagher",
+            pos: "CM",
+            status: "Available",
+            apps: "13",
+            subs: "1",
+            mins: "1,145'",
+            goals: 5,
+            assists: 6,
+            yc: 2,
+        },
+        {
+            num: 4,
+            name: "Tom Hughes",
+            pos: "CDM",
+            status: "Available",
+            apps: "12",
+            subs: "2",
+            mins: "1,060'",
+            goals: 1,
+            assists: 3,
+            yc: 4,
+            cautionAlert: true,
+        },
+        {
+            num: 5,
+            name: "Dan Foster (C)",
+            pos: "CB",
+            status: "Available",
+            apps: "14",
+            subs: "0",
+            mins: "1,260'",
+            goals: 2,
+            assists: 1,
+            yc: 1,
+        },
+        {
+            num: 14,
+            name: "Harrison Cole",
+            pos: "MID",
+            status: "Available",
+            apps: "6",
+            subs: "8",
+            mins: "685'",
+            goals: 3,
+            assists: 5,
+            yc: 0,
+        },
+        {
+            num: 19,
+            name: "Kieran Walsh",
+            pos: "LB",
+            status: "Injured • Hamstring",
+            apps: "9",
+            subs: "1",
+            mins: "780'",
+            goals: 0,
+            assists: 3,
+            yc: 2,
+        },
+    ];
+
+    const visibleRows = squadRows.filter((p) => {
+        if (squadFilter === "caution") return Boolean(p.cautionAlert);
+        if (squadFilter === "unavailable") return p.status !== "Available";
+        return true;
+    });
+
+    return (
+        <div className="p-4 sm:p-5 space-y-3.5 bg-[#FCFCFD] text-neutral-900 select-none">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base sm:text-lg font-black text-neutral-900">
+                        Player Squad & Season Stats
+                    </h3>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                        Synced from Matchday Planner • 14 Games
+                    </span>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="px-2.5 py-1 rounded-lg bg-white border border-neutral-200 text-neutral-700 text-[11px] font-bold flex items-center gap-1 shadow-2xs">
+                        <FileSpreadsheet className="w-3 h-3 text-emerald-600" /> Export Squad Stats
+                    </span>
+                    <span className="px-2.5 py-1 rounded-lg bg-red-600 text-white text-[11px] font-bold flex items-center gap-1">
+                        <Plus className="w-3 h-3" /> Add Player
+                    </span>
+                </div>
+            </div>
+
+            {/* Interactive Filter Strip */}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold">
+                    <button
+                        type="button"
+                        onClick={() => setSquadFilter("all")}
+                        className={`px-2.5 py-1 rounded-full text-[10px] transition-colors cursor-pointer ${
+                            squadFilter === "all"
+                                ? "bg-neutral-900 text-white"
+                                : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-100"
+                        }`}
+                    >
+                        All Squad (26)
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setSquadFilter("caution")}
+                        className={`px-2.5 py-1 rounded-full text-[10px] border flex items-center gap-1 transition-colors cursor-pointer ${
+                            squadFilter === "caution"
+                                ? "bg-amber-500 text-white border-amber-600"
+                                : "bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100"
+                        }`}
+                    >
+                        <AlertTriangle className="w-3 h-3" />
+                        1 Suspension Risk (4 YC)
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setSquadFilter("unavailable")}
+                        className={`px-2.5 py-1 rounded-full text-[10px] border transition-colors cursor-pointer ${
+                            squadFilter === "unavailable"
+                                ? "bg-rose-600 text-white border-rose-600"
+                                : "bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100"
+                        }`}
+                    >
+                        3 Unavailable / Injured
+                    </button>
+                </div>
+                <span className="text-[10px] font-semibold text-neutral-400">
+                    23 Fit for Saturday • Zero manual spreadsheets
+                </span>
+            </div>
+
+            {/* Squad Appearances, Minutes, Goals, Assists & Cards Table */}
+            <div className="bg-white rounded-2xl border border-neutral-200/80 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                        <thead>
+                            <tr className="border-b border-neutral-200 bg-neutral-50/70 text-[9px] font-black uppercase tracking-wider text-neutral-400">
+                                <th className="py-2.5 px-3">Player</th>
+                                <th className="py-2.5 px-2">Status</th>
+                                <th className="py-2.5 px-2 text-center">Apps (Sub)</th>
+                                <th className="py-2.5 px-2 text-center">Minutes</th>
+                                <th className="py-2.5 px-2 text-center">Goals</th>
+                                <th className="py-2.5 px-2 text-center">Assists</th>
+                                <th className="py-2.5 px-3 text-right">Cards</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100 text-xs">
+                            {visibleRows.map((p) => (
+                                <tr key={p.num} className="hover:bg-neutral-50/80">
+                                    <td className="py-2.5 px-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-5 h-5 rounded bg-neutral-900 text-white font-black text-[9px] flex items-center justify-center shrink-0">
+                                                {p.num}
+                                            </span>
+                                            <div>
+                                                <div className="font-bold text-neutral-900 leading-tight">
+                                                    {p.name}
+                                                </div>
+                                                <div className="text-[9px] font-extrabold text-neutral-400">
+                                                    {p.pos}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="py-2.5 px-2">
+                                        <span
+                                            className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-bold border ${
+                                                p.status === "Available"
+                                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                                    : "bg-rose-50 text-rose-700 border-rose-200"
+                                            }`}
+                                        >
+                                            {p.status}
+                                        </span>
+                                    </td>
+                                    <td className="py-2.5 px-2 text-center font-bold text-neutral-800 tabular-nums">
+                                        {p.apps}{" "}
+                                        <span className="text-neutral-400 font-semibold text-[10px]">
+                                            ({p.subs})
+                                        </span>
+                                    </td>
+                                    <td className="py-2.5 px-2 text-center">
+                                        <span className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-800 font-bold text-[11px] tabular-nums">
+                                            {p.mins}
+                                        </span>
+                                    </td>
+                                    <td className="py-2.5 px-2 text-center font-black text-emerald-700 tabular-nums">
+                                        {p.goals}
+                                    </td>
+                                    <td className="py-2.5 px-2 text-center font-black text-sky-700 tabular-nums">
+                                        {p.assists}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-right">
+                                        {p.yc > 0 ? (
+                                            <span
+                                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black border ${
+                                                    p.cautionAlert
+                                                        ? "bg-amber-100 text-amber-900 border-amber-400"
+                                                        : "bg-yellow-50 text-yellow-800 border-yellow-300"
+                                                }`}
+                                            >
+                                                <span className="w-2 h-2.5 rounded-[1px] bg-amber-400 border border-amber-600 inline-block" />
+                                                <span>
+                                                    {p.yc}
+                                                    {p.cautionAlert ? " • 1 off ban" : ""}
+                                                </span>
+                                            </span>
+                                        ) : (
+                                            <span className="text-[10px] text-neutral-300 font-bold">
+                                                0
+                                            </span>
+                                        )}
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
@@ -2205,7 +2473,7 @@ export default function LandingPage() {
                                     </span>
                                 )}
                             </div>
-                            <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 p-1.5 rounded-2xl bg-[#0d1322] border border-white/10 shadow-xl">
+                            <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-1.5 p-1.5 rounded-2xl bg-[#0d1322] border border-white/10 shadow-xl">
                                 {SHOWCASE_TABS.map((tab) => {
                                     const isSelected = tab.id === activeTab;
                                     return (
@@ -2213,7 +2481,7 @@ export default function LandingPage() {
                                             key={tab.id}
                                             type="button"
                                             onClick={() => handleManualTabSelect(tab.id)}
-                                            className={`relative overflow-hidden px-3.5 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
+                                            className={`relative overflow-hidden px-3 py-2 rounded-xl text-xs sm:text-[13px] font-bold transition-all cursor-pointer whitespace-nowrap ${
                                                 isSelected
                                                     ? "bg-red-600 text-white shadow-md shadow-red-600/30"
                                                     : "text-neutral-400 hover:text-white hover:bg-white/5"
@@ -2277,6 +2545,7 @@ export default function LandingPage() {
                                     {activeTab === "dashboard" && (
                                         <FullDashboardPreview onNavigate={handleManualTabSelect} />
                                     )}
+                                    {activeTab === "squad" && <FullSquadPreview />}
                                     {activeTab === "matchday-xi" && <FullMatchdayXiPreview />}
                                     {activeTab === "training" && <FullTrainingPreview />}
                                     {activeTab === "fixtures" && (
@@ -2403,11 +2672,11 @@ export default function LandingPage() {
                                     </p>
                                 </div>
                                 <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-bold text-neutral-300">
-                                    <span>Training Attendance • Season Stats</span>
+                                    <span>Player Squad • Training Attendance</span>
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            handleManualTabSelect("training");
+                                            handleManualTabSelect("squad");
                                             document
                                                 .getElementById("preview")
                                                 ?.scrollIntoView({ behavior: "smooth" });
@@ -2452,278 +2721,9 @@ export default function LandingPage() {
                 </section>
 
                 {/* =================================================================
-                    #2 BEFORE VS. AFTER + SQUAD APPEARANCES, MINUTES, ASSISTS & YELLOWS
-                ================================================================= */}
-                <section className="py-16 sm:py-24 border-t border-white/[0.07] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-14">
-                        <div className="text-xs font-bold uppercase tracking-widest text-red-500 mb-2">
-                            Stop Guessing. Know Your Numbers.
-                        </div>
-                        <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-                            Most managers guess minutes, assists, and yellow cards. ClubFlow tracks them automatically.
-                        </h2>
-                        <p className="mt-3 text-base text-neutral-400">
-                            Without a proper system, keeping tabs on sub appearances, playing time, assists, and disciplinary cautions across a 22-man squad is almost impossible by November.
-                        </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-                        {/* Left 5 Cols: The Old Way (Guesswork) */}
-                        <div className="lg:col-span-5 rounded-2xl bg-[#0d1323] border border-white/10 p-6 flex flex-col justify-between">
-                            <div>
-                                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-rose-500/15 border border-rose-500/30 text-rose-400 text-[11px] font-bold mb-4">
-                                    <X className="w-3.5 h-3.5" />
-                                    <span>How Most Clubs Manage It Now</span>
-                                </div>
-                                <h3 className="text-xl font-black text-white">
-                                    Guesswork, Notes apps & forgotten stats
-                                </h3>
-                                <ul className="mt-4 space-y-3.5 text-sm text-neutral-300">
-                                    {[
-                                        {
-                                            title: "Guessing player minutes & bench time",
-                                            desc: "No clear picture of who has only played 15-minute cameos over the last month until a player complains.",
-                                        },
-                                        {
-                                            title: "Blindsided by yellow-card suspensions",
-                                            desc: "Losing track of who is sitting on 4 bookings and one caution away from a mandatory league ban.",
-                                        },
-                                        {
-                                            title: "Untracked assists & sub appearances",
-                                            desc: "League websites rarely log assists or sub minutes accurately — leaving half your squad's contributions invisible.",
-                                        },
-                                        {
-                                            title: "Scattered across 4 WhatsApp chats",
-                                            desc: "Scrolling back through hundreds of messages to remember who started three Saturdays ago.",
-                                        },
-                                    ].map((pain) => (
-                                        <li
-                                            key={pain.title}
-                                            className="p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]"
-                                        >
-                                            <div className="font-bold text-white text-xs sm:text-sm flex items-center gap-2">
-                                                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-                                                <span>{pain.title}</span>
-                                            </div>
-                                            <p className="text-xs text-neutral-400 mt-1 leading-relaxed pl-3.5">
-                                                {pain.desc}
-                                            </p>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-
-                        {/* Right 7 Cols: Visual Squad Appearances, Minutes, Assists & Discipline Table */}
-                        <div className="lg:col-span-7 rounded-2xl bg-[#FCFCFD] text-neutral-900 border border-white/20 shadow-2xl overflow-hidden flex flex-col justify-between select-none">
-                            <div>
-                                {/* Mini App Header */}
-                                <div className="bg-[#171717] text-white px-4 py-3 flex flex-wrap items-center justify-between gap-2">
-                                    <div className="flex items-center gap-2">
-                                        <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-black uppercase">
-                                            With ClubFlow
-                                        </span>
-                                        <span className="text-xs sm:text-sm font-black">
-                                            Squad Appearances, Minutes & Discipline
-                                        </span>
-                                    </div>
-                                    <span className="text-[10px] font-semibold text-neutral-400">
-                                        Synced from Matchday Planner • 14 Games
-                                    </span>
-                                </div>
-
-                                {/* Summary Strip */}
-                                <div className="px-4 py-2.5 bg-white border-b border-neutral-200 flex flex-wrap items-center justify-between gap-2 text-[11px]">
-                                    <div className="flex flex-wrap items-center gap-1.5 font-bold">
-                                        <span className="px-2.5 py-0.5 rounded-full bg-neutral-900 text-white text-[10px]">
-                                            All Squad (23)
-                                        </span>
-                                        <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] flex items-center gap-1">
-                                            <AlertTriangle className="w-3 h-3 text-amber-600" />
-                                            1 Suspension Risk (4 YC)
-                                        </span>
-                                    </div>
-                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
-                                        <FileSpreadsheet className="w-3 h-3" /> Export Squad Stats
-                                    </span>
-                                </div>
-
-                                {/* Squad Stats Table */}
-                                <div className="p-3 sm:p-4 overflow-x-auto">
-                                    <table className="w-full text-left border-collapse">
-                                        <thead>
-                                            <tr className="border-b border-neutral-200 text-[9px] font-black uppercase tracking-wider text-neutral-400">
-                                                <th className="py-2 px-2">Player</th>
-                                                <th className="py-2 px-2 text-center">Apps (Sub)</th>
-                                                <th className="py-2 px-2 text-center">Minutes</th>
-                                                <th className="py-2 px-2 text-center">Goals</th>
-                                                <th className="py-2 px-2 text-center">Assists</th>
-                                                <th className="py-2 px-2 text-right">Cards</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-neutral-100 text-xs">
-                                            {[
-                                                {
-                                                    num: 9,
-                                                    name: "Marcus Vance",
-                                                    pos: "ST",
-                                                    apps: "14",
-                                                    subs: "0",
-                                                    mins: "1,215'",
-                                                    goals: 14,
-                                                    assists: 4,
-                                                    yc: 1,
-                                                    rc: 0,
-                                                },
-                                                {
-                                                    num: 10,
-                                                    name: "Declan Sterling",
-                                                    pos: "CAM",
-                                                    apps: "14",
-                                                    subs: "0",
-                                                    mins: "1,190'",
-                                                    goals: 7,
-                                                    assists: 11,
-                                                    yc: 2,
-                                                    rc: 0,
-                                                },
-                                                {
-                                                    num: 8,
-                                                    name: "Callum Gallagher",
-                                                    pos: "CM",
-                                                    apps: "13",
-                                                    subs: "1",
-                                                    mins: "1,145'",
-                                                    goals: 5,
-                                                    assists: 6,
-                                                    yc: 2,
-                                                    rc: 0,
-                                                },
-                                                {
-                                                    num: 4,
-                                                    name: "Tom Hughes",
-                                                    pos: "CDM",
-                                                    apps: "12",
-                                                    subs: "2",
-                                                    mins: "1,060'",
-                                                    goals: 1,
-                                                    assists: 3,
-                                                    yc: 4,
-                                                    rc: 0,
-                                                    cautionAlert: true,
-                                                },
-                                                {
-                                                    num: 5,
-                                                    name: "Dan Foster (C)",
-                                                    pos: "CB",
-                                                    apps: "14",
-                                                    subs: "0",
-                                                    mins: "1,260'",
-                                                    goals: 2,
-                                                    assists: 1,
-                                                    yc: 1,
-                                                    rc: 0,
-                                                },
-                                                {
-                                                    num: 14,
-                                                    name: "Harrison Cole",
-                                                    pos: "MID",
-                                                    apps: "6",
-                                                    subs: "8",
-                                                    mins: "685'",
-                                                    goals: 3,
-                                                    assists: 5,
-                                                    yc: 0,
-                                                    rc: 0,
-                                                },
-                                                {
-                                                    num: 12,
-                                                    name: "Sam Henderson",
-                                                    pos: "DEF",
-                                                    apps: "4",
-                                                    subs: "7",
-                                                    mins: "440'",
-                                                    goals: 0,
-                                                    assists: 2,
-                                                    yc: 1,
-                                                    rc: 0,
-                                                },
-                                            ].map((p) => (
-                                                <tr key={p.num} className="hover:bg-neutral-50">
-                                                    <td className="py-2.5 px-2">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="w-5 h-5 rounded bg-neutral-900 text-white font-black text-[9px] flex items-center justify-center shrink-0">
-                                                                {p.num}
-                                                            </span>
-                                                            <div>
-                                                                <div className="font-bold text-neutral-900 leading-tight">
-                                                                    {p.name}
-                                                                </div>
-                                                                <div className="text-[9px] font-extrabold text-neutral-400">
-                                                                    {p.pos}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-2.5 px-2 text-center font-bold text-neutral-800 tabular-nums">
-                                                        {p.apps}{" "}
-                                                        <span className="text-neutral-400 font-semibold text-[10px]">
-                                                            ({p.subs})
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-2.5 px-2 text-center">
-                                                        <span className="px-2 py-0.5 rounded bg-neutral-100 text-neutral-800 font-bold text-[11px] tabular-nums">
-                                                            {p.mins}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-2.5 px-2 text-center font-black text-emerald-700 tabular-nums">
-                                                        {p.goals}
-                                                    </td>
-                                                    <td className="py-2.5 px-2 text-center font-black text-sky-700 tabular-nums">
-                                                        {p.assists}
-                                                    </td>
-                                                    <td className="py-2.5 px-2 text-right">
-                                                        <div className="inline-flex items-center justify-end gap-1">
-                                                            {p.yc > 0 ? (
-                                                                <span
-                                                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-black border ${
-                                                                        p.cautionAlert
-                                                                            ? "bg-amber-100 text-amber-900 border-amber-400"
-                                                                            : "bg-yellow-50 text-yellow-800 border-yellow-300"
-                                                                    }`}
-                                                                >
-                                                                    <span className="w-2 h-2.5 rounded-[1px] bg-amber-400 border border-amber-600 inline-block" />
-                                                                    <span>
-                                                                        {p.yc}
-                                                                        {p.cautionAlert ? " • 1 off ban" : ""}
-                                                                    </span>
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-[10px] text-neutral-300 font-bold">
-                                                                    0
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-
-                            <div className="px-4 py-2.5 bg-neutral-50 border-t border-neutral-200 flex flex-wrap items-center justify-between gap-2 text-[10px] text-neutral-500 font-semibold">
-                                <span>Starts, unused bench slots, sub minutes, goals, assists & cards all stay in sync.</span>
-                                <span className="text-red-600 font-bold">Zero manual spreadsheets</span>
-                            </div>
-                        </div>
-                    </div>
-                </section>
-
-                {/* =================================================================
                     #3 & #4 WHATSAPP BRIEFING + EXPORTABLE MATCHDAY GRAPHICS & SCOUTING PDFS
                 ================================================================= */}
-                <section className="py-16 sm:py-24 border-t border-white/[0.07] bg-[#080c17]/70">
+                <section className="py-16 sm:py-24 border-t border-white/[0.07]">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-14">
                             <div className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-2">
