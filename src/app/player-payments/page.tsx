@@ -54,6 +54,7 @@ import {
     Users,
     UserPlus,
     Loader2,
+    X,
 } from "lucide-react";
 
 interface PaymentRequest {
@@ -112,18 +113,12 @@ interface EventQuickSelectOption {
     suggestedTitle: string;
 }
 
-const QUICK_SUB_PRESETS = [
-    { label: "Match Sub", title: "Saturday Match Sub", amount: 5, req: "required" as const },
-    { label: "Monthly Subs", title: "Monthly Club Subs", amount: 25, req: "required" as const },
-    { label: "Training Sub", title: "Training Session Sub", amount: 4, req: "required" as const },
-    { label: "Signing-On", title: "Season Signing-On Fee", amount: 30, req: "required" as const },
-    { label: "Social / Kit", title: "Club Social / Training Kit", amount: 15, req: "optional" as const },
-];
-
 const DEFAULT_STANDARD_FINES: StandardFineRule[] = [
-    { id: "sub-match", title: "Matchday Sub", category: "Subs & Fees", amount: 5, emoji: "⚽" },
+    { id: "sub-match", title: "Saturday Match Sub", category: "Subs & Fees", amount: 5, emoji: "⚽" },
     { id: "sub-monthly", title: "Monthly Club Subs", category: "Subs & Fees", amount: 25, emoji: "📅" },
     { id: "sub-training", title: "Training Session Sub", category: "Subs & Fees", amount: 4, emoji: "🏃" },
+    { id: "sub-signing", title: "Season Signing-On Fee", category: "Subs & Fees", amount: 30, emoji: "✍️" },
+    { id: "sub-social", title: "Club Social / Training Kit", category: "Subs & Fees", amount: 15, emoji: "👕" },
     { id: "fine-yellow-dissent", title: "Yellow Card (Dissent / Sin Bin)", category: "Discipline", amount: 10, emoji: "🟨" },
     { id: "fine-yellow-foul", title: "Yellow Card (Foul)", category: "Discipline", amount: 5, emoji: "🟨" },
     { id: "fine-red-card", title: "Red Card", category: "Discipline", amount: 20, emoji: "🟥" },
@@ -271,7 +266,7 @@ export default function PlayerPaymentsPage() {
             const raw = localStorage.getItem(storageKey);
             if (raw) {
                 const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed) && parsed.length > 0) {
+                if (Array.isArray(parsed)) {
                     setFineRules(parsed);
                 }
             }
@@ -388,7 +383,7 @@ export default function PlayerPaymentsPage() {
             if (remoteCfg?.url) {
                 try {
                     const parsedRemote = JSON.parse(remoteCfg.url);
-                    if (Array.isArray(parsedRemote.fineRules) && parsedRemote.fineRules.length > 0) {
+                    if (Array.isArray(parsedRemote.fineRules)) {
                         setFineRules(parsedRemote.fineRules);
                         localStorage.setItem(storageKey, JSON.stringify(parsedRemote.fineRules));
                     }
@@ -1406,33 +1401,27 @@ export default function PlayerPaymentsPage() {
         });
     };
 
+    const handleDeleteRule = (id: string) => {
+        saveFineRules(fineRules.filter(r => r.id !== id));
+    };
+
     const dynamicQuickPresets = useMemo(() => {
         const subRules = fineRules.filter(r => r.category === "Subs & Fees");
-        if (subRules.length === 0) return QUICK_SUB_PRESETS;
-        const mapped: {
-            label: string;
-            title: string;
-            amount: number;
-            req: "required" | "optional";
-        }[] = subRules.slice(0, 4).map(r => ({
+        return subRules.slice(0, 6).map(r => ({
+            id: r.id,
             label: r.title
                 .replace(/^Saturday\s+/i, "")
+                .replace(/^Club\s+/i, "")
+                .replace(/\s+Club\s+/i, " ")
                 .replace(/\s+Session/i, "")
                 .replace(/^Annual\s+/i, "")
                 .replace(/^Season\s+/i, ""),
             title: r.title,
             amount: r.amount,
-            req: r.title.toLowerCase().includes("social") ? "optional" : "required",
+            req: (r.title.toLowerCase().includes("social") ? "optional" : "required") as
+                | "required"
+                | "optional",
         }));
-        if (!mapped.some(m => m.title.toLowerCase().includes("social"))) {
-            mapped.push({
-                label: "Social / Kit",
-                title: "Club Social / Training Kit",
-                amount: 15,
-                req: "optional",
-            });
-        }
-        return mapped;
     }, [fineRules]);
 
     const currentPreviewBreakdown = calculateClubFlowFee(Number(basePrice || 0), feeCoverage);
@@ -1766,18 +1755,34 @@ export default function PlayerPaymentsPage() {
                                     />
                                     <div className="flex flex-wrap items-center gap-1.5">
                                         {dynamicQuickPresets.map(p => (
-                                            <button
-                                                key={p.label}
-                                                type="button"
-                                                onClick={() => {
-                                                    setDescription(p.title);
-                                                    setBasePrice(String(p.amount));
-                                                    setRequirement(p.req);
-                                                }}
-                                                className="px-2.5 py-1 rounded-full text-[11px] font-semibold border border-border bg-surface-1/70 text-muted-foreground hover:text-foreground hover:border-brand/50 transition-colors cursor-pointer"
+                                            <span
+                                                key={p.id}
+                                                className="inline-flex items-center rounded-full border border-border bg-surface-1/70 text-[11px] font-semibold text-muted-foreground hover:border-brand/50 transition-colors"
                                             >
-                                                {p.label} (£{p.amount})
-                                            </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => {
+                                                        setDescription(p.title);
+                                                        setBasePrice(String(p.amount));
+                                                        setRequirement(p.req);
+                                                    }}
+                                                    className="pl-2.5 pr-1.5 py-1 hover:text-foreground cursor-pointer"
+                                                >
+                                                    {p.label} (£{p.amount})
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={e => {
+                                                        e.stopPropagation();
+                                                        handleDeleteRule(p.id);
+                                                    }}
+                                                    title={`Delete "${p.label}" preset`}
+                                                    aria-label={`Delete ${p.label} preset`}
+                                                    className="pr-2 pl-0.5 py-1 text-muted-foreground/70 hover:text-rose-500 transition-colors cursor-pointer"
+                                                >
+                                                    <X className="h-3 w-3" />
+                                                </button>
+                                            </span>
                                         ))}
                                         <button
                                             type="button"
@@ -1789,26 +1794,68 @@ export default function PlayerPaymentsPage() {
                                     </div>
 
                                     {showFinePresetsDrawer && (
-                                        <div className="grid grid-cols-2 gap-1.5 p-2 rounded-xl bg-surface-1/60 border border-border max-h-36 overflow-y-auto">
-                                            {fineRules.map(rule => (
+                                        <div className="space-y-2 p-2.5 rounded-xl bg-surface-1/60 border border-border">
+                                            <div className="flex items-center justify-between gap-2 px-0.5">
+                                                <span className="text-[11px] font-bold text-muted-foreground">
+                                                    Saved Presets ({fineRules.length})
+                                                </span>
                                                 <button
-                                                    key={rule.id}
                                                     type="button"
-                                                    onClick={() => {
-                                                        setDescription(`${rule.emoji} ${rule.title}`);
-                                                        setBasePrice(String(rule.amount));
-                                                        setShowFinePresetsDrawer(false);
-                                                    }}
-                                                    className="flex items-center justify-between gap-1.5 px-2 py-1.5 rounded-lg border border-border bg-background hover:border-brand text-left text-[11px] cursor-pointer"
+                                                    onClick={handleOpenNewRule}
+                                                    className="text-[11px] font-bold text-brand hover:underline cursor-pointer"
                                                 >
-                                                    <span className="truncate">
-                                                        {rule.emoji} {rule.title}
-                                                    </span>
-                                                    <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
-                                                        £{rule.amount}
-                                                    </span>
+                                                    + New Preset
                                                 </button>
-                                            ))}
+                                            </div>
+                                            {fineRules.length === 0 ? (
+                                                <p className="text-[11px] text-muted-foreground text-center py-3">
+                                                    No saved presets yet. Click <strong>+ New Preset</strong> to create one.
+                                                </p>
+                                            ) : (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-44 overflow-y-auto">
+                                                    {fineRules.map(rule => (
+                                                        <div
+                                                            key={rule.id}
+                                                            className="flex items-center justify-between gap-1.5 px-2 py-1.5 rounded-lg border border-border bg-background hover:border-brand/60 text-[11px]"
+                                                        >
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setDescription(`${rule.emoji} ${rule.title}`);
+                                                                    setBasePrice(String(rule.amount));
+                                                                    setShowFinePresetsDrawer(false);
+                                                                }}
+                                                                className="flex items-center justify-between gap-1.5 flex-1 min-w-0 text-left cursor-pointer"
+                                                            >
+                                                                <span className="truncate">
+                                                                    {rule.emoji} {rule.title}
+                                                                </span>
+                                                                <span className="font-bold text-emerald-600 dark:text-emerald-400 shrink-0">
+                                                                    £{rule.amount}
+                                                                </span>
+                                                            </button>
+                                                            <div className="flex items-center gap-0.5 shrink-0 border-l border-border pl-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleOpenEditRule(rule)}
+                                                                    title="Edit preset"
+                                                                    className="p-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                                                                >
+                                                                    <Pencil className="h-3 w-3" />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleDeleteRule(rule.id)}
+                                                                    title="Delete preset"
+                                                                    className="p-1 text-muted-foreground hover:text-rose-500 cursor-pointer"
+                                                                >
+                                                                    <Trash2 className="h-3 w-3" />
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
