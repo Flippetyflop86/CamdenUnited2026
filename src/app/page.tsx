@@ -38,7 +38,6 @@ import {
     Flame,
     FileText,
     Swords,
-    Eye,
 } from "lucide-react";
 
 type ShowcaseTabId =
@@ -1798,29 +1797,22 @@ export default function LandingPage() {
                             and prepare for matchday — in one place.
                         </p>
 
-                        {/* Primary & Secondary CTAs */}
-                        <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3.5">
+                        {/* Primary CTA */}
+                        <div className="mt-7 flex items-center justify-center">
                             <Link
                                 href="/signup"
-                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-7 py-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-base shadow-xl shadow-red-600/25 transition-all hover:-translate-y-0.5"
+                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-base shadow-xl shadow-red-600/25 transition-all hover:-translate-y-0.5"
                             >
                                 <span>Start Your Club</span>
                                 <ArrowRight className="w-4 h-4" />
                             </Link>
-                            <a
-                                href="#preview"
-                                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-7 py-4 rounded-xl bg-white/[0.05] hover:bg-white/[0.09] text-white font-semibold text-base border border-white/10 transition-all"
-                            >
-                                <Eye className="w-4 h-4 text-neutral-300" />
-                                <span>See ClubFlow in Action</span>
-                            </a>
                         </div>
                     </div>
 
                     {/* =============================================================
                         INTERACTIVE FULL-SCALE PRODUCT SHOWCASE (#preview)
                     ============================================================= */}
-                    <div id="preview" className="mt-12 sm:mt-14 scroll-mt-24">
+                    <div id="preview" className="mt-9 sm:mt-11 scroll-mt-24">
                         {/* Screen Selector Tabs */}
                         <div className="flex flex-col items-center">
                             <div className="text-[11px] font-bold uppercase tracking-widest text-neutral-400 mb-3">
