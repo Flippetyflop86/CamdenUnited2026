@@ -737,8 +737,8 @@ function FullMatchdayXiPreview() {
                         <span className="text-xs font-bold text-neutral-900 flex items-center gap-1.5">
                             <Users className="w-3.5 h-3.5 text-neutral-500" /> Available Squad
                         </span>
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-700">
-                            21 Fit
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            23 Fit
                         </span>
                     </div>
 
@@ -758,17 +758,21 @@ function FullMatchdayXiPreview() {
                     </div>
 
                     <div className="text-[9px] font-bold uppercase tracking-wider text-neutral-400 mb-1.5">
-                        Remaining Pool (3)
+                        Remaining Pool (7)
                     </div>
-                    <div className="space-y-1.5">
+                    <div className="space-y-1 max-h-[290px] overflow-y-auto pr-0.5">
                         {[
                             { name: "B. Holloway", pos: "GK", startedLast: false, att: "94%" },
                             { name: "C. Doyle", pos: "DEF", startedLast: true, att: "89%" },
                             { name: "L. Jennings", pos: "MID", startedLast: false, att: "94%" },
+                            { name: "M. Richards", pos: "DEF", startedLast: false, att: "89%" },
+                            { name: "J. Abbott", pos: "MID", startedLast: false, att: "83%" },
+                            { name: "F. Spencer", pos: "FWD", startedLast: false, att: "83%" },
+                            { name: "R. Patel", pos: "DEF", startedLast: false, att: "78%" },
                         ].map((p) => (
                             <div
                                 key={p.name}
-                                className="flex items-center justify-between p-2 rounded-lg border border-neutral-200/80 bg-white hover:border-neutral-300 text-xs"
+                                className="flex items-center justify-between px-2 py-1.5 rounded-lg border border-neutral-200/80 bg-white hover:border-neutral-300 text-xs"
                             >
                                 <div className="min-w-0">
                                     <div className="font-bold text-neutral-900 text-[11px] truncate">
@@ -832,8 +836,8 @@ function FullMatchdayXiPreview() {
                         {/* Interactive Home / Away / 3rd + Any Club Colour Switcher */}
                         <div className="flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-neutral-100">
                             <div className="flex flex-wrap items-center gap-1">
-                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-neutral-400 mr-0.5">
-                                    Try Kits:
+                                <span className="text-[9px] font-extrabold uppercase tracking-wider text-neutral-500 mr-0.5">
+                                    Match Kit:
                                 </span>
                                 {[
                                     { id: "home" as const, label: "Home", dot: "#e11d48", border: "border-rose-700" },
@@ -1037,13 +1041,17 @@ function FullMatchdayXiPreview() {
                             <span className="text-xs font-bold text-neutral-900">
                                 Substitutes Bench
                             </span>
-                            <span className="text-[10px] font-bold text-neutral-400">3 / 5</span>
+                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded">
+                                5 / 5
+                            </span>
                         </div>
                         <div className="space-y-1">
                             {[
                                 { num: 12, name: "S. Henderson", pos: "DEF" },
                                 { num: 14, name: "H. Cole", pos: "MID" },
                                 { num: 15, name: "N. Palmer", pos: "FWD" },
+                                { num: 16, name: "K. Murray", pos: "DEF" },
+                                { num: 17, name: "Z. Bello", pos: "FWD" },
                             ].map((sub) => (
                                 <div
                                     key={sub.num}
@@ -1518,11 +1526,11 @@ function FullFixturesPreview({
  */
 function FullRecruitmentPreview() {
     const stages = [
-        { label: "Scouted", count: 8, color: "bg-neutral-100 text-neutral-800" },
-        { label: "Contacted", count: 5, color: "bg-blue-50 text-blue-700" },
-        { label: "Invited", count: 4, color: "bg-indigo-50 text-indigo-700" },
-        { label: "On Trial", count: 3, color: "bg-amber-50 text-amber-800" },
-        { label: "Signed", count: 2, color: "bg-emerald-50 text-emerald-700" },
+        { label: "Scouted", count: 2, color: "bg-neutral-100 text-neutral-800" },
+        { label: "Contacted", count: 1, color: "bg-blue-50 text-blue-700" },
+        { label: "Invited", count: 1, color: "bg-indigo-50 text-indigo-700" },
+        { label: "On Trial", count: 1, color: "bg-amber-50 text-amber-800" },
+        { label: "Signed", count: 1, color: "bg-emerald-50 text-emerald-700" },
     ];
 
     const targets = [
@@ -1535,7 +1543,7 @@ function FullRecruitmentPreview() {
             stage: "On Trial",
             stageBadge: "bg-amber-50 text-amber-800 border-amber-200",
             rating: "4.5",
-            notes: "Attended 2 Thursday sessions. Dominant aerially, calm left-footed distribution out from the back.",
+            notes: "Attended 2 Thursday sessions. Dominant aerially, calm left-footed distribution.",
         },
         {
             name: "Reece Campbell",
@@ -1543,21 +1551,68 @@ function FullRecruitmentPreview() {
             pos: "ST / RW",
             foot: "Right",
             currentClub: "Millbrook Reserves",
-            stage: "Invited to Training",
+            stage: "Invited",
             stageBadge: "bg-indigo-50 text-indigo-700 border-indigo-200",
             rating: "4.0",
-            notes: "12 goals in 14 games this season. Explosive pace in behind; attending next Tuesday session.",
+            notes: "12 goals in 14 games. Explosive pace in behind; attending Tuesday training.",
+        },
+        {
+            name: "Theo Saunders",
+            age: 24,
+            pos: "GK",
+            foot: "Right",
+            currentClub: "Oakwood FC",
+            stage: "Contacted",
+            stageBadge: "bg-blue-50 text-blue-700 border-blue-200",
+            rating: "4.0",
+            notes: "Commanding shot-stopper, strong kicking range. Spoke after Saturday's fixture.",
+        },
+        {
+            name: "Malik Boateng",
+            age: 22,
+            pos: "CM / CDM",
+            foot: "Right",
+            currentClub: "Westbourne Town",
+            stage: "Scouted",
+            stageBadge: "bg-neutral-100 text-neutral-700 border-neutral-300",
+            rating: "4.5",
+            notes: "Press-resistant #6 who breaks lines cleanly and wins second balls.",
+        },
+        {
+            name: "Kieran Norris",
+            age: 20,
+            pos: "LW",
+            foot: "Left",
+            currentClub: "Brookside U23",
+            stage: "Scouted",
+            stageBadge: "bg-neutral-100 text-neutral-700 border-neutral-300",
+            rating: "3.5",
+            notes: "Direct 1v1 winger with sharp delivery from wide left. Watching again next week.",
+        },
+        {
+            name: "Ellis Hayward",
+            age: 25,
+            pos: "RB",
+            foot: "Right",
+            currentClub: "Northbrook United",
+            stage: "Signed",
+            stageBadge: "bg-emerald-50 text-emerald-700 border-emerald-200",
+            rating: "4.5",
+            notes: "Impressed across 3 trial sessions. Registered and added to First Team squad.",
         },
     ];
 
     return (
-        <div className="p-4 sm:p-5 space-y-3.5 bg-[#FCFCFD] text-neutral-900 select-none">
+        <div className="p-4 sm:p-5 space-y-3 bg-[#FCFCFD] text-neutral-900 select-none">
             {/* Header */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                <div>
+                <div className="flex items-center gap-2">
                     <h3 className="text-base sm:text-lg font-black text-neutral-900">
                         Player Recruitment
                     </h3>
+                    <span className="px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-600 text-[10px] font-bold">
+                        6 Active Targets
+                    </span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                     <span className="px-2.5 py-1 rounded-lg bg-white border border-neutral-200 text-neutral-700 text-[11px] font-bold flex items-center gap-1">
@@ -1569,12 +1624,12 @@ function FullRecruitmentPreview() {
                 </div>
             </div>
 
-            {/* 5 Pipeline Stage Pills */}
+            {/* 5 Pipeline Stage Pills (2 + 1 + 1 + 1 + 1 = 6 Shown Below) */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                 {stages.map((s) => (
                     <div
                         key={s.label}
-                        className="bg-white rounded-xl border border-neutral-200/80 p-2.5 shadow-2xs flex items-center justify-between"
+                        className="bg-white rounded-xl border border-neutral-200/80 px-2.5 py-2 shadow-2xs flex items-center justify-between"
                     >
                         <span className="text-[11px] font-bold text-neutral-700">{s.label}</span>
                         <span className={`px-2 py-0.5 rounded-full text-[11px] font-black ${s.color}`}>
@@ -1584,50 +1639,47 @@ function FullRecruitmentPreview() {
                 ))}
             </div>
 
-            {/* Scouting Target Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* All 6 Scouting Target Cards Matching Top Stage Counts */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
                 {targets.map((t) => (
                     <div
                         key={t.name}
-                        className="bg-white rounded-2xl border border-neutral-200/80 shadow-xs p-3.5 flex flex-col justify-between"
+                        className="bg-white rounded-xl border border-neutral-200/80 shadow-2xs p-3 flex flex-col justify-between"
                     >
                         <div>
-                            <div className="flex items-start justify-between gap-2">
-                                <div>
-                                    <div className="flex flex-wrap items-center gap-1.5">
-                                        <span className="text-sm font-black text-neutral-900">
+                            <div className="flex items-start justify-between gap-1.5">
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-1">
+                                        <span className="text-xs font-black text-neutral-900 truncate">
                                             {t.name}
                                         </span>
-                                        <span className="px-1.5 py-0.5 rounded bg-neutral-900 text-white text-[9px] font-black">
+                                        <span className="px-1.5 py-0.2 rounded bg-neutral-900 text-white text-[8px] font-black">
                                             {t.pos}
                                         </span>
-                                        <span className="text-[10px] font-semibold text-neutral-400">
-                                            Age {t.age} • {t.foot}
-                                        </span>
                                     </div>
-                                    <div className="text-[11px] font-semibold text-neutral-500 mt-0.5">
-                                        Club: {t.currentClub}
+                                    <div className="text-[10px] font-semibold text-neutral-400 mt-0.5 truncate">
+                                        Age {t.age} • {t.foot} • {t.currentClub}
                                     </div>
                                 </div>
                                 <span
-                                    className={`px-2 py-0.5 rounded-full text-[9px] font-black border shrink-0 ${t.stageBadge}`}
+                                    className={`px-2 py-0.5 rounded-full text-[8px] font-black border shrink-0 ${t.stageBadge}`}
                                 >
                                     {t.stage}
                                 </span>
                             </div>
 
-                            <p className="mt-2 text-[11px] text-neutral-600 bg-neutral-50 p-2.5 rounded-xl border border-neutral-200/60 leading-relaxed">
+                            <p className="mt-2 text-[10px] text-neutral-600 bg-neutral-50 p-2 rounded-lg border border-neutral-200/60 leading-snug">
                                 “{t.notes}”
                             </p>
                         </div>
 
-                        <div className="mt-2.5 pt-2 border-t border-neutral-100 flex items-center justify-between text-[10px]">
+                        <div className="mt-2 pt-1.5 border-t border-neutral-100 flex items-center justify-between text-[9px]">
                             <span className="inline-flex items-center gap-1 font-bold text-amber-600">
-                                <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                                {t.rating} / 5.0 Rating
+                                <Star className="w-2.5 h-2.5 fill-amber-400 text-amber-400" />
+                                {t.rating} / 5.0
                             </span>
-                            <span className="font-bold text-neutral-700 hover:text-red-600">
-                                Convert to Squad →
+                            <span className="font-bold text-neutral-700">
+                                {t.stage === "Signed" ? "In Squad ✓" : "Convert to Squad →"}
                             </span>
                         </div>
                     </div>
@@ -1867,7 +1919,7 @@ const WHATSAPP_SAMPLES: Record<
 *STARTING XI (4-3-3):*
 1 J. Mercer | 2 L. Reid, 5 D. Foster (C), 6 R. Bennett, 3 A. Clarke | 4 T. Hughes, 8 C. Gallagher, 10 D. Sterling | 7 O. Grant, 9 M. Vance, 11 E. Brooks
 
-*BENCH:* 12 S. Henderson, 14 H. Cole, 15 N. Palmer
+*BENCH (5):* 12 S. Henderson, 14 H. Cole, 15 N. Palmer, 16 K. Murray, 17 Z. Bello
 🎯 Pens: M. Vance • FK: D. Sterling • Corners: O. Grant
 
 React ✅ once seen. £5 match subs via ClubFlow link.`,
@@ -2241,31 +2293,31 @@ export default function LandingPage() {
                             {currentShowcase.description}
                         </p>
 
-                        {/* #10 Real-Football Operational Credibility Strip */}
+                        {/* #10 Credibility Strip */}
                         <div className="mt-10 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                             {[
                                 {
-                                    badge: "BATTLE-TESTED WEEKLY",
-                                    title: "Built in Real League Football",
-                                    desc: "Designed by active grassroots & semi-pro coaching staff for real Saturday pressures.",
+                                    badge: "BUILT BY COACHES",
+                                    title: "Made for Football Managers",
+                                    desc: "Created by active grassroots & semi-pro coaches who run teams every week.",
                                     accent: "text-red-400",
                                 },
                                 {
                                     badge: "EVERY PITCH FORMAT",
                                     title: "11v11 • 9v9 • 7v7 • 5v5",
-                                    desc: "Full formation libraries, custom kit colours, and multi-squad support from U9s to First Team.",
+                                    desc: "Full formation libraries, custom kit colours, and support from Youth to First Team.",
                                     accent: "text-emerald-400",
                                 },
                                 {
-                                    badge: "ZERO MANUAL TALLIES",
-                                    title: "Starts, Sub Mins & Cards Synced",
-                                    desc: "Log a result once — appearances, minutes, goals, assists & yellow cards update everywhere.",
+                                    badge: "AUTOMATIC STATS",
+                                    title: "Stats Update Automatically",
+                                    desc: "Log a result once and appearances, minutes, goals, assists & cards update everywhere.",
                                     accent: "text-amber-400",
                                 },
                                 {
-                                    badge: "INSTANT ONBOARDING",
+                                    badge: "QUICK SETUP",
                                     title: "League Table & Fixture Sync",
-                                    desc: "Pull in division standings, PPG splits, and squad lists without typing everything from scratch.",
+                                    desc: "Pull in division standings, PPG splits, and squad lists without typing everything by hand.",
                                     accent: "text-sky-400",
                                 },
                             ].map((item) => (
@@ -2484,7 +2536,7 @@ export default function LandingPage() {
                                 <div className="px-4 py-2.5 bg-white border-b border-neutral-200 flex flex-wrap items-center justify-between gap-2 text-[11px]">
                                     <div className="flex flex-wrap items-center gap-1.5 font-bold">
                                         <span className="px-2.5 py-0.5 rounded-full bg-neutral-900 text-white text-[10px]">
-                                            All Squad (21)
+                                            All Squad (23)
                                         </span>
                                         <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[10px] flex items-center gap-1">
                                             <AlertTriangle className="w-3 h-3 text-amber-600" />
@@ -2801,7 +2853,7 @@ export default function LandingPage() {
                                             </div>
 
                                             <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between text-[8px] text-neutral-300 font-bold">
-                                                <span>BENCH: 12 Henderson • 14 Cole • 15 Palmer</span>
+                                                <span>BENCH: 12 Henderson • 14 Cole • 15 Palmer • 16 Murray • 17 Bello</span>
                                                 <span className="text-amber-400">C: Foster</span>
                                             </div>
                                         </div>
@@ -3109,7 +3161,7 @@ export default function LandingPage() {
                                             Bench & Set Pieces
                                         </div>
                                         <div className="text-neutral-600 font-semibold truncate">
-                                            Subs: 12 S. Henderson, 14 H. Cole, 15 N. Palmer
+                                            Subs (5/5): 12 Henderson, 14 Cole, 15 Palmer, 16 Murray, 17 Bello
                                         </div>
                                         <div className="flex items-center justify-between pt-1 border-t border-neutral-100 text-neutral-800 font-bold">
                                             <span>Capt: D. Foster</span>
