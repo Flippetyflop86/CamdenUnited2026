@@ -45,6 +45,9 @@ import {
     Sliders,
     Rocket,
     LayoutDashboard,
+    CreditCard,
+    Building2,
+    Mail,
 } from "lucide-react";
 
 type WizardMode = "express" | "full";
@@ -458,11 +461,22 @@ function OnboardingContent() {
             "📋 *MATCHDAY AVAILABILITY POLL*\nPlease vote on the poll below for this week's fixture so the gaffer can finalise the squad!"
     );
 
-    // Finance Model: "per_game" | "monthly" | "skip"
-    const [financeModel, setFinanceModel] = useState<"per_game" | "monthly" | "skip">("monthly");
+    // Finance Model & ClubFlow Pay Setup: "per_game" | "monthly" | "both" | "skip"
+    const [financeModel, setFinanceModel] = useState<"per_game" | "monthly" | "both" | "skip">(
+        isRerun && settings.subsEnabled === false ? "skip" : "per_game"
+    );
+    const [matchSubAmount, setMatchSubAmount] = useState(5);
     const [monthlySubs, setMonthlySubs] = useState(settings.monthlySubs ?? 25);
-    const [registrationFee, setRegistrationFee] = useState(settings.registrationFee ?? 50);
-    const [trainingFeePerSession, setTrainingFeePerSession] = useState(settings.trainingFeePerSession ?? 5);
+    const [registrationFee, setRegistrationFee] = useState(settings.registrationFee ?? 30);
+    const [trainingFeePerSession, setTrainingFeePerSession] = useState(settings.trainingFeePerSession ?? 4);
+    const [includeSocialPot, setIncludeSocialPot] = useState(true);
+    const [onboardingFeeCoverage, setOnboardingFeeCoverage] = useState<"player" | "club">("player");
+    const [bankHandler, setBankHandler] = useState<"self" | "treasurer">("self");
+    const [onboardingAccountHolderType, setOnboardingAccountHolderType] = useState<
+        "individual" | "non_profit" | "company"
+    >("individual");
+    const [treasurerInviteName, setTreasurerInviteName] = useState("");
+    const [treasurerInviteEmail, setTreasurerInviteEmail] = useState("");
     const [contractsEnabled, setContractsEnabled] = useState(settings.contractsEnabled ?? false);
     const [finesEnabled, setFinesEnabled] = useState(settings.finesEnabled ?? true);
     const [fineCategories, setFineCategories] = useState<{ id: string; name: string; amount: number }[]>(
@@ -1079,13 +1093,18 @@ function OnboardingContent() {
                 localStorage.setItem(`clubflow_meet_offset_${clubId}`, String(meetOffsetMins));
             }
 
+            const effectiveClubName = clubName.trim() || "My Football Club";
             const subsEnabledVal = financeModel !== "skip";
-            const effectiveMonthlySubs = financeModel === "per_game" ? 0 : Number(monthlySubs) || 0;
-            const effectiveRegFee = financeModel === "per_game" ? 0 : Number(registrationFee) || 0;
+            const hasMonthly = financeModel === "monthly" || financeModel === "both";
+            const hasPerGame = financeModel === "per_game" || financeModel === "both";
+            const effectiveMonthlySubs = subsEnabledVal && hasMonthly ? Number(monthlySubs) || 0 : 0;
+            const effectiveRegFee = subsEnabledVal ? Number(registrationFee) || 0 : 0;
+            const effectiveMatchSub = subsEnabledVal && hasPerGame ? Number(matchSubAmount) || 5 : 5;
+            const effectiveTrainingFee = subsEnabledVal ? Number(trainingFeePerSession) || 0 : 0;
 
             await updateSettings(
                 {
-                    name: clubName.trim() || "My Football Club",
+                    name: effectiveClubName,
                     logo: logoPreview,
                     primaryColor,
                     secondaryColor: "#0f172a",
@@ -1109,7 +1128,7 @@ function OnboardingContent() {
                     subsEnabled: subsEnabledVal,
                     monthlySubs: effectiveMonthlySubs,
                     registrationFee: effectiveRegFee,
-                    trainingFeePerSession: subsEnabledVal ? Number(trainingFeePerSession) || 0 : 0,
+                    trainingFeePerSession: effectiveTrainingFee,
                     contractsEnabled: subsEnabledVal ? contractsEnabled : false,
                     finesEnabled,
                     fineCategories,
@@ -1117,6 +1136,196 @@ function OnboardingContent() {
                 },
                 finalPermissions
             );
+
+            // Sync Subs, Quick-Chip Presets, Account Pots & Bank Handoff directly to Subs & Payments (/player-payments)
+            if (clubId) {
+                const subPresetRules: {
+                    id: string;
+                    title: string;
+                    category: "Subs & Fees" | "Discipline" | "Punctuality" | "Kit & Gear" | "Matchday" | "Custom";
+                    amount: number;
+                    emoji: string;
+                }[] = [];
+
+                if (subsEnabledVal) {
+                    if (hasPerGame && effectiveMatchSub > 0) {
+                        subPresetRules.push({
+                            id: "sub-match",
+                            title: "Saturday Match Sub",
+                            category: "Subs & Fees",
+                            amount: effectiveMatchSub,
+                            emoji: "⚽",
+                        });
+                    }
+                    if (hasMonthly && effectiveMonthlySubs > 0) {
+                        subPresetRules.push({
+                            id: "sub-monthly",
+                            title: "Monthly Player Subs",
+                            category: "Subs & Fees",
+                            amount: effectiveMonthlySubs,
+                            emoji: "📅",
+                        });
+                    }
+                    if (effectiveTrainingFee > 0) {
+                        subPresetRules.push({
+                            id: "sub-training",
+                            title: "Training Session Sub",
+                            category: "Subs & Fees",
+                            amount: effectiveTrainingFee,
+                            emoji: "🏃",
+                        });
+                    }
+                    if (effectiveRegFee > 0) {
+                        subPresetRules.push({
+                            id: "sub-signing",
+                            title: "Annual Signing-On Fee",
+                            category: "Subs & Fees",
+                            amount: effectiveRegFee,
+                            emoji: "✍️",
+                        });
+                    }
+                }
+
+                // Always keep clean standard presets available alongside the club's tailored subs
+                const fallbackPresets = [
+                    ...(subPresetRules.length === 0
+                        ? [
+                              {
+                                  id: "sub-match",
+                                  title: "Saturday Match Sub",
+                                  category: "Subs & Fees" as const,
+                                  amount: 5,
+                                  emoji: "⚽",
+                              },
+                              {
+                                  id: "sub-monthly",
+                                  title: "Monthly Player Subs",
+                                  category: "Subs & Fees" as const,
+                                  amount: 25,
+                                  emoji: "📅",
+                              },
+                          ]
+                        : []),
+                    {
+                        id: "sub-kit",
+                        title: "Club Social / Kit Contribution",
+                        category: "Subs & Fees" as const,
+                        amount: 15,
+                        emoji: "👕",
+                    },
+                    {
+                        id: "disc-yc-dissent",
+                        title: "Yellow Card (Dissent)",
+                        category: "Discipline" as const,
+                        amount: 10,
+                        emoji: "🟨",
+                    },
+                    {
+                        id: "punc-late-md",
+                        title: "Late to Matchday Meet",
+                        category: "Punctuality" as const,
+                        amount: 5,
+                        emoji: "⏰",
+                    },
+                ];
+
+                const finalRules = [...subPresetRules, ...fallbackPresets];
+                const managerParts = managerName.trim().split(/\s+/);
+                const payoutAccountConfig = {
+                    accountName: `${effectiveClubName} Main Account`,
+                    sortCode: "",
+                    accountNumber: "",
+                    defaultFeeCoverage: onboardingFeeCoverage,
+                    accountHolderType: onboardingAccountHolderType,
+                    treasurerFirstName:
+                        bankHandler === "treasurer"
+                            ? treasurerInviteName.trim()
+                            : managerParts[0] || "",
+                    treasurerLastName:
+                        bankHandler === "treasurer"
+                            ? ""
+                            : managerParts.slice(1).join(" ") || "",
+                    treasurerEmail:
+                        bankHandler === "treasurer"
+                            ? treasurerInviteEmail.trim()
+                            : user?.email || "",
+                    namedAccounts: includeSocialPot
+                        ? [{ id: "acct_social", label: `${effectiveClubName} Social & Fines Pot` }]
+                        : [],
+                    paymentsSkippedInOnboarding: financeModel === "skip",
+                };
+
+                if (typeof window !== "undefined") {
+                    try {
+                        localStorage.setItem(
+                            `clubflow-standard-fines-${clubId}`,
+                            JSON.stringify(finalRules)
+                        );
+                        localStorage.setItem(
+                            `clubflow-payout-account-${clubId}`,
+                            JSON.stringify(payoutAccountConfig)
+                        );
+                    } catch {}
+                }
+
+                try {
+                    const configPayload = JSON.stringify({
+                        fineRules: finalRules,
+                        payoutAccount: payoutAccountConfig,
+                        updatedAt: new Date().toISOString(),
+                    });
+                    const { data: existingPayDoc } = await supabase
+                        .from("documents")
+                        .select("id")
+                        .eq("club_id", clubId)
+                        .eq("category", "CLUB_FINES_CONFIG")
+                        .maybeSingle();
+
+                    if (existingPayDoc?.id) {
+                        await supabase
+                            .from("documents")
+                            .update({ url: configPayload, name: "ClubFlow Pay Config" })
+                            .eq("id", existingPayDoc.id);
+                    } else {
+                        await supabase.from("documents").insert({
+                            club_id: clubId,
+                            name: "ClubFlow Pay Config",
+                            type: "JSON",
+                            category: "CLUB_FINES_CONFIG",
+                            url: configPayload,
+                        });
+                    }
+                } catch {}
+
+                // If manager delegated bank setup to Treasurer/Secretary, automatically email their invite
+                if (
+                    subsEnabledVal &&
+                    bankHandler === "treasurer" &&
+                    treasurerInviteEmail.trim()
+                ) {
+                    try {
+                        const {
+                            data: { session },
+                        } = await supabase.auth.getSession();
+                        const headers: Record<string, string> = {
+                            "Content-Type": "application/json",
+                        };
+                        if (session?.access_token) {
+                            headers["Authorization"] = `Bearer ${session.access_token}`;
+                        }
+                        await fetch("/api/payments/invite-treasurer", {
+                            method: "POST",
+                            headers,
+                            body: JSON.stringify({
+                                clubId,
+                                clubName: effectiveClubName,
+                                treasurerName: treasurerInviteName.trim() || "Club Treasurer",
+                                treasurerEmail: treasurerInviteEmail.trim(),
+                            }),
+                        });
+                    } catch {}
+                }
+            }
 
             router.push(destination);
         } catch (err: any) {
@@ -2181,27 +2390,39 @@ function OnboardingContent() {
                                         )}
                                     </div>
 
-                                    {/* Simplified 3-Card Finance Setup */}
-                                    <div className="space-y-3 pt-2 border-t border-white/10">
-                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                                            <PoundSterling className="w-3.5 h-3.5 text-emerald-400" /> Player Subs & Finance Model
-                                        </label>
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                                    {/* Spond-Style Club Payments, Pots & Bank Setup */}
+                                    <div className="space-y-4 pt-3 border-t border-white/10">
+                                        <div className="flex flex-wrap items-center justify-between gap-2">
+                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
+                                                <PoundSterling className="w-3.5 h-3.5 text-emerald-400" /> Subs &amp; Club Payments Setup
+                                            </label>
+                                            <span className="text-[11px] text-slate-400">
+                                                Pre-fills your 1-tap payment chips &amp; accounts
+                                            </span>
+                                        </div>
+
+                                        {/* 1. How does your club collect subs? */}
+                                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                             {[
                                                 {
-                                                    id: "monthly",
-                                                    title: "Monthly Standing Order",
-                                                    desc: "Monthly subs + annual signing-on fee",
+                                                    id: "per_game",
+                                                    title: "Matchday / Weekly",
+                                                    desc: "Match & training subs",
                                                 },
                                                 {
-                                                    id: "per_game",
-                                                    title: "Pay-As-You-Play",
-                                                    desc: "Matchday & training session fees",
+                                                    id: "monthly",
+                                                    title: "Monthly Subs",
+                                                    desc: "Standing monthly fee",
+                                                },
+                                                {
+                                                    id: "both",
+                                                    title: "Both",
+                                                    desc: "Monthly + matchday fees",
                                                 },
                                                 {
                                                     id: "skip",
-                                                    title: "Pure Football Mode",
-                                                    desc: "Skip subs & contracts for now",
+                                                    title: "Skip for Now",
+                                                    desc: "Set up payments later",
                                                 },
                                             ].map((m) => (
                                                 <button
@@ -2211,7 +2432,7 @@ function OnboardingContent() {
                                                     className={`p-3 rounded-2xl border text-left transition-all ${
                                                         financeModel === m.id
                                                             ? "border-emerald-500/60 bg-emerald-500/10"
-                                                            : "border-white/10 bg-slate-950/60"
+                                                            : "border-white/10 bg-slate-950/60 hover:border-white/20"
                                                     }`}
                                                 >
                                                     <div className="text-xs font-bold text-white">{m.title}</div>
@@ -2221,106 +2442,215 @@ function OnboardingContent() {
                                         </div>
 
                                         {financeModel !== "skip" && (
-                                            <div className="grid grid-cols-3 gap-3 pt-2">
-                                                {financeModel === "monthly" && (
-                                                    <>
+                                            <div className="space-y-4 p-4 rounded-2xl bg-slate-950/70 border border-white/10">
+                                                {/* Default Price Inputs */}
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                                    {(financeModel === "per_game" || financeModel === "both") && (
+                                                        <div className="space-y-1">
+                                                            <label className="text-[11px] text-slate-400">Match Sub (£)</label>
+                                                            <Input
+                                                                type="number"
+                                                                min="0"
+                                                                step="0.5"
+                                                                value={matchSubAmount}
+                                                                onChange={(e) => setMatchSubAmount(Number(e.target.value))}
+                                                                className="h-9 bg-slate-900 border-white/15 text-white font-bold"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                    {(financeModel === "monthly" || financeModel === "both") && (
                                                         <div className="space-y-1">
                                                             <label className="text-[11px] text-slate-400">Monthly Subs (£)</label>
                                                             <Input
                                                                 type="number"
+                                                                min="0"
+                                                                step="1"
                                                                 value={monthlySubs}
                                                                 onChange={(e) => setMonthlySubs(Number(e.target.value))}
-                                                                className="h-9 bg-slate-950 border-white/15 text-white"
+                                                                className="h-9 bg-slate-900 border-white/15 text-white font-bold"
                                                             />
                                                         </div>
-                                                        <div className="space-y-1">
-                                                            <label className="text-[11px] text-slate-400">Signing Fee (£)</label>
-                                                            <Input
-                                                                type="number"
-                                                                value={registrationFee}
-                                                                onChange={(e) => setRegistrationFee(Number(e.target.value))}
-                                                                className="h-9 bg-slate-950 border-white/15 text-white"
-                                                            />
+                                                    )}
+                                                    <div className="space-y-1">
+                                                        <label className="text-[11px] text-slate-400">Training Sub (£)</label>
+                                                        <Input
+                                                            type="number"
+                                                            min="0"
+                                                            step="0.5"
+                                                            value={trainingFeePerSession}
+                                                            onChange={(e) => setTrainingFeePerSession(Number(e.target.value))}
+                                                            className="h-9 bg-slate-900 border-white/15 text-white font-bold"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <label className="text-[11px] text-slate-400">Signing-On (£)</label>
+                                                        <Input
+                                                            type="number"
+                                                            min="0"
+                                                            step="1"
+                                                            value={registrationFee}
+                                                            onChange={(e) => setRegistrationFee(Number(e.target.value))}
+                                                            className="h-9 bg-slate-900 border-white/15 text-white font-bold"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Account Pots & Processing Fee */}
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/10">
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                                                            <Building2 className="w-3.5 h-3.5 text-sky-400" /> Payment Pots Created Automatically
+                                                        </label>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-semibold text-emerald-300">
+                                                                ✓ {(clubName.trim() || "Club")} Main Account
+                                                            </span>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setIncludeSocialPot((v) => !v)}
+                                                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all ${
+                                                                    includeSocialPot
+                                                                        ? "bg-sky-500/15 border-sky-500/35 text-sky-300"
+                                                                        : "bg-slate-900 border-white/10 text-slate-400"
+                                                                }`}
+                                                            >
+                                                                {includeSocialPot ? "✓" : "+"} Social &amp; Fines Pot
+                                                            </button>
                                                         </div>
-                                                    </>
-                                                )}
-                                                <div className="space-y-1">
-                                                    <label className="text-[11px] text-slate-400">Training Fee (£)</label>
-                                                    <Input
-                                                        type="number"
-                                                        value={trainingFeePerSession}
-                                                        onChange={(e) => setTrainingFeePerSession(Number(e.target.value))}
-                                                        className="h-9 bg-slate-950 border-white/15 text-white"
-                                                    />
+                                                    </div>
+
+                                                    <div className="space-y-1.5">
+                                                        <label className="text-[11px] font-bold text-slate-300">
+                                                            Card / Apple Pay Processing Fee
+                                                        </label>
+                                                        <div className="grid grid-cols-2 gap-1.5">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setOnboardingFeeCoverage("player")}
+                                                                className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition-all ${
+                                                                    onboardingFeeCoverage === "player"
+                                                                        ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
+                                                                        : "bg-slate-900 border-white/10 text-slate-400"
+                                                                }`}
+                                                            >
+                                                                Player pays (Club 100%)
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setOnboardingFeeCoverage("club")}
+                                                                className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition-all ${
+                                                                    onboardingFeeCoverage === "club"
+                                                                        ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
+                                                                        : "bg-slate-900 border-white/10 text-slate-400"
+                                                                }`}
+                                                            >
+                                                                Club absorbs fee
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+
+                                                {/* Who manages the club bank account? */}
+                                                <div className="space-y-3 pt-2 border-t border-white/10">
+                                                    <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                                                        <CreditCard className="w-3.5 h-3.5 text-indigo-400" /> Who manages the club bank account?
+                                                    </label>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setBankHandler("self")}
+                                                            className={`p-3 rounded-xl border text-left transition-all ${
+                                                                bankHandler === "self"
+                                                                    ? "border-indigo-400/60 bg-indigo-500/15"
+                                                                    : "border-white/10 bg-slate-900/80"
+                                                            }`}
+                                                        >
+                                                            <div className="text-xs font-bold text-white">I manage the bank account</div>
+                                                            <div className="text-[10px] text-slate-400 mt-0.5">
+                                                                Link in 90s at launch — no Sort Code needed right now
+                                                            </div>
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setBankHandler("treasurer")}
+                                                            className={`p-3 rounded-xl border text-left transition-all ${
+                                                                bankHandler === "treasurer"
+                                                                    ? "border-indigo-400/60 bg-indigo-500/15"
+                                                                    : "border-white/10 bg-slate-900/80"
+                                                            }`}
+                                                        >
+                                                            <div className="text-xs font-bold text-white">
+                                                                Our Treasurer / Secretary handles it
+                                                            </div>
+                                                            <div className="text-[10px] text-slate-400 mt-0.5">
+                                                                Auto-email them a direct invite to link the club bank
+                                                            </div>
+                                                        </button>
+                                                    </div>
+
+                                                    {bankHandler === "self" ? (
+                                                        <div className="space-y-2">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                                {[
+                                                                    {
+                                                                        id: "individual",
+                                                                        label: "Grassroots / Treasurer",
+                                                                    },
+                                                                    {
+                                                                        id: "non_profit",
+                                                                        label: "Non-Profit / CASC",
+                                                                    },
+                                                                    {
+                                                                        id: "company",
+                                                                        label: "Registered Ltd",
+                                                                    },
+                                                                ].map((opt) => (
+                                                                    <button
+                                                                        key={opt.id}
+                                                                        type="button"
+                                                                        onClick={() =>
+                                                                            setOnboardingAccountHolderType(opt.id as any)
+                                                                        }
+                                                                        className={`px-3 py-2 rounded-lg border text-xs font-semibold text-left transition-all ${
+                                                                            onboardingAccountHolderType === opt.id
+                                                                                ? "border-emerald-500/50 bg-emerald-500/10 text-white"
+                                                                                : "border-white/10 bg-slate-900 text-slate-400"
+                                                                        }`}
+                                                                    >
+                                                                        {opt.label}
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                            <p className="text-[11px] text-slate-400">
+                                                                You can start sending payment requests straight away and connect your bank account in 1 click on the Launchpad (or anytime inside Subs &amp; Payments).
+                                                            </p>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="space-y-2">
+                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                                                                <Input
+                                                                    placeholder="Treasurer Name (e.g. Sarah Jenkins)"
+                                                                    value={treasurerInviteName}
+                                                                    onChange={(e) => setTreasurerInviteName(e.target.value)}
+                                                                    className="h-9 text-xs bg-slate-900 border-white/15 text-white"
+                                                                />
+                                                                <Input
+                                                                    type="email"
+                                                                    placeholder="Treasurer Email (e.g. treasurer@club.co.uk)"
+                                                                    value={treasurerInviteEmail}
+                                                                    onChange={(e) => setTreasurerInviteEmail(e.target.value)}
+                                                                    className="h-9 text-xs bg-slate-900 border-white/15 text-white"
+                                                                />
+                                                            </div>
+                                                            <p className="text-[11px] text-indigo-300 flex items-center gap-1.5">
+                                                                <Mail className="w-3.5 h-3.5 shrink-0" />
+                                                                When you finish setup, ClubFlow will automatically email them a Treasurer link that opens the bank connection screen directly.
+                                                            </p>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
-                                    </div>
-
-                                    {/* 1-Click Fines Master Pack */}
-                                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-white/10 space-y-3">
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <div className="flex items-center gap-2">
-                                                <Gavel className="w-4 h-4 text-amber-400" />
-                                                <span className="text-xs font-bold uppercase tracking-wider text-white">
-                                                    Squad Fines Master ({fineCategories.length} rules)
-                                                </span>
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                onClick={handleLoadFinesPresetPack}
-                                                className="h-7 text-[11px] font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30"
-                                            >
-                                                <Sparkles className="w-3 h-3 mr-1" /> Load Grassroots Fines Pack
-                                            </Button>
-                                        </div>
-
-                                        {fineCategories.length > 0 && (
-                                            <div className="flex flex-wrap gap-1.5">
-                                                {fineCategories.map((f) => (
-                                                    <span
-                                                        key={f.id}
-                                                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-white/10 text-xs text-slate-200"
-                                                    >
-                                                        {f.name} <strong className="text-amber-400">£{f.amount}</strong>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() =>
-                                                                setFineCategories((prev) => prev.filter((x) => x.id !== f.id))
-                                                            }
-                                                            className="text-slate-500 hover:text-rose-400"
-                                                        >
-                                                            ×
-                                                        </button>
-                                                    </span>
-                                                ))}
-                                            </div>
-                                        )}
-
-                                        <div className="flex items-center gap-2">
-                                            <Input
-                                                value={newFineName}
-                                                onChange={(e) => setNewFineName(e.target.value)}
-                                                placeholder="Add custom fine (e.g. Nutmegged in Rondo)"
-                                                className="h-8 text-xs bg-slate-900 border-white/10 text-white"
-                                            />
-                                            <Input
-                                                type="number"
-                                                value={newFineAmount}
-                                                onChange={(e) => setNewFineAmount(Number(e.target.value))}
-                                                className="h-8 w-20 text-xs bg-slate-900 border-white/10 text-white"
-                                            />
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={handleAddCustomFine}
-                                                className="h-8 text-xs border-white/15 bg-white/5 text-white shrink-0"
-                                            >
-                                                + Add
-                                            </Button>
-                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -2797,6 +3127,46 @@ function OnboardingContent() {
                                                 <div className="text-[10px] text-slate-400">Staff Invites</div>
                                             </div>
                                         </div>
+
+                                        {financeModel !== "skip" && bankHandler === "self" && (
+                                            <div className="p-3.5 rounded-2xl bg-indigo-500/15 border border-indigo-400/35 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                <div>
+                                                    <div className="text-xs font-black text-white flex items-center gap-1.5">
+                                                        <CreditCard className="w-4 h-4 text-indigo-300" />
+                                                        Ready to collect subs &amp; payments by Apple Pay / Card?
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-300 mt-0.5">
+                                                        Your subs presets &amp; club accounts are ready. Link your club bank account now in 90 seconds, or do it later inside Subs &amp; Payments.
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    disabled={isCompleting}
+                                                    onClick={() =>
+                                                        handleCompleteOnboarding("/player-payments?openBankSetup=1")
+                                                    }
+                                                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-9 shrink-0"
+                                                >
+                                                    <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+                                                    Link Club Bank Account (90s)
+                                                </Button>
+                                            </div>
+                                        )}
+
+                                        {financeModel !== "skip" &&
+                                            bankHandler === "treasurer" &&
+                                            treasurerInviteEmail.trim() && (
+                                                <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-400/35 flex items-center gap-2.5 text-xs text-emerald-200">
+                                                    <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
+                                                    <span>
+                                                        Treasurer bank-setup invite will be emailed automatically to{" "}
+                                                        <strong className="text-white">
+                                                            {treasurerInviteEmail.trim()}
+                                                        </strong>{" "}
+                                                        when you launch.
+                                                    </span>
+                                                </div>
+                                            )}
 
                                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
                                             <Button

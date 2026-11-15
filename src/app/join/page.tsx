@@ -105,11 +105,14 @@ function JoinPageInner() {
                 } catch {}
             }
 
-            // 4. Redirect to dashboard (or confirm email page)
+            // 4. Redirect to requested page (e.g. /player-payments for invited Treasurer) or /dashboard
+            const redirectParam = searchParams.get("redirect");
+            const safeRedirect =
+                redirectParam && redirectParam.startsWith("/") ? redirectParam : "/dashboard";
             if (authData.session) {
-                window.location.href = "/dashboard";
+                window.location.href = safeRedirect;
             } else {
-                router.push("/login?joined=1");
+                router.push(`/login?joined=1&redirect=${encodeURIComponent(safeRedirect)}`);
             }
         } catch (err: any) {
             setError(err.message || "Failed to create account. Please try again.");

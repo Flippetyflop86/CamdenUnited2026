@@ -30,6 +30,7 @@ export async function POST(request: Request) {
         const treasurerLastName = (body.treasurerLastName as string | undefined)?.trim();
         const accountHolderType = (body.accountHolderType as 'individual' | 'company' | 'non_profit' | undefined) || 'individual';
         const resetExisting = Boolean(body.resetAccount);
+        const preferEmbedded = Boolean(body.preferEmbedded);
 
         const { data: member } = await supabase
             .from('club_members')
@@ -48,7 +49,6 @@ export async function POST(request: Request) {
         clubId = member.club_id;
         userEmail = userEmail || member.email || undefined;
 
-        // Fetch club settings to check for existing Stripe Connect ID
         const { data: club, error: clubError } = await supabase
             .from('clubs')
             .select('id, name, stripe_connect_account_id, stripe_connect_onboarding_completed')
@@ -60,22 +60,19 @@ export async function POST(request: Request) {
         }
 
         const stripe = getStripe();
-        const origin = request.headers.get('origin') || 'https://clubflow.org.uk';
+        const origin = request.headers.get('origin') || 'https://www.clubflow.org.uk';
         const clubPortalUrl = `${origin}/pay/club/${club.id}`;
         let accountId = resetExisting ? null : club.stripe_connect_account_id;
 
-        // If an account already exists and onboarding is complete, try creating an Express Dashboard Login Link
-        // if requested by the client
         if (accountId && body.action === 'dashboard') {
             try {
                 const loginLink = await stripe.accounts.createLoginLink(accountId);
                 return NextResponse.json({ url: loginLink.url, accountId });
             } catch {
-                // Fall back to account_onboarding if login link is not available (e.g. incomplete Express or Standard account)
+                // Fall back to onboarding below if login link is not yet available
             }
         }
 
-        // Helper to create a pre-filled Stripe Express Account tailored for UK Grassroots Football Clubs
         const createPrefilledExpressAccount = async () => {
             const createParams: Stripe.AccountCreateParams = {
                 type: 'express',
@@ -88,16 +85,20 @@ export async function POST(request: Request) {
                 },
                 business_profile: {
                     name: club.name || 'Football Club',
-                    mcc: '7941', // Sports Clubs / Amateur Athletics — prevents Stripe asking what industry the club is in
-                    url: clubPortalUrl, // Pre-fills the club's ClubFlow Pay portal so no separate website is required
-                    product_description: `Grassroots football club member payments, match fees, and squad fines managed via ClubFlow for ${club.name || 'the club'}.`,
+                    mcc: '7941', // Sports Clubs / Amateur Athletics
+                    url: clubPortalUrl,
+                    product_description: `Football club player subs, match fees, and club payments managed via ClubFlow for ${club.name || 'the club'}.`,
                 },
                 settings: {
                     payouts: {
                         schedule: {
                             interval: 'daily',
                         },
-                        statement_descriptor: (club.name || 'CLUBFLOW').replace(/[^a-zA-Z0-9 ]/g, '').slice(0, 22).toUpperCase() || 'CLUBFLOW PAY',
+                        statement_descriptor:
+                            (club.name || 'CLUBFLOW')
+                                .replace(/[^a-zA-Z0-9 ]/g, '')
+                                .slice(0, 22)
+                                .toUpperCase() || 'CLUBFLOW PAY',
                     },
                 },
                 metadata: {
@@ -107,7 +108,6 @@ export async function POST(request: Request) {
                 },
             };
 
-            // Pre-fill treasurer name & email for Individual / Unincorporated Club Treasurer accounts
             if (accountHolderType === 'individual' && (treasurerFirstName || treasurerLastName || userEmail)) {
                 createParams.individual = {
                     ...(treasurerFirstName ? { first_name: treasurerFirstName } : {}),
@@ -135,26 +135,49 @@ export async function POST(request: Request) {
             return newAccount.id;
         };
 
-        // If no connected account exists, create a new pre-filled Stripe Connect Express Account
         if (!accountId) {
             accountId = await createPrefilledExpressAccount();
         } else {
-            // Also update the existing account's business_profile so MCC 7941 & ClubFlow URL are pre-filled
             try {
                 await stripe.accounts.update(accountId, {
                     business_profile: {
                         name: club.name || 'Football Club',
                         mcc: '7941',
                         url: clubPortalUrl,
-                        product_description: `Grassroots football club member payments, match fees, and squad fines managed via ClubFlow for ${club.name || 'the club'}.`,
+                        product_description: `Football club player subs, match fees, and club payments managed via ClubFlow for ${club.name || 'the club'}.`,
                     },
                 });
             } catch {
-                // Ignore if standard account doesn't allow direct profile update
+                // Ignore if account doesn't permit direct profile update
             }
         }
 
-        // Generate the pre-filled Express onboarding link (collect='currently_due' keeps the form as short as possible)
+        // Try Embedded Stripe Connect Account Session first if requested and publishable key is configured
+        const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
+        if (preferEmbedded && publishableKey && body.action !== 'dashboard') {
+            try {
+                const accountSession = await stripe.accountSessions.create({
+                    account: accountId,
+                    components: {
+                        account_onboarding: {
+                            enabled: true,
+                            features: {
+                                external_account_collection: true,
+                            },
+                        },
+                    },
+                });
+                return NextResponse.json({
+                    embedded: true,
+                    clientSecret: accountSession.client_secret,
+                    publishableKey,
+                    accountId,
+                });
+            } catch (embedErr) {
+                console.warn('Embedded Stripe session unavailable, falling back to hosted Express link:', embedErr);
+            }
+        }
+
         const accountLink = await stripe.accountLinks.create({
             account: accountId,
             refresh_url: `${origin}/player-payments?connect=refresh`,
@@ -163,7 +186,7 @@ export async function POST(request: Request) {
             collect: 'currently_due',
         });
 
-        return NextResponse.json({ url: accountLink.url, accountId });
+        return NextResponse.json({ embedded: false, url: accountLink.url, accountId });
     } catch (err: any) {
         console.error('Stripe Connect Express Onboarding Error:', err);
         return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status: 500 });

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useAuth } from "@/context/auth-context";
 import { useClub } from "@/context/club-context";
 import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
@@ -52,6 +52,8 @@ import {
     ChevronUp,
     Mail,
     Users,
+    UserPlus,
+    Loader2,
 } from "lucide-react";
 
 interface PaymentRequest {
@@ -100,6 +102,7 @@ interface ClubPayoutAccountConfig {
     treasurerLastName: string;
     treasurerEmail: string;
     namedAccounts?: NamedClubAccount[];
+    paymentsSkippedInOnboarding?: boolean;
 }
 
 interface EventQuickSelectOption {
@@ -211,6 +214,14 @@ export default function PlayerPaymentsPage() {
     const [onboardingLoading, setOnboardingLoading] = useState(false);
     const [syncingStripe, setSyncingStripe] = useState(false);
     const [syncingCardFines, setSyncingCardFines] = useState(false);
+
+    // Embedded Stripe Connect Onboarding Modal & Treasurer Handoff state
+    const [isEmbeddedStripeOpen, setIsEmbeddedStripeOpen] = useState(false);
+    const [embeddedStripeLoading, setEmbeddedStripeLoading] = useState(false);
+    const embeddedContainerRef = useRef<HTMLDivElement>(null);
+    const [invitingTreasurer, setInvitingTreasurer] = useState(false);
+    const [treasurerInviteLink, setTreasurerInviteLink] = useState<string | null>(null);
+    const [copiedTreasurerLink, setCopiedTreasurerLink] = useState(false);
 
     const storageKey = clubId ? `clubflow-standard-fines-${clubId}` : "clubflow-standard-fines-default";
     const accountStorageKey = clubId ? `clubflow-payout-account-${clubId}` : "clubflow-payout-account-default";
@@ -352,10 +363,14 @@ export default function PlayerPaymentsPage() {
         }
         const searchParams = new URLSearchParams(window.location.search);
         const connectParam = searchParams.get("connect");
+        const openBankParam = searchParams.get("openBankSetup");
         if (connectParam === "success") {
             setConnectBanner("success");
         } else if (connectParam === "refresh") {
             setConnectBanner("refresh");
+        }
+        if (openBankParam === "1") {
+            setIsEditingAccountModal(true);
         }
         loadData(connectParam === "success" || connectParam === "refresh");
     }, [clubId]);
@@ -743,11 +758,34 @@ export default function PlayerPaymentsPage() {
         }
     };
 
+    const loadConnectJsSdk = (): Promise<any> => {
+        return new Promise((resolve, reject) => {
+            if (typeof window === "undefined") return reject(new Error("Browser required"));
+            if ((window as any).StripeConnect) {
+                return resolve((window as any).StripeConnect);
+            }
+            const existing = document.querySelector('script[src="https://connect-js.stripe.com/v1.0/connect.js"]');
+            if (existing) {
+                existing.addEventListener("load", () => resolve((window as any).StripeConnect));
+                existing.addEventListener("error", () => reject(new Error("Failed to load Stripe Connect SDK")));
+                return;
+            }
+            const script = document.createElement("script");
+            script.src = "https://connect-js.stripe.com/v1.0/connect.js";
+            script.async = true;
+            script.onload = () => resolve((window as any).StripeConnect);
+            script.onerror = () => reject(new Error("Failed to load Stripe Connect SDK"));
+            document.head.appendChild(script);
+        });
+    };
+
     const handleConnectStripe = async (opts?: { resetAccount?: boolean; action?: "onboarding" | "dashboard" }) => {
         setOnboardingLoading(true);
         try {
+            const updatedAcct = { ...payoutAccount, paymentsSkippedInOnboarding: false };
+            setPayoutAccount(updatedAcct);
             try {
-                localStorage.setItem(accountStorageKey, JSON.stringify(payoutAccount));
+                localStorage.setItem(accountStorageKey, JSON.stringify(updatedAcct));
             } catch {}
 
             const { data: { session } } = await supabase.auth.getSession();
@@ -756,20 +794,80 @@ export default function PlayerPaymentsPage() {
                 headers["Authorization"] = `Bearer ${session.access_token}`;
             }
 
+            const action = opts?.action || "onboarding";
             const res = await fetch("/api/checkout/connect-onboarding", {
                 method: "POST",
                 headers,
                 body: JSON.stringify({
                     clubId,
-                    accountHolderType: payoutAccount.accountHolderType,
-                    treasurerFirstName: payoutAccount.treasurerFirstName,
-                    treasurerLastName: payoutAccount.treasurerLastName,
-                    treasurerEmail: payoutAccount.treasurerEmail,
+                    accountHolderType: updatedAcct.accountHolderType,
+                    treasurerFirstName: updatedAcct.treasurerFirstName,
+                    treasurerLastName: updatedAcct.treasurerLastName,
+                    treasurerEmail: updatedAcct.treasurerEmail,
                     resetAccount: opts?.resetAccount,
-                    action: opts?.action || "onboarding",
+                    action,
+                    preferEmbedded: action === "onboarding",
                 }),
             });
             const data = await res.json();
+
+            if (data.embedded && data.clientSecret && data.publishableKey) {
+                setIsEditingAccountModal(false);
+                setIsEmbeddedStripeOpen(true);
+                setEmbeddedStripeLoading(true);
+                try {
+                    const StripeConnect = await loadConnectJsSdk();
+                    const instance = StripeConnect.init({
+                        publishableKey: data.publishableKey,
+                        fetchClientSecret: async () => data.clientSecret,
+                    });
+                    const onboardingEl = instance.create("account-onboarding");
+                    if (typeof onboardingEl.setOnExit === "function") {
+                        onboardingEl.setOnExit(async () => {
+                            setIsEmbeddedStripeOpen(false);
+                            const verifyRes = await fetch("/api/checkout/verify-payment", {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ clubId }),
+                            })
+                                .then(r => r.json())
+                                .catch(() => null);
+                            if (verifyRes?.onboardingComplete) {
+                                setOnboardingComplete(true);
+                                setConnectBanner("success");
+                            }
+                            loadData(true);
+                        });
+                    }
+                    setTimeout(() => {
+                        if (embeddedContainerRef.current) {
+                            embeddedContainerRef.current.innerHTML = "";
+                            embeddedContainerRef.current.appendChild(onboardingEl);
+                        }
+                        setEmbeddedStripeLoading(false);
+                    }, 60);
+                    return;
+                } catch {
+                    setIsEmbeddedStripeOpen(false);
+                    setEmbeddedStripeLoading(false);
+                    // Fall back to hosted redirect if SDK failed to mount
+                    const fallbackRes = await fetch("/api/checkout/connect-onboarding", {
+                        method: "POST",
+                        headers,
+                        body: JSON.stringify({
+                            clubId,
+                            accountHolderType: updatedAcct.accountHolderType,
+                            action,
+                            preferEmbedded: false,
+                        }),
+                    }).then(r => r.json());
+                    if (fallbackRes?.url) {
+                        window.location.href = fallbackRes.url;
+                        return;
+                    }
+                }
+            }
+
             if (data.url) {
                 window.location.href = data.url;
             } else {
@@ -779,6 +877,49 @@ export default function PlayerPaymentsPage() {
             alert("An error occurred starting Stripe onboarding.");
         } finally {
             setOnboardingLoading(false);
+        }
+    };
+
+    const handleInviteTreasurer = async () => {
+        const email = payoutAccount.treasurerEmail.trim();
+        const fullName = `${payoutAccount.treasurerFirstName} ${payoutAccount.treasurerLastName}`.trim() || "Club Treasurer";
+        if (!email) {
+            alert("Please enter your Treasurer or Secretary's email address.");
+            return;
+        }
+        setInvitingTreasurer(true);
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            const headers: Record<string, string> = { "Content-Type": "application/json" };
+            if (session?.access_token) {
+                headers["Authorization"] = `Bearer ${session.access_token}`;
+            }
+            const res = await fetch("/api/payments/invite-treasurer", {
+                method: "POST",
+                headers,
+                body: JSON.stringify({
+                    clubId,
+                    clubName: settings.name,
+                    treasurerName: fullName,
+                    treasurerEmail: email,
+                }),
+            }).then(r => r.json());
+
+            if (res?.inviteUrl) {
+                setTreasurerInviteLink(res.inviteUrl);
+                savePayoutAccountConfig(payoutAccount);
+                showFeedback(
+                    res.emailSent
+                        ? `Sent Treasurer bank-setup invite to ${email}!`
+                        : `Created Treasurer invite link for ${fullName} — ready to copy or share on WhatsApp.`
+                );
+            } else {
+                alert(res?.error || "Could not send Treasurer invite.");
+            }
+        } catch {
+            alert("Could not send Treasurer invite right now.");
+        } finally {
+            setInvitingTreasurer(false);
         }
     };
 
@@ -1265,6 +1406,35 @@ export default function PlayerPaymentsPage() {
         });
     };
 
+    const dynamicQuickPresets = useMemo(() => {
+        const subRules = fineRules.filter(r => r.category === "Subs & Fees");
+        if (subRules.length === 0) return QUICK_SUB_PRESETS;
+        const mapped: {
+            label: string;
+            title: string;
+            amount: number;
+            req: "required" | "optional";
+        }[] = subRules.slice(0, 4).map(r => ({
+            label: r.title
+                .replace(/^Saturday\s+/i, "")
+                .replace(/\s+Session/i, "")
+                .replace(/^Annual\s+/i, "")
+                .replace(/^Season\s+/i, ""),
+            title: r.title,
+            amount: r.amount,
+            req: r.title.toLowerCase().includes("social") ? "optional" : "required",
+        }));
+        if (!mapped.some(m => m.title.toLowerCase().includes("social"))) {
+            mapped.push({
+                label: "Social / Kit",
+                title: "Club Social / Training Kit",
+                amount: 15,
+                req: "optional",
+            });
+        }
+        return mapped;
+    }, [fineRules]);
+
     const currentPreviewBreakdown = calculateClubFlowFee(Number(basePrice || 0), feeCoverage);
     const selectedWithEmailCount = selectedPlayerIds.filter(id => {
         const pl = players.find(p => p.id === id);
@@ -1359,8 +1529,8 @@ export default function PlayerPaymentsPage() {
                 </div>
             </div>
 
-            {/* 1-Time Bank Setup Strip (only prominent if Stripe not yet connected) */}
-            {!onboardingComplete && (
+            {/* 1-Time Bank Setup Strip (only prominent if Stripe not yet connected and not skipped in onboarding) */}
+            {!onboardingComplete && !payoutAccount.paymentsSkippedInOnboarding && (
                 <Card className="border-amber-500/35 bg-amber-500/5">
                     <CardContent className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
@@ -1372,20 +1542,31 @@ export default function PlayerPaymentsPage() {
                                     Connect Your Club Bank Account Once to Enable 1-Tap Card &amp; Apple Pay
                                 </h3>
                                 <p className="text-xs text-muted-foreground mt-0.5">
-                                    Link your Sort Code &amp; Account Number via Stripe Express so player payments land straight in your club account.
+                                    Link your Sort Code &amp; Account Number in ~90 seconds — or invite your Club Treasurer to link it on their phone.
                                 </p>
                             </div>
                         </div>
                         {isManager && (
-                            <Button
-                                size="sm"
-                                onClick={() => handleConnectStripe({ action: "onboarding" })}
-                                disabled={onboardingLoading}
-                                className="bg-brand hover:bg-brand/90 text-white text-xs font-bold shrink-0"
-                            >
-                                <CreditCard className="h-3.5 w-3.5 mr-1.5" />
-                                {onboardingLoading ? "Opening Stripe..." : "Link Club Bank Account"}
-                            </Button>
+                            <div className="flex flex-wrap items-center gap-2 shrink-0">
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setIsEditingAccountModal(true)}
+                                    className="text-xs font-semibold"
+                                >
+                                    <UserPlus className="h-3.5 w-3.5 mr-1.5" />
+                                    Invite Treasurer
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    onClick={() => handleConnectStripe({ action: "onboarding" })}
+                                    disabled={onboardingLoading}
+                                    className="bg-brand hover:bg-brand/90 text-white text-xs font-bold"
+                                >
+                                    <CreditCard className="h-3.5 w-3.5 mr-1.5" />
+                                    {onboardingLoading ? "Opening Setup..." : "Link Bank Account"}
+                                </Button>
+                            </div>
                         )}
                     </CardContent>
                 </Card>
@@ -1584,7 +1765,7 @@ export default function PlayerPaymentsPage() {
                                         required
                                     />
                                     <div className="flex flex-wrap items-center gap-1.5">
-                                        {QUICK_SUB_PRESETS.map(p => (
+                                        {dynamicQuickPresets.map(p => (
                                             <button
                                                 key={p.label}
                                                 type="button"
@@ -2678,6 +2859,84 @@ export default function PlayerPaymentsPage() {
                                 )}
                             </div>
                         </div>
+
+                        {/* Delegate Bank Setup to Club Treasurer / Secretary */}
+                        <div className="p-3.5 rounded-xl bg-surface-1 border border-border space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
+                                    <UserPlus className="h-3.5 w-3.5 text-brand" />
+                                    Don&apos;t have the club bank details? Invite your Treasurer
+                                </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                Send your Club Treasurer or Secretary a 1-click invite with <strong className="text-foreground">Subs &amp; Payments</strong> access so they can connect the club bank account directly.
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <Input
+                                    placeholder="Treasurer Name (e.g. Sarah Jenkins)"
+                                    value={payoutAccount.treasurerFirstName}
+                                    onChange={e =>
+                                        setPayoutAccount({
+                                            ...payoutAccount,
+                                            treasurerFirstName: e.target.value,
+                                        })
+                                    }
+                                    className="h-8 text-xs"
+                                />
+                                <Input
+                                    type="email"
+                                    placeholder="Treasurer Email (e.g. treasurer@club.co.uk)"
+                                    value={payoutAccount.treasurerEmail}
+                                    onChange={e =>
+                                        setPayoutAccount({
+                                            ...payoutAccount,
+                                            treasurerEmail: e.target.value,
+                                        })
+                                    }
+                                    className="h-8 text-xs"
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={invitingTreasurer || !payoutAccount.treasurerEmail.trim()}
+                                onClick={handleInviteTreasurer}
+                                className="w-full h-8 text-xs font-semibold"
+                            >
+                                {invitingTreasurer ? (
+                                    <>
+                                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                                        Sending Treasurer Invite...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Mail className="h-3.5 w-3.5 mr-1.5" />
+                                        Send Treasurer Bank-Setup Invite
+                                    </>
+                                )}
+                            </Button>
+                            {treasurerInviteLink && (
+                                <div className="flex items-center justify-between gap-2 p-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25">
+                                    <span className="text-[11px] text-emerald-700 dark:text-emerald-300 truncate">
+                                        ✓ Invite ready: {treasurerInviteLink}
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(treasurerInviteLink);
+                                            setCopiedTreasurerLink(true);
+                                            setTimeout(() => setCopiedTreasurerLink(false), 2000);
+                                        }}
+                                        className="h-7 px-2.5 text-[11px] font-semibold shrink-0"
+                                    >
+                                        {copiedTreasurerLink ? "Copied!" : "Copy Link"}
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
                     <DialogFooter>
@@ -2692,6 +2951,29 @@ export default function PlayerPaymentsPage() {
                             Save Accounts
                         </Button>
                     </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ===================================================================== */}
+            {/* EMBEDDED STRIPE CONNECT ONBOARDING MODAL                              */}
+            {/* ===================================================================== */}
+            <Dialog open={isEmbeddedStripeOpen} onOpenChange={setIsEmbeddedStripeOpen}>
+                <DialogContent className="sm:max-w-[640px] max-h-[92vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <CreditCard className="h-5 w-5 text-indigo-500" /> Connect Club Bank Account
+                        </DialogTitle>
+                        <DialogDescription className="text-xs">
+                            Complete secure verification below so player payments go straight into your club bank account.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {embeddedStripeLoading && (
+                        <div className="flex flex-col items-center justify-center py-12 gap-2 text-muted-foreground">
+                            <Loader2 className="h-6 w-6 animate-spin text-indigo-500" />
+                            <span className="text-xs font-medium">Loading secure Stripe Connect form...</span>
+                        </div>
+                    )}
+                    <div ref={embeddedContainerRef} className="min-h-[420px] w-full py-1" />
                 </DialogContent>
             </Dialog>
 
