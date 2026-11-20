@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import Papa from "papaparse";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
@@ -22,16 +23,11 @@ import {
     PoundSterling,
     Users,
     Calendar,
-    Plus,
-    Trash2,
     UserPlus,
-    Gavel,
     MapPin,
     Clock,
     Compass,
     Layers,
-    Hash,
-    MessageSquare,
     Copy,
     Share2,
     Zap,
@@ -48,16 +44,22 @@ import {
     CreditCard,
     Building2,
     Mail,
+    Camera,
+    Link2,
+    X,
 } from "lucide-react";
 
 type WizardMode = "express" | "full";
-type StageId = 0 | 1 | 2 | 3 | 4; // 0 = Welcome, 1 = Identity & Kits, 2 = Matchday & Finance, 3 = Instant Import Hub, 4 = Staff & Launch
+type StageId = 0 | 1 | 2 | 3 | 4;
 
 interface ParsedSquadDraft {
     squadNumber: number | null;
     firstName: string;
     lastName: string;
     position: string;
+    email?: string;
+    dateOfBirth?: string;
+    age?: number | null;
 }
 
 interface ParsedStandingsRow {
@@ -216,15 +218,6 @@ const FORMATIONS: Record<string, { label: string; coords: { x: number; y: number
     },
 };
 
-const FINES_PRESET_PACK = [
-    { id: "fine-late", name: "Late for Matchday Meet", amount: 5 },
-    { id: "fine-yellow", name: "Yellow Card (Dissent)", amount: 10 },
-    { id: "fine-red", name: "Red Card", amount: 25 },
-    { id: "fine-boots", name: "Dirty Boots on Matchday", amount: 3 },
-    { id: "fine-kit", name: "Forgot Kit Item", amount: 5 },
-    { id: "fine-noshow", name: "No-Show Without Notice", amount: 15 },
-];
-
 const COLOR_SWATCHES = [
     "#dc2626",
     "#2563eb",
@@ -238,6 +231,31 @@ const COLOR_SWATCHES = [
     "#0f172a",
 ];
 
+function getHexLuminance(hex: string): number {
+    const clean = (hex || "").replace("#", "").trim();
+    const full =
+        clean.length === 3
+            ? clean
+                  .split("")
+                  .map((c) => c + c)
+                  .join("")
+            : clean;
+    if (full.length !== 6) return 0;
+    const r = parseInt(full.slice(0, 2), 16);
+    const g = parseInt(full.slice(2, 4), 16);
+    const b = parseInt(full.slice(4, 6), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return 0;
+    return (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+}
+
+function isLightHex(hex: string): boolean {
+    return getHexLuminance(hex) > 0.65;
+}
+
+function isVeryLightHex(hex: string): boolean {
+    return getHexLuminance(hex) > 0.84;
+}
+
 function calculateMeetTime(koTime: string, offsetMinutes: number): string {
     const parts = koTime.split(":").map(Number);
     if (parts.length !== 2 || isNaN(parts[0]) || isNaN(parts[1])) return "13:45";
@@ -248,6 +266,53 @@ function calculateMeetTime(koTime: string, offsetMinutes: number): string {
     return `${hh}:${mm}`;
 }
 
+function normalizePositionString(raw?: string): string {
+    const up = (raw || "").trim().toUpperCase();
+    if (!up) return "CM";
+    if (up === "GK" || up.includes("GOALKEEPER") || up.includes("KEEPER")) return "GK";
+    if (up === "RWB" || up.includes("RIGHT WING BACK") || up.includes("RIGHT WING-BACK")) return "RWB";
+    if (up === "LWB" || up.includes("LEFT WING BACK") || up.includes("LEFT WING-BACK")) return "LWB";
+    if (up === "RB" || up.includes("RIGHT BACK") || up.includes("RIGHT-BACK")) return "RB";
+    if (up === "LB" || up.includes("LEFT BACK") || up.includes("LEFT-BACK")) return "LB";
+    if (up === "CB" || up === "DEF" || up.includes("CENTRE BACK") || up.includes("CENTER BACK") || up.includes("DEFENDER")) return "CB";
+    if (up === "CDM" || up === "DM" || up.includes("DEFENSIVE MID") || up.includes("HOLDING")) return "CDM";
+    if (up === "CAM" || up === "AM" || up.includes("ATTACKING MID")) return "CAM";
+    if (up === "RW" || up === "RM" || up.includes("RIGHT WING")) return "RW";
+    if (up === "LW" || up === "LM" || up.includes("LEFT WING") || up === "WINGER") return "LW";
+    if (up === "ST" || up === "CF" || up === "FWD" || up.includes("STRIKER") || up.includes("FORWARD")) return "ST";
+    if (["CM", "MID", "MIDFIELDER"].includes(up) || up.includes("MID")) return "CM";
+    return "CM";
+}
+
+function computeAgeFromDobStr(dobRaw?: string): { iso?: string; age?: number } {
+    if (!dobRaw) return {};
+    const trimmed = dobRaw.trim();
+    let iso = "";
+    if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+        iso = trimmed;
+    } else {
+        const ukMatch = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/);
+        if (ukMatch) {
+            const d = ukMatch[1].padStart(2, "0");
+            const m = ukMatch[2].padStart(2, "0");
+            const y = ukMatch[3].length === 2 ? (Number(ukMatch[3]) > 35 ? `19${ukMatch[3]}` : `20${ukMatch[3]}`) : ukMatch[3];
+            iso = `${y}-${m}-${d}`;
+        }
+    }
+    if (!iso) return {};
+    const [y, m, d] = iso.split("-").map(Number);
+    if (!y || !m || !d) return {};
+    const today = new Date();
+    let age = today.getFullYear() - y;
+    const md = today.getMonth() + 1 - m;
+    if (md < 0 || (md === 0 && today.getDate() < d)) age--;
+    if (age < 4 || age > 99) return {};
+    return { iso, age };
+}
+
+const NOISE_LINE_REGEX =
+    /^(players?|squad|team\s*sheet|appearances|goals|assists|position|status|active|registered|search|filter|total|name|first\s*name|last\s*name|surname|no\.?|#|date\s*of\s*birth|dob|actions|edit|select|page\s+\d+|\d{1,2}:\d{2})$/i;
+
 function parseSquadPasteText(raw: string): ParsedSquadDraft[] {
     if (!raw.trim()) return [];
     const lines = raw
@@ -256,40 +321,65 @@ function parseSquadPasteText(raw: string): ParsedSquadDraft[] {
         .filter(Boolean);
 
     const parsed: ParsedSquadDraft[] = [];
-    const posRegex = /\b(GK|GOALKEEPER|CB|RB|LB|RWB|LWB|DEF|DEFENDER|CDM|CM|CAM|RM|LM|MID|MIDFIELDER|RW|LW|ST|CF|FWD|FORWARD|WINGER|STRIKER)\b/i;
+    const posRegex =
+        /\b(GK|GOALKEEPER|CB|RB|LB|RWB|LWB|DEF|DEFENDER|CDM|CM|CAM|RM|LM|MID|MIDFIELDER|RW|LW|ST|CF|FWD|FORWARD|WINGER|STRIKER)\b/i;
 
     for (const line of lines) {
-        let cleaned = line.replace(/^[•\-*]\s*/, "").trim();
-        let squadNumber: number | null = null;
+        let cleaned = line
+            .replace(/^[•\-*✓✔☑️]+\s*/, "")
+            .replace(/\b\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4}\b/g, "")
+            .trim();
+        if (!cleaned || NOISE_LINE_REGEX.test(cleaned)) continue;
 
+        let squadNumber: number | null = null;
         const numMatch = cleaned.match(/^#?(\d{1,2})[\s.\-:)]+(.*)$/);
         if (numMatch) {
             squadNumber = parseInt(numMatch[1], 10);
             cleaned = numMatch[2].trim();
         }
 
-        let position = "MID";
+        let position = "CM";
         const posMatch = cleaned.match(posRegex);
         if (posMatch) {
-            const rawPos = posMatch[1].toUpperCase();
-            if (rawPos === "GOALKEEPER" || rawPos === "GK") position = "GK";
-            else if (["CB", "RB", "LB", "RWB", "LWB", "DEF", "DEFENDER"].includes(rawPos)) position = rawPos === "DEFENDER" ? "DEF" : rawPos;
-            else if (["CDM", "CM", "CAM", "RM", "LM", "MID", "MIDFIELDER"].includes(rawPos)) position = rawPos === "MIDFIELDER" ? "CM" : rawPos;
-            else position = ["STRIKER", "FORWARD"].includes(rawPos) ? "ST" : rawPos === "WINGER" ? "RW" : rawPos;
-
+            position = normalizePositionString(posMatch[1]);
             cleaned = cleaned
-                .replace(/\(\s*(GK|GOALKEEPER|CB|RB|LB|RWB|LWB|DEF|DEFENDER|CDM|CM|CAM|RM|LM|MID|MIDFIELDER|RW|LW|ST|CF|FWD|FORWARD|WINGER|STRIKER)\s*\)/i, "")
-                .replace(/[-–—|,:]\s*(GK|GOALKEEPER|CB|RB|LB|RWB|LWB|DEF|DEFENDER|CDM|CM|CAM|RM|LM|MID|MIDFIELDER|RW|LW|ST|CF|FWD|FORWARD|WINGER|STRIKER)\b/i, "")
+                .replace(
+                    /\(\s*(GK|GOALKEEPER|CB|RB|LB|RWB|LWB|DEF|DEFENDER|CDM|CM|CAM|RM|LM|MID|MIDFIELDER|RW|LW|ST|CF|FWD|FORWARD|WINGER|STRIKER)\s*\)/i,
+                    ""
+                )
+                .replace(
+                    /[-–—|,:]\s*(GK|GOALKEEPER|CB|RB|LB|RWB|LWB|DEF|DEFENDER|CDM|CM|CAM|RM|LM|MID|MIDFIELDER|RW|LW|ST|CF|FWD|FORWARD|WINGER|STRIKER)\b/i,
+                    ""
+                )
                 .replace(posRegex, "")
                 .trim();
         }
 
-        cleaned = cleaned.replace(/[-–—|,:()]+$/g, "").trim();
-        if (!cleaned) continue;
+        // Clean trailing stat numbers or punctuation from OCR / table copy
+        cleaned = cleaned
+            .replace(/\s+\d+(\s+\d+)*$/, "")
+            .replace(/[-–—|,:()]+$/g, "")
+            .replace(/\s+/g, " ")
+            .trim();
 
-        const nameParts = cleaned.split(/\s+/);
-        const firstName = nameParts[0] || "Player";
-        const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
+        if (!cleaned || cleaned.length < 2 || NOISE_LINE_REGEX.test(cleaned)) continue;
+        if (!/[a-zA-Z]{2,}/.test(cleaned)) continue;
+
+        // Support "Surname, Firstname" format from FA Full-Time / Mitoo exports
+        let firstName = "";
+        let lastName = "";
+        if (cleaned.includes(",")) {
+            const [left, right] = cleaned.split(",").map((s) => s.trim());
+            if (left && right) {
+                firstName = right;
+                lastName = left;
+            }
+        }
+        if (!firstName) {
+            const nameParts = cleaned.split(/\s+/);
+            firstName = nameParts[0] || "Player";
+            lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : "";
+        }
 
         parsed.push({
             squadNumber,
@@ -397,6 +487,31 @@ function parseLeagueStandingsText(raw: string): ParsedStandingsRow[] {
     return parsed.sort((a, b) => a.pos - b.pos);
 }
 
+async function runBrowserOcrFallback(file: File): Promise<string> {
+    if (typeof window === "undefined") return "";
+    const w = window as any;
+    if (!w.Tesseract) {
+        await new Promise<void>((resolve, reject) => {
+            const existing = document.querySelector('script[data-tesseract="1"]') as HTMLScriptElement | null;
+            if (existing) {
+                if (w.Tesseract) return resolve();
+                existing.addEventListener("load", () => resolve());
+                existing.addEventListener("error", () => reject(new Error("Could not load image scanner")));
+                return;
+            }
+            const script = document.createElement("script");
+            script.src = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+            script.async = true;
+            script.dataset.tesseract = "1";
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error("Could not load image scanner"));
+            document.head.appendChild(script);
+        });
+    }
+    const result = await w.Tesseract.recognize(file, "eng");
+    return result?.data?.text || "";
+}
+
 function OnboardingContent() {
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -461,7 +576,7 @@ function OnboardingContent() {
             "📋 *MATCHDAY AVAILABILITY POLL*\nPlease vote on the poll below for this week's fixture so the gaffer can finalise the squad!"
     );
 
-    // Finance Model & ClubFlow Pay Setup: "per_game" | "monthly" | "both" | "skip"
+    // Finance Model & ClubFlow Pay Setup
     const [financeModel, setFinanceModel] = useState<"per_game" | "monthly" | "both" | "skip">(
         isRerun && settings.subsEnabled === false ? "skip" : "per_game"
     );
@@ -477,23 +592,26 @@ function OnboardingContent() {
     >("individual");
     const [treasurerInviteName, setTreasurerInviteName] = useState("");
     const [treasurerInviteEmail, setTreasurerInviteEmail] = useState("");
-    const [contractsEnabled, setContractsEnabled] = useState(settings.contractsEnabled ?? false);
-    const [finesEnabled, setFinesEnabled] = useState(settings.finesEnabled ?? true);
-    const [fineCategories, setFineCategories] = useState<{ id: string; name: string; amount: number }[]>(
+    const [contractsEnabled] = useState(settings.contractsEnabled ?? false);
+    const [finesEnabled] = useState(settings.finesEnabled ?? true);
+    const [fineCategories] = useState<{ id: string; name: string; amount: number }[]>(
         (settings.fineCategories || []).map((f: any, idx: number) => ({
             id: f.id || `fine-init-${idx}`,
             name: f.name,
             amount: f.amount,
         }))
     );
-    const [newFineName, setNewFineName] = useState("");
-    const [newFineAmount, setNewFineAmount] = useState(5);
 
-    // Stage 3: Instant Data Import Hub
+    // Stage 3: Squad, CSV, Photo Scanner, Player Link & League Imports
     const [importTab, setImportTab] = useState<"squad" | "table" | "fixtures" | "demo">("squad");
     const [rawSquadPaste, setRawSquadPaste] = useState("");
+    const [extraStagedPlayers, setExtraStagedPlayers] = useState<ParsedSquadDraft[]>([]);
     const [importedPlayersCount, setImportedPlayersCount] = useState(0);
     const [isImportingSquad, setIsImportingSquad] = useState(false);
+    const [isScanningImage, setIsScanningImage] = useState(false);
+    const [squadImportNotice, setSquadImportNotice] = useState<{ type: "success" | "error"; text: string } | null>(null);
+    const [mintingPlayerLink, setMintingPlayerLink] = useState(false);
+    const [copiedPlayerLink, setCopiedPlayerLink] = useState(false);
 
     const [rawTablePaste, setRawTablePaste] = useState("");
     const [importedTeamsCount, setImportedTeamsCount] = useState(0);
@@ -520,15 +638,25 @@ function OnboardingContent() {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const sponsorInputRef = useRef<HTMLInputElement>(null);
+    const csvSquadInputRef = useRef<HTMLInputElement>(null);
+    const squadPhotoInputRef = useRef<HTMLInputElement>(null);
 
-    // Redirect away only if already onboarded AND not in rerun mode AND still on welcome stage
+    const brandIsLight = isLightHex(primaryColor);
+    const brandIsVeryLight = isVeryLightHex(primaryColor);
+    const brandTextColor = brandIsLight ? "#0f172a" : "#ffffff";
+    const safeBrandAccent = brandIsVeryLight ? "#0f172a" : primaryColor;
+    const brandButtonStyle: React.CSSProperties = {
+        backgroundColor: primaryColor,
+        color: brandTextColor,
+        border: brandIsLight ? "1px solid #94a3b8" : "1px solid transparent",
+    };
+
     useEffect(() => {
         if (settings.isOnboarded && !isRerun && stage === 0) {
             router.replace("/dashboard");
         }
     }, [settings.isOnboarded, isRerun, stage, router]);
 
-    // Sync initial settings when loaded
     useEffect(() => {
         if (settings.name && settings.name !== "My Club" && !clubName) {
             setClubName(settings.name);
@@ -538,7 +666,6 @@ function OnboardingContent() {
         }
     }, [settings.name, settings.logo]);
 
-    // Extract optional brand color swatches from uploaded badge using HTML5 Canvas
     const extractColorsFromImage = (dataUrl: string) => {
         if (typeof window === "undefined") return;
         const img = new Image();
@@ -560,9 +687,8 @@ function OnboardingContent() {
                     const b = data[i + 2];
                     const a = data[i + 3];
                     if (a < 128) continue;
-                    // Skip near-white or near-black background pixels
                     const brightness = (r + g + b) / 3;
-                    if (brightness > 240 || brightness < 20) continue;
+                    if (brightness < 18) continue;
 
                     const qr = Math.round(r / 32) * 32;
                     const qg = Math.round(g / 32) * 32;
@@ -583,9 +709,7 @@ function OnboardingContent() {
                 if (topColors.length > 0) {
                     setExtractedSwatches(topColors);
                 }
-            } catch {
-                // Ignore canvas taint errors
-            }
+            } catch {}
         };
         img.src = dataUrl;
     };
@@ -652,32 +776,260 @@ function OnboardingContent() {
         setCustomSquadInput("");
     };
 
-    const handleLoadFinesPresetPack = () => {
-        setFinesEnabled(true);
-        setFineCategories((prev) => {
-            const existingNames = new Set(prev.map((f) => f.name.toLowerCase()));
-            const merged = [...prev];
-            for (const preset of FINES_PRESET_PACK) {
-                if (!existingNames.has(preset.name.toLowerCase())) {
-                    merged.push({ ...preset, id: `${preset.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` });
+    // Combined squad drafts from text paste + CSV / Photo imports
+    const textSquadDrafts = parseSquadPasteText(rawSquadPaste);
+    const parsedSquadDrafts = [...extraStagedPlayers, ...textSquadDrafts];
+
+    // CSV Squad Upload Handler
+    const handleSquadCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        setSquadImportNotice(null);
+
+        Papa.parse(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+                const rows = (results.data || []) as Record<string, any>[];
+                const parsedCsvPlayers: ParsedSquadDraft[] = [];
+
+                for (const rawRow of rows) {
+                    const lowerMap: Record<string, string> = {};
+                    Object.entries(rawRow || {}).forEach(([k, v]) => {
+                        if (k && v !== undefined && v !== null) {
+                            lowerMap[k.trim().toLowerCase().replace(/[\s_-]+/g, "")] = String(v).trim();
+                        }
+                    });
+
+                    const fullName =
+                        lowerMap["fullname"] ||
+                        lowerMap["playername"] ||
+                        lowerMap["player"] ||
+                        lowerMap["name"] ||
+                        "";
+                    let firstName = lowerMap["firstname"] || lowerMap["forename"] || "";
+                    let lastName = lowerMap["lastname"] || lowerMap["surname"] || lowerMap["familyname"] || "";
+
+                    if (!firstName && fullName) {
+                        if (fullName.includes(",")) {
+                            const [s, f] = fullName.split(",").map((x) => x.trim());
+                            firstName = f || s;
+                            lastName = f ? s : "";
+                        } else {
+                            const parts = fullName.split(/\s+/);
+                            firstName = parts[0] || "";
+                            lastName = parts.slice(1).join(" ");
+                        }
+                    } else if (firstName && !lastName && firstName.includes(" ")) {
+                        const parts = firstName.split(/\s+/);
+                        firstName = parts[0] || "";
+                        lastName = parts.slice(1).join(" ");
+                    }
+
+                    if (!firstName && !lastName) continue;
+
+                    const posRaw =
+                        lowerMap["position"] ||
+                        lowerMap["pos"] ||
+                        lowerMap["role"] ||
+                        lowerMap["primaryposition"] ||
+                        "CM";
+                    const numRaw =
+                        lowerMap["squadnumber"] ||
+                        lowerMap["number"] ||
+                        lowerMap["shirt"] ||
+                        lowerMap["shirtnumber"] ||
+                        lowerMap["no"] ||
+                        "";
+                    const parsedNum = parseInt(numRaw, 10);
+                    const emailRaw = lowerMap["email"] || lowerMap["emailaddress"] || "";
+                    const dobRaw = lowerMap["dateofbirth"] || lowerMap["dob"] || lowerMap["birthdate"] || "";
+                    const { iso: dobIso, age } = computeAgeFromDobStr(dobRaw);
+
+                    parsedCsvPlayers.push({
+                        squadNumber: !isNaN(parsedNum) && parsedNum > 0 ? parsedNum : null,
+                        firstName: firstName || "Player",
+                        lastName: lastName || "—",
+                        position: normalizePositionString(posRaw),
+                        email: emailRaw || undefined,
+                        dateOfBirth: dobIso,
+                        age: age ?? null,
+                    });
                 }
-            }
-            return merged;
+
+                if (parsedCsvPlayers.length === 0) {
+                    setSquadImportNotice({
+                        type: "error",
+                        text: "No player rows found in that CSV. Include columns like Name (or First Name & Surname) and Position.",
+                    });
+                } else {
+                    setExtraStagedPlayers((prev) => [...prev, ...parsedCsvPlayers]);
+                    setSquadImportNotice({
+                        type: "success",
+                        text: `Loaded ${parsedCsvPlayers.length} players from CSV — review below and click Import.`,
+                    });
+                }
+                e.target.value = "";
+            },
+            error: () => {
+                setSquadImportNotice({ type: "error", text: "Could not read CSV file." });
+                e.target.value = "";
+            },
         });
     };
 
-    const handleAddCustomFine = () => {
-        if (!newFineName.trim()) return;
-        setFineCategories((prev) => [
-            ...prev,
-            { id: `fine-${Date.now()}`, name: newFineName.trim(), amount: Number(newFineAmount) || 5 },
-        ]);
-        setNewFineName("");
-        setNewFineAmount(5);
+    // AI / OCR Photo or Screenshot Squad List Scanner
+    const processSquadImageFile = async (file: File) => {
+        if (!file.type.startsWith("image/")) return;
+        setIsScanningImage(true);
+        setSquadImportNotice(null);
+        try {
+            let extractedText = "";
+            const fd = new FormData();
+            fd.append("image", file);
+            const res = await fetch("/api/parse-squad-image", {
+                method: "POST",
+                body: fd,
+            }).catch(() => null);
+
+            if (res && res.ok) {
+                const data = await res.json().catch(() => ({}));
+                if (data?.available && data?.text) {
+                    extractedText = String(data.text);
+                }
+            }
+
+            if (!extractedText) {
+                extractedText = await runBrowserOcrFallback(file);
+            }
+
+            const extractedDrafts = parseSquadPasteText(extractedText);
+            if (extractedDrafts.length === 0) {
+                if (extractedText.trim()) {
+                    setRawSquadPaste((prev) => (prev ? `${prev}\n${extractedText.trim()}` : extractedText.trim()));
+                }
+                setSquadImportNotice({
+                    type: "error",
+                    text: "Couldn't clearly detect player names from that image — try cropping closer to the player names column.",
+                });
+            } else {
+                const formattedLines = extractedDrafts
+                    .map(
+                        (p) =>
+                            `${p.squadNumber ? `${p.squadNumber}. ` : ""}${p.firstName}${
+                                p.lastName && p.lastName !== "—" ? ` ${p.lastName}` : ""
+                            } (${p.position})`
+                    )
+                    .join("\n");
+                setRawSquadPaste((prev) => (prev ? `${prev}\n${formattedLines}` : formattedLines));
+                setSquadImportNotice({
+                    type: "success",
+                    text: `Extracted ${extractedDrafts.length} players from your squad image! Edit any line below or click Import.`,
+                });
+            }
+        } catch (err: any) {
+            setSquadImportNotice({
+                type: "error",
+                text: err?.message || "Could not scan squad image.",
+            });
+        } finally {
+            setIsScanningImage(false);
+        }
     };
 
-    // Stage 3 Handlers: Bulk Squad Paste Import
-    const parsedSquadDrafts = parseSquadPasteText(rawSquadPaste);
+    const handleSquadPhotoInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            processSquadImageFile(file);
+        }
+        e.target.value = "";
+    };
+
+    const handleSquadPasteEvent = (e: React.ClipboardEvent) => {
+        const items = e.clipboardData?.items;
+        if (!items) return;
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            if (item.type.startsWith("image/")) {
+                const file = item.getAsFile();
+                if (file) {
+                    e.preventDefault();
+                    processSquadImageFile(file);
+                    return;
+                }
+            }
+        }
+    };
+
+    // Generate a 1-time individual player registration link right during Stage 3
+    const handleCopyOneTimePlayerLink = async () => {
+        if (!clubId || typeof window === "undefined" || mintingPlayerLink) return;
+        setMintingPlayerLink(true);
+        setSquadImportNotice(null);
+        try {
+            // Ensure current club name, badge & primary color are saved on the club row so the link shows the right crest/name
+            if (clubName.trim()) {
+                await supabase
+                    .from("clubs")
+                    .update({
+                        name: clubName.trim(),
+                        logo: logoPreview,
+                        primary_color: primaryColor,
+                        squads: squads.length > 0 ? squads : ["First Team"],
+                    })
+                    .eq("id", clubId);
+            }
+
+            const buildMsg = async (): Promise<string> => {
+                const {
+                    data: { session },
+                } = await supabase.auth.getSession();
+                const accessToken = session?.access_token;
+                if (!accessToken) throw new Error("Session expired — please sign in again.");
+
+                const res = await fetch(`/api/public/squad-onboarding/${encodeURIComponent(clubId)}`, {
+                    method: "PUT",
+                    headers: { Authorization: `Bearer ${accessToken}` },
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data?.token) {
+                    throw new Error(data?.error || "Could not generate 1-time player link.");
+                }
+                const targetSquad = squads[0] || "First Team";
+                const params = new URLSearchParams({ token: data.token, squad: targetSquad });
+                const url = `${window.location.origin}/squad-onboarding/${clubId}?${params.toString()}`;
+                const displayClub = clubName.trim() || settings.name || "Club";
+                return `📋 *${displayClub} — 1-Time Player Registration*\nWelcome aboard! Tap your unique link below to enter your position, DOB & contact details (valid for 1 submission):\n${url}`;
+            };
+
+            if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+                const p = buildMsg();
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        "text/plain": p.then((t) => new Blob([t], { type: "text/plain" })),
+                    }),
+                ]);
+                await p;
+            } else {
+                const msg = await buildMsg();
+                await navigator.clipboard.writeText(msg);
+            }
+
+            setCopiedPlayerLink(true);
+            setSquadImportNotice({
+                type: "success",
+                text: "Copied 1-time player link! Send it to a player on WhatsApp (click again anytime for another player, or from Squad -> New Player Link).",
+            });
+            setTimeout(() => setCopiedPlayerLink(false), 3500);
+        } catch (err: any) {
+            setSquadImportNotice({
+                type: "error",
+                text: err?.message || "Could not copy player link.",
+            });
+        } finally {
+            setMintingPlayerLink(false);
+        }
+    };
 
     const handleImportSquadDrafts = async () => {
         if (parsedSquadDrafts.length === 0 || !clubId) return;
@@ -690,6 +1042,9 @@ function OnboardingContent() {
                 last_name: p.lastName === "—" ? "" : p.lastName,
                 position: p.position,
                 squad_number: p.squadNumber,
+                ...(p.email ? { email: p.email } : {}),
+                ...(p.dateOfBirth ? { date_of_birth: p.dateOfBirth } : {}),
+                ...(p.age ? { age: p.age } : {}),
                 squad: defaultSquadName,
                 status: "Active",
                 medical_status: "Available",
@@ -703,6 +1058,11 @@ function OnboardingContent() {
 
             setImportedPlayersCount((prev) => prev + rowsToInsert.length);
             setRawSquadPaste("");
+            setExtraStagedPlayers([]);
+            setSquadImportNotice({
+                type: "success",
+                text: `Imported ${rowsToInsert.length} players into ${defaultSquadName}!`,
+            });
         } catch (err: any) {
             alert("Could not import squad players: " + (err.message || "Unknown error"));
         } finally {
@@ -743,12 +1103,13 @@ function OnboardingContent() {
                 };
             });
 
+            const nowIso = new Date().toISOString();
             const storageKey = `clubflow_league_table_${clubId}`;
             localStorage.setItem(storageKey, JSON.stringify(normalizedStandings));
+            localStorage.setItem(`${storageKey}_synced_at`, nowIso);
 
             const ourRow = normalizedStandings.find((r) => r.is_our_club);
 
-            // Sync opponent clubs to league_teams
             const existingRes = await supabase.from("league_teams").select("name").eq("club_id", clubId);
             const existingSet = new Set((existingRes.data || []).map((t: any) => (t.name || "").toLowerCase().trim()));
 
@@ -763,8 +1124,10 @@ function OnboardingContent() {
                 await supabase.from("league_teams").insert(newTeamRows);
             }
 
-            // Persist league table to Supabase documents (LEAGUE_TABLE_CACHE) across devices
-            const tableJson = JSON.stringify(normalizedStandings);
+            const tablePayload = JSON.stringify({
+                teams: normalizedStandings,
+                updatedAt: nowIso,
+            });
             const { data: existingCache } = await supabase
                 .from("documents")
                 .select("id")
@@ -775,16 +1138,15 @@ function OnboardingContent() {
             if (existingCache?.id) {
                 await supabase
                     .from("documents")
-                    .update({ url: tableJson, created_at: new Date().toISOString() })
+                    .update({ url: tablePayload, name: "League Standings Cache" })
                     .eq("id", existingCache.id);
             } else {
                 await supabase.from("documents").insert({
                     club_id: clubId,
-                    title: "League Standings Cache",
+                    name: "League Standings Cache",
+                    type: "JSON",
                     category: "LEAGUE_TABLE_CACHE",
-                    file_type: "JSON",
-                    size_label: "Auto",
-                    url: tableJson,
+                    url: tablePayload,
                 });
             }
 
@@ -793,11 +1155,7 @@ function OnboardingContent() {
                 lastImportHistory: {
                     ...settings.lastImportHistory,
                     leagueTable: normalizedStandings,
-                    table: {
-                        timestamp: new Date().toISOString(),
-                        summary: `Imported ${parsedStandingsRows.length} teams during onboarding`,
-                        count: parsedStandingsRows.length,
-                    },
+                    updatedAt: nowIso,
                 },
             });
 
@@ -810,7 +1168,6 @@ function OnboardingContent() {
         }
     };
 
-    // Stage 3 Handlers: Fixtures Paste Parse & Import
     const handleParseFixturesPaste = async () => {
         if (!rawFixturesPaste.trim()) return;
         setIsParsingFixtures(true);
@@ -848,10 +1205,10 @@ function OnboardingContent() {
                     rawRes === "W" || rawRes === "WIN"
                         ? "Win"
                         : rawRes === "D" || rawRes === "DRAW"
-                        ? "Draw"
-                        : rawRes === "L" || rawRes === "LOSS"
-                        ? "Loss"
-                        : "Pending";
+                          ? "Draw"
+                          : rawRes === "L" || rawRes === "LOSS"
+                            ? "Loss"
+                            : "Pending";
                 return {
                     club_id: clubId,
                     opponent: f.opponent,
@@ -878,7 +1235,6 @@ function OnboardingContent() {
         }
     };
 
-    // Stage 3 Handler: Seed Demo Sandbox Data
     const handleSeedDemoData = async () => {
         if (!clubId || demoSeeded) return;
         setIsSeedingDemo(true);
@@ -986,16 +1342,16 @@ function OnboardingContent() {
                 { position: 5, pos: 5, team_name: "Finsbury Park Rovers", team: "Finsbury Park Rovers", played: 10, won: 4, drawn: 2, lost: 4, goals_for: 15, gf: 15, goals_against: 16, ga: 16, goal_difference: -1, gd: -1, points: 14, pts: 14, is_our_club: false },
                 { position: 6, pos: 6, team_name: "Hampstead Town", team: "Hampstead Town", played: 10, won: 2, drawn: 1, lost: 7, goals_for: 10, gf: 10, goals_against: 22, ga: 22, goal_difference: -12, gd: -12, points: 7, pts: 7, is_our_club: false },
             ];
-            const sampleTableJson = JSON.stringify(sampleTable);
-            localStorage.setItem(`clubflow_league_table_${clubId}`, sampleTableJson);
+            const nowIso = new Date().toISOString();
+            localStorage.setItem(`clubflow_league_table_${clubId}`, JSON.stringify(sampleTable));
+            localStorage.setItem(`clubflow_league_table_${clubId}_synced_at`, nowIso);
 
             await supabase.from("documents").insert({
                 club_id: clubId,
-                title: "League Standings Cache",
+                name: "League Standings Cache",
+                type: "JSON",
                 category: "LEAGUE_TABLE_CACHE",
-                file_type: "JSON",
-                size_label: "Auto",
-                url: sampleTableJson,
+                url: JSON.stringify({ teams: sampleTable, updatedAt: nowIso }),
             });
 
             setImportedPlayersCount((prev) => prev + samplePlayers.length);
@@ -1009,7 +1365,6 @@ function OnboardingContent() {
         }
     };
 
-    // Stage 4 Handler: Create Real Staff Invite Link
     const handleCreateStaffInvite = async () => {
         if (!staffName.trim() || !clubId) return;
         setIsCreatingInvite(true);
@@ -1022,12 +1377,16 @@ function OnboardingContent() {
                 staffAccessLevel === "admin"
                     ? ALL_PAGE_PERMISSIONS.map((p) => p.key)
                     : staffAccessLevel === "coach"
-                    ? ["squad", "training", "matches", "matchday-xi", "opposition", "league", "recruitment"]
-                    : ["squad", "matches", "league"];
+                      ? ["squad", "training", "matches", "matchday-xi", "opposition", "league", "recruitment"]
+                      : ["squad", "matches", "league"];
+
+            const cleanInviteEmail = (
+                staffEmail.trim() || `${staffName.toLowerCase().replace(/\s+/g, ".")}@club.local`
+            ).toLowerCase();
 
             await supabase.from("club_invitations").insert({
                 club_id: clubId,
-                email: (staffEmail.trim() || `${staffName.toLowerCase().replace(/\s+/g, ".")}@club.local`).toLowerCase(),
+                email: cleanInviteEmail,
                 display_name: staffName.trim(),
                 role: staffAccessLevel === "admin" ? "manager" : "staff",
                 token,
@@ -1039,8 +1398,34 @@ function OnboardingContent() {
                 name: staffName.trim(),
                 email: staffEmail.trim() || null,
                 role: staffRoleTitle,
-                notes: `Access Level: ${staffAccessLevel === "admin" ? "Full Admin" : staffAccessLevel === "coach" ? "Coach View" : "View Only"}`,
+                notes: `Access Level: ${
+                    staffAccessLevel === "admin"
+                        ? "Full Admin"
+                        : staffAccessLevel === "coach"
+                          ? "Coach View"
+                          : "View Only"
+                }`,
             });
+
+            if (staffEmail.trim()) {
+                supabase.auth.getSession().then(({ data: { session } }) => {
+                    if (!session?.access_token) return;
+                    fetch("/api/staff/invite", {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            Authorization: `Bearer ${session.access_token}`,
+                        },
+                        body: JSON.stringify({
+                            clubId,
+                            email: staffEmail.trim().toLowerCase(),
+                            displayName: staffName.trim(),
+                            role: staffRoleTitle,
+                            inviteUrl,
+                        }),
+                    }).catch(() => {});
+                });
+            }
 
             setGeneratedInvites((prev) => [
                 ...prev,
@@ -1068,7 +1453,6 @@ function OnboardingContent() {
         setTimeout(() => setCopiedLinkKey(null), 2000);
     };
 
-    // Finalize Onboarding & Navigate
     const handleCompleteOnboarding = async (destination: string = "/dashboard") => {
         setIsCompleting(true);
         try {
@@ -1137,7 +1521,6 @@ function OnboardingContent() {
                 finalPermissions
             );
 
-            // Sync Subs, Quick-Chip Presets, Account Pots & Bank Handoff directly to Subs & Payments (/player-payments)
             if (clubId) {
                 const subPresetRules: {
                     id: string;
@@ -1186,7 +1569,6 @@ function OnboardingContent() {
                     }
                 }
 
-                // Always keep clean standard presets available alongside the club's tailored subs
                 const fallbackPresets = [
                     ...(subPresetRules.length === 0
                         ? [
@@ -1257,14 +1639,8 @@ function OnboardingContent() {
 
                 if (typeof window !== "undefined") {
                     try {
-                        localStorage.setItem(
-                            `clubflow-standard-fines-${clubId}`,
-                            JSON.stringify(finalRules)
-                        );
-                        localStorage.setItem(
-                            `clubflow-payout-account-${clubId}`,
-                            JSON.stringify(payoutAccountConfig)
-                        );
+                        localStorage.setItem(`clubflow-standard-fines-${clubId}`, JSON.stringify(finalRules));
+                        localStorage.setItem(`clubflow-payout-account-${clubId}`, JSON.stringify(payoutAccountConfig));
                     } catch {}
                 }
 
@@ -1297,12 +1673,7 @@ function OnboardingContent() {
                     }
                 } catch {}
 
-                // If manager delegated bank setup to Treasurer/Secretary, automatically email their invite
-                if (
-                    subsEnabledVal &&
-                    bankHandler === "treasurer" &&
-                    treasurerInviteEmail.trim()
-                ) {
+                if (subsEnabledVal && bankHandler === "treasurer" && treasurerInviteEmail.trim()) {
                     try {
                         const {
                             data: { session },
@@ -1344,13 +1715,13 @@ function OnboardingContent() {
     const visibleStages: { id: StageId; title: string; subtitle: string }[] =
         wizardMode === "express"
             ? [
-                  { id: 1, title: "Club & Kits", subtitle: "Badge, colors & strip" },
-                  { id: 4, title: "Launchpad", subtitle: "Ready for kick-off" },
+                  { id: 1, title: "Club & Kits", subtitle: "Badge, colours & strip" },
+                  { id: 4, title: "Finish Setup", subtitle: "Ready for kick-off" },
               ]
             : [
-                  { id: 1, title: "Identity & Kits", subtitle: "Badge, colors & strip" },
-                  { id: 2, title: "Matchday & Club", subtitle: "Formation, ground & subs" },
-                  { id: 3, title: "Instant Import", subtitle: "Squad, table & fixtures" },
+                  { id: 1, title: "Club & Kits", subtitle: "Badge, colours & strip" },
+                  { id: 2, title: "Matchday & Subs", subtitle: "Formation, venue & fees" },
+                  { id: 3, title: "Squad & Fixtures", subtitle: "CSV, photo or 1-time links" },
                   { id: 4, title: "Staff & Launch", subtitle: "Invites & kick-off" },
               ];
 
@@ -1372,73 +1743,59 @@ function OnboardingContent() {
     };
 
     return (
-        <div className="min-h-screen bg-[#070A10] text-white relative overflow-x-hidden flex flex-col">
-            {/* Ambient Club Glow */}
-            <div
-                className="pointer-events-none fixed -top-40 -left-40 w-[520px] h-[520px] rounded-full blur-[160px] opacity-20 transition-colors duration-700"
-                style={{ backgroundColor: primaryColor }}
-            />
-            <div
-                className="pointer-events-none fixed bottom-0 right-0 w-[460px] h-[460px] rounded-full blur-[160px] opacity-15 transition-colors duration-700"
-                style={{ backgroundColor: awayKitShirt }}
-            />
-
-            {/* Top Navigation Bar */}
-            <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070A10]/85 backdrop-blur-xl px-4 sm:px-8 py-3.5">
+        <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex flex-col antialiased">
+            {/* Crisp Workspace Top Header (matches real ClubFlow shell) */}
+            <header className="sticky top-0 z-30 border-b border-slate-200 bg-white px-4 sm:px-8 py-3">
                 <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center border border-white/15 shadow-lg overflow-hidden shrink-0"
-                            style={{ backgroundColor: `${primaryColor}22` }}
-                        >
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-slate-200 bg-slate-50 overflow-hidden shrink-0">
                             {logoPreview ? (
                                 <img src={logoPreview} alt="Badge" className="w-8 h-8 object-contain" />
                             ) : (
-                                <Shield className="w-5 h-5" style={{ color: primaryColor }} />
+                                <Shield className="w-5 h-5" style={{ color: safeBrandAccent }} />
                             )}
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
-                                <span className="font-extrabold tracking-tight text-white text-sm sm:text-base">
-                                    {clubName || "Club Onboarding Studio"}
+                                <span className="font-extrabold tracking-tight text-slate-900 text-sm sm:text-base">
+                                    {clubName || "Club Setup"}
                                 </span>
                                 {isRerun && (
-                                    <Badge className="bg-amber-500/20 text-amber-300 border-amber-500/30 text-[10px]">
+                                    <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px]">
                                         Setup Re-Run
                                     </Badge>
                                 )}
                             </div>
-                            <p className="text-[11px] text-slate-400 hidden sm:block">
-                                Configure your club identity, matchday defaults, data imports & coaching staff
+                            <p className="text-[11px] text-slate-500 hidden sm:block">
+                                Set up your club badge, kits, squad &amp; matchday defaults
                             </p>
                         </div>
                     </div>
 
-                    {/* Express vs Full Setup Mode Toggle */}
                     <div className="flex items-center gap-2">
-                        <div className="inline-flex rounded-xl bg-slate-900/90 p-1 border border-white/10">
+                        <div className="inline-flex rounded-xl bg-slate-100 p-1 border border-slate-200">
                             <button
                                 type="button"
                                 onClick={() => {
                                     setWizardMode("express");
                                     if (stage === 2 || stage === 3) setStage(1);
                                 }}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                     wizardMode === "express"
-                                        ? "bg-emerald-500 text-slate-950 shadow"
-                                        : "text-slate-400 hover:text-white"
+                                        ? "bg-white text-slate-900 shadow-2xs border border-slate-200/80"
+                                        : "text-slate-600 hover:text-slate-900"
                                 }`}
                             >
-                                <Zap className="w-3.5 h-3.5" />
+                                <Zap className="w-3.5 h-3.5 text-amber-500" />
                                 60s Express
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setWizardMode("full")}
-                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                                     wizardMode === "full"
-                                        ? "bg-white text-slate-950 shadow"
-                                        : "text-slate-400 hover:text-white"
+                                        ? "bg-slate-900 text-white shadow-2xs"
+                                        : "text-slate-600 hover:text-slate-900"
                                 }`}
                             >
                                 <Wrench className="w-3.5 h-3.5" />
@@ -1448,21 +1805,20 @@ function OnboardingContent() {
 
                         {isRerun && (
                             <Button
-                                variant="ghost"
+                                variant="outline"
                                 size="sm"
                                 onClick={() => router.push("/dashboard")}
-                                className="text-xs text-slate-400 hover:text-white"
+                                className="text-xs border-slate-200 text-slate-700 hover:bg-slate-100"
                             >
-                                Exit to Dashboard
+                                Back to Dashboard
                             </Button>
                         )}
                     </div>
                 </div>
 
-                {/* Stage Stepper Bar (shown when stage > 0) */}
                 {stage > 0 && (
-                    <div className="max-w-7xl mx-auto mt-3 pt-3 border-t border-white/5 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
-                        <div className="flex items-center gap-2 sm:gap-4">
+                    <div className="max-w-7xl mx-auto mt-3 pt-3 border-t border-slate-100 flex items-center justify-between gap-2 overflow-x-auto no-scrollbar">
+                        <div className="flex items-center gap-2 sm:gap-3">
                             {visibleStages.map((s, idx) => {
                                 const isActive = stage === s.id;
                                 const isDone = stage > s.id;
@@ -1471,29 +1827,43 @@ function OnboardingContent() {
                                         key={s.id}
                                         type="button"
                                         onClick={() => setStage(s.id)}
-                                        className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border text-left transition-all shrink-0 ${
+                                        className={`flex items-center gap-2.5 px-3 py-1.5 rounded-xl border text-left transition-all shrink-0 cursor-pointer ${
                                             isActive
-                                                ? "border-white/30 bg-white/10 text-white shadow-sm"
+                                                ? "border-slate-900 bg-slate-900 text-white shadow-2xs"
                                                 : isDone
-                                                ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                                                : "border-white/5 bg-slate-900/40 text-slate-500 hover:text-slate-300"
+                                                  ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                                                  : "border-slate-200 bg-white text-slate-500 hover:text-slate-800 hover:border-slate-300"
                                         }`}
                                     >
                                         <span
-                                            className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-black ${
+                                            className={`w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-black ${
                                                 isDone
-                                                    ? "bg-emerald-500 text-slate-950"
+                                                    ? "bg-emerald-600 text-white"
                                                     : isActive
-                                                    ? "text-white"
-                                                    : "bg-slate-800 text-slate-400"
+                                                      ? "font-black"
+                                                      : "bg-slate-100 text-slate-600"
                                             }`}
-                                            style={isActive ? { backgroundColor: primaryColor } : undefined}
+                                            style={
+                                                isActive
+                                                    ? {
+                                                          backgroundColor: primaryColor,
+                                                          color: brandTextColor,
+                                                          border: brandIsLight ? "1px solid #cbd5e1" : undefined,
+                                                      }
+                                                    : undefined
+                                            }
                                         >
-                                            {isDone ? <Check className="w-3.5 h-3.5" /> : idx + 1}
+                                            {isDone ? <Check className="w-3 h-3" /> : idx + 1}
                                         </span>
                                         <div>
                                             <div className="text-xs font-bold leading-tight">{s.title}</div>
-                                            <div className="text-[10px] opacity-75 hidden md:block">{s.subtitle}</div>
+                                            <div
+                                                className={`text-[10px] hidden md:block ${
+                                                    isActive ? "text-slate-300" : "text-slate-500"
+                                                }`}
+                                            >
+                                                {s.subtitle}
+                                            </div>
                                         </div>
                                     </button>
                                 );
@@ -1504,9 +1874,9 @@ function OnboardingContent() {
                             <button
                                 type="button"
                                 onClick={() => setShowMobilePreview((v) => !v)}
-                                className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-white/15 text-xs font-bold text-slate-200 shrink-0"
+                                className="lg:hidden flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-100 border border-slate-200 text-xs font-bold text-slate-800 shrink-0"
                             >
-                                <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                                <Eye className="w-3.5 h-3.5 text-emerald-600" />
                                 {showMobilePreview ? "Hide Preview" : "Live Preview"}
                             </button>
                         )}
@@ -1514,54 +1884,42 @@ function OnboardingContent() {
                 )}
             </header>
 
-            {/* STAGE 0: WELCOME SPLASH */}
+            {/* STAGE 0: CRISP WELCOME SCREEN */}
             {stage === 0 && (
-                <main className="flex-1 flex items-center justify-center p-4 sm:p-8 z-10">
-                    <div className="max-w-4xl w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-center bg-slate-900/70 border border-white/10 rounded-3xl p-6 sm:p-10 backdrop-blur-xl shadow-2xl">
-                        <div className="lg:col-span-7 space-y-6">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/15 border border-emerald-400/40 text-emerald-300 text-xs font-bold">
-                                <Sparkles className="w-3.5 h-3.5" /> Next-Gen Football Club Operating System
+                <main className="flex-1 flex items-center justify-center p-4 sm:p-8">
+                    <div className="max-w-4xl w-full grid grid-cols-1 lg:grid-cols-12 gap-6 items-center bg-white border border-slate-200 rounded-2xl p-6 sm:p-10 shadow-sm">
+                        <div className="lg:col-span-7 space-y-5">
+                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold">
+                                <CheckCircle2 className="w-3.5 h-3.5" /> 30-Day Free Trial • No Card Needed
                             </div>
-                            <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-[1.1]">
-                                Build Your Digital{" "}
-                                <span
-                                    className="bg-clip-text text-transparent"
-                                    style={{
-                                        backgroundImage: `linear-gradient(135deg, #ffffff 0%, ${primaryColor} 100%)`,
-                                    }}
-                                >
-                                    Dugout & Data Hub
-                                </span>
+                            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-slate-900 leading-tight">
+                                Set Up Your Football Club
                             </h1>
-                            <p className="text-slate-300 text-sm sm:text-base leading-relaxed">
-                                Whether you want to jump straight onto the tactics board in{" "}
-                                <strong className="text-white">60 seconds</strong> or import your entire{" "}
-                                <strong className="text-white">League Import fixtures, standings, squad & fines</strong> in
-                                one go, choose how you’d like to set up your club:
+                            <p className="text-slate-600 text-sm sm:text-base leading-relaxed">
+                                Get onto your tactics board in <strong className="text-slate-900">60 seconds</strong>,
+                                or bring across your <strong className="text-slate-900">squad, fixtures, league table &amp; subs</strong> in one go:
                             </p>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setWizardMode("full");
                                         setStage(1);
                                     }}
-                                    className="group text-left p-4 rounded-2xl border-2 border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/15 hover:border-emerald-400 transition-all shadow-lg"
+                                    className="group text-left p-4 rounded-xl border-2 border-slate-900 bg-slate-900 text-white hover:bg-slate-800 transition-all cursor-pointer shadow-xs"
                                 >
                                     <div className="flex items-center justify-between gap-2 mb-2.5">
-                                        <span className="p-2 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-                                            <Wrench className="w-5 h-5" />
+                                        <span className="p-2 rounded-lg bg-white/10 text-white">
+                                            <Wrench className="w-4 h-4" />
                                         </span>
-                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-400 text-slate-950 font-black text-[11px] tracking-wide shadow-md shadow-emerald-500/30">
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-emerald-400 text-slate-950 font-extrabold text-[11px]">
                                             Recommended (~3 mins)
                                         </span>
                                     </div>
-                                    <div className="font-bold text-base text-white group-hover:translate-x-0.5 transition-transform">
-                                        Full Club Setup
-                                    </div>
-                                    <p className="text-xs text-slate-300 mt-1">
-                                        Badge & kits, formation, matchday rules, League Import & staff invite links.
+                                    <div className="font-bold text-base text-white">Full Club Setup</div>
+                                    <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                                        Badge &amp; kits, formation, squad CSV / photo import, league sync &amp; coach invites.
                                     </p>
                                 </button>
 
@@ -1571,66 +1929,63 @@ function OnboardingContent() {
                                         setWizardMode("express");
                                         setStage(1);
                                     }}
-                                    className="group text-left p-4 rounded-2xl border-2 border-amber-400/40 bg-amber-500/10 hover:bg-amber-500/15 hover:border-amber-400 transition-all shadow-lg"
+                                    className="group text-left p-4 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-300 transition-all cursor-pointer"
                                 >
                                     <div className="flex items-center justify-between gap-2 mb-2.5">
-                                        <span className="p-2 rounded-xl bg-amber-400/20 text-amber-300 border border-amber-400/30">
-                                            <Zap className="w-5 h-5" />
+                                        <span className="p-2 rounded-lg bg-amber-100 text-amber-700">
+                                            <Zap className="w-4 h-4" />
                                         </span>
-                                        <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-amber-400 text-slate-950 font-black text-[11px] tracking-wide shadow-md shadow-amber-400/30">
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200 font-bold text-[11px]">
                                             Fast Track (~60 secs)
                                         </span>
                                     </div>
-                                    <div className="font-bold text-base text-white group-hover:translate-x-0.5 transition-transform">
-                                        60-Second Express
-                                    </div>
-                                    <p className="text-xs text-slate-300 mt-1">
-                                        Set your club name, badge & kit colors and jump straight into your workspace.
+                                    <div className="font-bold text-base text-slate-900">60-Second Express</div>
+                                    <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                                        Set your club name, badge &amp; kit colours and jump straight into your hub.
                                     </p>
                                 </button>
                             </div>
                         </div>
 
-                        {/* Welcome Visual Feature Stack */}
-                        <div className="lg:col-span-5 bg-slate-950/80 border border-white/10 rounded-2xl p-5 space-y-3.5">
-                            <div className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                                What you can set up today
+                        <div className="lg:col-span-5 bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-3">
+                            <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                                Included in your club hub
                             </div>
                             {[
                                 {
                                     icon: Palette,
-                                    title: "Club Crest & Custom Kit Studio",
-                                    desc: "Upload your club badge and customize your Home, Away & Goalkeeper strips.",
+                                    title: "Club Crest & Match Kits",
+                                    desc: "Upload your badge and set Home, Away & Goalkeeper strips.",
                                 },
                                 {
-                                    icon: ClipboardPaste,
-                                    title: "Instant Squad & League Import",
-                                    desc: "Paste your WhatsApp squad list, fixtures & league standings.",
+                                    icon: Users,
+                                    title: "CSV, Photo or 1-Time Player Links",
+                                    desc: "Upload a CSV, paste a squad screenshot, or send 1-time player links.",
                                 },
                                 {
                                     icon: Shirt,
-                                    title: "Tactical Formation & Matchday Setup",
-                                    desc: "Pre-configure your preferred formation, home ground & matchday defaults.",
+                                    title: "Matchday Planner & Kit Clash Check",
+                                    desc: "Set your formation, game length, home ground & auto-subs.",
                                 },
                                 {
                                     icon: Share2,
-                                    title: "1-Click WhatsApp Staff Invites",
-                                    desc: "Generate live join links for your Assistant & Coaches.",
+                                    title: "WhatsApp Coach & Treasurer Invites",
+                                    desc: "Share instant join links with your Assistant & Treasurer.",
                                 },
                             ].map((item, i) => (
                                 <div
                                     key={i}
-                                    className="flex items-start gap-3 p-3 rounded-xl bg-slate-900/70 border border-white/5"
+                                    className="flex items-start gap-3 p-3 rounded-lg bg-white border border-slate-200/80"
                                 >
                                     <div
-                                        className="p-2 rounded-lg shrink-0 mt-0.5"
-                                        style={{ backgroundColor: `${primaryColor}20`, color: primaryColor }}
+                                        className="p-2 rounded-lg shrink-0 mt-0.5 bg-slate-100"
+                                        style={{ color: safeBrandAccent }}
                                     >
                                         <item.icon className="w-4 h-4" />
                                     </div>
                                     <div>
-                                        <div className="text-xs font-bold text-white">{item.title}</div>
-                                        <div className="text-[11px] text-slate-400">{item.desc}</div>
+                                        <div className="text-xs font-bold text-slate-900">{item.title}</div>
+                                        <div className="text-[11px] text-slate-500 mt-0.5">{item.desc}</div>
                                     </div>
                                 </div>
                             ))}
@@ -1639,68 +1994,71 @@ function OnboardingContent() {
                 </main>
             )}
 
-            {/* STAGES 1–4: SPLIT-SCREEN WORKSPACE + LIVE PREVIEW */}
+            {/* STAGES 1–4 */}
             {stage > 0 && (
-                <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 z-10">
-                    {/* Left Column: Active Stage Controls */}
-                    <div className={stage <= 2 ? "lg:col-span-7 space-y-6" : "lg:col-span-12 max-w-4xl mx-auto w-full space-y-6"}>
-                        {/* STAGE 1: IDENTITY, ROLE & KITS */}
+                <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-8 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+                    <div
+                        className={
+                            stage <= 2
+                                ? "lg:col-span-7 space-y-5"
+                                : "lg:col-span-12 max-w-4xl mx-auto w-full space-y-5"
+                        }
+                    >
+                        {/* STAGE 1: CLUB IDENTITY & KITS */}
                         {stage === 1 && (
-                            <Card className="bg-slate-900/75 border-white/10 backdrop-blur-xl rounded-3xl overflow-hidden">
-                                <CardContent className="p-5 sm:p-7 space-y-7">
+                            <Card className="bg-white border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                                <CardContent className="p-5 sm:p-7 space-y-6">
                                     <div>
-                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[11px] font-black tracking-wider uppercase mb-2.5 shadow-sm">
-                                            STAGE 1 • CLUB IDENTITY & KIT STUDIO
+                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-bold uppercase tracking-wider mb-2">
+                                            Step 1 • Club Identity &amp; Kits
                                         </div>
-                                        <h2 className="text-2xl font-black text-white">
-                                            Club Identity, Crest & Match Kits
+                                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                                            Club Crest, Colours &amp; Match Kits
                                         </h2>
-                                        <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                                            Upload your club badge, choose your primary brand color, and customize your
-                                            Home, Away and Goalkeeper strips.
+                                        <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                                            Upload your club badge, choose your brand colour, and set your Home, Away and Goalkeeper strips.
                                         </p>
                                     </div>
 
-                                    {/* Club Name & Manager Name */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
                                                 Football Club Name *
                                             </label>
                                             <Input
                                                 value={clubName}
                                                 onChange={(e) => setClubName(e.target.value)}
-                                                placeholder="e.g. Highgate Albion FC"
-                                                className="h-11 bg-slate-950/90 border-white/15 text-white font-semibold"
+                                                placeholder="e.g. Rangers FC"
+                                                className="h-10 bg-white border-slate-300 text-slate-900 font-semibold"
                                             />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
                                                 Your Name (Manager / Admin)
                                             </label>
                                             <Input
                                                 value={managerName}
                                                 onChange={(e) => setManagerName(e.target.value)}
                                                 placeholder="e.g. Alex"
-                                                className="h-11 bg-slate-950/90 border-white/15 text-white"
+                                                className="h-10 bg-white border-slate-300 text-slate-900"
                                             />
                                         </div>
                                     </div>
 
-                                    {/* Badge Upload + Brand Color Suggestions */}
-                                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-white/10 flex flex-col sm:flex-row items-center gap-4">
+                                    {/* Badge Upload */}
+                                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 flex flex-col sm:flex-row items-center gap-4">
                                         <div
                                             onClick={() => fileInputRef.current?.click()}
-                                            className="w-20 h-20 rounded-2xl border-2 border-dashed border-white/20 hover:border-white/50 bg-slate-900 flex items-center justify-center cursor-pointer overflow-hidden shrink-0 transition-all"
+                                            className="w-18 h-18 rounded-xl border-2 border-dashed border-slate-300 hover:border-slate-500 bg-white flex items-center justify-center cursor-pointer overflow-hidden shrink-0 transition-all p-2"
                                         >
                                             {logoPreview ? (
                                                 <img
                                                     src={logoPreview}
                                                     alt="Club Crest"
-                                                    className="w-16 h-16 object-contain"
+                                                    className="w-14 h-14 object-contain"
                                                 />
                                             ) : (
-                                                <Upload className="w-6 h-6 text-slate-400" />
+                                                <Upload className="w-5 h-5 text-slate-400" />
                                             )}
                                         </div>
                                         <input
@@ -1717,28 +2075,32 @@ function OnboardingContent() {
                                                     size="sm"
                                                     variant="outline"
                                                     onClick={() => fileInputRef.current?.click()}
-                                                    className="h-8 text-xs border-white/15 bg-white/5 hover:bg-white/10 text-white"
+                                                    className="h-8 text-xs border-slate-300 bg-white text-slate-800 hover:bg-slate-100"
                                                 >
                                                     <Upload className="w-3.5 h-3.5 mr-1.5" />
                                                     {logoPreview ? "Change Badge" : "Upload Club Badge"}
                                                 </Button>
-                                                <span className="text-[11px] text-slate-400">
+                                                <span className="text-[11px] text-slate-500">
                                                     PNG or SVG recommended
                                                 </span>
                                             </div>
 
                                             {extractedSwatches.length > 0 && (
                                                 <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
-                                                    <span className="text-[11px] font-bold text-emerald-400 flex items-center gap-1">
-                                                        <Sparkles className="w-3 h-3" /> Crest accent swatches:
+                                                    <span className="text-[11px] font-semibold text-slate-600">
+                                                        Colours from your badge:
                                                     </span>
                                                     {extractedSwatches.map((hex, i) => (
                                                         <button
                                                             key={i}
                                                             type="button"
                                                             onClick={() => setPrimaryColor(hex)}
-                                                            title={`Set ${hex} as Club Brand Color`}
-                                                            className="w-6 h-6 rounded-full border-2 border-white/40 shadow hover:scale-110 transition-transform"
+                                                            title={`Set ${hex} as Club Brand Colour`}
+                                                            className={`w-6 h-6 rounded-full border transition-transform hover:scale-110 cursor-pointer ${
+                                                                primaryColor.toLowerCase() === hex.toLowerCase()
+                                                                    ? "ring-2 ring-slate-900 ring-offset-1 border-slate-400"
+                                                                    : "border-slate-300"
+                                                            }`}
                                                             style={{ backgroundColor: hex }}
                                                         />
                                                     ))}
@@ -1747,52 +2109,62 @@ function OnboardingContent() {
                                         </div>
                                     </div>
 
-                                    {/* Primary Theme Color */}
+                                    {/* Club Primary Brand Colour */}
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                                            Club Primary Brand Color
-                                        </label>
+                                        <div className="flex items-center justify-between">
+                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                                                Club Primary Brand Colour
+                                            </label>
+                                            {brandIsLight && (
+                                                <span className="text-[11px] font-medium text-slate-500">
+                                                    Light colour selected — dark text enabled automatically for visibility
+                                                </span>
+                                            )}
+                                        </div>
                                         <div className="flex flex-wrap items-center gap-2">
-                                            {COLOR_SWATCHES.map((hex) => (
-                                                <button
-                                                    key={hex}
-                                                    type="button"
-                                                    onClick={() => setPrimaryColor(hex)}
-                                                    className={`w-8 h-8 rounded-xl border-2 transition-all ${
-                                                        primaryColor.toLowerCase() === hex.toLowerCase()
-                                                            ? "border-white scale-110 shadow-lg"
-                                                            : "border-white/15 opacity-75 hover:opacity-100"
-                                                    }`}
-                                                    style={{ backgroundColor: hex }}
-                                                />
-                                            ))}
+                                            {COLOR_SWATCHES.map((hex) => {
+                                                const isSelected = primaryColor.toLowerCase() === hex.toLowerCase();
+                                                return (
+                                                    <button
+                                                        key={hex}
+                                                        type="button"
+                                                        onClick={() => setPrimaryColor(hex)}
+                                                        className={`w-8 h-8 rounded-lg border transition-all cursor-pointer ${
+                                                            isSelected
+                                                                ? "ring-2 ring-slate-900 ring-offset-2 border-slate-400 scale-105"
+                                                                : "border-slate-300 hover:scale-105"
+                                                        }`}
+                                                        style={{ backgroundColor: hex }}
+                                                    />
+                                                );
+                                            })}
                                             <input
                                                 type="color"
                                                 value={primaryColor}
                                                 onChange={(e) => setPrimaryColor(e.target.value)}
-                                                className="w-9 h-8 rounded-lg bg-transparent border border-white/20 cursor-pointer"
-                                                title="Custom Hex Color"
+                                                className="w-9 h-8 rounded-lg bg-white border border-slate-300 cursor-pointer p-0.5"
+                                                title="Custom Brand Colour"
                                             />
                                         </div>
                                     </div>
 
-                                    {/* Home, Away & GK Kit Studio */}
-                                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-white/10 space-y-4">
+                                    {/* Home, Away & GK Kit Colours */}
+                                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-4">
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                             <div className="flex items-center gap-2">
-                                                <Shirt className="w-4 h-4 text-emerald-400" />
-                                                <span className="text-xs font-bold uppercase tracking-wider text-white">
-                                                    Matchday Kit Colors (Home, Away & GK)
+                                                <Shirt className="w-4 h-4 text-slate-700" />
+                                                <span className="text-xs font-bold uppercase tracking-wider text-slate-800">
+                                                    Matchday Kit Colours (Home, Away &amp; GK)
                                                 </span>
                                             </div>
-                                            <div className="inline-flex rounded-lg bg-slate-900 p-0.5 border border-white/10">
+                                            <div className="inline-flex rounded-lg bg-white p-0.5 border border-slate-200">
                                                 <button
                                                     type="button"
                                                     onClick={() => setActiveKitPreview("home")}
-                                                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${
+                                                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer ${
                                                         activeKitPreview === "home"
-                                                            ? "bg-white text-slate-950"
-                                                            : "text-slate-400"
+                                                            ? "bg-slate-900 text-white"
+                                                            : "text-slate-600 hover:text-slate-900"
                                                     }`}
                                                 >
                                                     Home Strip
@@ -1800,10 +2172,10 @@ function OnboardingContent() {
                                                 <button
                                                     type="button"
                                                     onClick={() => setActiveKitPreview("away")}
-                                                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold ${
+                                                    className={`px-2.5 py-1 rounded-md text-[11px] font-bold cursor-pointer ${
                                                         activeKitPreview === "away"
-                                                            ? "bg-white text-slate-950"
-                                                            : "text-slate-400"
+                                                            ? "bg-slate-900 text-white"
+                                                            : "text-slate-600 hover:text-slate-900"
                                                     }`}
                                                 >
                                                     Away Strip
@@ -1813,84 +2185,84 @@ function OnboardingContent() {
 
                                         {activeKitPreview === "home" ? (
                                             <div className="grid grid-cols-3 gap-3">
-                                                <div className="p-3 rounded-xl bg-slate-900/90 border border-white/10 flex items-center justify-between">
-                                                    <span className="text-xs font-semibold text-slate-300">Home Shirt</span>
+                                                <div className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between">
+                                                    <span className="text-xs font-semibold text-slate-700">Home Shirt</span>
                                                     <input
                                                         type="color"
                                                         value={homeKitShirt}
                                                         onChange={(e) => setHomeKitShirt(e.target.value)}
-                                                        className="w-8 h-8 rounded cursor-pointer bg-transparent"
+                                                        className="w-8 h-8 rounded border border-slate-200 cursor-pointer bg-white p-0.5"
                                                     />
                                                 </div>
-                                                <div className="p-3 rounded-xl bg-slate-900/90 border border-white/10 flex items-center justify-between">
-                                                    <span className="text-xs font-semibold text-slate-300">Home Shorts</span>
+                                                <div className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between">
+                                                    <span className="text-xs font-semibold text-slate-700">Home Shorts</span>
                                                     <input
                                                         type="color"
                                                         value={homeKitShorts}
                                                         onChange={(e) => setHomeKitShorts(e.target.value)}
-                                                        className="w-8 h-8 rounded cursor-pointer bg-transparent"
+                                                        className="w-8 h-8 rounded border border-slate-200 cursor-pointer bg-white p-0.5"
                                                     />
                                                 </div>
-                                                <div className="p-3 rounded-xl bg-slate-900/90 border border-white/10 flex items-center justify-between">
-                                                    <span className="text-xs font-semibold text-slate-300">Home Socks</span>
+                                                <div className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between">
+                                                    <span className="text-xs font-semibold text-slate-700">Home Socks</span>
                                                     <input
                                                         type="color"
                                                         value={homeKitSocks}
                                                         onChange={(e) => setHomeKitSocks(e.target.value)}
-                                                        className="w-8 h-8 rounded cursor-pointer bg-transparent"
+                                                        className="w-8 h-8 rounded border border-slate-200 cursor-pointer bg-white p-0.5"
                                                     />
                                                 </div>
                                             </div>
                                         ) : (
                                             <div className="grid grid-cols-3 gap-3">
-                                                <div className="p-3 rounded-xl bg-slate-900/90 border border-white/10 flex items-center justify-between">
-                                                    <span className="text-xs font-semibold text-slate-300">Away Shirt</span>
+                                                <div className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between">
+                                                    <span className="text-xs font-semibold text-slate-700">Away Shirt</span>
                                                     <input
                                                         type="color"
                                                         value={awayKitShirt}
                                                         onChange={(e) => setAwayKitShirt(e.target.value)}
-                                                        className="w-8 h-8 rounded cursor-pointer bg-transparent"
+                                                        className="w-8 h-8 rounded border border-slate-200 cursor-pointer bg-white p-0.5"
                                                     />
                                                 </div>
-                                                <div className="p-3 rounded-xl bg-slate-900/90 border border-white/10 flex items-center justify-between">
-                                                    <span className="text-xs font-semibold text-slate-300">Away Shorts</span>
+                                                <div className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between">
+                                                    <span className="text-xs font-semibold text-slate-700">Away Shorts</span>
                                                     <input
                                                         type="color"
                                                         value={awayKitShorts}
                                                         onChange={(e) => setAwayKitShorts(e.target.value)}
-                                                        className="w-8 h-8 rounded cursor-pointer bg-transparent"
+                                                        className="w-8 h-8 rounded border border-slate-200 cursor-pointer bg-white p-0.5"
                                                     />
                                                 </div>
-                                                <div className="p-3 rounded-xl bg-slate-900/90 border border-white/10 flex items-center justify-between">
-                                                    <span className="text-xs font-semibold text-slate-300">Away Socks</span>
+                                                <div className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between">
+                                                    <span className="text-xs font-semibold text-slate-700">Away Socks</span>
                                                     <input
                                                         type="color"
                                                         value={awayKitSocks}
                                                         onChange={(e) => setAwayKitSocks(e.target.value)}
-                                                        className="w-8 h-8 rounded cursor-pointer bg-transparent"
+                                                        className="w-8 h-8 rounded border border-slate-200 cursor-pointer bg-white p-0.5"
                                                     />
                                                 </div>
                                             </div>
                                         )}
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                                            <div className="p-3 rounded-xl bg-slate-900/90 border border-white/10 flex items-center justify-between">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between">
                                                 <div>
-                                                    <div className="text-xs font-bold text-white">Goalkeeper Jersey</div>
-                                                    <div className="text-[10px] text-slate-400">Used on Matchday Planner graphic</div>
+                                                    <div className="text-xs font-bold text-slate-800">Goalkeeper Jersey</div>
+                                                    <div className="text-[10px] text-slate-500">Used on Matchday Planner</div>
                                                 </div>
                                                 <input
                                                     type="color"
                                                     value={gkKitColor}
                                                     onChange={(e) => setGkKitColor(e.target.value)}
-                                                    className="w-8 h-8 rounded cursor-pointer bg-transparent"
+                                                    className="w-8 h-8 rounded border border-slate-200 cursor-pointer bg-white p-0.5"
                                                 />
                                             </div>
 
-                                            <div className="p-3 rounded-xl bg-slate-900/90 border border-white/10 flex items-center justify-between">
+                                            <div className="p-2.5 rounded-lg bg-white border border-slate-200 flex items-center justify-between">
                                                 <div>
-                                                    <div className="text-xs font-bold text-white">Front-of-Shirt Sponsor</div>
-                                                    <div className="text-[10px] text-slate-400">
+                                                    <div className="text-xs font-bold text-slate-800">Front-of-Shirt Sponsor</div>
+                                                    <div className="text-[10px] text-slate-500">
                                                         {sponsorLogo ? "Sponsor uploaded" : "Optional logo on graphics"}
                                                     </div>
                                                 </div>
@@ -1899,7 +2271,7 @@ function OnboardingContent() {
                                                     size="sm"
                                                     variant="outline"
                                                     onClick={() => sponsorInputRef.current?.click()}
-                                                    className="h-8 text-xs border-white/15 bg-white/5 text-white"
+                                                    className="h-8 text-xs border-slate-300 bg-white text-slate-800"
                                                 >
                                                     {sponsorLogo ? "Change" : "Upload"}
                                                 </Button>
@@ -1914,26 +2286,26 @@ function OnboardingContent() {
                                         </div>
                                     </div>
 
-                                    {/* Match Formats (11v11 Default + Optional Youth Formats) & Coach Match Length Setup */}
-                                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-white/10 space-y-3.5">
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <div>
-                                                <div className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
-                                                    <Sliders className="w-3.5 h-3.5 text-emerald-400" /> Match Format &amp; Game Length (Minutes)
-                                                </div>
-                                                <p className="text-[11px] text-slate-400 mt-0.5">
-                                                    11v11 is default. Enable youth/small-sided formats if applicable and set how many minutes your matches are.
-                                                </p>
+                                    {/* Match Format & Game Length */}
+                                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                                        <div>
+                                            <div className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                                                <Sliders className="w-3.5 h-3.5 text-slate-700" /> Match Format &amp; Game Length
                                             </div>
+                                            <p className="text-[11px] text-slate-500 mt-0.5">
+                                                11v11 is default. Enable small-sided youth formats if needed and set your standard match length.
+                                            </p>
                                         </div>
 
                                         <div className="flex flex-wrap gap-2">
-                                            {([
-                                                { id: "11v11", label: "11v11 (Default)", defaultMins: 90 },
-                                                { id: "9v9", label: "9v9 (U11–U12)", defaultMins: 60 },
-                                                { id: "7v7", label: "7v7 (U9–U10)", defaultMins: 50 },
-                                                { id: "5v5", label: "5v5 (U7–U8)", defaultMins: 40 },
-                                            ] as const).map((fmt) => {
+                                            {(
+                                                [
+                                                    { id: "11v11", label: "11v11 (Default)", defaultMins: 90 },
+                                                    { id: "9v9", label: "9v9 (U11–U12)", defaultMins: 60 },
+                                                    { id: "7v7", label: "7v7 (U9–U10)", defaultMins: 50 },
+                                                    { id: "5v5", label: "5v5 (U7–U8)", defaultMins: 40 },
+                                                ] as const
+                                            ).map((fmt) => {
                                                 const active = enabledMatchFormats.includes(fmt.id);
                                                 return (
                                                     <button
@@ -1951,10 +2323,10 @@ function OnboardingContent() {
                                                                     : prev.filter((f) => f !== fmt.id);
                                                             });
                                                         }}
-                                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                                                             active
-                                                                ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-200"
-                                                                : "bg-slate-900/60 border-white/10 text-slate-400 hover:text-white"
+                                                                ? "bg-slate-900 border-slate-900 text-white"
+                                                                : "bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900"
                                                         }`}
                                                     >
                                                         {active ? "✓ " : "+ "}
@@ -1964,8 +2336,8 @@ function OnboardingContent() {
                                             })}
                                         </div>
 
-                                        <div className="pt-2 border-t border-white/10 flex flex-wrap items-center justify-between gap-2">
-                                            <span className="text-xs font-bold text-slate-300">
+                                        <div className="pt-2 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2">
+                                            <span className="text-xs font-semibold text-slate-700">
                                                 How many minutes are your matches?
                                             </span>
                                             <div className="flex flex-wrap items-center gap-1.5">
@@ -1974,10 +2346,10 @@ function OnboardingContent() {
                                                         key={mins}
                                                         type="button"
                                                         onClick={() => setDefaultMatchDuration(mins)}
-                                                        className={`px-2.5 py-1 rounded-lg text-xs font-extrabold border transition-all ${
+                                                        className={`px-2.5 py-1 rounded-md text-xs font-bold border transition-all cursor-pointer ${
                                                             defaultMatchDuration === mins
-                                                                ? "bg-emerald-500 text-slate-950 border-emerald-400"
-                                                                : "bg-slate-900 text-slate-400 border-white/10 hover:text-white"
+                                                                ? "bg-slate-900 text-white border-slate-900"
+                                                                : "bg-white text-slate-600 border-slate-200 hover:border-slate-300"
                                                         }`}
                                                     >
                                                         {mins}m
@@ -1989,31 +2361,35 @@ function OnboardingContent() {
                                                         min={10}
                                                         max={120}
                                                         value={defaultMatchDuration}
-                                                        onChange={(e) => setDefaultMatchDuration(Math.max(10, Math.min(120, Number(e.target.value) || 90)))}
-                                                        className="h-7 w-14 bg-slate-900 border-white/15 text-xs font-bold text-white text-center px-1"
+                                                        onChange={(e) =>
+                                                            setDefaultMatchDuration(
+                                                                Math.max(10, Math.min(120, Number(e.target.value) || 90))
+                                                            )
+                                                        }
+                                                        className="h-7 w-14 bg-white border-slate-300 text-xs font-bold text-slate-900 text-center px-1"
                                                     />
-                                                    <span className="text-[11px] text-slate-400">mins</span>
+                                                    <span className="text-[11px] text-slate-500">mins</span>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {enabledMatchFormats.some((f) => f !== "11v11") && (
-                                            <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-3">
+                                            <div className="pt-2 border-t border-slate-200 flex items-center justify-between gap-3">
                                                 <div>
-                                                    <div className="text-xs font-bold text-white">
-                                                        Youth Equal Play-Time Target (5v5 / 7v7 / 9v9 Only)
+                                                    <div className="text-xs font-bold text-slate-800">
+                                                        Youth Equal Play-Time Target (5v5 / 7v7 / 9v9)
                                                     </div>
-                                                    <div className="text-[10px] text-slate-400">
-                                                        Show equal game-time calculator on the bench for youth formats (never shown in 11v11).
+                                                    <div className="text-[11px] text-slate-500">
+                                                        Show equal game-time calculator on the bench for small-sided youth games.
                                                     </div>
                                                 </div>
                                                 <button
                                                     type="button"
                                                     onClick={() => setEqualPlayTimeEnabled((v) => !v)}
-                                                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all shrink-0 ${
+                                                    className={`px-3 py-1 rounded-lg text-xs font-bold border transition-all shrink-0 cursor-pointer ${
                                                         equalPlayTimeEnabled
-                                                            ? "bg-emerald-500 text-slate-950 border-emerald-400"
-                                                            : "bg-slate-900 text-slate-400 border-white/15"
+                                                            ? "bg-emerald-600 text-white border-emerald-600"
+                                                            : "bg-white text-slate-600 border-slate-300"
                                                     }`}
                                                 >
                                                     {equalPlayTimeEnabled ? "ON" : "OFF"}
@@ -2022,10 +2398,10 @@ function OnboardingContent() {
                                         )}
                                     </div>
 
-                                    {/* Your Role & Workspace Navigation Tabs */}
+                                    {/* Your Role & Sidebar Tabs */}
                                     <div className="space-y-3">
-                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                                            Your Role & Active Sidebar Modules
+                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                                            Your Role &amp; Sidebar Pages
                                         </label>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                             {ROLE_PRESETS.map((role) => {
@@ -2035,25 +2411,25 @@ function OnboardingContent() {
                                                         key={role.id}
                                                         type="button"
                                                         onClick={() => handleSelectRolePreset(role.id)}
-                                                        className={`p-3.5 rounded-2xl border text-left transition-all ${
+                                                        className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
                                                             active
-                                                                ? "border-emerald-500/60 bg-emerald-500/10"
-                                                                : "border-white/10 bg-slate-950/60 hover:border-white/25"
+                                                                ? "border-slate-900 bg-slate-50 ring-1 ring-slate-900"
+                                                                : "border-slate-200 bg-white hover:border-slate-300"
                                                         }`}
                                                     >
-                                                        <div className="text-xs font-bold text-white flex items-center justify-between">
+                                                        <div className="text-xs font-bold text-slate-900 flex items-center justify-between">
                                                             {role.label}
-                                                            {active && <CheckCircle2 className="w-4 h-4 text-emerald-400" />}
+                                                            {active && <CheckCircle2 className="w-4 h-4 text-emerald-600" />}
                                                         </div>
-                                                        <div className="text-[11px] text-slate-400 mt-1">{role.desc}</div>
+                                                        <div className="text-[11px] text-slate-500 mt-1">{role.desc}</div>
                                                     </button>
                                                 );
                                             })}
                                         </div>
 
-                                        <div className="pt-2">
-                                            <div className="text-[11px] text-slate-400 mb-2">
-                                                Toggle which tabs appear in your sidebar (you can change this anytime in Admin):
+                                        <div className="pt-1">
+                                            <div className="text-[11px] text-slate-500 mb-2">
+                                                Choose which pages appear in your sidebar (changeable anytime in Settings):
                                             </div>
                                             <div className="flex flex-wrap gap-1.5">
                                                 {ALL_PAGE_PERMISSIONS.filter((p) => p.key !== "admin").map((perm) => {
@@ -2063,10 +2439,10 @@ function OnboardingContent() {
                                                             key={perm.key}
                                                             type="button"
                                                             onClick={() => toggleTabPermission(perm.key)}
-                                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all ${
+                                                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
                                                                 on
-                                                                    ? "bg-white/15 border-white/30 text-white"
-                                                                    : "bg-slate-950/50 border-white/5 text-slate-500"
+                                                                    ? "bg-slate-900 border-slate-900 text-white"
+                                                                    : "bg-slate-50 border-slate-200 text-slate-500 hover:text-slate-800"
                                                             }`}
                                                         >
                                                             {on ? "✓ " : ""}
@@ -2081,27 +2457,25 @@ function OnboardingContent() {
                             </Card>
                         )}
 
-                        {/* STAGE 2: MATCHDAY, TACTICAL & FINANCE DEFAULTS */}
+                        {/* STAGE 2: MATCHDAY, VENUES & SUBS */}
                         {stage === 2 && (
-                            <Card className="bg-slate-900/75 border-white/10 backdrop-blur-xl rounded-3xl overflow-hidden">
-                                <CardContent className="p-5 sm:p-7 space-y-7">
+                            <Card className="bg-white border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                                <CardContent className="p-5 sm:p-7 space-y-6">
                                     <div>
-                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[11px] font-black tracking-wider uppercase mb-2.5 shadow-sm">
-                                            STAGE 2 • MATCHDAY, TACTICS & FINANCES
+                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-bold uppercase tracking-wider mb-2">
+                                            Step 2 • Matchday, Venues &amp; Subs
                                         </div>
-                                        <h2 className="text-2xl font-black text-white">
-                                            Tactical Setup, Ground & Club Finances
+                                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                                            Formation, Home Ground &amp; Player Subs
                                         </h2>
-                                        <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                                            Set your default formation, shirt numbering mode, kick-off times and optional match
-                                            subs or fine rules.
+                                        <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                                            Set your default formation, shirt numbering style, kick-off times and optional subs setup.
                                         </p>
                                     </div>
 
-                                    {/* Competition Format Presets */}
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                                            1. Competition Format Preset
+                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                                            Competition Kick-Off Preset
                                         </label>
                                         <div className="flex flex-wrap gap-2">
                                             {COMPETITION_PRESETS.map((cp) => (
@@ -2109,10 +2483,10 @@ function OnboardingContent() {
                                                     key={cp.id}
                                                     type="button"
                                                     onClick={() => handleSelectCompetitionPreset(cp.id)}
-                                                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all ${
+                                                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                                                         competitionPreset === cp.id
-                                                            ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-300"
-                                                            : "bg-slate-950/70 border-white/10 text-slate-300 hover:border-white/25"
+                                                            ? "bg-slate-900 border-slate-900 text-white"
+                                                            : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                                                     }`}
                                                 >
                                                     {cp.label} ({cp.ko})
@@ -2121,11 +2495,10 @@ function OnboardingContent() {
                                         </div>
                                     </div>
 
-                                    {/* Preferred Formation & Shirt Numbering Mode */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-2">
-                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                                                Preferred Tactical Formation
+                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                                                Preferred Formation
                                             </label>
                                             <div className="grid grid-cols-3 gap-2">
                                                 {Object.keys(FORMATIONS).map((fKey) => (
@@ -2136,10 +2509,10 @@ function OnboardingContent() {
                                                             setPreferredFormation(fKey);
                                                             setPreviewTab("pitch");
                                                         }}
-                                                        className={`p-2.5 rounded-xl border text-xs font-bold transition-all ${
+                                                        className={`p-2.5 rounded-lg border text-xs font-bold transition-all cursor-pointer ${
                                                             preferredFormation === fKey
-                                                                ? "bg-white text-slate-950 border-white"
-                                                                : "bg-slate-950/70 border-white/10 text-slate-300 hover:border-white/25"
+                                                                ? "bg-slate-900 text-white border-slate-900"
+                                                                : "bg-white border-slate-200 text-slate-700 hover:border-slate-300"
                                                         }`}
                                                     >
                                                         {fKey}
@@ -2149,101 +2522,100 @@ function OnboardingContent() {
                                         </div>
 
                                         <div className="space-y-2">
-                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
+                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
                                                 Matchday Shirt Numbering
                                             </label>
                                             <div className="space-y-2">
                                                 <button
                                                     type="button"
                                                     onClick={() => setUseMatchdayNumbering(true)}
-                                                    className={`w-full p-2.5 rounded-xl border text-left transition-all ${
+                                                    className={`w-full p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
                                                         useMatchdayNumbering
-                                                            ? "border-emerald-500/60 bg-emerald-500/10"
-                                                            : "border-white/10 bg-slate-950/70"
+                                                            ? "border-slate-900 bg-slate-50 ring-1 ring-slate-900"
+                                                            : "border-slate-200 bg-white hover:border-slate-300"
                                                     }`}
                                                 >
-                                                    <div className="text-xs font-bold text-white">
-                                                        1–11 Traditional Matchday Numbers
+                                                    <div className="text-xs font-bold text-slate-900">
+                                                        1–11 Matchday Numbers
                                                     </div>
-                                                    <div className="text-[10px] text-slate-400">
-                                                        Starters wear 1–11, subs wear 12–18 automatically
+                                                    <div className="text-[10px] text-slate-500">
+                                                        Starters wear 1–11, subs wear 12–18
                                                     </div>
                                                 </button>
                                                 <button
                                                     type="button"
                                                     onClick={() => setUseMatchdayNumbering(false)}
-                                                    className={`w-full p-2.5 rounded-xl border text-left transition-all ${
+                                                    className={`w-full p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
                                                         !useMatchdayNumbering
-                                                            ? "border-emerald-500/60 bg-emerald-500/10"
-                                                            : "border-white/10 bg-slate-950/70"
+                                                            ? "border-slate-900 bg-slate-50 ring-1 ring-slate-900"
+                                                            : "border-slate-200 bg-white hover:border-slate-300"
                                                     }`}
                                                 >
-                                                    <div className="text-xs font-bold text-white">
-                                                        Fixed Season Squad Numbers
+                                                    <div className="text-xs font-bold text-slate-900">
+                                                        Fixed Squad Numbers
                                                     </div>
-                                                    <div className="text-[10px] text-slate-400">
-                                                        Players keep their assigned squad number all season
+                                                    <div className="text-[10px] text-slate-500">
+                                                        Players keep their squad number all season
                                                     </div>
                                                 </button>
                                             </div>
                                         </div>
                                     </div>
 
-                                    {/* Venues & Kick-Off Defaults */}
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                                                <MapPin className="w-3.5 h-3.5 text-emerald-400" /> Home Ground Venue
+                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                                <MapPin className="w-3.5 h-3.5 text-emerald-600" /> Home Ground Venue
                                             </label>
                                             <Input
                                                 value={homeGround}
                                                 onChange={(e) => setHomeGround(e.target.value)}
                                                 placeholder="e.g. Hackney Marshes Pitch 1"
-                                                className="h-10 bg-slate-950/90 border-white/15 text-white"
+                                                className="h-10 bg-white border-slate-300 text-slate-900"
                                             />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                                                <Compass className="w-3.5 h-3.5 text-sky-400" /> Training Venue
+                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                                <Compass className="w-3.5 h-3.5 text-sky-600" /> Training Venue
                                             </label>
                                             <Input
                                                 value={trainingLocation}
                                                 onChange={(e) => setTrainingLocation(e.target.value)}
                                                 placeholder="e.g. Market Road 3G (Wed 8pm)"
-                                                className="h-10 bg-slate-950/90 border-white/15 text-white"
+                                                className="h-10 bg-white border-slate-300 text-slate-900"
                                             />
                                         </div>
                                         <div className="space-y-1.5">
-                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                                                <Trophy className="w-3.5 h-3.5 text-amber-400" /> Primary League Name
+                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                                <Trophy className="w-3.5 h-3.5 text-amber-600" /> Primary League Name
                                             </label>
                                             <Input
                                                 value={defaultCompetition}
                                                 onChange={(e) => setDefaultCompetition(e.target.value)}
                                                 placeholder="e.g. Middlesex County Premier"
-                                                className="h-10 bg-slate-950/90 border-white/15 text-white"
+                                                className="h-10 bg-white border-slate-300 text-slate-900"
                                             />
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
                                             <div className="space-y-1.5">
-                                                <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1">
-                                                    <Clock className="w-3.5 h-3.5 text-emerald-400" /> Home KO
+                                                <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                                                    <Clock className="w-3.5 h-3.5 text-slate-600" /> Home KO
                                                 </label>
                                                 <Input
                                                     type="time"
                                                     value={defaultHomeKickOff}
                                                     onChange={(e) => setDefaultHomeKickOff(e.target.value)}
-                                                    className="h-10 bg-slate-950/90 border-white/15 text-white"
+                                                    className="h-10 bg-white border-slate-300 text-slate-900"
                                                 />
                                             </div>
                                             <div className="space-y-1.5">
-                                                <label className="text-xs font-bold uppercase tracking-wider text-slate-300">
-                                                    Meet Offset
+                                                <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                                                    Meet Time
                                                 </label>
                                                 <select
                                                     value={meetOffsetMins}
                                                     onChange={(e) => setMeetOffsetMins(Number(e.target.value))}
-                                                    className="w-full h-10 rounded-md bg-slate-950/90 border border-white/15 px-2.5 text-xs text-white"
+                                                    className="w-full h-10 rounded-md bg-white border border-slate-300 px-2.5 text-xs text-slate-900"
                                                 >
                                                     <option value={45}>45m before ({calculateMeetTime(defaultHomeKickOff, 45)})</option>
                                                     <option value={60}>60m before ({calculateMeetTime(defaultHomeKickOff, 60)})</option>
@@ -2254,10 +2626,10 @@ function OnboardingContent() {
                                         </div>
                                     </div>
 
-                                    {/* Club Squads Multi-Select */}
+                                    {/* Club Squads */}
                                     <div className="space-y-2">
-                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                                            <Layers className="w-3.5 h-3.5 text-purple-400" /> Active Club Squads
+                                        <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                            <Layers className="w-3.5 h-3.5 text-slate-700" /> Club Squads
                                         </label>
                                         <div className="flex flex-wrap gap-2">
                                             {[
@@ -2276,10 +2648,10 @@ function OnboardingContent() {
                                                         key={sq}
                                                         type="button"
                                                         onClick={() => toggleSquadChip(sq)}
-                                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
+                                                        className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all cursor-pointer ${
                                                             active
-                                                                ? "bg-purple-500/20 border-purple-500/50 text-purple-200"
-                                                                : "bg-slate-950/60 border-white/10 text-slate-400"
+                                                                ? "bg-slate-900 border-slate-900 text-white"
+                                                                : "bg-white border-slate-200 text-slate-600 hover:border-slate-300"
                                                         }`}
                                                     >
                                                         {active ? "✓ " : "+ "}
@@ -2291,15 +2663,15 @@ function OnboardingContent() {
                                                 <Input
                                                     value={customSquadInput}
                                                     onChange={(e) => setCustomSquadInput(e.target.value)}
-                                                    placeholder="Custom squad..."
-                                                    className="h-8 w-36 bg-slate-950/90 border-white/15 text-xs text-white"
+                                                    placeholder="Add squad..."
+                                                    className="h-8 w-36 bg-white border-slate-300 text-xs text-slate-900"
                                                 />
                                                 <Button
                                                     type="button"
                                                     size="sm"
                                                     variant="outline"
                                                     onClick={handleAddCustomSquad}
-                                                    className="h-8 text-xs border-white/15 bg-white/5 text-white"
+                                                    className="h-8 text-xs border-slate-300 bg-white text-slate-800"
                                                 >
                                                     Add
                                                 </Button>
@@ -2307,211 +2679,109 @@ function OnboardingContent() {
                                         </div>
                                     </div>
 
-                                    {/* Match Formats (11v11 Default + Optional Youth/Small-Sided Formats) & Total Match Duration */}
-                                    <div className="p-4 rounded-2xl bg-slate-950/70 border border-white/10 space-y-3.5">
+                                    {/* Subs & Payments Setup */}
+                                    <div className="space-y-4 pt-3 border-t border-slate-200">
                                         <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <div>
-                                                <div className="text-xs font-bold uppercase tracking-wider text-white flex items-center gap-1.5">
-                                                    <Sliders className="w-3.5 h-3.5 text-emerald-400" /> Match Formats &amp; Total Match Length
-                                                </div>
-                                                <p className="text-[11px] text-slate-400 mt-0.5">
-                                                    11v11 is enabled by default. Select additional small-sided formats if your club runs youth/academy teams.
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="text-[11px] font-bold text-slate-300">Match Length:</span>
-                                                <Input
-                                                    type="number"
-                                                    min={10}
-                                                    max={120}
-                                                    value={defaultMatchDuration}
-                                                    onChange={(e) => setDefaultMatchDuration(Math.max(10, Math.min(120, Number(e.target.value) || 90)))}
-                                                    className="h-8 w-16 bg-slate-900 border-white/15 text-xs font-bold text-white text-center px-1.5"
-                                                />
-                                                <span className="text-[11px] text-slate-400">mins</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-wrap gap-2">
-                                            {([
-                                                { id: "11v11", label: "11v11 (Default)" },
-                                                { id: "9v9", label: "9v9 (U11–U12)" },
-                                                { id: "7v7", label: "7v7 (U9–U10)" },
-                                                { id: "5v5", label: "5v5 (U7–U8)" },
-                                            ] as const).map((fmt) => {
-                                                const active = enabledMatchFormats.includes(fmt.id);
-                                                return (
-                                                    <button
-                                                        key={fmt.id}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            if (fmt.id === "11v11") return; // 11v11 is always kept as default base format
-                                                            setEnabledMatchFormats((prev) =>
-                                                                prev.includes(fmt.id)
-                                                                    ? prev.filter((f) => f !== fmt.id)
-                                                                    : [...prev, fmt.id]
-                                                            );
-                                                        }}
-                                                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all ${
-                                                            active
-                                                                ? "bg-emerald-500/20 border-emerald-500/50 text-emerald-200"
-                                                                : "bg-slate-900/60 border-white/10 text-slate-400 hover:text-white"
-                                                        }`}
-                                                    >
-                                                        {active ? "✓ " : "+ "}
-                                                        {fmt.label}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-
-                                        {enabledMatchFormats.some((f) => f !== "11v11") && (
-                                            <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-3">
-                                                <div>
-                                                    <div className="text-xs font-bold text-white">
-                                                        Youth Equal Play-Time Target (5v5 / 7v7 / 9v9 Only)
-                                                    </div>
-                                                    <div className="text-[10px] text-slate-400">
-                                                        Show equal game-time calculator on the bench for small-sided youth formats (never shown on 11v11).
-                                                    </div>
-                                                </div>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setEqualPlayTimeEnabled((v) => !v)}
-                                                    className={`px-3 py-1.5 rounded-xl text-xs font-extrabold border transition-all shrink-0 ${
-                                                        equalPlayTimeEnabled
-                                                            ? "bg-emerald-500 text-slate-950 border-emerald-400"
-                                                            : "bg-slate-900 text-slate-400 border-white/15"
-                                                    }`}
-                                                >
-                                                    {equalPlayTimeEnabled ? "ON" : "OFF"}
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Spond-Style Club Payments, Pots & Bank Setup */}
-                                    <div className="space-y-4 pt-3 border-t border-white/10">
-                                        <div className="flex flex-wrap items-center justify-between gap-2">
-                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
-                                                <PoundSterling className="w-3.5 h-3.5 text-emerald-400" /> Subs &amp; Club Payments Setup
+                                            <label className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                                                <PoundSterling className="w-3.5 h-3.5 text-emerald-600" /> Subs &amp; Club Payments Setup
                                             </label>
-                                            <span className="text-[11px] text-slate-400">
-                                                Pre-fills your 1-tap payment chips &amp; accounts
+                                            <span className="text-[11px] text-slate-500">
+                                                Pre-fills your 1-tap payment presets
                                             </span>
                                         </div>
 
-                                        {/* 1. How does your club collect subs? */}
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                             {[
-                                                {
-                                                    id: "per_game",
-                                                    title: "Matchday / Weekly",
-                                                    desc: "Match & training subs",
-                                                },
-                                                {
-                                                    id: "monthly",
-                                                    title: "Monthly Subs",
-                                                    desc: "Standing monthly fee",
-                                                },
-                                                {
-                                                    id: "both",
-                                                    title: "Both",
-                                                    desc: "Monthly + matchday fees",
-                                                },
-                                                {
-                                                    id: "skip",
-                                                    title: "Skip for Now",
-                                                    desc: "Set up payments later",
-                                                },
+                                                { id: "per_game", title: "Matchday / Weekly", desc: "Match & training subs" },
+                                                { id: "monthly", title: "Monthly Subs", desc: "Standing monthly fee" },
+                                                { id: "both", title: "Both", desc: "Monthly + matchday fees" },
+                                                { id: "skip", title: "Skip for Now", desc: "Set up payments later" },
                                             ].map((m) => (
                                                 <button
                                                     key={m.id}
                                                     type="button"
                                                     onClick={() => setFinanceModel(m.id as any)}
-                                                    className={`p-3 rounded-2xl border text-left transition-all ${
+                                                    className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                                                         financeModel === m.id
-                                                            ? "border-emerald-500/60 bg-emerald-500/10"
-                                                            : "border-white/10 bg-slate-950/60 hover:border-white/20"
+                                                            ? "border-slate-900 bg-slate-50 ring-1 ring-slate-900"
+                                                            : "border-slate-200 bg-white hover:border-slate-300"
                                                     }`}
                                                 >
-                                                    <div className="text-xs font-bold text-white">{m.title}</div>
-                                                    <div className="text-[10px] text-slate-400 mt-0.5">{m.desc}</div>
+                                                    <div className="text-xs font-bold text-slate-900">{m.title}</div>
+                                                    <div className="text-[10px] text-slate-500 mt-0.5">{m.desc}</div>
                                                 </button>
                                             ))}
                                         </div>
 
                                         {financeModel !== "skip" && (
-                                            <div className="space-y-4 p-4 rounded-2xl bg-slate-950/70 border border-white/10">
-                                                {/* Default Price Inputs */}
+                                            <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
                                                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                                                     {(financeModel === "per_game" || financeModel === "both") && (
                                                         <div className="space-y-1">
-                                                            <label className="text-[11px] text-slate-400">Match Sub (£)</label>
+                                                            <label className="text-[11px] font-semibold text-slate-600">Match Sub (£)</label>
                                                             <Input
                                                                 type="number"
                                                                 min="0"
                                                                 step="0.5"
                                                                 value={matchSubAmount}
                                                                 onChange={(e) => setMatchSubAmount(Number(e.target.value))}
-                                                                className="h-9 bg-slate-900 border-white/15 text-white font-bold"
+                                                                className="h-9 bg-white border-slate-300 text-slate-900 font-bold"
                                                             />
                                                         </div>
                                                     )}
                                                     {(financeModel === "monthly" || financeModel === "both") && (
                                                         <div className="space-y-1">
-                                                            <label className="text-[11px] text-slate-400">Monthly Subs (£)</label>
+                                                            <label className="text-[11px] font-semibold text-slate-600">Monthly Subs (£)</label>
                                                             <Input
                                                                 type="number"
                                                                 min="0"
                                                                 step="1"
                                                                 value={monthlySubs}
                                                                 onChange={(e) => setMonthlySubs(Number(e.target.value))}
-                                                                className="h-9 bg-slate-900 border-white/15 text-white font-bold"
+                                                                className="h-9 bg-white border-slate-300 text-slate-900 font-bold"
                                                             />
                                                         </div>
                                                     )}
                                                     <div className="space-y-1">
-                                                        <label className="text-[11px] text-slate-400">Training Sub (£)</label>
+                                                        <label className="text-[11px] font-semibold text-slate-600">Training Sub (£)</label>
                                                         <Input
                                                             type="number"
                                                             min="0"
                                                             step="0.5"
                                                             value={trainingFeePerSession}
                                                             onChange={(e) => setTrainingFeePerSession(Number(e.target.value))}
-                                                            className="h-9 bg-slate-900 border-white/15 text-white font-bold"
+                                                            className="h-9 bg-white border-slate-300 text-slate-900 font-bold"
                                                         />
                                                     </div>
                                                     <div className="space-y-1">
-                                                        <label className="text-[11px] text-slate-400">Signing-On (£)</label>
+                                                        <label className="text-[11px] font-semibold text-slate-600">Signing-On (£)</label>
                                                         <Input
                                                             type="number"
                                                             min="0"
                                                             step="1"
                                                             value={registrationFee}
                                                             onChange={(e) => setRegistrationFee(Number(e.target.value))}
-                                                            className="h-9 bg-slate-900 border-white/15 text-white font-bold"
+                                                            className="h-9 bg-white border-slate-300 text-slate-900 font-bold"
                                                         />
                                                     </div>
                                                 </div>
 
-                                                {/* Account Pots & Processing Fee */}
-                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-white/10">
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200">
                                                     <div className="space-y-1.5">
-                                                        <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
-                                                            <Building2 className="w-3.5 h-3.5 text-sky-400" /> Payment Pots Created Automatically
+                                                        <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                                                            <Building2 className="w-3.5 h-3.5 text-slate-600" /> Payment Pots
                                                         </label>
                                                         <div className="flex flex-wrap gap-1.5">
-                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-[11px] font-semibold text-emerald-300">
+                                                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-[11px] font-semibold text-emerald-800">
                                                                 ✓ {(clubName.trim() || "Club")} Main Account
                                                             </span>
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setIncludeSocialPot((v) => !v)}
-                                                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all ${
+                                                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition-all cursor-pointer ${
                                                                     includeSocialPot
-                                                                        ? "bg-sky-500/15 border-sky-500/35 text-sky-300"
-                                                                        : "bg-slate-900 border-white/10 text-slate-400"
+                                                                        ? "bg-sky-50 border-sky-200 text-sky-800"
+                                                                        : "bg-white border-slate-200 text-slate-500"
                                                                 }`}
                                                             >
                                                                 {includeSocialPot ? "✓" : "+"} Social &amp; Fines Pot
@@ -2520,17 +2790,17 @@ function OnboardingContent() {
                                                     </div>
 
                                                     <div className="space-y-1.5">
-                                                        <label className="text-[11px] font-bold text-slate-300">
+                                                        <label className="text-[11px] font-bold text-slate-700">
                                                             Card / Apple Pay Processing Fee
                                                         </label>
                                                         <div className="grid grid-cols-2 gap-1.5">
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setOnboardingFeeCoverage("player")}
-                                                                className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition-all ${
+                                                                className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition-all cursor-pointer ${
                                                                     onboardingFeeCoverage === "player"
-                                                                        ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
-                                                                        : "bg-slate-900 border-white/10 text-slate-400"
+                                                                        ? "bg-slate-900 border-slate-900 text-white"
+                                                                        : "bg-white border-slate-200 text-slate-600"
                                                                 }`}
                                                             >
                                                                 Player pays (Club 100%)
@@ -2538,10 +2808,10 @@ function OnboardingContent() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => setOnboardingFeeCoverage("club")}
-                                                                className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition-all ${
+                                                                className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition-all cursor-pointer ${
                                                                     onboardingFeeCoverage === "club"
-                                                                        ? "bg-emerald-500/15 border-emerald-500/40 text-emerald-300"
-                                                                        : "bg-slate-900 border-white/10 text-slate-400"
+                                                                        ? "bg-slate-900 border-slate-900 text-white"
+                                                                        : "bg-white border-slate-200 text-slate-600"
                                                                 }`}
                                                             >
                                                                 Club absorbs fee
@@ -2550,80 +2820,65 @@ function OnboardingContent() {
                                                     </div>
                                                 </div>
 
-                                                {/* Who manages the club bank account? */}
-                                                <div className="space-y-3 pt-2 border-t border-white/10">
-                                                    <label className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
-                                                        <CreditCard className="w-3.5 h-3.5 text-indigo-400" /> Who manages the club bank account?
+                                                <div className="space-y-3 pt-2 border-t border-slate-200">
+                                                    <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
+                                                        <CreditCard className="w-3.5 h-3.5 text-slate-600" /> Who manages the club bank account?
                                                     </label>
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                                         <button
                                                             type="button"
                                                             onClick={() => setBankHandler("self")}
-                                                            className={`p-3 rounded-xl border text-left transition-all ${
+                                                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                                                                 bankHandler === "self"
-                                                                    ? "border-indigo-400/60 bg-indigo-500/15"
-                                                                    : "border-white/10 bg-slate-900/80"
+                                                                    ? "border-slate-900 bg-white ring-1 ring-slate-900"
+                                                                    : "border-slate-200 bg-white"
                                                             }`}
                                                         >
-                                                            <div className="text-xs font-bold text-white">I manage the bank account</div>
-                                                            <div className="text-[10px] text-slate-400 mt-0.5">
+                                                            <div className="text-xs font-bold text-slate-900">I manage the bank account</div>
+                                                            <div className="text-[10px] text-slate-500 mt-0.5">
                                                                 Link in 90s at launch — no Sort Code needed right now
                                                             </div>
                                                         </button>
                                                         <button
                                                             type="button"
                                                             onClick={() => setBankHandler("treasurer")}
-                                                            className={`p-3 rounded-xl border text-left transition-all ${
+                                                            className={`p-3 rounded-xl border text-left transition-all cursor-pointer ${
                                                                 bankHandler === "treasurer"
-                                                                    ? "border-indigo-400/60 bg-indigo-500/15"
-                                                                    : "border-white/10 bg-slate-900/80"
+                                                                    ? "border-slate-900 bg-white ring-1 ring-slate-900"
+                                                                    : "border-slate-200 bg-white"
                                                             }`}
                                                         >
-                                                            <div className="text-xs font-bold text-white">
+                                                            <div className="text-xs font-bold text-slate-900">
                                                                 Our Treasurer / Secretary handles it
                                                             </div>
-                                                            <div className="text-[10px] text-slate-400 mt-0.5">
+                                                            <div className="text-[10px] text-slate-500 mt-0.5">
                                                                 Auto-email them a direct invite to link the club bank
                                                             </div>
                                                         </button>
                                                     </div>
 
                                                     {bankHandler === "self" ? (
-                                                        <div className="space-y-2">
-                                                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                                                                {[
-                                                                    {
-                                                                        id: "individual",
-                                                                        label: "Grassroots / Treasurer",
-                                                                    },
-                                                                    {
-                                                                        id: "non_profit",
-                                                                        label: "Non-Profit / CASC",
-                                                                    },
-                                                                    {
-                                                                        id: "company",
-                                                                        label: "Registered Ltd",
-                                                                    },
-                                                                ].map((opt) => (
-                                                                    <button
-                                                                        key={opt.id}
-                                                                        type="button"
-                                                                        onClick={() =>
-                                                                            setOnboardingAccountHolderType(opt.id as any)
-                                                                        }
-                                                                        className={`px-3 py-2 rounded-lg border text-xs font-semibold text-left transition-all ${
-                                                                            onboardingAccountHolderType === opt.id
-                                                                                ? "border-emerald-500/50 bg-emerald-500/10 text-white"
-                                                                                : "border-white/10 bg-slate-900 text-slate-400"
-                                                                        }`}
-                                                                    >
-                                                                        {opt.label}
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                            <p className="text-[11px] text-slate-400">
-                                                                You can start sending payment requests straight away and connect your bank account in 1 click on the Launchpad (or anytime inside Subs &amp; Payments).
-                                                            </p>
+                                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                                            {[
+                                                                { id: "individual", label: "Grassroots / Treasurer" },
+                                                                { id: "non_profit", label: "Non-Profit / CASC" },
+                                                                { id: "company", label: "Registered Ltd" },
+                                                            ].map((opt) => (
+                                                                <button
+                                                                    key={opt.id}
+                                                                    type="button"
+                                                                    onClick={() =>
+                                                                        setOnboardingAccountHolderType(opt.id as any)
+                                                                    }
+                                                                    className={`px-3 py-2 rounded-lg border text-xs font-semibold text-left transition-all cursor-pointer ${
+                                                                        onboardingAccountHolderType === opt.id
+                                                                            ? "border-slate-900 bg-slate-900 text-white"
+                                                                            : "border-slate-200 bg-white text-slate-700"
+                                                                    }`}
+                                                                >
+                                                                    {opt.label}
+                                                                </button>
+                                                            ))}
                                                         </div>
                                                     ) : (
                                                         <div className="space-y-2">
@@ -2632,19 +2887,19 @@ function OnboardingContent() {
                                                                     placeholder="Treasurer Name (e.g. Sarah Jenkins)"
                                                                     value={treasurerInviteName}
                                                                     onChange={(e) => setTreasurerInviteName(e.target.value)}
-                                                                    className="h-9 text-xs bg-slate-900 border-white/15 text-white"
+                                                                    className="h-9 text-xs bg-white border-slate-300 text-slate-900"
                                                                 />
                                                                 <Input
                                                                     type="email"
                                                                     placeholder="Treasurer Email (e.g. treasurer@club.co.uk)"
                                                                     value={treasurerInviteEmail}
                                                                     onChange={(e) => setTreasurerInviteEmail(e.target.value)}
-                                                                    className="h-9 text-xs bg-slate-900 border-white/15 text-white"
+                                                                    className="h-9 text-xs bg-white border-slate-300 text-slate-900"
                                                                 />
                                                             </div>
-                                                            <p className="text-[11px] text-indigo-300 flex items-center gap-1.5">
-                                                                <Mail className="w-3.5 h-3.5 shrink-0" />
-                                                                When you finish setup, ClubFlow will automatically email them a Treasurer link that opens the bank connection screen directly.
+                                                            <p className="text-[11px] text-slate-600 flex items-center gap-1.5">
+                                                                <Mail className="w-3.5 h-3.5 shrink-0 text-slate-500" />
+                                                                When you finish setup, ClubFlow will email them a direct link to connect the club bank account.
                                                             </p>
                                                         </div>
                                                     )}
@@ -2656,54 +2911,54 @@ function OnboardingContent() {
                             </Card>
                         )}
 
-                        {/* STAGE 3: INSTANT DATA IMPORT HUB (ZERO-EMPTY-STATE) */}
+                        {/* STAGE 3: POPULATE YOUR CLUB (CSV, AI PHOTO PASTE, TEXT PASTE, 1-TIME PLAYER LINKS, LEAGUE & FIXTURES) */}
                         {stage === 3 && (
-                            <Card className="bg-slate-900/75 border-white/10 backdrop-blur-xl rounded-3xl overflow-hidden">
+                            <Card
+                                onPaste={importTab === "squad" ? handleSquadPasteEvent : undefined}
+                                className="bg-white border-slate-200 rounded-2xl shadow-xs overflow-hidden"
+                            >
                                 <CardContent className="p-5 sm:p-7 space-y-6">
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div>
-                                            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[11px] font-black tracking-wider uppercase mb-2.5 shadow-sm">
-                                                STAGE 3 • ZERO-EMPTY-STATE DATA IMPORT HUB
+                                            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-bold uppercase tracking-wider mb-2">
+                                                Step 3 • Populate Your Club (Optional)
                                             </div>
-                                            <h2 className="text-2xl font-black text-white">
-                                                Populate Your Club in Seconds (Optional)
+                                            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                                                Add Your Squad, League Table &amp; Fixtures
                                             </h2>
-                                            <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                                                Paste your squad list from WhatsApp or use League Import for your table and fixtures so your
-                                                dashboard is alive from minute one.
+                                            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                                                Upload a CSV, drop in a photo/screenshot of your squad list, paste text, or send individual 1-time links to players.
                                             </p>
                                         </div>
 
-                                        {/* Live Imported Tally */}
                                         <div className="flex flex-wrap items-center gap-2">
-                                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-emerald-500/40 text-white font-extrabold text-xs shadow-sm">
-                                                👥 <span className="text-emerald-400">{importedPlayersCount}</span> Players
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 border border-emerald-200 text-slate-900 font-bold text-xs">
+                                                👥 <span className="text-emerald-700">{importedPlayersCount}</span> Players
                                             </span>
-                                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-sky-500/40 text-white font-extrabold text-xs shadow-sm">
-                                                📅 <span className="text-sky-400">{importedFixturesCount}</span> Fixtures
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-50 border border-sky-200 text-slate-900 font-bold text-xs">
+                                                📅 <span className="text-sky-700">{importedFixturesCount}</span> Fixtures
                                             </span>
-                                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-950 border border-amber-500/40 text-white font-extrabold text-xs shadow-sm">
-                                                🏆 <span className="text-amber-400">{importedTeamsCount}</span> Teams
+                                            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200 text-slate-900 font-bold text-xs">
+                                                🏆 <span className="text-amber-700">{importedTeamsCount}</span> Teams
                                             </span>
                                         </div>
                                     </div>
 
-                                        {/* 4 Import Sub-Tabs */}
                                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                                         {[
-                                            { id: "squad", label: "1. Paste Squad", shortLabel: "1. Squad", icon: Users },
-                                            { id: "table", label: "2. League Import (Table)", shortLabel: "2. League Table", icon: Trophy },
-                                            { id: "fixtures", label: "3. League Import (Fixtures)", shortLabel: "3. Fixtures", icon: Calendar },
-                                            { id: "demo", label: "4. Sample Data", shortLabel: "4. Sample Data", icon: Sparkles },
+                                            { id: "squad", label: "1. Squad Players", shortLabel: "1. Squad", icon: Users },
+                                            { id: "table", label: "2. League Table", shortLabel: "2. Table", icon: Trophy },
+                                            { id: "fixtures", label: "3. Fixtures", shortLabel: "3. Fixtures", icon: Calendar },
+                                            { id: "demo", label: "4. Sample Data", shortLabel: "4. Sample", icon: Sparkles },
                                         ].map((t) => (
                                             <button
                                                 key={t.id}
                                                 type="button"
                                                 onClick={() => setImportTab(t.id as any)}
-                                                className={`flex items-center justify-center gap-1.5 py-2.5 px-2.5 sm:px-3 rounded-xl text-xs font-bold border transition-all ${
+                                                className={`flex items-center justify-center gap-1.5 py-2.5 px-2.5 sm:px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer ${
                                                     importTab === t.id
-                                                        ? "bg-white text-slate-950 border-white shadow"
-                                                        : "bg-slate-950/60 border-white/10 text-slate-300 hover:border-white/25"
+                                                        ? "bg-slate-900 text-white border-slate-900 shadow-2xs"
+                                                        : "bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900"
                                                 }`}
                                             >
                                                 <t.icon className="w-3.5 h-3.5 shrink-0" />
@@ -2713,85 +2968,222 @@ function OnboardingContent() {
                                         ))}
                                     </div>
 
-                                    {/* TAB 1: PASTE SQUAD LIST */}
+                                    {/* TAB 1: SQUAD IMPORT (CSV + PHOTO/SCREENSHOT AI + TEXT PASTE + INDIVIDUAL 1-TIME PLAYER LINKS) */}
                                     {importTab === "squad" && (
-                                        <div className="space-y-4 p-4 rounded-2xl bg-slate-950/70 border border-white/10">
-                                            <div>
-                                                <div className="text-sm font-bold text-white">
-                                                    Smart Squad List Parser (WhatsApp / Notes / Excel)
-                                                </div>
-                                                <p className="text-xs text-slate-300 mt-0.5">
-                                                    Paste one player per line with their position (e.g.{" "}
-                                                    <code className="text-emerald-300 font-semibold">1. Callum Mercer (GK)</code>,{" "}
-                                                    <code className="text-emerald-300 font-semibold">4. Marcus Vance - CB</code>, or{" "}
-                                                    <code className="text-emerald-300 font-semibold">Jayden Okafor RW</code>).
-                                                </p>
+                                        <div className="space-y-4">
+                                            {/* Quick Import Toolbar: CSV + Photo/Screenshot */}
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => csvSquadInputRef.current?.click()}
+                                                    className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-400 text-left transition-all cursor-pointer"
+                                                >
+                                                    <div className="p-2 rounded-lg bg-emerald-100 text-emerald-700 shrink-0">
+                                                        <FileSpreadsheet className="w-4 h-4" />
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-bold text-slate-900">
+                                                            Import Squad CSV File
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                                            Upload a `.csv` with player names, positions, shirt numbers, DOB or emails.
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                                <input
+                                                    ref={csvSquadInputRef}
+                                                    type="file"
+                                                    accept=".csv,text/csv"
+                                                    onChange={handleSquadCsvUpload}
+                                                    className="hidden"
+                                                />
+
+                                                <button
+                                                    type="button"
+                                                    disabled={isScanningImage}
+                                                    onClick={() => squadPhotoInputRef.current?.click()}
+                                                    className="flex items-start gap-3 p-3.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-white hover:border-slate-400 text-left transition-all cursor-pointer disabled:opacity-60"
+                                                >
+                                                    <div className="p-2 rounded-lg bg-indigo-100 text-indigo-700 shrink-0">
+                                                        {isScanningImage ? (
+                                                            <Loader2 className="w-4 h-4 animate-spin" />
+                                                        ) : (
+                                                            <Camera className="w-4 h-4" />
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-xs font-bold text-slate-900">
+                                                            {isScanningImage
+                                                                ? "Scanning Squad Image..."
+                                                                : "Upload or Paste Photo of Squad List"}
+                                                        </div>
+                                                        <div className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                                                            Upload a screenshot/photo (or press <strong>Ctrl+V</strong>) and we&apos;ll extract the names &amp; positions automatically.
+                                                        </div>
+                                                    </div>
+                                                </button>
+                                                <input
+                                                    ref={squadPhotoInputRef}
+                                                    type="file"
+                                                    accept="image/*"
+                                                    onChange={handleSquadPhotoInput}
+                                                    className="hidden"
+                                                />
                                             </div>
 
-                                            <textarea
-                                                value={rawSquadPaste}
-                                                onChange={(e) => setRawSquadPaste(e.target.value)}
-                                                rows={6}
-                                                placeholder={`1. Callum Mercer (GK)\n2. Liam Sterling - RB\n4. Marcus Vance CB\n6. Harrison Cole CDM\n7. Jayden Okafor RW\n9. Nathan Cross ST`}
-                                                className="w-full rounded-xl bg-slate-900 border border-white/15 p-3 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
-                                            />
-
-                                            {parsedSquadDrafts.length > 0 && (
-                                                <div className="space-y-2">
-                                                    <div className="text-xs font-bold text-emerald-400">
-                                                        Preview: {parsedSquadDrafts.length} players ready to import into{" "}
-                                                        {squads[0] || "First Team"}
-                                                    </div>
-                                                    <div className="max-h-40 overflow-y-auto flex flex-wrap gap-1.5 p-2 rounded-xl bg-slate-900/90 border border-white/10">
-                                                        {parsedSquadDrafts.map((p, i) => (
-                                                            <span
-                                                                key={i}
-                                                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950 border border-white/10 text-xs"
-                                                            >
-                                                                {p.squadNumber && (
-                                                                    <strong className="text-slate-400">#{p.squadNumber}</strong>
-                                                                )}
-                                                                <span className="font-semibold text-white">
-                                                                    {p.firstName} {p.lastName !== "—" ? p.lastName : ""}
-                                                                </span>
-                                                                <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold text-[10px]">
-                                                                    {p.position}
-                                                                </span>
-                                                            </span>
-                                                        ))}
-                                                    </div>
-                                                    <Button
+                                            {squadImportNotice && (
+                                                <div
+                                                    className={`px-3.5 py-2.5 rounded-xl border text-xs font-semibold flex items-center justify-between gap-2 ${
+                                                        squadImportNotice.type === "error"
+                                                            ? "bg-rose-50 border-rose-200 text-rose-700"
+                                                            : "bg-emerald-50 border-emerald-200 text-emerald-800"
+                                                    }`}
+                                                >
+                                                    <span>{squadImportNotice.text}</span>
+                                                    <button
                                                         type="button"
-                                                        disabled={isImportingSquad}
-                                                        onClick={handleImportSquadDrafts}
-                                                        className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black"
+                                                        onClick={() => setSquadImportNotice(null)}
+                                                        className="text-slate-400 hover:text-slate-700"
                                                     >
-                                                        {isImportingSquad ? (
-                                                            <>
-                                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Importing Squad...
-                                                            </>
-                                                        ) : (
-                                                            <>
-                                                                <Check className="w-4 h-4 mr-2" /> Import {parsedSquadDrafts.length}{" "}
-                                                                Players Now
-                                                            </>
-                                                        )}
-                                                    </Button>
+                                                        <X className="w-3.5 h-3.5" />
+                                                    </button>
                                                 </div>
                                             )}
+
+                                            {/* Paste Squad List Box */}
+                                            <div className="space-y-3 p-4 rounded-xl bg-slate-50 border border-slate-200">
+                                                <div>
+                                                    <div className="text-xs font-bold text-slate-900">
+                                                        Or Paste Squad List (WhatsApp / Notes / Excel)
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                                        One player per line with optional number &amp; position — e.g.{" "}
+                                                        <code className="text-slate-800 font-semibold">1. Callum Mercer (GK)</code>,{" "}
+                                                        <code className="text-slate-800 font-semibold">2. Liam Sterling - RWB</code>, or{" "}
+                                                        <code className="text-slate-800 font-semibold">Nathan Cross ST</code>. You can also press{" "}
+                                                        <strong>Ctrl+V</strong> here to paste a screenshot.
+                                                    </p>
+                                                </div>
+
+                                                <textarea
+                                                    value={rawSquadPaste}
+                                                    onChange={(e) => setRawSquadPaste(e.target.value)}
+                                                    onPaste={handleSquadPasteEvent}
+                                                    rows={5}
+                                                    placeholder={`1. Callum Mercer (GK)\n2. Liam Sterling - RWB\n4. Marcus Vance CB\n6. Harrison Cole CDM\n7. Jayden Okafor RW\n9. Nathan Cross ST`}
+                                                    className="w-full rounded-xl bg-white border border-slate-300 p-3 text-xs text-slate-900 placeholder:text-slate-400 font-mono focus:outline-none focus:ring-2 focus:ring-slate-900/15 focus:border-slate-500"
+                                                />
+
+                                                {parsedSquadDrafts.length > 0 && (
+                                                    <div className="space-y-2.5">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="text-xs font-bold text-emerald-700">
+                                                                Ready to import: {parsedSquadDrafts.length} players into{" "}
+                                                                {squads[0] || "First Team"}
+                                                            </div>
+                                                            {extraStagedPlayers.length > 0 && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setExtraStagedPlayers([])}
+                                                                    className="text-[11px] font-semibold text-slate-500 hover:text-rose-600"
+                                                                >
+                                                                    Clear CSV rows
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                        <div className="max-h-40 overflow-y-auto flex flex-wrap gap-1.5 p-2.5 rounded-xl bg-white border border-slate-200">
+                                                            {parsedSquadDrafts.map((p, i) => (
+                                                                <span
+                                                                    key={i}
+                                                                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200 text-xs"
+                                                                >
+                                                                    {p.squadNumber && (
+                                                                        <strong className="text-slate-500">#{p.squadNumber}</strong>
+                                                                    )}
+                                                                    <span className="font-semibold text-slate-900">
+                                                                        {p.firstName} {p.lastName !== "—" ? p.lastName : ""}
+                                                                    </span>
+                                                                    <span className="px-1.5 py-0.2 rounded bg-slate-900 text-white font-bold text-[10px]">
+                                                                        {p.position}
+                                                                    </span>
+                                                                    {p.age ? (
+                                                                        <span className="text-[10px] text-slate-500">
+                                                                            {p.age}y
+                                                                        </span>
+                                                                    ) : null}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                        <Button
+                                                            type="button"
+                                                            disabled={isImportingSquad}
+                                                            onClick={handleImportSquadDrafts}
+                                                            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+                                                        >
+                                                            {isImportingSquad ? (
+                                                                <>
+                                                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Importing Squad...
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    <Check className="w-4 h-4 mr-2" /> Add {parsedSquadDrafts.length}{" "}
+                                                                    Players to Squad
+                                                                </>
+                                                            )}
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            {/* Individual Player Self-Fill Link Option */}
+                                            <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                                <div className="space-y-1">
+                                                    <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                                        <Link2 className="w-4 h-4 text-emerald-700 shrink-0" />
+                                                        Prefer individual players to enter their own details?
+                                                    </div>
+                                                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                                                        You can generate <strong>1-time registration links</strong> for individual players to upload their own{" "}
+                                                        <strong>Name, Date of Birth (auto-fills age), Position, Wing-Back/2nd Position, Foot, Shirt # &amp; Email</strong>. Each link works once and waits for your approval on the <strong>Squad</strong> page.
+                                                    </p>
+                                                </div>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    disabled={mintingPlayerLink || !clubId}
+                                                    onClick={handleCopyOneTimePlayerLink}
+                                                    className="shrink-0 h-9 text-xs font-bold border-emerald-300 bg-white text-emerald-800 hover:bg-emerald-100"
+                                                >
+                                                    {copiedPlayerLink ? (
+                                                        <>
+                                                            <Check className="w-3.5 h-3.5 mr-1.5 text-emerald-600" />
+                                                            Copied 1-Time Link ✓
+                                                        </>
+                                                    ) : mintingPlayerLink ? (
+                                                        <>
+                                                            <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                                                            Generating...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Share2 className="w-3.5 h-3.5 mr-1.5" />
+                                                            Copy 1-Time Player Link
+                                                        </>
+                                                    )}
+                                                </Button>
+                                            </div>
                                         </div>
                                     )}
 
-                                    {/* TAB 2: PASTE LEAGUE TABLE */}
+                                    {/* TAB 2: LEAGUE TABLE */}
                                     {importTab === "table" && (
-                                        <div className="space-y-4 p-4 rounded-2xl bg-slate-950/70 border border-white/10">
+                                        <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
                                             <div>
-                                                <div className="text-sm font-bold text-white">
-                                                    League Import — Standings Table
+                                                <div className="text-sm font-bold text-slate-900">
+                                                    League Standings Table
                                                 </div>
-                                                <p className="text-xs text-slate-300 mt-0.5">
-                                                    Copy & paste your league table rows. We’ll save your league
-                                                    standings AND automatically add every opponent club to your database.
+                                                <p className="text-xs text-slate-500 mt-0.5">
+                                                    Copy &amp; paste your league table rows — we&apos;ll save your standings and add every opponent club automatically.
                                                 </p>
                                             </div>
 
@@ -2800,27 +3192,27 @@ function OnboardingContent() {
                                                 onChange={(e) => setRawTablePaste(e.target.value)}
                                                 rows={6}
                                                 placeholder={`1\tHighgate Albion FC\t10\t8\t1\t1\t26\t9\t17\t25\n2\tHackney Wick Athletic\t10\t7\t2\t1\t22\t11\t11\t23`}
-                                                className="w-full rounded-xl bg-slate-900 border border-white/15 p-3 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                                                className="w-full rounded-xl bg-white border border-slate-300 p-3 text-xs text-slate-900 placeholder:text-slate-400 font-mono focus:outline-none focus:border-slate-500"
                                             />
 
                                             {parsedStandingsRows.length > 0 && (
                                                 <div className="space-y-3">
-                                                    <div className="text-xs font-bold text-emerald-400">
-                                                        Detected {parsedStandingsRows.length} League Table rows:
+                                                    <div className="text-xs font-bold text-emerald-700">
+                                                        Detected {parsedStandingsRows.length} league rows:
                                                     </div>
-                                                    <div className="max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-slate-900/90 p-2 text-xs space-y-1">
+                                                    <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 text-xs space-y-1">
                                                         {parsedStandingsRows.map((r) => (
                                                             <div
                                                                 key={r.pos}
-                                                                className="flex items-center justify-between px-2 py-1 rounded bg-slate-950/60"
+                                                                className="flex items-center justify-between px-2.5 py-1.5 rounded bg-slate-50"
                                                             >
                                                                 <span>
-                                                                    <strong className="text-slate-400 mr-2">{r.pos}.</strong>
-                                                                    <span className="font-semibold text-white">{r.team}</span>
+                                                                    <strong className="text-slate-500 mr-2">{r.pos}.</strong>
+                                                                    <span className="font-semibold text-slate-900">{r.team}</span>
                                                                 </span>
-                                                                <span className="text-slate-400 font-mono">
+                                                                <span className="text-slate-600 font-mono">
                                                                     P{r.played} • GD {r.gd >= 0 ? `+${r.gd}` : r.gd} •{" "}
-                                                                    <strong className="text-emerald-400">{r.pts} pts</strong>
+                                                                    <strong className="text-emerald-700">{r.pts} pts</strong>
                                                                 </span>
                                                             </div>
                                                         ))}
@@ -2829,16 +3221,15 @@ function OnboardingContent() {
                                                         type="button"
                                                         disabled={isImportingTable}
                                                         onClick={handleImportLeagueTable}
-                                                        className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black"
+                                                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
                                                     >
                                                         {isImportingTable ? (
                                                             <>
-                                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Syncing Table &
-                                                                Opponents...
+                                                                <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Saving Table...
                                                             </>
                                                         ) : (
                                                             <>
-                                                                <Check className="w-4 h-4 mr-2" /> Save Table & Sync{" "}
+                                                                <Check className="w-4 h-4 mr-2" /> Save Table &amp; Sync{" "}
                                                                 {parsedStandingsRows.length} Clubs
                                                             </>
                                                         )}
@@ -2848,16 +3239,15 @@ function OnboardingContent() {
                                         </div>
                                     )}
 
-                                    {/* TAB 3: PASTE LEAGUE FIXTURES */}
+                                    {/* TAB 3: FIXTURES */}
                                     {importTab === "fixtures" && (
-                                        <div className="space-y-4 p-4 rounded-2xl bg-slate-950/70 border border-white/10">
+                                        <div className="space-y-4 p-4 rounded-xl bg-slate-50 border border-slate-200">
                                             <div>
-                                                <div className="text-sm font-bold text-white">
-                                                    League Import — Fixtures or Results
+                                                <div className="text-sm font-bold text-slate-900">
+                                                    Fixtures &amp; Results
                                                 </div>
-                                                <p className="text-xs text-slate-300 mt-0.5">
-                                                    Copy & paste your upcoming fixtures or past results and click
-                                                    Parse to auto-detect Home/Away, dates, and opponents.
+                                                <p className="text-xs text-slate-500 mt-0.5">
+                                                    Paste your upcoming fixtures or past results and click Parse to detect Home/Away, dates, and opponents.
                                                 </p>
                                             </div>
 
@@ -2866,7 +3256,7 @@ function OnboardingContent() {
                                                 onChange={(e) => setRawFixturesPaste(e.target.value)}
                                                 rows={5}
                                                 placeholder="Paste your league fixture list text here..."
-                                                className="w-full rounded-xl bg-slate-900 border border-white/15 p-3 text-xs text-white font-mono focus:outline-none focus:border-emerald-500"
+                                                className="w-full rounded-xl bg-white border border-slate-300 p-3 text-xs text-slate-900 placeholder:text-slate-400 font-mono focus:outline-none focus:border-slate-500"
                                             />
 
                                             <div className="flex items-center gap-2">
@@ -2875,7 +3265,7 @@ function OnboardingContent() {
                                                     disabled={isParsingFixtures || !rawFixturesPaste.trim()}
                                                     onClick={handleParseFixturesPaste}
                                                     variant="outline"
-                                                    className="border-white/15 bg-white/5 text-white text-xs"
+                                                    className="border-slate-300 bg-white text-slate-800 text-xs font-semibold"
                                                 >
                                                     {isParsingFixtures ? (
                                                         <>
@@ -2891,7 +3281,7 @@ function OnboardingContent() {
                                                         type="button"
                                                         disabled={isImportingFixtures}
                                                         onClick={handleConfirmImportFixtures}
-                                                        className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs"
+                                                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs"
                                                     >
                                                         {isImportingFixtures ? (
                                                             <>
@@ -2905,19 +3295,19 @@ function OnboardingContent() {
                                             </div>
 
                                             {parsedFixturesPreview.length > 0 && (
-                                                <div className="max-h-40 overflow-y-auto rounded-xl border border-white/10 bg-slate-900/90 p-2 text-xs space-y-1">
+                                                <div className="max-h-40 overflow-y-auto rounded-xl border border-slate-200 bg-white p-2 text-xs space-y-1">
                                                     {parsedFixturesPreview.map((f, idx) => (
                                                         <div
                                                             key={idx}
-                                                            className="flex items-center justify-between px-2 py-1 rounded bg-slate-950/60"
+                                                            className="flex items-center justify-between px-2.5 py-1.5 rounded bg-slate-50"
                                                         >
                                                             <span>
-                                                                <span className="mr-2 px-1.5 py-0.5 rounded bg-white/10 text-white font-bold text-[10px]">
+                                                                <span className="mr-2 px-1.5 py-0.5 rounded bg-slate-200 text-slate-800 font-bold text-[10px]">
                                                                     {f.homeAway}
                                                                 </span>
-                                                                <strong className="text-white">vs {f.opponent}</strong>
+                                                                <strong className="text-slate-900">vs {f.opponent}</strong>
                                                             </span>
-                                                            <span className="text-slate-400">
+                                                            <span className="text-slate-500">
                                                                 {f.date} {f.scoreline ? `(${f.scoreline})` : ""}
                                                             </span>
                                                         </div>
@@ -2927,33 +3317,31 @@ function OnboardingContent() {
                                         </div>
                                     )}
 
-                                    {/* TAB 4: DEMO DATA SEEDER */}
+                                    {/* TAB 4: SAMPLE DATA */}
                                     {importTab === "demo" && (
-                                        <div className="p-5 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-sky-500/10 border border-emerald-500/30 space-y-3">
-                                            <div className="flex items-center gap-2 text-emerald-300 font-bold text-sm">
-                                                <Sparkles className="w-4 h-4" /> Test-Drive Mode: Seed Sample Club Data
+                                        <div className="p-5 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                                            <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
+                                                <Sparkles className="w-4 h-4 text-emerald-600" /> Try With Sample Club Data
                                             </div>
-                                            <p className="text-xs text-slate-300 leading-relaxed">
-                                                Don’t have your squad list handy right now? Load a sample 16-man squad (fictional players + positions), 4 fixtures,
-                                                and a 6-team league table so you can immediately explore the Matchday Planner pitch
-                                                builder and stats hub.
+                                            <p className="text-xs text-slate-600 leading-relaxed">
+                                                Don&apos;t have your squad list handy right now? Load a sample 16-man squad, 4 fixtures, and a 6-team league table so you can explore the Matchday Planner pitch straight away.
                                             </p>
                                             <Button
                                                 type="button"
                                                 disabled={isSeedingDemo || demoSeeded}
                                                 onClick={handleSeedDemoData}
-                                                className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs"
+                                                className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs"
                                             >
                                                 {demoSeeded ? (
                                                     <>
-                                                        <Check className="w-4 h-4 mr-1.5" /> Sample Squad, Fixtures & Table Loaded!
+                                                        <Check className="w-4 h-4 mr-1.5 text-emerald-400" /> Sample Squad, Fixtures &amp; Table Loaded!
                                                     </>
                                                 ) : isSeedingDemo ? (
                                                     <>
                                                         <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> Loading Sample Data...
                                                     </>
                                                 ) : (
-                                                    "⚡ Load Sample Club Data (16 Players + 4 Fixtures)"
+                                                    "Load Sample Club Data (16 Players + 4 Fixtures)"
                                                 )}
                                             </Button>
                                         </div>
@@ -2962,45 +3350,43 @@ function OnboardingContent() {
                             </Card>
                         )}
 
-                        {/* STAGE 4: STAFF INVITES, PLAYER PORTAL LINK & CELEBRATORY LAUNCHPAD */}
+                        {/* STAGE 4: STAFF INVITES & LAUNCH */}
                         {stage === 4 && (
-                            <Card className="bg-slate-900/75 border-white/10 backdrop-blur-xl rounded-3xl overflow-hidden">
-                                <CardContent className="p-5 sm:p-7 space-y-7">
+                            <Card className="bg-white border-slate-200 rounded-2xl shadow-xs overflow-hidden">
+                                <CardContent className="p-5 sm:p-7 space-y-6">
                                     <div>
-                                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 text-[11px] font-black tracking-wider uppercase mb-2.5 shadow-sm">
-                                            FINAL STAGE • STAFF ACCESS & LAUNCHPAD
+                                        <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-slate-700 text-[11px] font-bold uppercase tracking-wider mb-2">
+                                            Final Step • Coaching Staff &amp; Kick-Off
                                         </div>
-                                        <h2 className="text-2xl font-black text-white">
-                                            Invite Your Backroom Staff & Kick Off
+                                        <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+                                            Invite Your Coaching Staff &amp; Enter Club
                                         </h2>
-                                        <p className="text-xs sm:text-sm text-slate-300 mt-1">
-                                            Generate instant <code className="text-emerald-300 font-semibold">/join</code> invite links to share on
-                                            WhatsApp with your Assistant Manager, Coaches or Secretary.
+                                        <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                                            Optional: generate instant join links to share on WhatsApp (or email) with your Assistant Manager, Coaches or Secretary.
                                         </p>
                                     </div>
 
-                                    {/* Create Real Staff Invite Link */}
-                                    <div className="p-4 sm:p-5 rounded-2xl bg-slate-950/75 border border-white/10 space-y-3.5">
-                                        <div className="text-xs font-bold uppercase tracking-wider text-slate-200 flex items-center gap-1.5">
-                                            <UserPlus className="w-3.5 h-3.5 text-emerald-400" /> Generate Backroom Staff Invite Link
+                                    <div className="p-4 sm:p-5 rounded-xl bg-slate-50 border border-slate-200 space-y-3.5">
+                                        <div className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                            <UserPlus className="w-3.5 h-3.5 text-slate-700" /> Invite Backroom Staff
                                         </div>
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <Input
                                                 value={staffName}
                                                 onChange={(e) => setStaffName(e.target.value)}
                                                 placeholder="Staff Name (e.g. Jordan Cole)"
-                                                className="h-10 text-xs bg-slate-900 border-white/15 text-white"
+                                                className="h-10 text-xs bg-white border-slate-300 text-slate-900"
                                             />
                                             <Input
                                                 value={staffEmail}
                                                 onChange={(e) => setStaffEmail(e.target.value)}
                                                 placeholder="Email (optional)"
-                                                className="h-10 text-xs bg-slate-900 border-white/15 text-white"
+                                                className="h-10 text-xs bg-white border-slate-300 text-slate-900"
                                             />
                                             <select
                                                 value={staffRoleTitle}
                                                 onChange={(e) => setStaffRoleTitle(e.target.value)}
-                                                className="h-10 rounded-md bg-slate-900 border border-white/15 px-3 text-xs text-white"
+                                                className="h-10 rounded-md bg-white border border-slate-300 px-3 text-xs text-slate-900"
                                             >
                                                 <option value="Assistant Manager">Assistant Manager</option>
                                                 <option value="First-Team Coach">First-Team Coach</option>
@@ -3011,9 +3397,9 @@ function OnboardingContent() {
                                             <select
                                                 value={staffAccessLevel}
                                                 onChange={(e) => setStaffAccessLevel(e.target.value as any)}
-                                                className="h-10 rounded-md bg-slate-900 border border-white/15 px-3 text-xs text-white"
+                                                className="h-10 rounded-md bg-white border border-slate-300 px-3 text-xs text-slate-900"
                                             >
-                                                <option value="coach">Coach Access (Pitch Tabs)</option>
+                                                <option value="coach">Coach Access (Pitch Pages)</option>
                                                 <option value="admin">Full Club Admin</option>
                                                 <option value="viewer">Read-Only Viewer</option>
                                             </select>
@@ -3022,7 +3408,8 @@ function OnboardingContent() {
                                             type="button"
                                             disabled={isCreatingInvite || !staffName.trim()}
                                             onClick={handleCreateStaffInvite}
-                                            className="w-full h-10 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs shadow-md"
+                                            variant="outline"
+                                            className="w-full h-10 border-slate-300 bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs"
                                         >
                                             {isCreatingInvite ? (
                                                 <>
@@ -3036,7 +3423,7 @@ function OnboardingContent() {
                                         </Button>
 
                                         {generatedInvites.length > 0 && (
-                                            <div className="space-y-2 pt-2">
+                                            <div className="space-y-2 pt-1">
                                                 {generatedInvites.map((inv) => {
                                                     const waText = `Hey ${inv.name}! Join ${
                                                         clubName || "our club"
@@ -3044,16 +3431,16 @@ function OnboardingContent() {
                                                     return (
                                                         <div
                                                             key={inv.id}
-                                                            className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-slate-900 border border-emerald-500/30"
+                                                            className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-lg bg-white border border-slate-200"
                                                         >
                                                             <div>
-                                                                <div className="text-xs font-bold text-white">
+                                                                <div className="text-xs font-bold text-slate-900">
                                                                     {inv.name}{" "}
-                                                                    <span className="text-emerald-400 font-normal">
+                                                                    <span className="text-slate-500 font-normal">
                                                                         ({inv.roleTitle})
                                                                     </span>
                                                                 </div>
-                                                                <div className="text-[10px] text-slate-400 truncate max-w-xs">
+                                                                <div className="text-[10px] text-slate-500 truncate max-w-xs">
                                                                     {inv.inviteUrl}
                                                                 </div>
                                                             </div>
@@ -3063,7 +3450,7 @@ function OnboardingContent() {
                                                                     size="sm"
                                                                     variant="outline"
                                                                     onClick={() => copyToClipboard(inv.inviteUrl, inv.id)}
-                                                                    className="h-7 text-[11px] border-white/15 bg-white/5 text-white"
+                                                                    className="h-7 text-[11px] border-slate-300 bg-white text-slate-800"
                                                                 >
                                                                     <Copy className="w-3 h-3 mr-1" />
                                                                     {copiedLinkKey === inv.id ? "Copied!" : "Copy Link"}
@@ -3072,7 +3459,7 @@ function OnboardingContent() {
                                                                     href={`https://wa.me/?text=${encodeURIComponent(waText)}`}
                                                                     target="_blank"
                                                                     rel="noreferrer"
-                                                                    className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold"
+                                                                    className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold"
                                                                 >
                                                                     <Share2 className="w-3 h-3" /> WhatsApp
                                                                 </a>
@@ -3084,59 +3471,54 @@ function OnboardingContent() {
                                         )}
                                     </div>
 
-                                    {/* Celebratory Summary Card */}
-                                    <div
-                                        className="p-5 rounded-2xl border border-white/15 space-y-4"
-                                        style={{
-                                            background: `linear-gradient(135deg, ${primaryColor}22 0%, rgba(15,23,42,0.9) 100%)`,
-                                        }}
-                                    >
+                                    {/* Summary Card */}
+                                    <div className="p-5 rounded-xl border border-slate-200 bg-slate-50 space-y-4">
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <div className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                                                    ✓ Club Hub Configured
+                                                <div className="text-xs font-bold uppercase tracking-wider text-emerald-700">
+                                                    ✓ Ready to Kick Off
                                                 </div>
-                                                <div className="text-xl font-black text-white">
-                                                    {clubName || "Your Football Club"} is Matchday Ready
+                                                <div className="text-xl font-black text-slate-900">
+                                                    {clubName || "Your Football Club"}
                                                 </div>
                                             </div>
                                             {logoPreview && (
                                                 <img
                                                     src={logoPreview}
                                                     alt="Badge"
-                                                    className="w-12 h-12 object-contain rounded-xl bg-slate-950/60 p-1.5 border border-white/10"
+                                                    className="w-12 h-12 object-contain rounded-xl bg-white p-1.5 border border-slate-200"
                                                 />
                                             )}
                                         </div>
 
                                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-center">
-                                            <div className="p-2.5 rounded-xl bg-slate-950/70 border border-white/10">
-                                                <div className="text-lg font-black text-white">{preferredFormation}</div>
-                                                <div className="text-[10px] text-slate-400">Default System</div>
+                                            <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                                                <div className="text-lg font-black text-slate-900">{preferredFormation}</div>
+                                                <div className="text-[10px] text-slate-500">Default System</div>
                                             </div>
-                                            <div className="p-2.5 rounded-xl bg-slate-950/70 border border-white/10">
-                                                <div className="text-lg font-black text-emerald-400">{importedPlayersCount}</div>
-                                                <div className="text-[10px] text-slate-400">Players Added</div>
+                                            <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                                                <div className="text-lg font-black text-emerald-700">{importedPlayersCount}</div>
+                                                <div className="text-[10px] text-slate-500">Players Added</div>
                                             </div>
-                                            <div className="p-2.5 rounded-xl bg-slate-950/70 border border-white/10">
-                                                <div className="text-lg font-black text-sky-400">{importedFixturesCount}</div>
-                                                <div className="text-[10px] text-slate-400">Fixtures Scheduled</div>
+                                            <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                                                <div className="text-lg font-black text-sky-700">{importedFixturesCount}</div>
+                                                <div className="text-[10px] text-slate-500">Fixtures Scheduled</div>
                                             </div>
-                                            <div className="p-2.5 rounded-xl bg-slate-950/70 border border-white/10">
-                                                <div className="text-lg font-black text-amber-400">{generatedInvites.length}</div>
-                                                <div className="text-[10px] text-slate-400">Staff Invites</div>
+                                            <div className="p-2.5 rounded-lg bg-white border border-slate-200">
+                                                <div className="text-lg font-black text-amber-700">{generatedInvites.length}</div>
+                                                <div className="text-[10px] text-slate-500">Staff Invites</div>
                                             </div>
                                         </div>
 
                                         {financeModel !== "skip" && bankHandler === "self" && (
-                                            <div className="p-3.5 rounded-2xl bg-indigo-500/15 border border-indigo-400/35 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                            <div className="p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                                 <div>
-                                                    <div className="text-xs font-black text-white flex items-center gap-1.5">
-                                                        <CreditCard className="w-4 h-4 text-indigo-300" />
-                                                        Ready to collect subs &amp; payments by Apple Pay / Card?
+                                                    <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                                                        <CreditCard className="w-4 h-4 text-indigo-600" />
+                                                        Ready to collect subs by Apple Pay / Card?
                                                     </div>
-                                                    <p className="text-[11px] text-slate-300 mt-0.5">
-                                                        Your subs presets &amp; club accounts are ready. Link your club bank account now in 90 seconds, or do it later inside Subs &amp; Payments.
+                                                    <p className="text-[11px] text-slate-500 mt-0.5">
+                                                        Link your club bank account now in 90 seconds, or do it later inside Subs &amp; Payments.
                                                     </p>
                                                 </div>
                                                 <Button
@@ -3145,10 +3527,10 @@ function OnboardingContent() {
                                                     onClick={() =>
                                                         handleCompleteOnboarding("/player-payments?openBankSetup=1")
                                                     }
-                                                    className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs h-9 shrink-0"
+                                                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs h-9 shrink-0"
                                                 >
                                                     <CreditCard className="w-3.5 h-3.5 mr-1.5" />
-                                                    Link Club Bank Account (90s)
+                                                    Link Bank Account (90s)
                                                 </Button>
                                             </div>
                                         )}
@@ -3156,47 +3538,44 @@ function OnboardingContent() {
                                         {financeModel !== "skip" &&
                                             bankHandler === "treasurer" &&
                                             treasurerInviteEmail.trim() && (
-                                                <div className="p-3 rounded-2xl bg-emerald-500/15 border border-emerald-400/35 flex items-center gap-2.5 text-xs text-emerald-200">
-                                                    <Mail className="w-4 h-4 text-emerald-400 shrink-0" />
+                                                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-800">
+                                                    <Mail className="w-4 h-4 text-emerald-600 shrink-0" />
                                                     <span>
-                                                        Treasurer bank-setup invite will be emailed automatically to{" "}
-                                                        <strong className="text-white">
-                                                            {treasurerInviteEmail.trim()}
-                                                        </strong>{" "}
-                                                        when you launch.
+                                                        Treasurer bank-setup invite will be emailed to{" "}
+                                                        <strong>{treasurerInviteEmail.trim()}</strong> when you launch.
                                                     </span>
                                                 </div>
                                             )}
 
-                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2">
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
                                             <Button
                                                 type="button"
                                                 disabled={isCompleting}
                                                 onClick={() => handleCompleteOnboarding("/dashboard")}
-                                                className="h-11 bg-white hover:bg-slate-200 text-slate-950 font-black"
+                                                className="h-11 bg-slate-900 hover:bg-slate-800 text-white font-bold"
                                             >
                                                 <LayoutDashboard className="w-4 h-4 mr-2" />
-                                                Launch Dashboard
+                                                Open Dashboard
                                             </Button>
                                             <Button
                                                 type="button"
                                                 disabled={isCompleting}
                                                 onClick={() => handleCompleteOnboarding("/matchday-xi")}
                                                 variant="outline"
-                                                className="h-11 border-white/20 bg-white/5 hover:bg-white/10 text-white font-bold"
+                                                className="h-11 border-slate-300 bg-white hover:bg-slate-100 text-slate-900 font-bold"
                                             >
-                                                <Shirt className="w-4 h-4 mr-2 text-emerald-400" />
-                                                Open Matchday Planner
+                                                <Shirt className="w-4 h-4 mr-2 text-emerald-600" />
+                                                Matchday Planner
                                             </Button>
                                             <Button
                                                 type="button"
                                                 disabled={isCompleting}
                                                 onClick={() => handleCompleteOnboarding("/squad")}
                                                 variant="outline"
-                                                className="h-11 border-white/20 bg-white/5 hover:bg-white/10 text-white font-bold"
+                                                className="h-11 border-slate-300 bg-white hover:bg-slate-100 text-slate-900 font-bold"
                                             >
-                                                <Users className="w-4 h-4 mr-2 text-sky-400" />
-                                                Go to Squad Hub
+                                                <Users className="w-4 h-4 mr-2 text-sky-600" />
+                                                Squad Page
                                             </Button>
                                         </div>
                                     </div>
@@ -3204,13 +3583,13 @@ function OnboardingContent() {
                             </Card>
                         )}
 
-                        {/* Bottom Back / Continue Action Bar */}
+                        {/* Bottom Back / Continue Bar — 100% Contrast-Safe Even When Brand Colour Is White */}
                         <div className="flex items-center justify-between gap-3 pt-1">
                             <Button
                                 type="button"
                                 variant="outline"
                                 onClick={goPrevStage}
-                                className="h-11 px-5 rounded-xl border-white/15 bg-slate-900/80 text-slate-200 hover:text-white"
+                                className="h-11 px-5 rounded-xl border-slate-300 bg-white text-slate-800 hover:bg-slate-100 font-semibold"
                             >
                                 <ArrowLeft className="w-4 h-4 mr-2" /> Back
                             </Button>
@@ -3219,8 +3598,8 @@ function OnboardingContent() {
                                 <Button
                                     type="button"
                                     onClick={goNextStage}
-                                    className="h-11 px-6 rounded-xl font-black text-white shadow-lg"
-                                    style={{ backgroundColor: primaryColor }}
+                                    className="h-11 px-6 rounded-xl font-bold shadow-xs hover:opacity-90 transition-opacity"
+                                    style={brandButtonStyle}
                                 >
                                     Continue <ArrowRight className="w-4 h-4 ml-2" />
                                 </Button>
@@ -3229,7 +3608,8 @@ function OnboardingContent() {
                                     type="button"
                                     disabled={isCompleting}
                                     onClick={() => handleCompleteOnboarding("/dashboard")}
-                                    className="h-11 px-7 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black shadow-lg"
+                                    className="h-11 px-7 rounded-xl font-bold shadow-xs hover:opacity-90 transition-opacity"
+                                    style={brandButtonStyle}
                                 >
                                     {isCompleting ? (
                                         <>
@@ -3237,7 +3617,7 @@ function OnboardingContent() {
                                         </>
                                     ) : (
                                         <>
-                                            <Rocket className="w-4 h-4 mr-2" /> Complete Setup & Enter Club
+                                            <Rocket className="w-4 h-4 mr-2" /> Complete Setup &amp; Enter Club
                                         </>
                                     )}
                                 </Button>
@@ -3245,19 +3625,19 @@ function OnboardingContent() {
                         </div>
                     </div>
 
-                    {/* Right Column: Live Split-Screen Interactive Preview (Only on Stages 1 & 2 where Kits/Formation/Venues are configured) */}
+                    {/* Right Column: Crisp Live Preview (Matches Real ClubFlow Matchday Planner & Cards) */}
                     {(stage === 1 || stage === 2) && (
                         <div
                             className={`lg:col-span-5 space-y-4 ${
                                 showMobilePreview ? "block" : "hidden lg:block"
                             }`}
                         >
-                            <div className="sticky top-28 bg-slate-900/80 border border-white/10 rounded-3xl p-5 backdrop-blur-xl shadow-2xl space-y-4">
+                            <div className="sticky top-28 bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-4">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
-                                        <Eye className="w-3.5 h-3.5 text-emerald-400" /> Live Matchday Preview
+                                    <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                                        <Eye className="w-3.5 h-3.5 text-emerald-600" /> Live Matchday Preview
                                     </span>
-                                    <div className="inline-flex self-start sm:self-auto rounded-xl bg-slate-950 p-1 border border-white/10">
+                                    <div className="inline-flex self-start sm:self-auto rounded-lg bg-slate-100 p-0.5 border border-slate-200">
                                         {[
                                             { id: "pitch", label: "Pitch & Kits" },
                                             { id: "dashboard", label: "Next Match" },
@@ -3267,10 +3647,10 @@ function OnboardingContent() {
                                                 key={t.id}
                                                 type="button"
                                                 onClick={() => setPreviewTab(t.id as any)}
-                                                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
+                                                className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
                                                     previewTab === t.id
-                                                        ? "bg-white text-slate-950"
-                                                        : "text-slate-400 hover:text-white"
+                                                        ? "bg-white text-slate-900 shadow-2xs"
+                                                        : "text-slate-600 hover:text-slate-900"
                                                 }`}
                                             >
                                                 {t.label}
@@ -3279,11 +3659,9 @@ function OnboardingContent() {
                                     </div>
                                 </div>
 
-                                {/* PREVIEW 1: INTERACTIVE PITCH & KIT BUILDER */}
                                 {previewTab === "pitch" && (
                                     <div className="space-y-3">
-                                        {/* Header Banner ABOVE Pitch so Striker is never cut off */}
-                                        <div className="flex items-center justify-between bg-slate-950/90 px-3.5 py-2.5 rounded-2xl border border-white/15">
+                                        <div className="flex items-center justify-between bg-slate-50 px-3.5 py-2.5 rounded-xl border border-slate-200">
                                             <div className="flex items-center gap-2.5">
                                                 {logoPreview ? (
                                                     <img
@@ -3292,13 +3670,13 @@ function OnboardingContent() {
                                                         className="w-7 h-7 object-contain"
                                                     />
                                                 ) : (
-                                                    <Shield className="w-5 h-5" style={{ color: primaryColor }} />
+                                                    <Shield className="w-5 h-5" style={{ color: safeBrandAccent }} />
                                                 )}
                                                 <div>
-                                                    <div className="text-xs font-black text-white leading-none">
+                                                    <div className="text-xs font-extrabold text-slate-900 leading-none">
                                                         {clubName || "Your Football Club"}
                                                     </div>
-                                                    <div className="text-[10px] text-emerald-300 mt-0.5 font-semibold">
+                                                    <div className="text-[10px] text-slate-500 mt-0.5 font-semibold">
                                                         {activeFormation.label} •{" "}
                                                         {useMatchdayNumbering ? "1–11 Numbers" : "Squad Numbers"}
                                                     </div>
@@ -3309,23 +3687,31 @@ function OnboardingContent() {
                                                 onClick={() =>
                                                     setActiveKitPreview((k) => (k === "home" ? "away" : "home"))
                                                 }
-                                                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-[10px] font-bold text-white border border-white/15 transition-colors"
+                                                className="px-2.5 py-1 rounded-md bg-white hover:bg-slate-100 text-[10px] font-bold text-slate-800 border border-slate-200 transition-colors cursor-pointer"
                                             >
                                                 {activeKitPreview === "home" ? "Home Kit" : "Away Kit"}
                                             </button>
                                         </div>
 
-                                        <div className="relative rounded-2xl overflow-hidden border border-emerald-500/30 bg-gradient-to-b from-emerald-950 via-emerald-900/90 to-emerald-950 aspect-[4/5] p-4 shadow-inner">
-                                            {/* Pitch Markings */}
-                                            <div className="absolute inset-3 border border-white/20 rounded-xl pointer-events-none" />
-                                            <div className="absolute left-3 right-3 top-1/2 border-t border-white/20 pointer-events-none" />
-                                            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full border border-white/20 pointer-events-none" />
+                                        <div className="relative rounded-xl overflow-hidden border border-emerald-700/30 bg-[#1e6b38] aspect-[4/5] p-4">
+                                            <div
+                                                className="absolute inset-0 opacity-15 pointer-events-none"
+                                                style={{
+                                                    backgroundImage:
+                                                        "repeating-linear-gradient(to bottom, #ffffff 0px, #ffffff 28px, transparent 28px, transparent 56px)",
+                                                }}
+                                            />
+                                            <div className="absolute inset-3 border border-white/45 rounded-lg pointer-events-none" />
+                                            <div className="absolute left-3 right-3 top-1/2 border-t border-white/45 pointer-events-none" />
+                                            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full border border-white/45 pointer-events-none" />
 
-                                            {/* 11 Formation Nodes */}
                                             {activeFormation.coords.map((node, i) => {
                                                 const isGK = node.role === "GK";
                                                 const shirtFill = isGK ? gkKitColor : activeShirt;
-                                                const num = useMatchdayNumbering ? i + 1 : [1, 2, 5, 6, 3, 4, 8, 10, 11, 9, 7][i] || i + 1;
+                                                const shirtText = isLightHex(shirtFill) ? "#0f172a" : "#ffffff";
+                                                const num = useMatchdayNumbering
+                                                    ? i + 1
+                                                    : [1, 2, 5, 6, 3, 4, 8, 10, 11, 9, 7][i] || i + 1;
                                                 return (
                                                     <div
                                                         key={i}
@@ -3333,19 +3719,15 @@ function OnboardingContent() {
                                                         style={{ left: `${node.x}%`, top: `${node.y}%` }}
                                                     >
                                                         <div
-                                                            className="w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black shadow-lg border-2 border-white/80 transition-colors"
+                                                            className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black shadow-md border-2 border-white transition-colors"
                                                             style={{
                                                                 backgroundColor: shirtFill,
-                                                                color:
-                                                                    shirtFill.toLowerCase() === "#ffffff" ||
-                                                                    shirtFill.toLowerCase() === "#eab308"
-                                                                        ? "#0f172a"
-                                                                        : "#ffffff",
+                                                                color: shirtText,
                                                             }}
                                                         >
                                                             {num}
                                                         </div>
-                                                        <span className="mt-0.5 px-1.5 py-0.2 rounded bg-slate-950/85 text-[9px] font-bold text-white border border-white/10">
+                                                        <span className="mt-0.5 px-1.5 py-0.2 rounded bg-slate-900/90 text-[9px] font-bold text-white">
                                                             {node.role}
                                                         </span>
                                                     </div>
@@ -3353,41 +3735,40 @@ function OnboardingContent() {
                                             })}
                                         </div>
 
-                                        {/* Mini Kit Strip Legend */}
                                         <div className="grid grid-cols-3 gap-2 text-center">
-                                            <div className="p-2 rounded-xl bg-slate-950/70 border border-white/10">
+                                            <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
                                                 <div className="flex justify-center gap-1 mb-1">
                                                     <span
-                                                        className="w-3.5 h-3.5 rounded-full border border-white/30"
+                                                        className="w-3.5 h-3.5 rounded-full border border-slate-300"
                                                         style={{ backgroundColor: activeShirt }}
                                                     />
                                                     <span
-                                                        className="w-3.5 h-3.5 rounded-full border border-white/30"
+                                                        className="w-3.5 h-3.5 rounded-full border border-slate-300"
                                                         style={{ backgroundColor: activeShorts }}
                                                     />
                                                     <span
-                                                        className="w-3.5 h-3.5 rounded-full border border-white/30"
+                                                        className="w-3.5 h-3.5 rounded-full border border-slate-300"
                                                         style={{ backgroundColor: activeSocks }}
                                                     />
                                                 </div>
-                                                <div className="text-[10px] font-bold text-slate-300">
+                                                <div className="text-[10px] font-bold text-slate-600">
                                                     {activeKitPreview === "home" ? "Home Strip" : "Away Strip"}
                                                 </div>
                                             </div>
-                                            <div className="p-2 rounded-xl bg-slate-950/70 border border-white/10">
+                                            <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
                                                 <div className="flex justify-center mb-1">
                                                     <span
-                                                        className="w-3.5 h-3.5 rounded-full border border-white/30"
+                                                        className="w-3.5 h-3.5 rounded-full border border-slate-300"
                                                         style={{ backgroundColor: gkKitColor }}
                                                     />
                                                 </div>
-                                                <div className="text-[10px] font-bold text-slate-300">GK Jersey</div>
+                                                <div className="text-[10px] font-bold text-slate-600">GK Jersey</div>
                                             </div>
-                                            <div className="p-2 rounded-xl bg-slate-950/70 border border-white/10">
-                                                <div className="text-xs font-black text-emerald-400">
+                                            <div className="p-2 rounded-lg bg-slate-50 border border-slate-200">
+                                                <div className="text-xs font-black text-slate-900">
                                                     {defaultHomeKickOff}
                                                 </div>
-                                                <div className="text-[10px] font-bold text-slate-300">
+                                                <div className="text-[10px] font-semibold text-slate-500">
                                                     Meet {computedMeetTime}
                                                 </div>
                                             </div>
@@ -3395,89 +3776,78 @@ function OnboardingContent() {
                                     </div>
                                 )}
 
-                                {/* PREVIEW 2: LIVE DASHBOARD NEXT MATCH CARD */}
                                 {previewTab === "dashboard" && (
-                                    <div className="space-y-3">
-                                        <div
-                                            className="p-5 rounded-2xl border border-white/15 space-y-4"
-                                            style={{
-                                                background: `linear-gradient(135deg, ${primaryColor}30 0%, rgba(9,13,22,0.95) 100%)`,
-                                            }}
-                                        >
-                                            <div className="flex items-center justify-between">
-                                                <span className="px-2.5 py-0.5 rounded-full bg-white/10 text-white border border-white/20 font-bold text-[10px]">
-                                                    {defaultCompetition || "Premier Division"}
-                                                </span>
-                                                <span className="text-xs font-bold text-emerald-400">
-                                                    KO {defaultHomeKickOff} (Meet {computedMeetTime})
-                                                </span>
-                                            </div>
+                                    <div className="p-4 rounded-xl border border-slate-200 bg-slate-50 space-y-4">
+                                        <div className="flex items-center justify-between">
+                                            <span className="px-2.5 py-0.5 rounded-full bg-white text-slate-800 border border-slate-200 font-bold text-[10px]">
+                                                {defaultCompetition || "Premier Division"}
+                                            </span>
+                                            <span className="text-xs font-bold text-emerald-700">
+                                                KO {defaultHomeKickOff} (Meet {computedMeetTime})
+                                            </span>
+                                        </div>
 
-                                            <div className="flex items-center justify-between gap-3 py-2">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-12 h-12 rounded-2xl bg-slate-950/80 border border-white/15 flex items-center justify-center overflow-hidden">
-                                                        {logoPreview ? (
-                                                            <img
-                                                                src={logoPreview}
-                                                                alt="Crest"
-                                                                className="w-9 h-9 object-contain"
-                                                            />
-                                                        ) : (
-                                                            <Shield
-                                                                className="w-6 h-6"
-                                                                style={{ color: primaryColor }}
-                                                            />
-                                                        )}
+                                        <div className="flex items-center justify-between gap-3 py-2">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="w-11 h-11 rounded-xl bg-white border border-slate-200 flex items-center justify-center overflow-hidden p-1">
+                                                    {logoPreview ? (
+                                                        <img
+                                                            src={logoPreview}
+                                                            alt="Crest"
+                                                            className="w-8 h-8 object-contain"
+                                                        />
+                                                    ) : (
+                                                        <Shield
+                                                            className="w-5 h-5"
+                                                            style={{ color: safeBrandAccent }}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm font-black text-slate-900">
+                                                        {clubName || "Your Football Club"}
                                                     </div>
-                                                    <div>
-                                                        <div className="text-sm font-black text-white">
-                                                            {clubName || "Your Football Club"}
-                                                        </div>
-                                                        <div className="text-[11px] text-slate-400">
-                                                            {squads[0] || "First Team"} (Home)
-                                                        </div>
+                                                    <div className="text-[11px] text-slate-500">
+                                                        {squads[0] || "First Team"} (Home)
                                                     </div>
                                                 </div>
-                                                <span className="text-xs font-black text-slate-500">VS</span>
-                                                <div className="text-right">
-                                                    <div className="text-sm font-black text-white">Opposition FC</div>
-                                                    <div className="text-[11px] text-slate-400">Saturday Fixture</div>
-                                                </div>
                                             </div>
+                                            <span className="text-xs font-black text-slate-400">VS</span>
+                                            <div className="text-right">
+                                                <div className="text-sm font-black text-slate-900">Opposition FC</div>
+                                                <div className="text-[11px] text-slate-500">Saturday Fixture</div>
+                                            </div>
+                                        </div>
 
-                                            <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] text-slate-300">
-                                                <span className="flex items-center gap-1">
-                                                    <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                                                    {homeGround || "Home Ground"}
-                                                </span>
-                                                <span>{selectedTabs.length} Modules Enabled</span>
-                                            </div>
+                                        <div className="pt-2 border-t border-slate-200 flex items-center justify-between text-[11px] text-slate-600">
+                                            <span className="flex items-center gap-1">
+                                                <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                                                {homeGround || "Home Ground"}
+                                            </span>
+                                            <span>{selectedTabs.length} Pages Active</span>
                                         </div>
                                     </div>
                                 )}
 
-                                {/* PREVIEW 3: WHATSAPP POLL MESSAGE */}
                                 {previewTab === "whatsapp" && (
-                                    <div className="space-y-3">
-                                        <div className="p-4 rounded-2xl bg-[#0b141a] border border-emerald-500/30 space-y-2">
-                                            <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">
-                                                WhatsApp Group Availability Poll Preview
-                                            </div>
-                                            <div className="p-3 rounded-xl bg-[#005c4b] text-white text-xs whitespace-pre-line leading-relaxed shadow">
-                                                {whatsappPollMessage}
-                                                {"\n\n"}⚽ *{clubName || "Club"} vs Opposition FC*
-                                                {"\n"}🏆 {defaultCompetition || "League"}
-                                                {"\n"}📍 {homeGround || "Home Ground"}
-                                                {"\n"}🕜 Meet: {computedMeetTime} | Kick-Off: {defaultHomeKickOff}
-                                            </div>
-                                            <textarea
-                                                value={whatsappPollMessage}
-                                                onChange={(e) => setWhatsappPollMessage(e.target.value)}
-                                                rows={3}
-                                                className="w-full rounded-xl bg-slate-950 border border-white/15 p-2.5 text-xs text-white"
-                                                placeholder="Customize your WhatsApp poll header message..."
-                                            />
+                                    <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2.5">
+                                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600">
+                                            WhatsApp Group Availability Poll Preview
                                         </div>
+                                        <div className="p-3 rounded-xl bg-[#d9fdd3] border border-emerald-200 text-slate-900 text-xs whitespace-pre-line leading-relaxed">
+                                            {whatsappPollMessage}
+                                            {"\n\n"}⚽ *{clubName || "Club"} vs Opposition FC*
+                                            {"\n"}🏆 {defaultCompetition || "League"}
+                                            {"\n"}📍 {homeGround || "Home Ground"}
+                                            {"\n"}🕜 Meet: {computedMeetTime} | Kick-Off: {defaultHomeKickOff}
+                                        </div>
+                                        <textarea
+                                            value={whatsappPollMessage}
+                                            onChange={(e) => setWhatsappPollMessage(e.target.value)}
+                                            rows={3}
+                                            className="w-full rounded-xl bg-white border border-slate-300 p-2.5 text-xs text-slate-900"
+                                            placeholder="Customize your WhatsApp poll header message..."
+                                        />
                                     </div>
                                 )}
                             </div>
@@ -3493,8 +3863,8 @@ export default function OnboardingPage() {
     return (
         <Suspense
             fallback={
-                <div className="min-h-screen bg-[#070A10] text-white flex items-center justify-center">
-                    <Loader2 className="w-6 h-6 animate-spin text-emerald-400" />
+                <div className="min-h-screen bg-[#F8FAFC] text-slate-900 flex items-center justify-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-slate-600" />
                 </div>
             }
         >

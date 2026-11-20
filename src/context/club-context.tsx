@@ -617,15 +617,35 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const primaryHex = settings.primaryColor || "#dc2626";
+    const isLightPrimary = (() => {
+        const clean = primaryHex.replace("#", "");
+        if (clean.length !== 6) return false;
+        const r = parseInt(clean.slice(0, 2), 16);
+        const g = parseInt(clean.slice(2, 4), 16);
+        const b = parseInt(clean.slice(4, 6), 16);
+        if (isNaN(r) || isNaN(g) || isNaN(b)) return false;
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.68;
+    })();
+    const isNearWhitePrimary = (() => {
+        const clean = primaryHex.replace("#", "");
+        if (clean.length !== 6) return false;
+        const r = parseInt(clean.slice(0, 2), 16);
+        const g = parseInt(clean.slice(2, 4), 16);
+        const b = parseInt(clean.slice(4, 6), 16);
+        if (isNaN(r) || isNaN(g) || isNaN(b)) return false;
+        return (0.299 * r + 0.587 * g + 0.114 * b) / 255 > 0.85;
+    })();
+
     return (
         <ClubContext.Provider value={{ settings, isLoaded, updateSettings }}>
             {isMounted && settings.primaryColor && (
                 <style dangerouslySetInnerHTML={{ __html: `
-                    .bg-red-600 { background-color: ${settings.primaryColor} !important; }
-                    .hover\\:bg-red-700:hover { background-color: ${getDarkerColor(settings.primaryColor)} !important; }
-                    .text-red-600, .text-red-500 { color: ${settings.primaryColor} !important; }
-                    .border-red-500, .border-red-600 { border-color: ${settings.primaryColor} !important; }
-                    .focus\\:ring-red-500:focus, .focus-visible\\:ring-red-500:focus-visible { --tw-ring-color: ${settings.primaryColor} !important; }
+                    .bg-red-600 { background-color: ${settings.primaryColor} !important; color: ${isLightPrimary ? "#0f172a" : "#ffffff"} !important; ${isNearWhitePrimary ? "border: 1px solid #cbd5e1 !important;" : ""} }
+                    .hover\\:bg-red-700:hover { background-color: ${getDarkerColor(settings.primaryColor, isNearWhitePrimary ? 8 : 15)} !important; color: ${isLightPrimary ? "#0f172a" : "#ffffff"} !important; }
+                    .text-red-600, .text-red-500 { color: ${isNearWhitePrimary ? "#0f172a" : settings.primaryColor} !important; }
+                    .border-red-500, .border-red-600 { border-color: ${isNearWhitePrimary ? "#94a3b8" : settings.primaryColor} !important; }
+                    .focus\\:ring-red-500:focus, .focus-visible\\:ring-red-500:focus-visible { --tw-ring-color: ${isNearWhitePrimary ? "#64748b" : settings.primaryColor} !important; }
                     .shadow-red-900\\/50 { --tw-shadow-color: ${settings.primaryColor}40 !important; }
                 `}} />
             )}
