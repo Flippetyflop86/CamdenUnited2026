@@ -42,7 +42,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         cleanPath?.startsWith("/checkin") ||
         cleanPath?.startsWith("/match-checkin") ||
         cleanPath?.startsWith("/respond") ||
-        cleanPath?.startsWith("/pay");
+        cleanPath?.startsWith("/pay") ||
+        cleanPath?.startsWith("/squad-onboarding");
     const isLegalPage = cleanPath === "/privacy" || cleanPath === "/terms";
     const isAuthPage = ["/login", "/signup", "/reset-password", "/update-password", "/join", "/signup/player"].includes(cleanPath);
     const isOnboardingPage = cleanPath === "/onboarding";

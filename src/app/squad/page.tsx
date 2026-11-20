@@ -51,7 +51,7 @@ import { PageSection } from "@/components/layout/page-section";
 import { SectionHeader } from "@/components/ui/section-header";
 import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
 import imageCompression from "browser-image-compression";
-import { UploadCloud, Loader2 } from "lucide-react";
+import { UploadCloud, Loader2, Share2 } from "lucide-react";
 import { logActivity } from "@/lib/activity";
 import { useSearchParams, useRouter } from "next/navigation";
 import Papa from "papaparse";
@@ -138,7 +138,24 @@ export default function SquadPage() {
     // CSV Import and Bulk Invite Hooks/Handlers
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isBulkInviting, setIsBulkInviting] = useState(false);
+    const [copiedSelfFillLink, setCopiedSelfFillLink] = useState(false);
     const [csvFeedbackBanner, setCsvFeedbackBanner] = useState<{ type: "success" | "error"; message: string } | null>(null);
+
+    const handleCopySquadSelfFillLink = () => {
+        if (!clubId || typeof window === "undefined") return;
+        const url = `${window.location.origin}/squad-onboarding/${clubId}`;
+        const msg = `📋 *${settings.name || "Club"} — 15-Second Squad Details*\nTap the link below, pick your name, and pop in your position, shirt # & email for matchday and subs updates:\n${url}`;
+        navigator.clipboard.writeText(msg).catch(() => {});
+        setCopiedSelfFillLink(true);
+        setCsvFeedbackBanner({
+            type: "success",
+            message: "Copied WhatsApp Player Self-Fill Link! Paste it into your squad group chat.",
+        });
+        setTimeout(() => {
+            setCopiedSelfFillLink(false);
+            setCsvFeedbackBanner(null);
+        }, 4000);
+    };
 
     const resolveCsvRowPlayer = (rawRow: Record<string, any>) => {
         const lowerMap: Record<string, string> = {};
@@ -763,10 +780,37 @@ export default function SquadPage() {
                 parseCards(m.red_cards, 'red');
             });
 
+            const todayIso = new Date().toISOString().split("T")[0];
+            const autoHealedReturnPlayers: { id: string; cleanedNotes: string }[] = [];
+
             const formattedPlayers: Player[] = dbPlayers.map((p: any) => {
                 const s = playerStats.get(p.id) || { apps: 0, starts: 0, subApps: 0, goals: 0, assists: 0, yellow: 0, red: 0, minutes: 0, wins: 0, draws: 0, losses: 0 };
                 const winRate = s.apps > 0 ? Math.round((s.wins / s.apps) * 100) : 0;
                 const dep = parsePlayerDeparture(p);
+                const rawReturnDate = p.notes && p.notes.match(/\[RETURN_DATE:([^\]]+)\]/)
+                    ? p.notes.match(/\[RETURN_DATE:([^\]]+)\]/)![1].trim()
+                    : undefined;
+                let effectiveMedStatus = p.medical_status as MedicalStatus;
+                let effectiveAvailability = p.availability;
+                let effectiveNotes = p.notes || "";
+                if (!dep.isFormer) {
+                    const injuryExpired =
+                        (effectiveMedStatus === "Injured" || effectiveMedStatus === "Doubtful") &&
+                        Boolean(rawReturnDate && rawReturnDate <= todayIso);
+                    const holidayExpired =
+                        effectiveMedStatus === "Holiday" &&
+                        Boolean(p.holiday_end && String(p.holiday_end).slice(0, 10) < todayIso);
+                    if (injuryExpired || holidayExpired) {
+                        effectiveMedStatus = "Available";
+                        effectiveAvailability = true;
+                        effectiveNotes = effectiveNotes
+                            .replace(/\[RETURN_DATE:[^\]]*\]\s*/g, "")
+                            .replace(/\[INJURY:[^\]]*\]\s*/g, "")
+                            .replace(/\[OUT_DURATION:[^\]]*\]\s*/g, "")
+                            .trim();
+                        autoHealedReturnPlayers.push({ id: p.id, cleanedNotes: effectiveNotes });
+                    }
+                }
 
                 return {
                     id: p.id,
@@ -778,8 +822,8 @@ export default function SquadPage() {
                     age: p.age,
                     nationality: p.nationality,
                     squad: p.squad as SquadType,
-                    medicalStatus: p.medical_status as any,
-                    availability: p.availability,
+                    medicalStatus: effectiveMedStatus as any,
+                    availability: effectiveAvailability,
                     contractExpiry: p.contract_expiry,
                     imageUrl: p.image_url,
                     appearances: s.apps,
@@ -803,7 +847,8 @@ export default function SquadPage() {
                     loanClub: p.notes && p.notes.match(/\[LOAN_CLUB:([^\]]+)\]/) ? p.notes.match(/\[LOAN_CLUB:([^\]]+)\]/)![1] : undefined,
                     loanEndDate: p.notes && p.notes.match(/\[LOAN_END:([^\]]+)\]/) ? p.notes.match(/\[LOAN_END:([^\]]+)\]/)![1] : undefined,
                     injuryType: p.notes && p.notes.match(/\[INJURY:(.*?)\]/) ? p.notes.match(/\[INJURY:(.*?)\]/)![1] : undefined,
-                    injuryDuration: p.notes && p.notes.match(/\[OUT_DURATION:(.*?)\]/) ? p.notes.match(/\[OUT_DURATION:(.*?)\]/)![1] : undefined,
+                    injuryDuration: effectiveNotes && effectiveNotes.match(/\[OUT_DURATION:(.*?)\]/) ? effectiveNotes.match(/\[OUT_DURATION:(.*?)\]/)![1] : undefined,
+                    injuryReturnDate: effectiveMedStatus === "Injured" || effectiveMedStatus === "Doubtful" ? rawReturnDate : undefined,
                     suspensionReason: p.notes && p.notes.match(/\[SUSPENSION_REASON:(.*?)\]/) ? p.notes.match(/\[SUSPENSION_REASON:(.*?)\]/)![1] : undefined,
                     suspensionDuration: p.notes && p.notes.match(/\[SUSPENSION_DURATION:(.*?)\]/) ? p.notes.match(/\[SUSPENSION_DURATION:(.*?)\]/)![1] : undefined,
                     isInTrainingSquad: p.is_in_training_squad,
@@ -824,6 +869,22 @@ export default function SquadPage() {
                     departureNotes: dep.departureNotes,
                 };
             });
+
+            if (autoHealedReturnPlayers.length > 0) {
+                autoHealedReturnPlayers.forEach((item) => {
+                    supabase
+                        .from("players")
+                        .update({
+                            medical_status: "Available",
+                            availability: true,
+                            notes: item.cleanedNotes,
+                            holiday_start: null,
+                            holiday_end: null,
+                        })
+                        .eq("id", item.id)
+                        .then(() => {});
+                });
+            }
 
             setPlayers(formattedPlayers);
             hasLoaded.current = true;
@@ -1355,6 +1416,7 @@ export default function SquadPage() {
         cleanedNotes = cleanedNotes.replace(/\[LOAN_END:[^\]]*\]/g, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[INJURY:.*?\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[OUT_DURATION:.*?\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[RETURN_DATE:[^\]]*\]/g, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[SUSPENSION_REASON:.*?\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[SUSPENSION_DURATION:.*?\]/, "").trim();
 
@@ -1402,6 +1464,7 @@ export default function SquadPage() {
         cleanedNotes = cleanedNotes.replace(/\[LOAN_END:[^\]]*\]/g, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[INJURY:.*?\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[OUT_DURATION:.*?\]/, "").trim();
+        cleanedNotes = cleanedNotes.replace(/\[RETURN_DATE:[^\]]*\]/g, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[SUSPENSION_REASON:.*?\]/, "").trim();
         cleanedNotes = cleanedNotes.replace(/\[SUSPENSION_DURATION:.*?\]/, "").trim();
         
@@ -1431,6 +1494,7 @@ export default function SquadPage() {
         if (updatedPlayer.medicalStatus === "Injured" || updatedPlayer.medicalStatus === "Doubtful") {
             if (updatedPlayer.injuryType) finalNotes = `${finalNotes} [INJURY:${updatedPlayer.injuryType}]`.trim();
             if (updatedPlayer.injuryDuration) finalNotes = `${finalNotes} [OUT_DURATION:${updatedPlayer.injuryDuration}]`.trim();
+            if (updatedPlayer.injuryReturnDate) finalNotes = `${finalNotes} [RETURN_DATE:${updatedPlayer.injuryReturnDate.trim()}]`.trim();
         }
         if (updatedPlayer.medicalStatus === "Suspended") {
             if (updatedPlayer.suspensionReason) finalNotes = `${finalNotes} [SUSPENSION_REASON:${updatedPlayer.suspensionReason}]`.trim();
@@ -1632,7 +1696,14 @@ export default function SquadPage() {
         let statusSubLabel = "";
         if (!isFormer) {
             if (player.medicalStatus === "Injured" || player.medicalStatus === "Doubtful") {
-                statusSubLabel = [player.injuryType, player.injuryDuration].filter(Boolean).join(" • ");
+                statusSubLabel = [
+                    player.injuryType,
+                    player.injuryReturnDate
+                        ? `Back ${new Date(player.injuryReturnDate + "T00:00:00").toLocaleDateString("en-GB", { day: "numeric", month: "short" })}`
+                        : player.injuryDuration,
+                ]
+                    .filter(Boolean)
+                    .join(" • ");
             } else if (player.medicalStatus === "Holiday" && player.holidayEnd) {
                 const parsedEnd = new Date(player.holidayEnd + "T00:00:00");
                 statusSubLabel = !isNaN(parsedEnd.getTime())
@@ -1962,6 +2033,29 @@ export default function SquadPage() {
                         </div>
                     </div>
 
+                    {/* Quick WhatsApp Player Self-Fill Link Banner */}
+                    <button
+                        type="button"
+                        onClick={handleCopySquadSelfFillLink}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-bold active:scale-[0.99] transition-all"
+                    >
+                        <span className="inline-flex items-center gap-1.5 truncate">
+                            {copiedSelfFillLink ? (
+                                <Check className="w-3.5 h-3.5 shrink-0" />
+                            ) : (
+                                <Share2 className="w-3.5 h-3.5 shrink-0" />
+                            )}
+                            <span className="truncate">
+                                {copiedSelfFillLink
+                                    ? "Copied! Paste into Players' WhatsApp Group ✓"
+                                    : "Player Self-Fill Link (WhatsApp Squad Setup)"}
+                            </span>
+                        </span>
+                        <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/15 shrink-0">
+                            {copiedSelfFillLink ? "Copied" : "Copy"}
+                        </span>
+                    </button>
+
                     {/* 2. Squad Tabs Strip */}
                     <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4 pt-0.5">
                         <button
@@ -2225,6 +2319,24 @@ export default function SquadPage() {
                     className="text-xs h-9 shadow-sm"
                 >
                     Import CSV
+                </Button>
+                <Button
+                    variant="outline"
+                    onClick={handleCopySquadSelfFillLink}
+                    className="text-xs h-9 shadow-sm gap-1.5"
+                    title="Copy one link for your players' WhatsApp group so players fill in their own position, shirt # & email"
+                >
+                    {copiedSelfFillLink ? (
+                        <>
+                            <Check className="w-3.5 h-3.5 text-emerald-500" />
+                            <span>Copied Link ✓</span>
+                        </>
+                    ) : (
+                        <>
+                            <Share2 className="w-3.5 h-3.5 text-emerald-600" />
+                            <span>Player Self-Fill Link</span>
+                        </>
+                    )}
                 </Button>
                 <input type="file" ref={fileInputRef} onChange={handleCSVImport} accept=".csv" className="hidden" />
                 <Button onClick={() => setIsManageSquadsOpen(true)} variant="outline" size="icon" className="h-9 w-9 shadow-sm">
@@ -3343,6 +3455,17 @@ export default function SquadPage() {
                                             onChange={(e) => setEditingPlayer({ ...editingPlayer, injuryType: e.target.value })}
                                             placeholder="e.g. Hamstring Tear"
                                             className="h-8 text-sm bg-white"
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <label className="block text-xs font-medium text-slate-600">
+                                            Expected Return Date (Auto-Clears to Available)
+                                        </label>
+                                        <Input
+                                            type="date"
+                                            value={editingPlayer.injuryReturnDate || ""}
+                                            onChange={(e) => setEditingPlayer({ ...editingPlayer, injuryReturnDate: e.target.value })}
+                                            className="h-8 text-xs bg-white"
                                         />
                                     </div>
                                     <div className="space-y-1">

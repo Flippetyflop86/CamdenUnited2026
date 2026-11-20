@@ -68,6 +68,7 @@ export interface Player {
     loanEndDate?: string; // YYYY-MM-DD
     injuryType?: string;
     injuryDuration?: string;
+    injuryReturnDate?: string; // YYYY-MM-DD (auto-clears back to Available on/after this date)
     suspensionReason?: string;
     suspensionDuration?: string;
 

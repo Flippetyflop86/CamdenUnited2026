@@ -4,6 +4,10 @@
     {
       "path": "/api/cron/payment-reminders",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/league-sync",
+      "schedule": "30 17 * * *"
     }
   ]
 }

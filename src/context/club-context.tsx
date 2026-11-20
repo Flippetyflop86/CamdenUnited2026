@@ -368,6 +368,84 @@ export function ClubProvider({ children }: { children: React.ReactNode }) {
         fetchSettings();
     }, [user, clubId, authLoading]);
 
+    // Automatic background League & Fixture Sync (#22) — ensures fresh Saturday 5:30 PM standings/results & clears expired injury return dates
+    useEffect(() => {
+        if (!isLoaded || !user || !clubId || !settings.leagueUrl || typeof window === "undefined") {
+            return;
+        }
+
+        const syncGuardKey = `clubflow_auto_league_sync_${clubId}`;
+        if (sessionStorage.getItem(syncGuardKey)) {
+            return;
+        }
+
+        const lastUpdatedIso =
+            settings.lastImportHistory?.updatedAt ||
+            settings.lastImportHistory?.lastSyncedAt ||
+            null;
+        const lastUpdatedMs = lastUpdatedIso ? new Date(lastUpdatedIso).getTime() : 0;
+        const now = new Date();
+        const isOver12HoursOld = !lastUpdatedMs || now.getTime() - lastUpdatedMs > 12 * 60 * 60 * 1000;
+
+        // Saturday >= 17:30 local time check (results typically published by 5:30 PM Saturday)
+        const isSaturdayAfter530 =
+            now.getDay() === 6 &&
+            (now.getHours() > 17 || (now.getHours() === 17 && now.getMinutes() >= 30));
+        const saturday530Cutoff = new Date(now);
+        saturday530Cutoff.setHours(17, 30, 0, 0);
+        const needsSaturday530Sync =
+            isSaturdayAfter530 && lastUpdatedMs < saturday530Cutoff.getTime();
+
+        if (!isOver12HoursOld && !needsSaturday530Sync) {
+            return;
+        }
+
+        sessionStorage.setItem(syncGuardKey, now.toISOString());
+
+        (async () => {
+            try {
+                const {
+                    data: { session },
+                } = await unproxiedSupabase.auth.getSession();
+                const token = session?.access_token;
+                if (!token) return;
+
+                const res = await fetch("/api/cron/league-sync", {
+                    method: "POST",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
+                if (!res.ok) return;
+
+                const { data: refreshed } = await unproxiedSupabase
+                    .from("clubs")
+                    .select("league_position, last_import_history")
+                    .eq("id", clubId)
+                    .maybeSingle();
+
+                if (refreshed) {
+                    setSettings((prev) => {
+                        const next: ClubSettings = {
+                            ...prev,
+                            leaguePosition: refreshed.league_position || prev.leaguePosition,
+                            lastImportHistory: refreshed.last_import_history || prev.lastImportHistory,
+                        };
+                        try {
+                            localStorage.setItem(
+                                `clubflow_cache_clubSettings_${clubId}`,
+                                JSON.stringify(next)
+                            );
+                        } catch {}
+                        return next;
+                    });
+                }
+            } catch {
+                // Silent background refresh; never disrupt the user's session
+            }
+        })();
+    }, [isLoaded, user, clubId, settings.leagueUrl, settings.lastImportHistory]);
+
     const updateSettings = async (newSettings: Partial<ClubSettings>, pagePermissions?: string[]) => {
         if (newSettings.measurementUnit && typeof window !== "undefined") {
             const unitKey = clubId ? `clubflow_measurement_unit_${clubId}` : "clubflow_measurement_unit";
