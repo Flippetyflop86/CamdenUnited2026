@@ -141,6 +141,110 @@ const FAQ_ITEMS = [
 ];
 
 /**
+ * Realistic Modern iPhone Titanium Frame with Dynamic Island, Status Bar, Side Buttons & Home Indicator
+ */
+function RealisticPhoneMockup({
+    activeBottomTab,
+    title,
+    subtitle,
+    children,
+}: {
+    activeBottomTab: "home" | "xi" | "training";
+    title: string;
+    subtitle: string;
+    children: React.ReactNode;
+}) {
+    return (
+        <div className="flex flex-col items-center">
+            {/* Outer Hardware Wrapper with Physical Side Buttons */}
+            <div className="relative w-[294px] h-[600px] select-none">
+                {/* Left Side Buttons: Silent/Action + Volume Up + Volume Down */}
+                <div className="absolute -left-[3px] top-[106px] w-[3px] h-6 rounded-l-sm bg-gradient-to-b from-neutral-500 to-neutral-700" />
+                <div className="absolute -left-[3px] top-[148px] w-[3px] h-11 rounded-l-sm bg-gradient-to-b from-neutral-500 to-neutral-700" />
+                <div className="absolute -left-[3px] top-[202px] w-[3px] h-11 rounded-l-sm bg-gradient-to-b from-neutral-500 to-neutral-700" />
+                {/* Right Side Button: Power / Lock */}
+                <div className="absolute -right-[3px] top-[166px] w-[3px] h-16 rounded-r-sm bg-gradient-to-b from-neutral-500 to-neutral-700" />
+
+                {/* Brushed Titanium Frame */}
+                <div className="w-full h-full rounded-[50px] p-[3px] bg-gradient-to-b from-[#4a505e] via-[#262a34] to-[#181b22] shadow-[0_30px_70px_-15px_rgba(0,0,0,0.9)]">
+                    {/* Inner Black Glass Bezel */}
+                    <div className="w-full h-full rounded-[47px] bg-[#050507] p-[9px] flex flex-col ring-1 ring-white/10">
+                        {/* Rounded OLED Screen */}
+                        <div className="w-full h-full rounded-[39px] overflow-hidden bg-[#FCFCFD] text-neutral-900 flex flex-col justify-between relative">
+                            {/* Top iOS Status Bar + Dynamic Island */}
+                            <div className="bg-[#171717] text-white pt-2.5 pb-1.5 px-5 flex items-center justify-between shrink-0">
+                                <span className="text-[11px] font-semibold tracking-tight w-10">9:41</span>
+
+                                {/* Dynamic Island */}
+                                <div className="w-[82px] h-[22px] rounded-full bg-black border border-white/[0.06] flex items-center justify-end pr-2 shadow-inner">
+                                    <span className="w-2.5 h-2.5 rounded-full bg-[#0f172a] ring-1 ring-indigo-400/25 flex items-center justify-center">
+                                        <span className="w-1 h-1 rounded-full bg-sky-400/40" />
+                                    </span>
+                                </div>
+
+                                {/* Cellular + Wi-Fi + Battery */}
+                                <div className="flex items-center justify-end gap-1 w-10">
+                                    <div className="flex items-end gap-[1.5px] h-2.5">
+                                        <span className="w-[2px] h-[3px] bg-white rounded-[0.5px]" />
+                                        <span className="w-[2px] h-[5px] bg-white rounded-[0.5px]" />
+                                        <span className="w-[2px] h-[7px] bg-white rounded-[0.5px]" />
+                                        <span className="w-[2px] h-[9px] bg-white rounded-[0.5px]" />
+                                    </div>
+                                    <svg className="w-3 h-3 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 18c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2zm-4.9-2.3l1.4 1.4C9.5 16.4 10.7 16 12 16s2.5.4 3.5 1.1l1.4-1.4C15.6 14.6 13.9 14 12 14s-3.6.6-4.9 1.7zm-2.8-2.8l1.4 1.4C7.3 13 9.5 12 12 12s4.7 1 6.3 2.3l1.4-1.4C17.7 11.1 15 10 12 10s-5.7 1.1-7.7 2.9z" />
+                                    </svg>
+                                    <div className="flex items-center">
+                                        <div className="w-[16px] h-[9px] rounded-[2.5px] border border-white/75 p-[1px] flex items-center">
+                                            <div className="w-full h-full bg-white rounded-[1px]" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Main App Body */}
+                            <div className="flex-1 flex flex-col min-h-0 overflow-hidden bg-[#F6F7F9]">
+                                {children}
+                            </div>
+
+                            {/* Bottom Mobile App Tab Bar + iOS Home Indicator */}
+                            <div className="bg-white border-t border-neutral-200 pt-1.5 pb-2 px-4 shrink-0">
+                                <div className="grid grid-cols-4 text-center text-[8px] font-bold">
+                                    <div className={activeBottomTab === "home" ? "text-red-600" : "text-neutral-400"}>
+                                        <LayoutDashboard className="w-3.5 h-3.5 mx-auto mb-0.5" />
+                                        <span>Club</span>
+                                    </div>
+                                    <div className={activeBottomTab === "xi" ? "text-red-600" : "text-neutral-400"}>
+                                        <Shirt className="w-3.5 h-3.5 mx-auto mb-0.5" />
+                                        <span>Match XI</span>
+                                    </div>
+                                    <div className={activeBottomTab === "training" ? "text-red-600" : "text-neutral-400"}>
+                                        <ClipboardCheck className="w-3.5 h-3.5 mx-auto mb-0.5" />
+                                        <span>Training</span>
+                                    </div>
+                                    <div className="text-neutral-400">
+                                        <CreditCard className="w-3.5 h-3.5 mx-auto mb-0.5" />
+                                        <span>Subs</span>
+                                    </div>
+                                </div>
+                                <div className="mt-2 flex justify-center">
+                                    <div className="w-28 h-[4px] rounded-full bg-neutral-900/85" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* External Caption Below Phone */}
+            <div className="mt-5 text-center">
+                <div className="text-sm font-bold text-white">{title}</div>
+                <div className="text-xs text-neutral-400 mt-0.5">{subtitle}</div>
+            </div>
+        </div>
+    );
+}
+
+/**
  * Exact SVG Jersey & Name Pill matching src/app/matchday-xi/page.tsx
  */
 function PitchJerseyNode({
@@ -2784,279 +2888,328 @@ export default function LandingPage() {
                         </p>
                     </div>
 
-                    {/* 3 Full-Scale Mobile Screens Matching AppShell */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start justify-items-center">
+                    {/* 3 Realistic iPhone Mockups */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-10 lg:gap-8 items-start justify-items-center">
                         {/* PHONE 1: Mobile Dashboard */}
-                        <div className="w-full max-w-[330px] rounded-[36px] p-3 bg-[#161922] border-2 border-white/15 shadow-2xl">
-                            <div className="rounded-[26px] overflow-hidden bg-[#FCFCFD] text-neutral-900 border border-neutral-200">
-                                {/* Mobile AppShell Top Bar (#171717) */}
-                                <div className="h-12 bg-[#171717] text-white px-3.5 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded bg-red-600 font-black text-[10px] flex items-center justify-center">
-                                            NU
-                                        </div>
-                                        <span className="font-bold text-xs">Northbrook United</span>
+                        <RealisticPhoneMockup
+                            activeBottomTab="home"
+                            title="Club Dashboard"
+                            subtitle="Form, splits, next fixture & live subs"
+                        >
+                            <div className="h-10 bg-[#171717] text-white px-3.5 flex items-center justify-between border-t border-white/[0.06] shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-5 h-5 rounded bg-red-600 font-black text-[9px] flex items-center justify-center">
+                                        NU
                                     </div>
-                                    <Menu className="w-4 h-4 text-neutral-400" />
+                                    <span className="font-bold text-xs">Northbrook United</span>
+                                </div>
+                                <Menu className="w-4 h-4 text-neutral-400" />
+                            </div>
+
+                            <div className="p-3 space-y-2.5 flex-1">
+                                {/* Rank & Form */}
+                                <div className="bg-white rounded-xl p-2.5 border border-neutral-200/90 shadow-2xs">
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-[11px] font-black text-neutral-900">
+                                            Premier Division
+                                        </span>
+                                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-amber-50 text-amber-800 border border-amber-200">
+                                            #1st (35 Pts)
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center gap-1 mt-1.5">
+                                        <span className="text-[8px] font-bold text-neutral-400 uppercase mr-1">
+                                            Form:
+                                        </span>
+                                        {["W", "W", "D", "W", "W"].map((r, i) => (
+                                            <span
+                                                key={i}
+                                                className={`w-4 h-4 rounded text-[8px] font-black text-white flex items-center justify-center ${
+                                                    r === "W" ? "bg-emerald-500" : "bg-amber-400"
+                                                }`}
+                                            >
+                                                {r}
+                                            </span>
+                                        ))}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-1.5 mt-2 pt-2 border-t border-neutral-100 text-[9px]">
+                                        <div className="bg-neutral-50 p-1.5 rounded border border-neutral-200/70">
+                                            <div className="text-neutral-400 font-bold text-[7px] uppercase">
+                                                Home Split
+                                            </div>
+                                            <div className="font-black text-neutral-900">
+                                                6W-1D-0L • 2.71
+                                            </div>
+                                        </div>
+                                        <div className="bg-neutral-50 p-1.5 rounded border border-neutral-200/70">
+                                            <div className="text-neutral-400 font-bold text-[7px] uppercase">
+                                                Away Split
+                                            </div>
+                                            <div className="font-black text-neutral-900">
+                                                5W-1D-1L • 2.29
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="p-3.5 space-y-3">
-                                    {/* Rank & Form */}
-                                    <div className="bg-white rounded-xl p-3 border border-neutral-200 shadow-2xs">
-                                        <div className="flex items-center justify-between">
-                                            <span className="text-xs font-black text-neutral-900">
-                                                Premier Division
-                                            </span>
-                                            <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-50 text-amber-800 border border-amber-200">
-                                                #1st (35 Pts)
-                                            </span>
-                                        </div>
-                                        <div className="flex items-center gap-1 mt-2">
-                                            <span className="text-[9px] font-bold text-neutral-400 uppercase mr-1">
-                                                Form:
-                                            </span>
-                                            {["W", "W", "D", "W", "W"].map((r, i) => (
-                                                <span
-                                                    key={i}
-                                                    className={`w-4 h-4 rounded text-[8px] font-black text-white flex items-center justify-center ${
-                                                        r === "W" ? "bg-emerald-500" : "bg-amber-400"
-                                                    }`}
-                                                >
-                                                    {r}
-                                                </span>
-                                            ))}
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-1.5 mt-2.5 pt-2 border-t border-neutral-100 text-[10px]">
-                                            <div className="bg-neutral-50 p-1.5 rounded border border-neutral-200/70">
-                                                <div className="text-neutral-400 font-bold text-[8px] uppercase">
-                                                    Home Split
-                                                </div>
-                                                <div className="font-black text-neutral-900">
-                                                    6W-1D-0L • 2.71 PPG
-                                                </div>
-                                            </div>
-                                            <div className="bg-neutral-50 p-1.5 rounded border border-neutral-200/70">
-                                                <div className="text-neutral-400 font-bold text-[8px] uppercase">
-                                                    Away Split
-                                                </div>
-                                                <div className="font-black text-neutral-900">
-                                                    5W-1D-1L • 2.29 PPG
-                                                </div>
-                                            </div>
-                                        </div>
+                                {/* Next Match Mobile Card */}
+                                <div className="bg-white rounded-xl p-2.5 border border-neutral-200/90 shadow-2xs">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-[8px] font-black uppercase text-neutral-400">
+                                            Next Match • Saturday
+                                        </span>
+                                        <span className="px-1.5 py-0.2 rounded text-[8px] font-black bg-emerald-50 text-emerald-700">
+                                            HOME • 4G
+                                        </span>
                                     </div>
+                                    <div className="text-xs font-black text-neutral-900">
+                                        vs Kingswood Rovers (#2nd)
+                                    </div>
+                                    <div className="text-[9px] text-neutral-500 mt-0.5">
+                                        KO 15:00 • Meet 14:00 • Northbrook Ground
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-1.5 mt-2">
+                                        <span className="py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold text-[9px] text-center border border-emerald-200">
+                                            WhatsApp Copy
+                                        </span>
+                                        <span className="py-1.5 rounded-lg bg-red-600 text-white font-bold text-[9px] text-center">
+                                            Matchday XI
+                                        </span>
+                                    </div>
+                                </div>
 
-                                    {/* Next Match Mobile Card */}
-                                    <div className="bg-white rounded-xl p-3 border border-neutral-200 shadow-2xs">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <span className="text-[9px] font-black uppercase text-neutral-400">
-                                                Next Match • 3 Days
-                                            </span>
-                                            <span className="px-1.5 py-0.2 rounded text-[9px] font-black bg-emerald-50 text-emerald-700">
-                                                HOME
-                                            </span>
-                                        </div>
-                                        <div className="text-xs font-black text-neutral-900">
-                                            vs Kingswood Rovers (#2nd)
-                                        </div>
-                                        <div className="text-[10px] text-neutral-500 mt-0.5">
-                                            Sat 14 Nov • 14:00 • Northbrook Ground
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-1.5 mt-2.5">
-                                            <span className="py-1.5 rounded-lg bg-emerald-50 text-emerald-700 font-bold text-[10px] text-center border border-emerald-200">
-                                                WhatsApp Copy
-                                            </span>
-                                            <span className="py-1.5 rounded-lg bg-red-600 text-white font-bold text-[10px] text-center">
-                                                Matchday Planner
-                                            </span>
-                                        </div>
+                                {/* Squad Leaders & Subs Snapshot */}
+                                <div className="bg-white rounded-xl p-2.5 border border-neutral-200/90 shadow-2xs space-y-1.5">
+                                    <div className="flex items-center justify-between text-[8px] font-black uppercase text-neutral-400">
+                                        <span>Season Leaders</span>
+                                        <span className="text-emerald-600">14 Games</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[10px]">
+                                        <span className="font-bold text-neutral-800">⚽ M. Vance</span>
+                                        <span className="font-black text-emerald-700">14 Goals</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[10px]">
+                                        <span className="font-bold text-neutral-800">👟 D. Sterling</span>
+                                        <span className="font-black text-sky-700">11 Assists</span>
+                                    </div>
+                                    <div className="pt-1.5 border-t border-neutral-100 flex items-center justify-between text-[9px]">
+                                        <span className="font-semibold text-neutral-500">Match Subs</span>
+                                        <span className="px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 font-bold">
+                                            14 / 16 Paid
+                                        </span>
                                     </div>
                                 </div>
                             </div>
-                            <div className="mt-3 text-center">
-                                <div className="text-xs font-bold text-white">Mobile Club Dashboard</div>
-                                <div className="text-[11px] text-neutral-400">
-                                    Form, splits, next fixture & WhatsApp copy
-                                </div>
-                            </div>
-                        </div>
+                        </RealisticPhoneMockup>
 
                         {/* PHONE 2: Mobile Matchday Planner */}
-                        <div className="w-full max-w-[330px] rounded-[36px] p-3 bg-[#161922] border-2 border-white/15 shadow-2xl">
-                            <div className="rounded-[26px] overflow-hidden bg-[#FCFCFD] text-neutral-900 border border-neutral-200">
-                                <div className="h-12 bg-[#171717] text-white px-3.5 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <Shirt className="w-4 h-4 text-red-500" />
-                                        <span className="font-bold text-xs">Matchday Planner</span>
+                        <RealisticPhoneMockup
+                            activeBottomTab="xi"
+                            title="Matchday Planner"
+                            subtitle="Starting XI, bench & 1-tap WhatsApp export"
+                        >
+                            <div className="h-10 bg-[#171717] text-white px-3.5 flex items-center justify-between border-t border-white/[0.06] shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <Shirt className="w-3.5 h-3.5 text-red-500" />
+                                    <span className="font-bold text-xs">Matchday Planner</span>
+                                </div>
+                                <span className="px-2 py-0.5 rounded bg-red-600 text-[9px] font-bold">
+                                    4-3-3
+                                </span>
+                            </div>
+
+                            <div className="p-2.5 space-y-2 flex-1 flex flex-col justify-between">
+                                <div className="h-[248px] w-full">
+                                    <RealisticPitchMarkings>
+                                        <PitchJerseyNode
+                                            x={50}
+                                            y={88}
+                                            number={1}
+                                            name="J. Mercer"
+                                            kitColor="#10b981"
+                                            compact
+                                        />
+                                        <PitchJerseyNode
+                                            x={17}
+                                            y={70}
+                                            number={3}
+                                            name="A. Clarke"
+                                            compact
+                                        />
+                                        <PitchJerseyNode
+                                            x={38}
+                                            y={73}
+                                            number={5}
+                                            name="D. Foster"
+                                            isCaptain
+                                            compact
+                                        />
+                                        <PitchJerseyNode
+                                            x={62}
+                                            y={73}
+                                            number={6}
+                                            name="R. Bennett"
+                                            compact
+                                        />
+                                        <PitchJerseyNode
+                                            x={83}
+                                            y={70}
+                                            number={2}
+                                            name="L. Reid"
+                                            compact
+                                        />
+                                        <PitchJerseyNode
+                                            x={50}
+                                            y={53}
+                                            number={4}
+                                            name="T. Hughes"
+                                            compact
+                                        />
+                                        <PitchJerseyNode
+                                            x={28}
+                                            y={42}
+                                            number={8}
+                                            name="C. Gallagher"
+                                            compact
+                                        />
+                                        <PitchJerseyNode
+                                            x={72}
+                                            y={42}
+                                            number={10}
+                                            name="D. Sterling"
+                                            compact
+                                        />
+                                        <PitchJerseyNode
+                                            x={20}
+                                            y={19}
+                                            number={11}
+                                            name="E. Brooks"
+                                            compact
+                                        />
+                                        <PitchJerseyNode
+                                            x={50}
+                                            y={14}
+                                            number={9}
+                                            name="M. Vance"
+                                            compact
+                                        />
+                                        <PitchJerseyNode
+                                            x={80}
+                                            y={19}
+                                            number={7}
+                                            name="O. Grant"
+                                            compact
+                                        />
+                                    </RealisticPitchMarkings>
+                                </div>
+
+                                <div className="bg-white rounded-xl p-2.5 border border-neutral-200/90 text-[10px] space-y-1.5">
+                                    <div className="flex items-center justify-between">
+                                        <span className="font-black text-neutral-900 uppercase text-[8px]">
+                                            Bench (5 Selected)
+                                        </span>
+                                        <span className="text-[8px] font-bold text-emerald-700">
+                                            16 Squad Ready
+                                        </span>
                                     </div>
-                                    <span className="px-2 py-0.5 rounded bg-red-600 text-[10px] font-bold">
-                                        4-3-3
+                                    <div className="flex flex-wrap gap-1">
+                                        {["12 Henderson", "14 Cole", "15 Palmer", "16 Murray", "17 Bello"].map(
+                                            (subName) => (
+                                                <span
+                                                    key={subName}
+                                                    className="px-1.5 py-0.5 rounded bg-neutral-100 text-neutral-700 font-semibold text-[8px]"
+                                                >
+                                                    {subName}
+                                                </span>
+                                            )
+                                        )}
+                                    </div>
+                                    <div className="flex items-center justify-between pt-1 border-t border-neutral-100 text-neutral-800 font-bold text-[9px]">
+                                        <span>Capt: D. Foster</span>
+                                        <span>Pens: M. Vance</span>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-1.5">
+                                    <span className="py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-[9px] text-center">
+                                        Share to WhatsApp
+                                    </span>
+                                    <span className="py-1.5 rounded-lg bg-neutral-900 text-white font-bold text-[9px] text-center">
+                                        Save XI Graphic
                                     </span>
                                 </div>
-
-                                <div className="p-3 space-y-2.5">
-                                    <div className="h-[225px] w-full">
-                                        <RealisticPitchMarkings>
-                                            <PitchJerseyNode
-                                                x={50}
-                                                y={88}
-                                                number={1}
-                                                name="J. Mercer"
-                                                kitColor="#10b981"
-                                                compact
-                                            />
-                                            <PitchJerseyNode
-                                                x={17}
-                                                y={70}
-                                                number={3}
-                                                name="A. Clarke"
-                                                compact
-                                            />
-                                            <PitchJerseyNode
-                                                x={38}
-                                                y={73}
-                                                number={5}
-                                                name="D. Foster"
-                                                isCaptain
-                                                compact
-                                            />
-                                            <PitchJerseyNode
-                                                x={62}
-                                                y={73}
-                                                number={6}
-                                                name="R. Bennett"
-                                                compact
-                                            />
-                                            <PitchJerseyNode
-                                                x={83}
-                                                y={70}
-                                                number={2}
-                                                name="L. Reid"
-                                                compact
-                                            />
-                                            <PitchJerseyNode
-                                                x={50}
-                                                y={53}
-                                                number={4}
-                                                name="T. Hughes"
-                                                compact
-                                            />
-                                            <PitchJerseyNode
-                                                x={28}
-                                                y={42}
-                                                number={8}
-                                                name="C. Gallagher"
-                                                compact
-                                            />
-                                            <PitchJerseyNode
-                                                x={72}
-                                                y={42}
-                                                number={10}
-                                                name="D. Sterling"
-                                                compact
-                                            />
-                                            <PitchJerseyNode
-                                                x={20}
-                                                y={19}
-                                                number={11}
-                                                name="E. Brooks"
-                                                compact
-                                            />
-                                            <PitchJerseyNode
-                                                x={50}
-                                                y={14}
-                                                number={9}
-                                                name="M. Vance"
-                                                compact
-                                            />
-                                            <PitchJerseyNode
-                                                x={80}
-                                                y={19}
-                                                number={7}
-                                                name="O. Grant"
-                                                compact
-                                            />
-                                        </RealisticPitchMarkings>
-                                    </div>
-
-                                    <div className="bg-white rounded-xl p-2.5 border border-neutral-200 text-[10px] space-y-1">
-                                        <div className="font-black text-neutral-900 uppercase text-[9px]">
-                                            Bench & Set Pieces
-                                        </div>
-                                        <div className="text-neutral-600 font-semibold truncate">
-                                            Subs (5/5): 12 Henderson, 14 Cole, 15 Palmer, 16 Murray, 17 Bello
-                                        </div>
-                                        <div className="flex items-center justify-between pt-1 border-t border-neutral-100 text-neutral-800 font-bold">
-                                            <span>Capt: D. Foster</span>
-                                            <span>Pens: M. Vance</span>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
-                            <div className="mt-3 text-center">
-                                <div className="text-xs font-bold text-white">Mobile Matchday Planner</div>
-                                <div className="text-[11px] text-neutral-400">
-                                    Starting lineup, bench & set-piece takers
-                                </div>
-                            </div>
-                        </div>
+                        </RealisticPhoneMockup>
 
                         {/* PHONE 3: Mobile Training & Attendance */}
-                        <div className="w-full max-w-[330px] rounded-[36px] p-3 bg-[#161922] border-2 border-white/15 shadow-2xl">
-                            <div className="rounded-[26px] overflow-hidden bg-[#FCFCFD] text-neutral-900 border border-neutral-200">
-                                <div className="h-12 bg-[#171717] text-white px-3.5 flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <ClipboardCheck className="w-4 h-4 text-emerald-400" />
-                                        <span className="font-bold text-xs">Training Attendance</span>
-                                    </div>
-                                    <span className="px-2 py-0.5 rounded bg-emerald-600 text-[10px] font-bold">
-                                        86% Avg
-                                    </span>
+                        <RealisticPhoneMockup
+                            activeBottomTab="training"
+                            title="Training Attendance"
+                            subtitle="Streaks, last 5 sessions & commitment %"
+                        >
+                            <div className="h-10 bg-[#171717] text-white px-3.5 flex items-center justify-between border-t border-white/[0.06] shrink-0">
+                                <div className="flex items-center gap-2">
+                                    <ClipboardCheck className="w-3.5 h-3.5 text-emerald-400" />
+                                    <span className="font-bold text-xs">Training</span>
                                 </div>
+                                <span className="px-2 py-0.5 rounded bg-emerald-600 text-[9px] font-bold">
+                                    86% Avg
+                                </span>
+                            </div>
 
-                                <div className="p-3.5 space-y-2.5">
-                                    <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-2.5">
-                                        <div className="flex items-center justify-between text-[10px] font-black text-emerald-800">
+                            <div className="p-3 space-y-2.5 flex-1 flex flex-col justify-between">
+                                <div className="space-y-2">
+                                    <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-2.5">
+                                        <div className="flex items-center justify-between text-[9px] font-black text-emerald-800">
                                             <span>THU 12 NOV • 19:30</span>
-                                            <span>18 ATTENDING</span>
+                                            <span>18 GOING</span>
                                         </div>
-                                        <div className="text-xs font-black text-neutral-900 mt-0.5">
-                                            Set Pieces & Out-of-Possession Shape
+                                        <div className="text-[11px] font-black text-neutral-900 mt-0.5">
+                                            Set Pieces &amp; Rest Defence
                                         </div>
                                     </div>
 
-                                    <div className="bg-white rounded-xl border border-neutral-200 divide-y divide-neutral-100">
+                                    <div className="bg-white rounded-xl border border-neutral-200/90 divide-y divide-neutral-100">
                                         {[
                                             {
                                                 name: "Harrison Cole",
-                                                pos: "MID",
                                                 streak: "🔥 9",
                                                 last5: ["✓", "✓", "✓", "✓", "✓"],
                                                 pct: "94%",
                                             },
                                             {
                                                 name: "Dan Foster",
-                                                pos: "DEF",
                                                 streak: "🔥 6",
                                                 last5: ["✓", "✓", "L", "✓", "✓"],
                                                 pct: "94%",
                                             },
                                             {
                                                 name: "Jordan Mercer",
-                                                pos: "GK",
                                                 streak: "🔥 5",
                                                 last5: ["✓", "✓", "✓", "✓", "✓"],
                                                 pct: "89%",
                                             },
+                                            {
+                                                name: "Marcus Vance",
+                                                streak: "🔥 4",
+                                                last5: ["✓", "–", "✓", "✓", "✓"],
+                                                pct: "83%",
+                                            },
+                                            {
+                                                name: "Callum Gallagher",
+                                                streak: "🔥 4",
+                                                last5: ["✓", "✓", "–", "✓", "✓"],
+                                                pct: "83%",
+                                            },
                                         ].map((p) => (
                                             <div
                                                 key={p.name}
-                                                className="p-2.5 flex items-center justify-between text-[11px]"
+                                                className="px-2.5 py-2 flex items-center justify-between text-[10px]"
                                             >
                                                 <div>
                                                     <div className="font-bold text-neutral-900 flex items-center gap-1">
                                                         <span>{p.name}</span>
-                                                        <span className="text-[9px] px-1 rounded bg-orange-50 text-orange-700 font-black">
+                                                        <span className="text-[8px] px-1 rounded bg-orange-50 text-orange-700 font-black">
                                                             {p.streak}
                                                         </span>
                                                     </div>
@@ -3064,12 +3217,12 @@ export default function LandingPage() {
                                                         {p.last5.map((s, idx) => (
                                                             <span
                                                                 key={idx}
-                                                                className={`w-4 h-4 rounded text-[8px] font-black flex items-center justify-center ${
+                                                                className={`w-3.5 h-3.5 rounded text-[7px] font-black flex items-center justify-center ${
                                                                     s === "✓"
                                                                         ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                                                                         : s === "L"
                                                                         ? "bg-amber-50 text-amber-700 border border-amber-200"
-                                                                        : "bg-red-50 text-red-600 border border-red-200"
+                                                                        : "bg-neutral-100 text-neutral-400 border border-neutral-200"
                                                                 }`}
                                                             >
                                                                 {s}
@@ -3077,23 +3230,19 @@ export default function LandingPage() {
                                                         ))}
                                                     </div>
                                                 </div>
-                                                <span className="font-black text-emerald-700 text-xs">
+                                                <span className="font-black text-emerald-700 text-[11px]">
                                                     {p.pct}
                                                 </span>
                                             </div>
                                         ))}
                                     </div>
                                 </div>
-                            </div>
-                            <div className="mt-3 text-center">
-                                <div className="text-xs font-bold text-white">
-                                    Mobile Training &amp; Attendance
-                                </div>
-                                <div className="text-[11px] text-neutral-400">
-                                    Streaks, last 5 sessions &amp; commitment %
+
+                                <div className="py-1.5 rounded-lg bg-emerald-600 text-white font-bold text-[9px] text-center">
+                                    ✓ Save Thursday Register
                                 </div>
                             </div>
-                        </div>
+                        </RealisticPhoneMockup>
                     </div>
                 </section>
 
