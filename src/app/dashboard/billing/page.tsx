@@ -284,15 +284,15 @@ export default function BillingPage() {
                                     {sub.isPaymentConfigured
                                         ? "Active Stripe Subscription"
                                         : isTrialExpired
-                                        ? "Trial Expired"
-                                        : `${daysLeft} Days Remaining on 7-Day Trial`}
+                                        ? "Free Trial Ended"
+                                        : `${daysLeft} Days Remaining on 30-Day Free Trial`}
                                 </p>
                                 <p className="text-xs text-slate-400 mt-0.5">
                                     {sub.isPaymentConfigured
                                         ? `Subscribed to the ${sub.tier} Plan via Stripe.`
                                         : isTrialExpired
-                                        ? "Your club trial has ended. Activate a Stripe plan below to restore locked modules."
-                                        : `Currently trialing on the ${sub.tier} Plan. Activate Stripe billing anytime below.`}
+                                        ? "Your 30-day free trial has ended. Choose a Stripe plan below to continue."
+                                        : "Full access to every ClubFlow feature during your 30-day trial — no card required upfront."}
                                 </p>
                             </div>
                         </div>

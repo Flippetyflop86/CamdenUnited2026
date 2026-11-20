@@ -123,7 +123,7 @@ export async function GET(request: Request) {
         ]);
 
         const clubCreatedMs = club?.created_at ? new Date(club.created_at).getTime() : Date.now();
-        const trialEndsAt = new Date(clubCreatedMs + 7 * 24 * 60 * 60 * 1000).toISOString();
+        const trialEndsAt = new Date(clubCreatedMs + 30 * 24 * 60 * 60 * 1000).toISOString();
 
         const historyRows = (payments || []).map((p: any) => ({
             id: p.stripe_session_id

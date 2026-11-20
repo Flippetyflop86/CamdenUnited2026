@@ -7,13 +7,14 @@ export interface UserSubscription {
     isPaymentConfigured: boolean;
 }
 
-const STORAGE_KEY = "clubflow_subscription_v1";
+export const TRIAL_DURATION_DAYS = 30;
+const STORAGE_KEY = "clubflow_subscription_v2";
 
 export function getSubscription(): UserSubscription {
     if (typeof window === "undefined") {
         return {
-            tier: "Medium",
-            trialEndsAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            tier: "High",
+            trialEndsAt: new Date(Date.now() + TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000).toISOString(),
             isActive: true,
             isPaymentConfigured: false,
         };
@@ -21,12 +22,12 @@ export function getSubscription(): UserSubscription {
 
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
-        // Initialize 7-day trial starting now
+        // Initialize 30-day full-access free trial starting now (no card required upfront)
         const trialEndDate = new Date();
-        trialEndDate.setDate(trialEndDate.getDate() + 7);
+        trialEndDate.setDate(trialEndDate.getDate() + TRIAL_DURATION_DAYS);
         
         const defaultSub: UserSubscription = {
-            tier: "Medium",
+            tier: "High",
             trialEndsAt: trialEndDate.toISOString(),
             isActive: true,
             isPaymentConfigured: false,
@@ -52,10 +53,10 @@ export function getSubscription(): UserSubscription {
         };
     } catch {
         const trialEndDate = new Date();
-        trialEndDate.setDate(trialEndDate.getDate() + 7);
+        trialEndDate.setDate(trialEndDate.getDate() + TRIAL_DURATION_DAYS);
         
         return {
-            tier: "Medium",
+            tier: "High",
             trialEndsAt: trialEndDate.toISOString(),
             isActive: true,
             isPaymentConfigured: false,

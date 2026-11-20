@@ -413,13 +413,13 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                     </DialogHeader>
                     <div className="space-y-4 mt-2">
                         <p className="text-sm text-slate-600 leading-relaxed">
-                            To unlock advanced modules like **Opposition Scouting Reports**, **Sponsorships**, or **Recruitment** during your 7-day trial, you need to configure your Stripe auto-billing credentials.
+                            Your 30-day free trial gives you full access to every ClubFlow feature — no card required upfront.
                         </p>
                         <div className="bg-indigo-50 border border-indigo-100 p-3.5 rounded-xl text-xs text-indigo-950 space-y-1.5">
                             <p className="font-bold flex items-center gap-1">Default Subscription Plan:</p>
                             <ul className="list-disc list-inside space-y-1 text-slate-700">
                                 <li><strong>Medium Tier</strong> Plan selected</li>
-                                <li>£9.99 / month starting after your 7-day trial</li>
+                                <li>Plans from £4.99 / month starting after your 30-day trial</li>
                                 <li>No charge will be made before trial finishes</li>
                                 <li>Cancel anytime inside the billing portal</li>
                             </ul>
