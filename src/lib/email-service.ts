@@ -7,6 +7,12 @@ interface EmailPayload {
     html?: string;
 }
 
+export function isEmailConfigured(): boolean {
+    return Boolean(
+        process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS
+    );
+}
+
 export async function sendEmail({ to, subject, text, html }: EmailPayload): Promise<boolean> {
     const host = process.env.SMTP_HOST;
     const port = process.env.SMTP_PORT ? parseInt(process.env.SMTP_PORT) : 587;
@@ -15,13 +21,10 @@ export async function sendEmail({ to, subject, text, html }: EmailPayload): Prom
     const from = process.env.SMTP_FROM || '"ClubFlow" <noreply@clubflow.org.uk>';
 
     if (!host || !user || !pass) {
-        console.log("\n=======================================================");
-        console.log(`[DEV MODE] MOCK EMAIL SENT`);
-        console.log(`To: ${to}`);
-        console.log(`Subject: ${subject}`);
-        console.log(`Body:\n${text}`);
-        console.log("=======================================================\n");
-        return true;
+        console.warn(
+            `[Email Service] SMTP credentials not configured (SMTP_HOST / SMTP_USER / SMTP_PASS missing). Skipping email to ${to} (${subject}).`
+        );
+        return false;
     }
 
     try {

@@ -2,7 +2,6 @@
 
 import React, { useEffect, useState, use } from "react";
 import Link from "next/link";
-import { unproxiedSupabase } from "@/lib/supabase";
 import { calculateClubFlowFee, parsePaymentDescription } from "@/lib/clubflow-pay";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -34,55 +33,41 @@ export default function PayPage({ params }: PaymentPageProps) {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
     const [declining, setDeclining] = useState(false);
-    const [status, setStatus] = useState<"idle" | "success" | "cancelled">("idle");
+    const [status, setStatus] = useState<"idle" | "success" | "cancelled" | "unverified">("idle");
 
     useEffect(() => {
         const searchParams = new URLSearchParams(window.location.search);
         const paymentResult = searchParams.get("payment");
-        if (paymentResult === "success") {
-            setStatus("success");
-            fetch("/api/checkout/verify-payment", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ paymentId }),
-            }).catch(() => {});
-
-            unproxiedSupabase
-                .from("player_payment_requests")
-                .update({ status: "Paid", paid_at: new Date().toISOString() })
-                .eq("id", paymentId)
-                .then(() => {});
-        } else if (paymentResult === "cancelled") {
+        if (paymentResult === "cancelled") {
             setStatus("cancelled");
         }
 
         async function loadPaymentDetails() {
             try {
-                const { data: payData, error: payErr } = await unproxiedSupabase
-                    .from("player_payment_requests")
-                    .select("*")
-                    .eq("id", paymentId)
-                    .single();
+                // Only server-side Stripe session verification can mark a payment Paid
+                if (paymentResult === "success") {
+                    const verifyRes = await fetch("/api/checkout/verify-payment", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ paymentId }),
+                    })
+                        .then(r => r.json())
+                        .catch(() => null);
 
-                if (payErr || !payData) throw new Error("Payment request not found.");
+                    if (verifyRes?.status === "Paid") {
+                        setStatus("success");
+                    } else {
+                        setStatus("unverified");
+                    }
+                }
 
-                setPayment(payData);
+                const res = await fetch(`/api/public/pay/${encodeURIComponent(paymentId)}`);
+                if (!res.ok) throw new Error("Payment request not found.");
+                const data = await res.json();
 
-                const [{ data: playerData }, { data: clubData }] = await Promise.all([
-                    unproxiedSupabase
-                        .from("players")
-                        .select("id, first_name, last_name")
-                        .eq("id", payData.player_id)
-                        .single(),
-                    unproxiedSupabase
-                        .from("clubs")
-                        .select("id, name, logo, primary_color")
-                        .eq("id", payData.club_id)
-                        .single(),
-                ]);
-
-                setPlayer(playerData);
-                setClub(clubData);
+                setPayment(data.payment);
+                setPlayer(data.player);
+                setClub(data.club);
             } catch (err) {
                 console.error("Error loading payment data:", err);
             } finally {
@@ -286,6 +271,15 @@ export default function PayPage({ params }: PaymentPageProps) {
                         <div className="bg-amber-500/10 border border-amber-500/30 text-amber-300 p-3 rounded-lg flex items-start gap-2 text-xs">
                             <Info className="h-4 w-4 shrink-0 mt-0.5" />
                             <p>Checkout cancelled. You can pay below whenever you&apos;re ready.</p>
+                        </div>
+                    )}
+
+                    {status === "unverified" && (
+                        <div className="bg-rose-500/10 border border-rose-500/30 text-rose-300 p-3 rounded-lg flex items-start gap-2 text-xs">
+                            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                            <p>
+                                Payment has not been confirmed by Stripe yet. Please complete checkout below to settle this request.
+                            </p>
                         </div>
                     )}
 

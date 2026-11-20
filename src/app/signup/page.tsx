@@ -298,6 +298,18 @@ export default function SignupPage() {
                                     Sign In
                                 </Link>
                             </div>
+
+                            <p className="text-[11px] text-slate-500 text-center leading-relaxed">
+                                By signing up, you agree to our{" "}
+                                <Link href="/terms" className="text-slate-300 underline hover:text-white">
+                                    Terms of Service
+                                </Link>{" "}
+                                and{" "}
+                                <Link href="/privacy" className="text-slate-300 underline hover:text-white">
+                                    UK GDPR Privacy Policy
+                                </Link>
+                                .
+                            </p>
                         </CardFooter>
                     </form>
                 </Card>

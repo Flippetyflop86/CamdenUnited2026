@@ -19,7 +19,7 @@ import { useAuth } from "@/context/auth-context";
 import { RefreshCw } from "lucide-react";
 import { MatchStatsDialog } from "@/components/matches/match-stats-dialog";
 import { FORMATIONS } from "@/lib/formations";
-import { calculateMeetTime, generateWhatsAppMessage, getDefaultKickoffTime, resolveFixtureKickoffTime, resolveFullMatchAddress } from "@/lib/whatsapp-utils";
+import { calculateMeetTime, generateWhatsAppMessage, getDefaultKickoffTime, resolveFixtureKickoffTime, resolveFullMatchAddress, resolveFixtureSurface } from "@/lib/whatsapp-utils";
 import { FootballDataImportCentre } from "./components/FootballDataImportCentre";
 import { NextMatchHero } from "./components/NextMatchHero";
 import { UpcomingFixtures } from "./components/UpcomingFixtures";
@@ -510,7 +510,23 @@ export default function MatchesPage() {
             });
 
             const surfaceMatch = notesToScan ? notesToScan.match(/\[Surface:\s*([^\]]*)\]/i) : null;
-            const surface = surfaceMatch ? surfaceMatch[1].trim() : "4G";
+            const explicitSurface =
+                (surfaceMatch ? surfaceMatch[1].trim() : "") ||
+                (parsedConfirmDetails?.surface ? String(parsedConfirmDetails.surface).trim() : "");
+            const isGenericImportSurface =
+                !m.is_home &&
+                explicitSurface === "4G" &&
+                (!rawLocFromTag || /^(home|away)$/i.test(rawLocFromTag)) &&
+                !/\[SurfaceManual:\s*1\]/i.test(notesToScan);
+            const surface = resolveFixtureSurface({
+                explicitSurface,
+                isGenericImportSurface,
+                location,
+                opponent: m.opponent,
+                isHome: Boolean(m.is_home),
+                homeGround: settings.homeGround,
+                defaultHomeSurface: settings.preferredSurface || settings.matchdayConfirmDefaults?.surfaceType,
+            });
 
             const normalizedTime = resolveFixtureKickoffTime(m.date, m.time);
             if (normalizedTime !== (m.time || "").trim().slice(0, 5)) {
@@ -534,6 +550,7 @@ export default function MatchesPage() {
             let cleanNotes = extracted.cleanNotes;
             cleanNotes = cleanNotes.replace(/\[Location: .*?\]\n?/gi, "");
             cleanNotes = cleanNotes.replace(/\[Surface: .*?\]\n?/gi, "");
+            cleanNotes = cleanNotes.replace(/\[SurfaceManual: .*?\]\n?/gi, "");
             cleanNotes = cleanNotes.replace(/\[MeetTime: .*?\]\n?/gi, "");
             cleanNotes = cleanNotes.replace(/\[ConfirmDetails: .*?\]\n?/gi, "");
             cleanNotes = cleanNotes.replace(/(?:,?\s*["']usedSubstitutes["']\s*:\s*\[\]\s*\}\s*)+/g, "");
@@ -609,11 +626,38 @@ export default function MatchesPage() {
 
     const handleVenueChange = (isHome: boolean) => {
         const computed = autoCalculateMeetTime(formData.time, isHome);
+        const autoSurf = resolveFixtureSurface({
+            location: formData.location,
+            opponent: formData.opponent,
+            isHome,
+            homeGround: settings.homeGround,
+            defaultHomeSurface: settings.preferredSurface || settings.matchdayConfirmDefaults?.surfaceType,
+        });
         setFormData((prev: any) => ({
             ...prev,
             isHome,
-            meetTime: computed
+            meetTime: computed,
+            surface: autoSurf,
         }));
+    };
+
+    const handleToggleMatchSurface = async (match: Match) => {
+        const currentIsArtificial = /\b(3g|4g|agp|astro|artificial|synthetic)\b/i.test(match.surface || "");
+        const nextSurface: "4G" | "Grass" = currentIsArtificial ? "Grass" : "4G";
+        const raw = ((match as any).rawNotes || match.notes || "") as string;
+        let updatedNotes = raw.includes("[Surface:")
+            ? raw.replace(/\[Surface:\s*[^\]]*\]/i, `[Surface: ${nextSurface}]`)
+            : `[Surface: ${nextSurface}]${raw ? `\n${raw}` : ""}`;
+        if (!/\[SurfaceManual:\s*1\]/i.test(updatedNotes)) {
+            updatedNotes = `${updatedNotes}[SurfaceManual: 1]`;
+        }
+
+        setMatches(prev =>
+            prev.map(m =>
+                m.id === match.id ? ({ ...m, surface: nextSurface, rawNotes: updatedNotes } as any) : m
+            )
+        );
+        await supabase.from("matches").update({ notes: updatedNotes }).eq("id", match.id);
     };
 
     // Quick-Add 1-line fixture handler (#3)
@@ -625,6 +669,13 @@ export default function MatchesPage() {
             const resolvedKo = quickTime || getDefaultKickoffTime(quickDate);
             const meet = autoCalculateMeetTime(resolvedKo, quickIsHome);
             const loc = quickIsHome ? (settings.homeGround || "Home") : "Away";
+            const resolvedSurf = resolveFixtureSurface({
+                location: loc,
+                opponent: quickOpponent.trim(),
+                isHome: quickIsHome,
+                homeGround: settings.homeGround,
+                defaultHomeSurface: settings.preferredSurface || settings.matchdayConfirmDefaults?.surfaceType,
+            });
             const payload: any = {
                 club_id: clubId || undefined,
                 date: quickDate,
@@ -634,7 +685,7 @@ export default function MatchesPage() {
                 competition: quickCompetition || "League",
                 scoreline: "",
                 result: "Pending",
-                notes: `[Location: ${loc}][Surface: 4G][MeetTime: ${meet}]`,
+                notes: `[Location: ${loc}][Surface: ${resolvedSurf}][MeetTime: ${meet}]`,
                 event_token: Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
             };
             const { error } = await supabase.from("matches").insert([payload]);
@@ -668,7 +719,7 @@ export default function MatchesPage() {
 
         // Build combined metadata in the notes column
         const locationPrefix = `[Location: ${formData.location || ""}]`;
-        const surfacePrefix = `[Surface: ${formData.surface || "4G"}]`;
+        const surfacePrefix = `[Surface: ${formData.surface || "4G"}][SurfaceManual: 1]`;
         const meetTimePrefix = `[MeetTime: ${formData.meetTime || ""}]`;
         
         let lineupTag = "";
@@ -1611,33 +1662,53 @@ export default function MatchesPage() {
         const isMatchFinished = Boolean(isPast || hasResultLogged || isKickoffFinished);
         const dayWeather = isMatchFinished ? undefined : weatherForecast[localDate];
 
+        const isArtificialPitch = /\b(3g|4g|agp|astro|artificial|synthetic)\b/i.test(
+            `${match.surface || ""} ${match.location || ""}`
+        );
+
         let weatherIcon = <Sun className="h-4 w-4 text-amber-500" />;
         let weatherLabel = "Sunny / Clear";
         let isWarning = false;
         let warningText = "";
 
         if (dayWeather) {
-            const { code, tempMax, tempMin, rain, snow } = dayWeather;
+            const { code, tempMin, rain, snow } = dayWeather;
             if (code >= 95) {
                 weatherIcon = <CloudLightning className="h-4 w-4 text-purple-500 animate-pulse" />;
                 weatherLabel = "Thunderstorms";
                 isWarning = true;
-                warningText = "Thunderstorms forecasted. Risk of pitch cancellation.";
+                warningText = "Thunderstorms forecasted. Risk of match suspension / postponement.";
             } else if (snow > 0 || (code >= 71 && code <= 77) || (code >= 85 && code <= 86)) {
                 weatherIcon = <Snowflake className="h-4 w-4 text-sky-400 animate-spin" style={{ animationDuration: '3s' }} />;
                 weatherLabel = "Snowfall";
                 isWarning = true;
-                warningText = "Snow forecasted. Risk of frozen pitch.";
+                warningText = "Snow forecasted. Risk of postponement due to snow cover.";
             } else if (tempMin <= 1) {
                 weatherIcon = <Thermometer className="h-4 w-4 text-blue-500" />;
                 weatherLabel = `Freezing (${tempMin}°C)`;
-                isWarning = true;
-                warningText = `Sub-zero temperatures (${tempMin}°C) expected. Risk of frozen pitch.`;
+                if (isArtificialPitch) {
+                    // 3G/4G rubber crumb handles light frost (0°C–1°C); only hard freezes (<= -2°C) risk pitch closure
+                    if (tempMin <= -2) {
+                        isWarning = true;
+                        warningText = `Hard freeze (${tempMin}°C) expected. Check venue 4G frost inspection.`;
+                    }
+                } else {
+                    isWarning = true;
+                    warningText = `Sub-zero / frost temperatures (${tempMin}°C) expected. Risk of frozen grass pitch.`;
+                }
             } else if (rain > 8 || code === 63 || code === 65 || code === 82) {
                 weatherIcon = <CloudRain className="h-4 w-4 text-blue-600" />;
                 weatherLabel = "Heavy Rain";
-                isWarning = true;
-                warningText = "Heavy rain expected. Risk of waterlogged pitch.";
+                if (isArtificialPitch) {
+                    // 3G/4G all-weather pitches drain standard heavy rain without waterlogging
+                    if (rain >= 40) {
+                        isWarning = true;
+                        warningText = `Extreme rainfall (${rain}mm) forecast. Check 4G venue drainage.`;
+                    }
+                } else {
+                    isWarning = true;
+                    warningText = "Heavy rain expected. Risk of waterlogged grass pitch.";
+                }
             } else if (rain > 1 || (code >= 51 && code <= 55) || code === 61 || code === 80 || code === 81) {
                 weatherIcon = <CloudRain className="h-4 w-4 text-blue-400" />;
                 weatherLabel = "Light Rain";
@@ -1811,9 +1882,17 @@ export default function MatchesPage() {
                         {(match.location || (dayWeather && !isPast)) && (
                             <div className="flex flex-wrap items-center justify-center gap-1.5 text-[10px] text-muted-foreground">
                                 {match.location && (
-                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-2/80 border border-border truncate max-w-[210px]">
+                                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-surface-2/80 border border-border truncate max-w-[240px]">
                                         <MapPin className="h-2.5 w-2.5 shrink-0" />
                                         <span className="truncate">{match.location}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleToggleMatchSurface(match)}
+                                            title="Click to toggle pitch surface (4G / Grass)"
+                                            className="ml-0.5 px-1.5 py-0 rounded bg-background hover:bg-brand/10 border border-border text-[9px] font-bold text-foreground shrink-0 cursor-pointer"
+                                        >
+                                            {isArtificialPitch ? "4G" : "Grass"}
+                                        </button>
                                     </span>
                                 )}
                                 {dayWeather && !isPast && (
@@ -2130,8 +2209,17 @@ export default function MatchesPage() {
                                 </Badge>
                             )}
                             {match.location && (
-                                <span className="text-xs text-muted-foreground mt-1.5 flex items-center justify-center gap-1 bg-surface-2/80 px-2 py-0.5 rounded-full font-medium">
-                                    <MapPin className="h-3 w-3 text-muted-foreground shrink-0" /> {match.location}
+                                <span className="text-xs text-muted-foreground mt-1.5 flex items-center justify-center gap-1.5 bg-surface-2/80 px-2.5 py-0.5 rounded-full font-medium">
+                                    <MapPin className="h-3 w-3 text-muted-foreground shrink-0" />
+                                    <span>{match.location}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => handleToggleMatchSurface(match)}
+                                        title="Click to toggle pitch surface (4G / Grass)"
+                                        className="px-1.5 py-0 rounded-full bg-background hover:bg-brand/10 border border-border text-[10px] font-bold text-foreground shrink-0 cursor-pointer transition-colors"
+                                    >
+                                        {isArtificialPitch ? "4G" : "Grass"}
+                                    </button>
                                 </span>
                             )}
                         </div>

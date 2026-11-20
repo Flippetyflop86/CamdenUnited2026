@@ -26,11 +26,14 @@ export async function POST(request: Request) {
 }
 
 async function runAutomatedPaymentReminders(request: Request) {
+    const authHeader = request.headers.get("authorization");
+    const isVercelCron = request.headers.get("x-vercel-cron") === "1";
     if (process.env.CRON_SECRET) {
-        const authHeader = request.headers.get("authorization");
-        if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+        if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && !isVercelCron) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+    } else if (process.env.NODE_ENV === "production" && !isVercelCron) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const supabase = getServerSupabase();

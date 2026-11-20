@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useEffect, useState, use, useMemo } from "react";
-import { unproxiedSupabase } from "@/lib/supabase";
-import { isFormerPlayer } from "@/lib/utils";
 import { calculateClubFlowFee, parsePaymentDescription } from "@/lib/clubflow-pay";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -82,49 +80,30 @@ export default function ClubPlayerPayPortalPage({ params }: ClubPayPortalProps) 
         async function loadClubPortal() {
             try {
                 if (paymentResult === "success" && paidIdsParam) {
-                    setPaymentBanner("success");
                     const ids = paidIdsParam.split(",").map(s => s.trim()).filter(Boolean);
                     if (ids.length > 0) {
-                        await fetch("/api/checkout/verify-payment", {
+                        const verifyRes = await fetch("/api/checkout/verify-payment", {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ paymentIds: ids }),
-                        }).catch(() => {});
+                        })
+                            .then(r => r.json())
+                            .catch(() => null);
 
-                        await unproxiedSupabase
-                            .from("player_payment_requests")
-                            .update({ status: "Paid", paid_at: new Date().toISOString() })
-                            .in("id", ids);
+                        if (verifyRes?.status === "Paid") {
+                            setPaymentBanner("success");
+                        }
                     }
                 } else if (paymentResult === "cancelled") {
                     setPaymentBanner("cancelled");
                 }
 
-                const { data: clubData } = await unproxiedSupabase
-                    .from("clubs")
-                    .select("id, name, logo, primary_color")
-                    .eq("id", clubId)
-                    .single();
-                setClub(clubData);
-
-                const { data: playersData } = await unproxiedSupabase
-                    .from("players")
-                    .select("id, first_name, last_name, position, notes")
-                    .eq("club_id", clubId)
-                    .order("first_name", { ascending: true });
-
-                if (playersData) {
-                    setPlayers(playersData.filter(p => !isFormerPlayer(p.notes)));
-                }
-
-                const { data: paymentsData } = await unproxiedSupabase
-                    .from("player_payment_requests")
-                    .select("*")
-                    .eq("club_id", clubId)
-                    .order("created_at", { ascending: false });
-
-                if (paymentsData) {
-                    setPayments(paymentsData);
+                const res = await fetch(`/api/public/club-pay/${encodeURIComponent(clubId)}`);
+                if (res.ok) {
+                    const data = await res.json();
+                    setClub(data.club || null);
+                    setPlayers(data.players || []);
+                    setPayments(data.payments || []);
                 }
             } catch (err) {
                 console.error("Failed to load ClubFlow Pay portal:", err);

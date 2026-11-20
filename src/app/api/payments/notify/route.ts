@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase";
-import { sendEmail } from "@/lib/email-service";
+import { sendEmail, isEmailConfigured } from "@/lib/email-service";
 import {
     buildPaymentNotificationEmail,
     calculateClubFlowFee,
@@ -11,6 +11,57 @@ import {
 export async function POST(request: Request) {
     const supabase = getServerSupabase();
     try {
+        const authHeader = request.headers.get("Authorization");
+        const token = authHeader?.split(" ")[1];
+        if (!token) {
+            return NextResponse.json(
+                { error: "Unauthorized: Missing authentication token" },
+                { status: 401 }
+            );
+        }
+
+        const {
+            data: { user },
+            error: authErr,
+        } = await supabase.auth.getUser(token);
+        if (authErr || !user) {
+            return NextResponse.json(
+                { error: "Unauthorized: Invalid session token" },
+                { status: 401 }
+            );
+        }
+
+        const { data: member } = await supabase
+            .from("club_members")
+            .select("club_id, role, page_permissions")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        if (!member?.club_id) {
+            return NextResponse.json(
+                { error: "Forbidden: Club membership not found" },
+                { status: 403 }
+            );
+        }
+
+        const roleClean = (member.role || "").toLowerCase();
+        const perms = Array.isArray(member.page_permissions) ? member.page_permissions : [];
+        const canSendPaymentAlerts =
+            roleClean === "manager" ||
+            roleClean === "super admin" ||
+            roleClean === "treasurer" ||
+            roleClean === "secretary" ||
+            perms.includes("player-payments") ||
+            perms.includes("fines") ||
+            perms.includes("admin");
+
+        if (!canSendPaymentAlerts) {
+            return NextResponse.json(
+                { error: "Forbidden: Subs & Payments permission required" },
+                { status: 403 }
+            );
+        }
+
         const body = await request.json();
         const { paymentIds, mode = "initial" } = body as {
             paymentIds?: string[];
@@ -21,6 +72,16 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "No paymentIds provided" }, { status: 400 });
         }
 
+        const smtpConfigured = isEmailConfigured();
+        if (!smtpConfigured) {
+            return NextResponse.json({
+                sentCount: 0,
+                skippedNoEmailCount: 0,
+                totalUnpaid: paymentIds.length,
+                smtpConfigured: false,
+            });
+        }
+
         const origin =
             request.headers.get("origin") ||
             process.env.NEXT_PUBLIC_SITE_URL ||
@@ -29,6 +90,7 @@ export async function POST(request: Request) {
         const { data: payments, error: payErr } = await supabase
             .from("player_payment_requests")
             .select("*")
+            .eq("club_id", member.club_id)
             .in("id", paymentIds);
 
         if (payErr || !payments || payments.length === 0) {

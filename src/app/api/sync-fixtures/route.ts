@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
-import { getDefaultKickoffTime } from '@/lib/whatsapp-utils';
+import { getDefaultKickoffTime, resolveFixtureSurface } from '@/lib/whatsapp-utils';
 
 function parseDateToken(raw: string): string | null {
     // 1. Long date e.g. "Saturday, 31 October 2026"
@@ -198,6 +198,11 @@ export async function POST(request: Request) {
                 }
             }
 
+            const resolvedSurface = resolveFixtureSurface({
+                opponent,
+                isHome: weAreHome,
+            });
+
             matches.push({
                 date: dateIso,
                 time: getDefaultKickoffTime(dateIso),
@@ -206,7 +211,7 @@ export async function POST(request: Request) {
                 result,
                 scoreline,
                 competition,
-                notes: `[Location: ${weAreHome ? "Home" : "Away"}][Surface: 4G]`
+                notes: `[Location: ${weAreHome ? "Home" : "Away"}][Surface: ${resolvedSurface}]`
             });
         });
 

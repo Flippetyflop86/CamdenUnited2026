@@ -612,9 +612,17 @@ export default function PlayerPaymentsPage() {
 
             if (createdRows.length > 0 && autoNotifyPlayers) {
                 try {
+                    const {
+                        data: { session },
+                    } = await supabase.auth.getSession();
+                    const headers: Record<string, string> = { "Content-Type": "application/json" };
+                    if (session?.access_token) {
+                        headers["Authorization"] = `Bearer ${session.access_token}`;
+                    }
+
                     const notifyRes = await fetch("/api/payments/notify", {
                         method: "POST",
-                        headers: { "Content-Type": "application/json" },
+                        headers,
                         body: JSON.stringify({
                             paymentIds: createdRows.map(r => r.id),
                             mode: "initial",
@@ -632,7 +640,10 @@ export default function PlayerPaymentsPage() {
                         );
                     }
 
-                    if (typeof notifyRes?.sentCount === "number") {
+                    if (notifyRes?.smtpConfigured === false) {
+                        notifNote =
+                            " • Email server (SMTP) not configured yet — copy & share the 1-tap link directly";
+                    } else if (typeof notifyRes?.sentCount === "number") {
                         notifNote =
                             notifyRes.sentCount > 0
                                 ? ` • ${notifyRes.sentCount} player${
@@ -668,9 +679,17 @@ export default function PlayerPaymentsPage() {
         else setRemindingPaymentId(paymentIds[0]);
 
         try {
+            const {
+                data: { session },
+            } = await supabase.auth.getSession();
+            const headers: Record<string, string> = { "Content-Type": "application/json" };
+            if (session?.access_token) {
+                headers["Authorization"] = `Bearer ${session.access_token}`;
+            }
+
             const res = await fetch("/api/payments/notify", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers,
                 body: JSON.stringify({ paymentIds, mode: "reminder" }),
             }).then(r => r.json());
 
@@ -679,6 +698,13 @@ export default function PlayerPaymentsPage() {
                 setPayments(prev =>
                     prev.map(p => (map.has(p.id) ? { ...p, description: map.get(p.id)! } : p))
                 );
+            }
+
+            if (res?.smtpConfigured === false) {
+                showFeedback(
+                    "SMTP email credentials are not configured on the server yet — use Copy WhatsApp List or Link to remind players directly."
+                );
+                return;
             }
 
             const sent = res?.sentCount || 0;

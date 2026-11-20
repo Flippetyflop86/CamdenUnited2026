@@ -237,6 +237,118 @@ export function resolveFullMatchAddress(params: {
     return opponent ? `${opponent.trim()} Ground (Full address TBC)` : "Away Ground (Full address TBC)";
 }
 
+const KNOWN_GROUND_SURFACES: Record<string, "4G" | "Grass"> = {
+    "rectory meadow": "4G",
+    "london samurai rovers": "4G",
+    "new river": "4G",
+    "camden united": "4G",
+    "stonewall": "4G",
+    "bedfont sports": "4G",
+    "market road": "4G",
+    "camden & islington": "4G",
+    "camden and islington": "4G",
+    "gunnersbury park": "4G",
+    "sporting duet": "4G",
+    "brunel university": "4G",
+    "explorers": "4G",
+    "wood lane": "4G",
+    "memorial park": "4G",
+    "jolof sports": "4G",
+    "silver jubilee park": "4G",
+    "hilltop": "4G",
+    "skyex": "4G",
+    "hayes & yeading": "4G",
+    "claremont high school": "4G",
+    "harrow united": "4G",
+    "christ's college": "4G",
+    "apollo london": "4G",
+    "club des sports": "4G",
+    "lbs lions": "4G",
+    "paddington recreation": "4G",
+    "london fennecs": "4G",
+    "vale farm": "4G",
+    "eagles land": "4G",
+    "lord halsbury": "Grass",
+    "larkspur rovers": "Grass",
+    "brentham club": "Grass",
+    "fh whistlers": "Grass",
+    "harrow weald recreation": "Grass",
+    "kodak": "Grass",
+    "middlesex stadium": "Grass",
+    "hayes & hillingdon": "Grass",
+    "hayes and hillingdon": "Grass",
+    "linford christie": "Grass",
+    "kensington dragons": "Grass",
+    "indian gymkhana": "Grass",
+    "robert parker stadium": "Grass",
+    "pfc victoria": "Grass",
+    "kingshill avenue": "Grass",
+    "brook house": "Grass",
+};
+
+/**
+ * Resolves whether a fixture's playing surface is "4G" (artificial 3G/4G turf) or natural "Grass".
+ * Priority:
+ * 1. Explicit `[Surface: ...]` tag saved on the match
+ * 2. Surface keywords in the resolved venue/location string (`3G`, `4G`, `AGP`, `Astro` vs `Grass`)
+ * 3. Known venue / club ground surface lookup
+ * 4. Club's default home surface (for Home games) or "Grass" (for unknown Away grounds)
+ */
+export function resolveFixtureSurface(params: {
+    explicitSurface?: string | null;
+    isGenericImportSurface?: boolean;
+    location?: string | null;
+    opponent?: string | null;
+    isHome?: boolean;
+    homeGround?: string | null;
+    defaultHomeSurface?: string | null;
+}): "4G" | "Grass" {
+    const {
+        explicitSurface,
+        isGenericImportSurface = false,
+        location,
+        opponent,
+        isHome = true,
+        homeGround,
+        defaultHomeSurface,
+    } = params;
+
+    const combinedText = `${location || ""} ${isHome ? homeGround || "" : opponent || ""}`.toLowerCase();
+
+    // If surface was explicitly set by user (not a generic `[Location: Away][Surface: 4G]` auto-import stamp), honour it first
+    if (explicitSurface && explicitSurface.trim() && !isGenericImportSurface) {
+        const cleanExp = explicitSurface.trim();
+        if (/\b(3g|4g|agp|astro|artificial|synthetic)\b/i.test(cleanExp)) return "4G";
+        if (/\bgrass\b/i.test(cleanExp)) return "Grass";
+    }
+
+    if (/\b(3g|4g|agp|astro|artificial|synthetic)\b/i.test(combinedText)) {
+        return "4G";
+    }
+    if (/\bgrass\b/i.test(combinedText)) {
+        return "Grass";
+    }
+
+    for (const [needle, surf] of Object.entries(KNOWN_GROUND_SURFACES)) {
+        if (combinedText.includes(needle)) {
+            return surf;
+        }
+    }
+
+    if (explicitSurface && explicitSurface.trim()) {
+        const cleanExp = explicitSurface.trim();
+        if (/\b(3g|4g|agp|astro|artificial|synthetic)\b/i.test(cleanExp)) return "4G";
+        if (/\bgrass\b/i.test(cleanExp)) return "Grass";
+    }
+
+    if (isHome) {
+        if (defaultHomeSurface && /\bgrass\b/i.test(defaultHomeSurface)) return "Grass";
+        return "4G";
+    }
+
+    return "Grass";
+}
+
 /**
  * Replaces placeholders in the template string with match details and customized inputs.
  */

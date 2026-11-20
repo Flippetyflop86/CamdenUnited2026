@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { RefreshCw, Link2, FileSpreadsheet, ClipboardPaste, CheckCircle2, AlertTriangle, Trash2, Plus } from "lucide-react";
 import { supabase } from "@/lib/supabase";
-import { getDefaultKickoffTime, resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
+import { getDefaultKickoffTime, resolveFixtureKickoffTime, resolveFixtureSurface } from "@/lib/whatsapp-utils";
 
 interface ImportCentreProps {
     clubId: string;
@@ -180,17 +180,26 @@ export function FootballDataImportCentre({
         }
         setIsSaving(true);
         try {
-            const toInsert = validRows.map(f => ({
-                club_id: clubId || undefined,
-                date: f.date,
-                time: f.time || getDefaultKickoffTime(f.date),
-                opponent: f.opponent.trim(),
-                is_home: f.is_home,
-                competition: f.competition || "League",
-                notes: `[Location: ${f.venue || (f.is_home ? "Home" : "Away")}][Surface: 4G]`,
-                scoreline: "",
-                result: "Pending"
-            }));
+            const toInsert = validRows.map(f => {
+                const resolvedSurf = resolveFixtureSurface({
+                    location: f.venue,
+                    opponent: f.opponent,
+                    isHome: f.is_home,
+                    homeGround: clubSettings?.homeGround,
+                    defaultHomeSurface: clubSettings?.preferredSurface || clubSettings?.matchdayConfirmDefaults?.surfaceType,
+                });
+                return {
+                    club_id: clubId || undefined,
+                    date: f.date,
+                    time: f.time || getDefaultKickoffTime(f.date),
+                    opponent: f.opponent.trim(),
+                    is_home: f.is_home,
+                    competition: f.competition || "League",
+                    notes: `[Location: ${f.venue || (f.is_home ? "Home" : "Away")}][Surface: ${resolvedSurf}]`,
+                    scoreline: "",
+                    result: "Pending"
+                };
+            });
 
             const query = supabase.from('matches').select('id, date, opponent, competition, is_home');
             const { data: existing } = clubId ? await query.eq('club_id', clubId) : await query;

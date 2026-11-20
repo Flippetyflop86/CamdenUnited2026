@@ -83,7 +83,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
 
     const isPublicPage = (path: string) => {
-        const AUTH_PAGES = ["", "/", "/login", "/signup", "/reset-password", "/update-password", "/join", "/signup/player"];
+        const AUTH_PAGES = [
+            "",
+            "/",
+            "/login",
+            "/signup",
+            "/reset-password",
+            "/update-password",
+            "/join",
+            "/signup/player",
+            "/privacy",
+            "/terms",
+        ];
         let currentPath = path;
         if (typeof window !== 'undefined') {
             currentPath = window.location.pathname;
@@ -102,7 +113,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return AUTH_PAGES.includes(cleanPath) || 
                cleanPath.startsWith("/checkin") || 
                cleanPath.startsWith("/match-checkin") || 
-               cleanPath.startsWith("/respond");
+               cleanPath.startsWith("/respond") ||
+               cleanPath.startsWith("/pay");
     };
 
     const fetchClubMembership = async (userId: string, userEmail?: string, providedToken?: string) => {
@@ -183,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (finalMember) {
                 const data = finalMember;
                 setClubId(data.club_id);
-                setGlobalClubId(data.club_id);
+                setGlobalClubId(data.club_id, true);
                 const finalRole = data.role ? data.role.toLowerCase() : null;
                 setRole(finalRole);
                 const finalPerms = data.page_permissions || [];

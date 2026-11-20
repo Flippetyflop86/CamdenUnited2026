@@ -3506,6 +3506,15 @@ export default function LandingPage() {
                         <a href="#faq" className="hover:text-neutral-300">
                             FAQ
                         </a>
+                        <Link href="/privacy" className="hover:text-neutral-300">
+                            Privacy Policy
+                        </Link>
+                        <Link href="/terms" className="hover:text-neutral-300">
+                            Terms &amp; Refunds
+                        </Link>
+                        <a href="mailto:support@clubflow.org.uk" className="hover:text-neutral-300">
+                            Support
+                        </a>
                         <Link href="/login" className="hover:text-neutral-300">
                             Sign In
                         </Link>

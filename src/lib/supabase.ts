@@ -41,10 +41,23 @@ const rawClient = isBrowserEnv
       )
     : getServerSupabase();
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 let activeClubId: string | null = null;
+let serverVerifiedClubId: string | null = null;
 
-export function setGlobalClubId(clubId: string | null) {
-    activeClubId = clubId;
+export function setGlobalClubId(clubId: string | null, verifiedByServer = false) {
+    if (clubId === null) {
+        activeClubId = null;
+        serverVerifiedClubId = null;
+        return;
+    }
+    if (!UUID_RE.test(clubId)) return;
+    if (verifiedByServer) {
+        serverVerifiedClubId = clubId;
+        activeClubId = clubId;
+    } else if (!serverVerifiedClubId) {
+        activeClubId = clubId;
+    }
 }
 
 const CLUSTERED_TABLES = [
@@ -78,13 +91,15 @@ const CLUSTERED_TABLES = [
 const isBrowser = typeof window !== 'undefined';
 
 function getEffectiveClubId(): string | null {
+    // Always prioritize the server-verified membership clubId over browser localStorage
+    if (serverVerifiedClubId) return serverVerifiedClubId;
     if (activeClubId) return activeClubId;
     if (isBrowser) {
         try {
             const cached = localStorage.getItem('clubflow_cache_clubId');
             if (cached) {
                 const parsed = JSON.parse(cached);
-                if (parsed) {
+                if (typeof parsed === 'string' && UUID_RE.test(parsed)) {
                     activeClubId = parsed;
                     return parsed;
                 }

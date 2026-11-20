@@ -38,10 +38,15 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     }, []);
 
     const cleanPath = pathname?.endsWith("/") && pathname.length > 1 ? pathname.slice(0, -1) : pathname;
-    const isPublicCheckin = cleanPath?.startsWith("/checkin") || cleanPath?.startsWith("/match-checkin") || cleanPath?.startsWith("/respond");
-    const isAuthPage = ["/login", "/signup", "/reset-password", "/update-password", "/join"].includes(cleanPath);
+    const isPublicCheckin =
+        cleanPath?.startsWith("/checkin") ||
+        cleanPath?.startsWith("/match-checkin") ||
+        cleanPath?.startsWith("/respond") ||
+        cleanPath?.startsWith("/pay");
+    const isLegalPage = cleanPath === "/privacy" || cleanPath === "/terms";
+    const isAuthPage = ["/login", "/signup", "/reset-password", "/update-password", "/join", "/signup/player"].includes(cleanPath);
     const isOnboardingPage = cleanPath === "/onboarding";
-    const isNoShellPage = isAuthPage || isOnboardingPage || isPublicCheckin || cleanPath === "/" || !cleanPath;
+    const isNoShellPage = isAuthPage || isOnboardingPage || isPublicCheckin || isLegalPage || cleanPath === "/" || !cleanPath;
 
     useEffect(() => {
         console.warn("AppShell redirect check:", {
