@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { CheckCircle2, Shield, AlertTriangle } from "lucide-react";
+import { CheckCircle2, Shield, AlertTriangle, Lock } from "lucide-react";
 
 const POSITION_CHOICES = [
     "GK",
@@ -39,8 +39,10 @@ function calculatePreviewAge(dobIso: string): number | null {
 function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
     const searchParams = useSearchParams();
     const squadFromUrl = (searchParams?.get("squad") || "").trim();
+    const inviteToken = (searchParams?.get("token") || "").trim();
 
     const [loading, setLoading] = useState(true);
+    const [linkError, setLinkError] = useState<{ title: string; message: string; isUsed?: boolean } | null>(null);
     const [club, setClub] = useState<{
         id: string;
         name: string;
@@ -64,41 +66,65 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
     const [submittedInfo, setSubmittedInfo] = useState<{ name: string; squad: string } | null>(null);
     const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-    const storageKey = `clubflow_new_player_reg_${clubId}`;
-
     useEffect(() => {
-        if (typeof window !== "undefined") {
-            try {
-                // Clear legacy device lock so coaches/shared devices can test or register multiple distinct players
-                localStorage.removeItem(`clubflow_new_player_reg_${clubId}`);
-                localStorage.removeItem(`clubflow_player_reg_${clubId}`);
-            } catch {}
-        }
-
         async function loadClubForm() {
+            if (!inviteToken) {
+                setLinkError({
+                    title: "One-Time Invite Link Required",
+                    message:
+                        "Each player registration uses a unique single-use link. Please ask your coach or manager to send you a fresh registration link from ClubFlow.",
+                });
+                setLoading(false);
+                return;
+            }
+
             try {
-                const res = await fetch(`/api/public/squad-onboarding/${encodeURIComponent(clubId)}`);
-                if (!res.ok) throw new Error("Club not found");
-                const data = await res.json();
+                const res = await fetch(
+                    `/api/public/squad-onboarding/${encodeURIComponent(clubId)}?token=${encodeURIComponent(inviteToken)}`
+                );
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    const isUsed = data?.code === "USED_TOKEN";
+                    const isExpired = data?.code === "EXPIRED_TOKEN";
+                    setLinkError({
+                        title: isUsed
+                            ? "Link Already Used"
+                            : isExpired
+                              ? "Registration Link Expired"
+                              : "Invalid Registration Link",
+                        message:
+                            data?.error ||
+                            "Please ask your coach or manager to send you a fresh registration link from ClubFlow.",
+                        isUsed,
+                    });
+                    setClub(null);
+                    return;
+                }
+
                 const loadedClub = data.club || null;
                 setClub(loadedClub);
                 if (loadedClub) {
-                    const squads: string[] = Array.isArray(loadedClub.squads) && loadedClub.squads.length > 0
-                        ? loadedClub.squads
-                        : ["First Team"];
+                    const squads: string[] =
+                        Array.isArray(loadedClub.squads) && loadedClub.squads.length > 0
+                            ? loadedClub.squads
+                            : ["First Team"];
                     const matchedUrlSquad = squads.find(
                         (s) => s.toLowerCase() === squadFromUrl.toLowerCase()
                     );
                     setSelectedSquad(matchedUrlSquad || squads[0]);
                 }
             } catch {
+                setLinkError({
+                    title: "Unable to Load Form",
+                    message: "Please check your connection and reload the link.",
+                });
                 setClub(null);
             } finally {
                 setLoading(false);
             }
         }
         loadClubForm();
-    }, [clubId, squadFromUrl, storageKey]);
+    }, [clubId, squadFromUrl, inviteToken]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -109,6 +135,7 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    token: inviteToken,
                     firstName,
                     lastName,
                     dateOfBirth: dateOfBirth || undefined,
@@ -123,6 +150,14 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
             });
             const data = await res.json();
             if (!res.ok) {
+                if (data?.code === "USED_TOKEN" || data?.code === "EXPIRED_TOKEN") {
+                    setLinkError({
+                        title: data.code === "USED_TOKEN" ? "Link Already Used" : "Registration Link Expired",
+                        message: data.error,
+                        isUsed: data.code === "USED_TOKEN",
+                    });
+                    return;
+                }
                 setErrorMsg(data.error || "Could not submit your details.");
                 return;
             }
@@ -145,15 +180,43 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
         );
     }
 
-    if (!club) {
+    if (submittedInfo && club) {
         return (
             <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-                <Card className="max-w-md w-full bg-slate-900 border-slate-800 text-white">
-                    <CardHeader className="text-center">
-                        <AlertTriangle className="h-10 w-10 text-rose-500 mx-auto mb-2" />
-                        <h1 className="text-lg font-black text-white">Invalid Registration Link</h1>
-                        <p className="text-slate-400 text-xs mt-1">
-                            Please ask your coach or manager to re-copy the registration link from ClubFlow.
+                <Card className="max-w-md w-full bg-slate-900 border-slate-800 text-white shadow-2xl overflow-hidden relative">
+                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-emerald-500" />
+                    <CardHeader className="text-center pt-8 pb-7 px-6">
+                        <CheckCircle2 className="h-14 w-14 text-emerald-500 mx-auto mb-3" />
+                        <h1 className="text-xl font-black text-white">
+                            Registration Sent, {submittedInfo.name}!
+                        </h1>
+                        <p className="text-slate-300 text-xs mt-2 leading-relaxed">
+                            Your player details have been sent to{" "}
+                            <strong className="text-white">{club.name}</strong> ({submittedInfo.squad}) for
+                            manager approval. This one-time invite link is now complete.
+                        </p>
+                    </CardHeader>
+                </Card>
+            </div>
+        );
+    }
+
+    if (linkError || !club) {
+        return (
+            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+                <Card className="max-w-md w-full bg-slate-900 border-slate-800 text-white shadow-2xl">
+                    <CardHeader className="text-center py-8 px-6">
+                        {linkError?.isUsed ? (
+                            <Lock className="h-10 w-10 text-amber-400 mx-auto mb-2.5" />
+                        ) : (
+                            <AlertTriangle className="h-10 w-10 text-rose-500 mx-auto mb-2.5" />
+                        )}
+                        <h1 className="text-lg font-black text-white">
+                            {linkError?.title || "Invalid Registration Link"}
+                        </h1>
+                        <p className="text-slate-400 text-xs mt-1.5 leading-relaxed">
+                            {linkError?.message ||
+                                "Please ask your coach or manager to generate a fresh registration link from ClubFlow."}
                         </p>
                     </CardHeader>
                 </Card>
@@ -167,44 +230,6 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
             club.squads.some((s) => s.toLowerCase() === squadFromUrl.toLowerCase())
     );
     const previewAge = calculatePreviewAge(dateOfBirth);
-
-    if (submittedInfo) {
-        return (
-            <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-                <Card className="max-w-md w-full bg-slate-900 border-slate-800 text-white shadow-2xl overflow-hidden relative">
-                    <div className="absolute top-0 left-0 right-0 h-1.5 bg-emerald-500" />
-                    <CardHeader className="text-center pt-8 pb-7 px-6">
-                        <CheckCircle2 className="h-14 w-14 text-emerald-500 mx-auto mb-3" />
-                        <h1 className="text-xl font-black text-white">
-                            Registration Sent, {submittedInfo.name}!
-                        </h1>
-                        <p className="text-slate-300 text-xs mt-2 leading-relaxed">
-                            Your player details have been sent to{" "}
-                            <strong className="text-white">{club.name}</strong> ({submittedInfo.squad}) for
-                            manager approval. You don&apos;t need to submit this form again.
-                        </p>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setSubmittedInfo(null);
-                                setFirstName("");
-                                setLastName("");
-                                setDateOfBirth("");
-                                setEmail("");
-                                setPhone("");
-                                setSquadNumber("");
-                                setSecondaryPosition("");
-                                setErrorMsg(null);
-                            }}
-                            className="mt-4 text-[11px] font-semibold text-slate-400 hover:text-white underline underline-offset-2 cursor-pointer"
-                        >
-                            Register a different player
-                        </button>
-                    </CardHeader>
-                </Card>
-            </div>
-        );
-    }
 
     return (
         <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4 py-8">
@@ -226,8 +251,8 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
                     )}
                     <div className="inline-flex items-center justify-center mx-auto mb-1.5 px-2.5 py-0.5 rounded-full bg-white/10 border border-white/20 text-[10px] font-bold uppercase tracking-wider text-white">
                         {hasLockedUrlSquad
-                            ? `${selectedSquad} • New Player Registration`
-                            : "New Player Registration"}
+                            ? `${selectedSquad} • 1-Time Player Invite`
+                            : "1-Time New Player Registration"}
                     </div>
                     <h1 className="text-2xl font-black text-white tracking-tight">{club.name}</h1>
                     <p className="text-slate-400 text-xs mt-1 leading-relaxed">

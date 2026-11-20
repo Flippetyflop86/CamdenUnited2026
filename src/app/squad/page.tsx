@@ -144,28 +144,82 @@ export default function SquadPage() {
 
     const [processingPendingId, setProcessingPendingId] = useState<string | null>(null);
 
-    const handleCopySquadSelfFillLink = () => {
-        if (!clubId || typeof window === "undefined") return;
-        const squadParam = activeTab && activeTab !== "All" ? `?squad=${encodeURIComponent(activeTab)}` : "";
-        const url = `${window.location.origin}/squad-onboarding/${clubId}${squadParam}`;
-        const squadLabel = activeTab && activeTab !== "All" ? `${settings.name || "Club"} (${activeTab})` : settings.name || "Club";
-        const msg = `📋 *${squadLabel} — New Player Registration*\nWelcome aboard! Tap the link below to pop in your name, position, preferred foot & contact details:\n${url}`;
-        navigator.clipboard.writeText(msg).catch(() => {});
-        setCopiedSelfFillLink(true);
-        setCsvFeedbackBanner({
-            type: "success",
-            message: `Copied New Player Registration Link${activeTab && activeTab !== "All" ? ` (${activeTab})` : ""}! Send it to any new players joining.`,
-        });
-        setTimeout(() => {
-            setCopiedSelfFillLink(false);
-            setCsvFeedbackBanner(null);
-        }, 4000);
+    const [mintingInviteLink, setMintingInviteLink] = useState(false);
+
+    const handleCopySquadSelfFillLink = async () => {
+        if (!clubId || typeof window === "undefined" || mintingInviteLink) return;
+        setMintingInviteLink(true);
+        try {
+            const buildMessage = async (): Promise<string> => {
+                const {
+                    data: { session },
+                } = await supabase.auth.getSession();
+                const accessToken = session?.access_token;
+                if (!accessToken) {
+                    throw new Error("Please sign in again to generate a one-time registration link.");
+                }
+                const res = await fetch(`/api/public/squad-onboarding/${encodeURIComponent(clubId)}`, {
+                    method: "PUT",
+                    headers: {
+                        Authorization: `Bearer ${accessToken}`,
+                    },
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok || !data?.token) {
+                    throw new Error(data?.error || "Could not generate registration link.");
+                }
+                const params = new URLSearchParams({ token: data.token });
+                if (activeTab && activeTab !== "All") {
+                    params.set("squad", activeTab);
+                }
+                const url = `${window.location.origin}/squad-onboarding/${clubId}?${params.toString()}`;
+                const squadLabel =
+                    activeTab && activeTab !== "All"
+                        ? `${settings.name || "Club"} (${activeTab})`
+                        : settings.name || "Club";
+                return `📋 *${squadLabel} — 1-Time Player Registration*\nWelcome aboard! Tap your unique link below to submit your player details (valid for 1 submission):\n${url}`;
+            };
+
+            if (typeof ClipboardItem !== "undefined" && navigator.clipboard?.write) {
+                const textPromise = buildMessage();
+                await navigator.clipboard.write([
+                    new ClipboardItem({
+                        "text/plain": textPromise.then((txt) => new Blob([txt], { type: "text/plain" })),
+                    }),
+                ]);
+                await textPromise;
+            } else {
+                const msg = await buildMessage();
+                await navigator.clipboard.writeText(msg);
+            }
+
+            setCopiedSelfFillLink(true);
+            setCsvFeedbackBanner({
+                type: "success",
+                message: `Copied fresh 1-time New Player Link${activeTab && activeTab !== "All" ? ` (${activeTab})` : ""}! Expires automatically after 1 submission (or 72h).`,
+            });
+            setTimeout(() => {
+                setCopiedSelfFillLink(false);
+                setCsvFeedbackBanner(null);
+            }, 4500);
+        } catch (err: any) {
+            setCsvFeedbackBanner({
+                type: "error",
+                message: err?.message || "Failed to copy 1-time registration link.",
+            });
+            setTimeout(() => setCsvFeedbackBanner(null), 4000);
+        } finally {
+            setMintingInviteLink(false);
+        }
     };
 
     const handleApprovePendingPlayer = async (player: Player) => {
         setProcessingPendingId(player.id);
         try {
-            const cleanedNotes = (player.notes || "").replace(/\[PENDING_REG:1\]\s*/g, "").trim();
+            const cleanedNotes = (player.notes || "")
+                .replace(/\[PENDING_REG:1\]\s*/g, "")
+                .replace(/\[REG_NONCE:[^\]]*\]\s*/g, "")
+                .trim();
             const { error } = await supabase
                 .from("players")
                 .update({
