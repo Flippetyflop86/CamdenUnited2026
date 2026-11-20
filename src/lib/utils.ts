@@ -66,7 +66,7 @@ export function parsePlayerDeparture(player: any): ParsedPlayerDeparture {
     }
 
     // 3. Check structured tags in notes column
-    const rawNotes: string = player.notes || "";
+    const rawNotes: string = typeof player === "string" ? player : (player.notes || "");
     const statusMatch = rawNotes.match(/\[LEFT_STATUS:([^\]]+)\]/);
     if (statusMatch && statusMatch[1] && statusMatch[1] !== "Active") {
         const rawReason = statusMatch[1].trim();
@@ -85,7 +85,14 @@ export function parsePlayerDeparture(player: any): ParsedPlayerDeparture {
 }
 
 export function isFormerPlayer(player: any): boolean {
-    return parsePlayerDeparture(player).isFormer;
+    return parsePlayerDeparture(player).isFormer || isPendingPlayerRegistration(player);
+}
+
+export function isPendingPlayerRegistration(player: any): boolean {
+    if (!player) return false;
+    if (typeof player === "object" && player.status === "Pending Approval") return true;
+    const rawNotes: string = typeof player === "string" ? player : (player.notes || "");
+    return /\[PENDING_REG:1\]/.test(rawNotes);
 }
 
 export function normalizeSquadKey(squad?: string | null): string {

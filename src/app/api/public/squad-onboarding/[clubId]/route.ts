@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase";
-import { isFormerPlayer } from "@/lib/utils";
+import { parsePlayerDeparture } from "@/lib/utils";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -36,35 +36,20 @@ export async function GET(
         }
 
         const supabase = getServerSupabase();
-        const [{ data: clubData, error: clubErr }, { data: playersData }] = await Promise.all([
-            supabase
-                .from("clubs")
-                .select("id, name, logo, primary_color, squads")
-                .eq("id", clubId)
-                .single(),
-            supabase
-                .from("players")
-                .select("id, first_name, last_name, position, squad_number, email, notes")
-                .eq("club_id", clubId)
-                .order("first_name", { ascending: true }),
-        ]);
+        const { data: clubData, error: clubErr } = await supabase
+            .from("clubs")
+            .select("id, name, logo, primary_color, squads")
+            .eq("id", clubId)
+            .single();
 
         if (clubErr || !clubData) {
             return NextResponse.json({ error: "Club not found" }, { status: 404 });
         }
 
-        const activePlayers = (playersData || [])
-            .filter((p: any) => !isFormerPlayer(p))
-            .map((p: any) => ({
-                id: p.id,
-                first_name: p.first_name,
-                last_name: p.last_name,
-                position: p.position || "CM",
-                squad_number: p.squad_number || null,
-                completed: Boolean(
-                    p.notes && /\[SELF_PROFILE:1\]/.test(p.notes)
-                ),
-            }));
+        const squads =
+            Array.isArray(clubData.squads) && clubData.squads.length > 0
+                ? clubData.squads
+                : ["First Team"];
 
         return NextResponse.json({
             club: {
@@ -72,16 +57,14 @@ export async function GET(
                 name: clubData.name,
                 logo: clubData.logo,
                 primary_color: clubData.primary_color,
-                defaultSquad: Array.isArray(clubData.squads) && clubData.squads.length > 0
-                    ? clubData.squads[0]
-                    : "First Team",
+                squads,
+                defaultSquad: squads[0],
             },
-            players: activePlayers,
         });
     } catch (err: any) {
         console.error("Squad onboarding GET error:", err);
         return NextResponse.json(
-            { error: "Unable to load squad form" },
+            { error: "Unable to load registration form" },
             { status: 500 }
         );
     }
@@ -99,145 +82,142 @@ export async function POST(
 
         const body = await request.json();
         const {
-            mode = "claim",
-            playerId,
             firstName,
             lastName,
             email,
+            phone,
             position,
             secondaryPosition,
             squadNumber,
             preferredFoot,
+            squad,
         } = body as {
-            mode?: "claim" | "create";
-            playerId?: string;
             firstName?: string;
             lastName?: string;
             email?: string;
+            phone?: string;
             position?: string;
             secondaryPosition?: string;
             squadNumber?: number | string | null;
             preferredFoot?: "Right" | "Left" | "Both";
+            squad?: string;
         };
+
+        const cleanFirst = (firstName || "").trim().replace(/\s+/g, " ").slice(0, 40);
+        const cleanLast = (lastName || "").trim().replace(/\s+/g, " ").slice(0, 40);
+        if (!cleanFirst || !cleanLast) {
+            return NextResponse.json(
+                { error: "Please enter both your first name and surname." },
+                { status: 400 }
+            );
+        }
 
         const cleanPos = String(position || "CM").toUpperCase().trim();
         if (!VALID_POSITIONS.has(cleanPos)) {
-            return NextResponse.json({ error: "Please select a valid position" }, { status: 400 });
+            return NextResponse.json({ error: "Please select a valid main position." }, { status: 400 });
         }
 
         const cleanSecPos = secondaryPosition ? String(secondaryPosition).toUpperCase().trim() : "";
         const validSecPos = cleanSecPos && VALID_POSITIONS.has(cleanSecPos) ? cleanSecPos : null;
+
         const cleanEmail = (email || "").trim().toLowerCase();
-        if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
-            return NextResponse.json({ error: "Please enter a valid email address" }, { status: 400 });
+        if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+            return NextResponse.json(
+                { error: "Please enter a valid email address." },
+                { status: 400 }
+            );
         }
 
+        const cleanPhone = (phone || "").replace(/[^\d+\s()-]/g, "").trim().slice(0, 24);
         const parsedNum =
             squadNumber !== undefined && squadNumber !== null && String(squadNumber).trim() !== ""
                 ? Math.max(1, Math.min(99, parseInt(String(squadNumber), 10) || 0))
                 : null;
-        const footTag =
-            preferredFoot === "Left" || preferredFoot === "Right" || preferredFoot === "Both"
-                ? `[FOOT:${preferredFoot}]`
-                : "";
 
         const supabase = getServerSupabase();
-        const { data: club } = await supabase
-            .from("clubs")
-            .select("id, squads")
-            .eq("id", clubId)
-            .single();
+        const [{ data: club }, { data: existingPlayers }] = await Promise.all([
+            supabase
+                .from("clubs")
+                .select("id, name, squads")
+                .eq("id", clubId)
+                .single(),
+            supabase
+                .from("players")
+                .select("id, first_name, last_name, email, notes, club_status")
+                .eq("club_id", clubId),
+        ]);
 
         if (!club) {
             return NextResponse.json({ error: "Club not found" }, { status: 404 });
         }
 
-        if (mode === "claim") {
-            if (!playerId || !UUID_RE.test(playerId)) {
-                return NextResponse.json({ error: "Please select your name from the squad list" }, { status: 400 });
-            }
-
-            const { data: existingPlayer } = await supabase
-                .from("players")
-                .select("id, club_id, notes")
-                .eq("id", playerId)
-                .eq("club_id", clubId)
-                .single();
-
-            if (!existingPlayer) {
-                return NextResponse.json({ error: "Player not found in this club" }, { status: 404 });
-            }
-
-            if (existingPlayer.notes && /\[SELF_PROFILE:1\]/.test(existingPlayer.notes)) {
+        // Prevent duplicate submissions by email or full name among current & pending players
+        const normalizedFullName = `${cleanFirst} ${cleanLast}`.toLowerCase();
+        for (const p of existingPlayers || []) {
+            if (parsePlayerDeparture(p).isFormer) continue;
+            const existingEmail = (p.email || "").trim().toLowerCase();
+            if (existingEmail && existingEmail === cleanEmail) {
                 return NextResponse.json(
                     {
-                        error: "This player's profile has already been submitted. Ask your manager if you need to update it.",
+                        error: `A player with this email is already registered at ${club.name} — no need to submit again.`,
                     },
                     { status: 409 }
                 );
             }
-
-            let nextNotes = (existingPlayer.notes || "")
-                .replace(/\[FOOT:(Left|Right|Both)\]/g, "")
-                .replace(/\[SELF_PROFILE:1\]/g, "")
-                .trim();
-            if (footTag) nextNotes = `${nextNotes} ${footTag}`.trim();
-            nextNotes = `${nextNotes} [SELF_PROFILE:1]`.trim();
-
-            const updatePayload: Record<string, any> = {
-                position: cleanPos,
-                notes: nextNotes,
-            };
-            if (cleanEmail) updatePayload.email = cleanEmail;
-            if (validSecPos) updatePayload.secondary_position = validSecPos;
-            if (parsedNum && parsedNum > 0) updatePayload.squad_number = parsedNum;
-
-            const { error: updErr } = await supabase
-                .from("players")
-                .update(updatePayload)
-                .eq("id", playerId)
-                .eq("club_id", clubId);
-
-            if (updErr) throw updErr;
-            return NextResponse.json({ success: true });
+            const existingName = `${p.first_name || ""} ${p.last_name || ""}`
+                .trim()
+                .replace(/\s+/g, " ")
+                .toLowerCase();
+            if (existingName && existingName === normalizedFullName) {
+                return NextResponse.json(
+                    {
+                        error: `${cleanFirst} ${cleanLast} is already on ${club.name}'s registration list — no need to submit again.`,
+                    },
+                    { status: 409 }
+                );
+            }
         }
 
-        // mode === "create"
-        const cleanFirst = (firstName || "").trim().slice(0, 40);
-        const cleanLast = (lastName || "").trim().slice(0, 40);
-        if (!cleanFirst) {
-            return NextResponse.json({ error: "Please enter your first name" }, { status: 400 });
-        }
+        const clubSquads: string[] =
+            Array.isArray(club.squads) && club.squads.length > 0 ? club.squads : ["First Team"];
+        const requestedSquad = (squad || "").trim();
+        const resolvedSquad =
+            clubSquads.find((s) => s.toLowerCase() === requestedSquad.toLowerCase()) ||
+            clubSquads[0];
 
-        const defaultSquad =
-            Array.isArray(club.squads) && club.squads.length > 0 ? club.squads[0] : "First Team";
-        const notesStr = `${footTag} [REG:Standard] [SELF_PROFILE:1]`.trim();
+        const noteParts = ["[PENDING_REG:1]", "[REG:Standard]"];
+        if (preferredFoot === "Left" || preferredFoot === "Right" || preferredFoot === "Both") {
+            noteParts.push(`[FOOT:${preferredFoot}]`);
+        }
+        if (cleanPhone) {
+            noteParts.push(`[PHONE:${cleanPhone}]`);
+        }
 
         const { error: insErr } = await supabase.from("players").insert([
             {
                 club_id: clubId,
                 first_name: cleanFirst,
                 last_name: cleanLast,
-                email: cleanEmail || null,
+                email: cleanEmail,
                 position: cleanPos,
                 secondary_position: validSecPos,
                 squad_number: parsedNum && parsedNum > 0 ? parsedNum : null,
-                squad: defaultSquad,
-                status: "Active",
+                squad: resolvedSquad,
+                status: "Pending Approval",
                 medical_status: "Available",
-                availability: true,
-                is_in_training_squad: true,
-                is_in_matchday_tracker: true,
-                notes: notesStr,
+                availability: false,
+                is_in_training_squad: false,
+                is_in_matchday_tracker: false,
+                notes: noteParts.join(" "),
             },
         ]);
 
         if (insErr) throw insErr;
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ success: true, squad: resolvedSquad });
     } catch (err: any) {
         console.error("Squad onboarding POST error:", err);
         return NextResponse.json(
-            { error: err.message || "Could not save player profile" },
+            { error: err.message || "Could not submit player registration" },
             { status: 500 }
         );
     }

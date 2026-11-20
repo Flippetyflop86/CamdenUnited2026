@@ -59,6 +59,7 @@ export interface Player {
     subsBillingModel?: "Monthly" | "Pay-As-You-Go" | "Matchday-PAYG" | "Both-PAYG" | "Exempt";
     subsCustomAmount?: number;
     status?: string;
+    email?: string;
     weight?: number;
     height?: number;
     preferredFoot?: "Left" | "Right" | "Both";

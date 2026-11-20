@@ -7,6 +7,7 @@ import {
     DEPARTURE_REASONS,
     formatPlayerName,
     isFormerPlayer,
+    isPendingPlayerRegistration,
     isPlayerInDeletedSquad,
     normalizeSquadKey,
     parsePlayerDeparture,
@@ -141,20 +142,79 @@ export default function SquadPage() {
     const [copiedSelfFillLink, setCopiedSelfFillLink] = useState(false);
     const [csvFeedbackBanner, setCsvFeedbackBanner] = useState<{ type: "success" | "error"; message: string } | null>(null);
 
+    const [processingPendingId, setProcessingPendingId] = useState<string | null>(null);
+
     const handleCopySquadSelfFillLink = () => {
         if (!clubId || typeof window === "undefined") return;
-        const url = `${window.location.origin}/squad-onboarding/${clubId}`;
-        const msg = `📋 *${settings.name || "Club"} — 15-Second Squad Details*\nTap the link below, pick your name, and pop in your position, shirt # & email for matchday and subs updates:\n${url}`;
+        const squadParam = activeTab && activeTab !== "All" ? `?squad=${encodeURIComponent(activeTab)}` : "";
+        const url = `${window.location.origin}/squad-onboarding/${clubId}${squadParam}`;
+        const squadLabel = activeTab && activeTab !== "All" ? `${settings.name || "Club"} (${activeTab})` : settings.name || "Club";
+        const msg = `📋 *${squadLabel} — New Player Registration*\nWelcome aboard! Tap the link below to pop in your name, position, preferred foot & contact details:\n${url}`;
         navigator.clipboard.writeText(msg).catch(() => {});
         setCopiedSelfFillLink(true);
         setCsvFeedbackBanner({
             type: "success",
-            message: "Copied WhatsApp Player Self-Fill Link! Paste it into your squad group chat.",
+            message: `Copied New Player Registration Link${activeTab && activeTab !== "All" ? ` (${activeTab})` : ""}! Send it to any new players joining.`,
         });
         setTimeout(() => {
             setCopiedSelfFillLink(false);
             setCsvFeedbackBanner(null);
         }, 4000);
+    };
+
+    const handleApprovePendingPlayer = async (player: Player) => {
+        setProcessingPendingId(player.id);
+        try {
+            const cleanedNotes = (player.notes || "").replace(/\[PENDING_REG:1\]\s*/g, "").trim();
+            const { error } = await supabase
+                .from("players")
+                .update({
+                    status: "Active",
+                    medical_status: "Available",
+                    availability: true,
+                    is_in_training_squad: true,
+                    is_in_matchday_tracker: true,
+                    notes: cleanedNotes,
+                })
+                .eq("id", player.id);
+            if (error) throw error;
+            setPlayers((prev) =>
+                prev.map((p) =>
+                    p.id === player.id
+                        ? {
+                              ...p,
+                              status: "Active",
+                              medicalStatus: "Available",
+                              availability: true,
+                              isInTrainingSquad: true,
+                              isInMatchdayTracker: true,
+                              notes: cleanedNotes,
+                          }
+                        : p
+                )
+            );
+            logActivity(
+                "Approved New Player Registration",
+                `Approved ${player.firstName} ${player.lastName} (${player.position}) into ${player.squad || "squad"}.`
+            );
+        } catch (err: any) {
+            alert(`Could not approve player: ${err.message}`);
+        } finally {
+            setProcessingPendingId(null);
+        }
+    };
+
+    const handleDismissPendingPlayer = async (player: Player) => {
+        setProcessingPendingId(player.id);
+        try {
+            const { error } = await supabase.from("players").delete().eq("id", player.id);
+            if (error) throw error;
+            setPlayers((prev) => prev.filter((p) => p.id !== player.id));
+        } catch (err: any) {
+            alert(`Could not dismiss registration: ${err.message}`);
+        } finally {
+            setProcessingPendingId(null);
+        }
     };
 
     const resolveCsvRowPlayer = (rawRow: Record<string, any>) => {
@@ -815,6 +875,7 @@ export default function SquadPage() {
                 return {
                     id: p.id,
                     status: p.status || "Pending Invitation",
+                    email: p.email || undefined,
                     firstName: p.first_name,
                     lastName: p.last_name,
                     position: p.position as any,
@@ -1307,10 +1368,12 @@ export default function SquadPage() {
     const isPlayerFormerOrDeletedSquad = (p: Player) =>
         isFormerPlayer(p) || isPlayerInDeletedSquad(p.squad, currentSquads);
 
-    const activeSquadPlayers = players.filter((p) => !isPlayerFormerOrDeletedSquad(p));
-    const formerSquadPlayers = players.filter((p) => isPlayerFormerOrDeletedSquad(p));
+    const pendingRegistrationPlayers = players.filter((p) => isPendingPlayerRegistration(p));
+    const activeSquadPlayers = players.filter((p) => !isPendingPlayerRegistration(p) && !isPlayerFormerOrDeletedSquad(p));
+    const formerSquadPlayers = players.filter((p) => !isPendingPlayerRegistration(p) && isPlayerFormerOrDeletedSquad(p));
 
     const filteredPlayers = players.filter((player) => {
+        if (isPendingPlayerRegistration(player)) return false;
         const playerIsFormer = isPlayerFormerOrDeletedSquad(player);
         if (squadViewMode === "active" && playerIsFormer) return false;
         if (squadViewMode === "former" && !playerIsFormer) return false;
@@ -1887,6 +1950,101 @@ export default function SquadPage() {
         );
     };
 
+    const renderPendingRegistrationsBanner = (isMobile = false) => {
+        if (pendingRegistrationPlayers.length === 0) return null;
+        return (
+            <div
+                className={`${
+                    isMobile ? "mx-3 mt-3 p-3" : "mb-5 p-4"
+                } rounded-xl border border-emerald-500/35 bg-emerald-500/5 space-y-2.5`}
+            >
+                <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[11px] font-black">
+                            {pendingRegistrationPlayers.length}
+                        </span>
+                        <span className="text-xs sm:text-sm font-black text-foreground">
+                            New Player Registration{pendingRegistrationPlayers.length === 1 ? "" : "s"} Waiting Approval
+                        </span>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground hidden sm:inline">
+                        Approve to add to live squad or dismiss duplicate/mistake entries
+                    </span>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                    {pendingRegistrationPlayers.map((reg) => {
+                        const phoneMatch = reg.notes?.match(/\[PHONE:([^\]]+)\]/);
+                        const phoneStr = phoneMatch?.[1]?.trim() || "";
+                        const isBusy = processingPendingId === reg.id;
+                        return (
+                            <div
+                                key={reg.id}
+                                className="flex flex-wrap sm:flex-nowrap items-center justify-between gap-2.5 rounded-lg border border-border bg-card px-3 py-2.5 shadow-2xs"
+                            >
+                                <div className="min-w-0 space-y-0.5">
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-xs sm:text-sm font-bold text-foreground truncate">
+                                            {reg.firstName} {reg.lastName}
+                                        </span>
+                                        {renderMobilePosBadge(reg.position)}
+                                        {reg.secondaryPositions && reg.secondaryPositions.length > 0 && (
+                                            <span className="text-[10px] font-semibold text-muted-foreground">
+                                                / {reg.secondaryPositions[0]}
+                                            </span>
+                                        )}
+                                        {reg.squadNumber ? (
+                                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-surface-2 text-foreground">
+                                                #{reg.squadNumber}
+                                            </span>
+                                        ) : null}
+                                        {reg.preferredFoot && (
+                                            <span className="text-[10px] text-muted-foreground">
+                                                • {reg.preferredFoot} foot
+                                            </span>
+                                        )}
+                                        {reg.squad && (
+                                            <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+                                                {reg.squad}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="text-[11px] text-muted-foreground truncate">
+                                        {[reg.email, phoneStr].filter(Boolean).join(" • ") || "No contact info"}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-1.5 shrink-0 ml-auto">
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        disabled={isBusy}
+                                        onClick={() => handleApprovePendingPlayer(reg)}
+                                        className="h-7 px-2.5 text-[11px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white gap-1"
+                                    >
+                                        <Check className="w-3 h-3" />
+                                        Approve
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={isBusy}
+                                        onClick={() => handleDismissPendingPlayer(reg)}
+                                        className="h-7 px-2 text-[11px] font-semibold text-rose-600 border-rose-500/30 hover:bg-rose-500/10 gap-1"
+                                    >
+                                        <X className="w-3 h-3" />
+                                        Dismiss
+                                    </Button>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
     const mobilePositionGroups = [
         {
             label: "Goalkeepers",
@@ -2047,8 +2205,8 @@ export default function SquadPage() {
                             )}
                             <span className="truncate">
                                 {copiedSelfFillLink
-                                    ? "Copied! Paste into Players' WhatsApp Group ✓"
-                                    : "Player Self-Fill Link (WhatsApp Squad Setup)"}
+                                    ? "Copied! Send to New Players on WhatsApp ✓"
+                                    : `New Player Registration Link${activeTab && activeTab !== "All" ? ` (${activeTab})` : ""}`}
                             </span>
                         </span>
                         <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-emerald-500/15 shrink-0">
@@ -2229,6 +2387,8 @@ export default function SquadPage() {
                     </div>
                 )}
 
+                {renderPendingRegistrationsBanner(true)}
+
                 {/* Loan Expiry Warning on Mobile */}
                 {squadViewMode === "active" && expiringLoans.length > 0 && (
                     <div className="mx-3 mt-3 p-2.5 rounded-lg border border-purple-500/30 bg-purple-500/5 text-[11px] flex items-center gap-2 overflow-x-auto no-scrollbar">
@@ -2324,7 +2484,7 @@ export default function SquadPage() {
                     variant="outline"
                     onClick={handleCopySquadSelfFillLink}
                     className="text-xs h-9 shadow-sm gap-1.5"
-                    title="Copy one link for your players' WhatsApp group so players fill in their own position, shirt # & email"
+                    title="Copy a registration link to send to new players or trialists joining the squad"
                 >
                     {copiedSelfFillLink ? (
                         <>
@@ -2334,7 +2494,7 @@ export default function SquadPage() {
                     ) : (
                         <>
                             <Share2 className="w-3.5 h-3.5 text-emerald-600" />
-                            <span>Player Self-Fill Link</span>
+                            <span>New Player Link</span>
                         </>
                     )}
                 </Button>
@@ -2498,6 +2658,8 @@ export default function SquadPage() {
                         </div>
                     </div>
                 </div>
+
+                {renderPendingRegistrationsBanner(false)}
 
                 {/* Loan Expiry Warning Banner */}
                 {squadViewMode === "active" && expiringLoans.length > 0 && (
