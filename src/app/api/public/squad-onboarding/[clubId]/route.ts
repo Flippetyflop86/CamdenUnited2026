@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase";
 import { parsePlayerDeparture } from "@/lib/utils";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const VALID_POSITIONS = new Set([
     "GK",
@@ -24,6 +24,20 @@ const VALID_POSITIONS = new Set([
     "MID",
     "FWD",
 ]);
+
+function computeAgeFromDob(dobIso: string): number | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dobIso)) return null;
+    const [y, m, d] = dobIso.split("-").map(Number);
+    if (!y || !m || !d) return null;
+    const today = new Date();
+    let age = today.getFullYear() - y;
+    const monthDiff = today.getMonth() + 1 - m;
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d)) {
+        age--;
+    }
+    if (age < 4 || age > 99) return null;
+    return age;
+}
 
 export async function GET(
     _request: Request,
@@ -84,6 +98,7 @@ export async function POST(
         const {
             firstName,
             lastName,
+            dateOfBirth,
             email,
             phone,
             position,
@@ -94,6 +109,7 @@ export async function POST(
         } = body as {
             firstName?: string;
             lastName?: string;
+            dateOfBirth?: string;
             email?: string;
             phone?: string;
             position?: string;
@@ -119,6 +135,18 @@ export async function POST(
 
         const cleanSecPos = secondaryPosition ? String(secondaryPosition).toUpperCase().trim() : "";
         const validSecPos = cleanSecPos && VALID_POSITIONS.has(cleanSecPos) ? cleanSecPos : null;
+
+        const cleanDob = (dateOfBirth || "").trim();
+        let computedAge: number | null = null;
+        if (cleanDob) {
+            computedAge = computeAgeFromDob(cleanDob);
+            if (computedAge === null) {
+                return NextResponse.json(
+                    { error: "Please enter a valid Date of Birth." },
+                    { status: 400 }
+                );
+            }
+        }
 
         const cleanEmail = (email || "").trim().toLowerCase();
         if (!cleanEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
@@ -198,6 +226,8 @@ export async function POST(
                 club_id: clubId,
                 first_name: cleanFirst,
                 last_name: cleanLast,
+                date_of_birth: cleanDob || null,
+                ...(computedAge !== null ? { age: computedAge } : {}),
                 email: cleanEmail,
                 position: cleanPos,
                 secondary_position: validSecPos,

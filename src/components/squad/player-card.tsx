@@ -363,21 +363,6 @@ export function PlayerCard({
                         <RotateCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>
                 )}
-                {isFormer && onDelete && (
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            onDelete(player.id);
-                        }}
-                        className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 text-red-600 hover:text-red-700 hover:bg-red-500/10 border-red-500/30 bg-surface-1 shadow-sm"
-                        title="Permanently Remove from Database"
-                    >
-                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    </Button>
-                )}
                 {!isFormer && onMarkLeft && (
                     <Button
                         variant="outline"
@@ -388,9 +373,28 @@ export function PlayerCard({
                             onMarkLeft(player);
                         }}
                         className="h-8 w-8 sm:h-9 sm:w-9 shrink-0 text-muted-foreground hover:text-amber-600 hover:border-amber-500/40 bg-surface-1 shadow-sm"
-                        title="Mark as Left Club"
+                        title="Mark as Left Club (Keep History)"
                     >
                         <UserMinus className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    </Button>
+                )}
+                {onDelete && (
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onDelete(player.id);
+                        }}
+                        className={`h-8 w-8 sm:h-9 sm:w-9 shrink-0 bg-surface-1 shadow-sm ${
+                            isFormer
+                                ? "text-red-600 hover:text-red-700 hover:bg-red-500/10 border-red-500/30"
+                                : "text-muted-foreground hover:text-red-600 hover:bg-red-500/10 hover:border-red-500/40"
+                        }`}
+                        title="Permanently Delete Player from Records"
+                    >
+                        <Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                     </Button>
                 )}
             </CardFooter>

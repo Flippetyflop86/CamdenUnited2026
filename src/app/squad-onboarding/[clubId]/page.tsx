@@ -13,6 +13,8 @@ const POSITION_CHOICES = [
     "CB",
     "RB",
     "LB",
+    "RWB",
+    "LWB",
     "CDM",
     "CM",
     "CAM",
@@ -20,6 +22,19 @@ const POSITION_CHOICES = [
     "LW",
     "ST",
 ] as const;
+
+function calculatePreviewAge(dobIso: string): number | null {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(dobIso)) return null;
+    const [y, m, d] = dobIso.split("-").map(Number);
+    if (!y || !m || !d) return null;
+    const today = new Date();
+    let age = today.getFullYear() - y;
+    const monthDiff = today.getMonth() + 1 - m;
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < d)) {
+        age--;
+    }
+    return age >= 4 && age <= 99 ? age : null;
+}
 
 function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
     const searchParams = useSearchParams();
@@ -38,6 +53,7 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
     const [selectedSquad, setSelectedSquad] = useState("");
     const [firstName, setFirstName] = useState("");
     const [lastName, setLastName] = useState("");
+    const [dateOfBirth, setDateOfBirth] = useState("");
     const [email, setEmail] = useState("");
     const [phone, setPhone] = useState("");
     const [position, setPosition] = useState("CM");
@@ -102,6 +118,7 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
                 body: JSON.stringify({
                     firstName,
                     lastName,
+                    dateOfBirth: dateOfBirth || undefined,
                     email,
                     phone: phone || undefined,
                     position,
@@ -162,6 +179,7 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
         squadFromUrl &&
             club.squads.some((s) => s.toLowerCase() === squadFromUrl.toLowerCase())
     );
+    const previewAge = calculatePreviewAge(dateOfBirth);
 
     if (submittedInfo) {
         return (
@@ -267,8 +285,28 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
                         </div>
 
                         <div className="space-y-1.5">
+                            <div className="flex items-center justify-between">
+                                <Label className="text-xs font-bold text-slate-300">
+                                    Date of Birth (Optional)
+                                </Label>
+                                {previewAge !== null && (
+                                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                                        Age: {previewAge}
+                                    </span>
+                                )}
+                            </div>
+                            <Input
+                                type="date"
+                                max={new Date().toISOString().split("T")[0]}
+                                value={dateOfBirth}
+                                onChange={(e) => setDateOfBirth(e.target.value)}
+                                className="h-10 bg-slate-950 border-slate-800 text-white text-xs [color-scheme:dark]"
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
                             <Label className="text-xs font-bold text-slate-300">Main Position *</Label>
-                            <div className="grid grid-cols-5 gap-1.5">
+                            <div className="grid grid-cols-4 sm:grid-cols-6 gap-1.5">
                                 {POSITION_CHOICES.map((pos) => (
                                     <button
                                         key={pos}

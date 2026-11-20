@@ -1049,13 +1049,18 @@ export default function SquadPage() {
     const handleDeletePlayerFromDb = async (player: Player) => {
         const fullName = formatPlayerName(player);
         const confirmed = window.confirm(
-            `Permanently delete ${fullName} from the database?\n\nThis will remove the player profile and cannot be undone.`
+            `Permanently delete ${fullName} from all club records?\n\nThis completely erases their profile, match stats, training attendance, and payment history and cannot be undone.`
         );
         if (!confirmed) return;
 
         try {
             // Clean up dependent stats/records first so foreign keys never block deletion
-            await supabase.from("match_player_stats").delete().eq("player_id", player.id);
+            await Promise.allSettled([
+                supabase.from("match_player_stats").delete().eq("player_id", player.id),
+                supabase.from("training_attendance").delete().eq("player_id", player.id),
+                supabase.from("player_payment_requests").delete().eq("player_id", player.id),
+                supabase.from("player_fines").delete().eq("player_id", player.id),
+            ]);
 
             const { error } = await supabase.from("players").delete().eq("id", player.id);
             if (error) throw error;
@@ -1066,7 +1071,7 @@ export default function SquadPage() {
             }
 
             logActivity(
-                "Deleted Former Player",
+                "Deleted Player",
                 `Permanently removed ${player.firstName} ${player.lastName} from the database.`
             );
 
@@ -1998,6 +2003,11 @@ export default function SquadPage() {
                                                 #{reg.squadNumber}
                                             </span>
                                         ) : null}
+                                        {getPlayerAge(reg) !== null && (
+                                            <span className="text-[10px] font-semibold text-muted-foreground">
+                                                • {getPlayerAge(reg)} yrs
+                                            </span>
+                                        )}
                                         {reg.preferredFoot && (
                                             <span className="text-[10px] text-muted-foreground">
                                                 • {reg.preferredFoot} foot
@@ -3093,6 +3103,17 @@ export default function SquadPage() {
                                                     onClick={(e) => e.stopPropagation()}
                                                 >
                                                     <div className="flex items-center justify-end gap-1">
+                                                        {!isFormer && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="icon"
+                                                                onClick={() => handleDeletePlayerFromDb(player)}
+                                                                className="order-last h-7 w-7 text-muted-foreground hover:text-red-600 hover:bg-red-500/10 hover:border-red-500/40"
+                                                                title="Permanently Delete Player from Records"
+                                                            >
+                                                                <Trash2 className="w-3.5 h-3.5" />
+                                                            </Button>
+                                                        )}
                                                         <Button
                                                             variant="outline"
                                                             size="icon"
@@ -3876,7 +3897,22 @@ export default function SquadPage() {
                                     </button>
                                 )
                             ) : <div />}
-                            <div className="flex gap-2 shrink-0">
+                            {editingPlayer.id !== "new" && !isFormerPlayer(editingPlayer) && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const p = players.find(pl => pl.id === editingPlayer.id) || editingPlayer;
+                                        handleDeletePlayerFromDb(p);
+                                    }}
+                                    className="px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-500/10 rounded transition-colors flex items-center gap-1.5 shrink-0"
+                                    title="Permanently erase player from all club records"
+                                >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                    <span className="hidden xs:inline">Delete Player</span>
+                                    <span className="xs:hidden">Delete</span>
+                                </button>
+                            )}
+                            <div className="flex gap-2 shrink-0 ml-auto">
                                 <button
                                     onClick={closeEditDrawer}
                                     className="px-3 sm:px-4 py-1.5 text-xs border border-border rounded hover:bg-muted text-muted-foreground transition-colors"
@@ -3985,7 +4021,23 @@ export default function SquadPage() {
                         </div>
                     )}
 
-                    <DialogFooter className="gap-2 sm:gap-0">
+                    <DialogFooter className="gap-2">
+                        {departingPlayer && !isBulkDepartOpen ? (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => {
+                                    const target = departingPlayer;
+                                    setDepartingPlayer(null);
+                                    handleDeletePlayerFromDb(target);
+                                }}
+                                disabled={isSavingDeparture}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-500/10 text-xs font-semibold gap-1.5 sm:mr-auto"
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                                Delete Permanently Instead
+                            </Button>
+                        ) : <div className="hidden sm:block" />}
                         <Button
                             variant="outline"
                             onClick={() => {

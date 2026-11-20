@@ -24,6 +24,7 @@ import {
     ChevronDown,
     Edit,
     UserMinus,
+    Trash2,
     RotateCcw,
     Archive,
     Building2,
@@ -768,6 +769,32 @@ export default function PlayerProfilePage() {
         }
     };
 
+    const handlePermanentDelete = async () => {
+        if (!player) return;
+        const fullName = formatPlayerName(player);
+        const confirmed = window.confirm(
+            `Permanently delete ${fullName} from all club records?\n\nThis completely erases their profile, match stats, training attendance, and payment history and cannot be undone.`
+        );
+        if (!confirmed) return;
+        try {
+            await Promise.allSettled([
+                supabase.from("match_player_stats").delete().eq("player_id", player.id),
+                supabase.from("training_attendance").delete().eq("player_id", player.id),
+                supabase.from("player_payment_requests").delete().eq("player_id", player.id),
+                supabase.from("player_fines").delete().eq("player_id", player.id),
+            ]);
+            const { error } = await supabase.from("players").delete().eq("id", player.id);
+            if (error) throw error;
+            logActivity(
+                "Deleted Player",
+                `Permanently erased ${player.firstName} ${player.lastName} from all club records.`
+            );
+            router.push("/squad");
+        } catch (err: any) {
+            alert("Failed to delete player: " + err.message);
+        }
+    };
+
     const handleRestore = async () => {
         if (!player) return;
         try {
@@ -1352,6 +1379,13 @@ export default function PlayerProfilePage() {
                             <UserMinus className="h-3.5 w-3.5" /> Mark Left Club
                         </Button>
                     )}
+                    <Button
+                        variant="outline"
+                        onClick={handlePermanentDelete}
+                        className="col-span-2 w-full text-red-600 dark:text-red-400 hover:bg-red-500/10 border-red-500/30 h-8.5 text-xs font-semibold gap-1.5 rounded-xl"
+                    >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete Player Permanently
+                    </Button>
                 </div>
             </div>
 
@@ -1769,6 +1803,14 @@ export default function PlayerProfilePage() {
                                     <UserMinus className="h-3.5 w-3.5" /> Mark as Left Club
                                 </Button>
                             )}
+                            <Button
+                                variant="ghost"
+                                onClick={handlePermanentDelete}
+                                className="text-red-600 dark:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/25 h-9 px-3 text-xs font-medium gap-1.5 rounded-lg"
+                                title="Permanently erase player from all club records"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" /> Delete Player
+                            </Button>
                             <Button
                                 variant="outline"
                                 asChild
