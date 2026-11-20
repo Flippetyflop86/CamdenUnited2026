@@ -175,8 +175,9 @@ export async function GET(request: Request) {
             .replace(/\[MeetTime:\s*.*?\]/g, "")
             .trim();
 
+        const { event_token: _omitToken, ...publicEventFields } = event;
         const sanitizedEvent = {
-            ...event,
+            ...publicEventFields,
             location: locationMatch?.[1]?.trim() || event.location,
             notes: sanitizedNotes
         };
@@ -200,9 +201,9 @@ export async function POST(request: Request) {
     const supabaseAdmin = getAdminClient();
     try {
         const body = await request.json();
-        const { playerId, eventId, eventType, status, notes } = body;
+        const { token, playerId, eventId, eventType, status, notes } = body;
 
-        if (!playerId || !eventId || !eventType || !status) {
+        if (!token || !playerId || !eventId || !eventType || !status) {
             return NextResponse.json({ success: false, error: "Missing required parameters." }, { status: 400 });
         }
 
@@ -257,6 +258,14 @@ export async function POST(request: Request) {
                 return NextResponse.json({ success: false, error: "Match event not found." }, { status: 404 });
             }
 
+            if (match.event_token !== token && match.id !== token) {
+                return NextResponse.json({ success: false, error: "Invalid or unauthorized RSVP token." }, { status: 403 });
+            }
+
+            if (match.lock_type && match.lock_type !== "Never" && match.lock_time && new Date() > new Date(match.lock_time)) {
+                return NextResponse.json({ success: false, error: "Availability responses for this match are now locked." }, { status: 403 });
+            }
+
             if (match.club_id && player.club_id && match.club_id !== player.club_id) {
                 return NextResponse.json({ success: false, error: "Forbidden: Player does not belong to this club's event." }, { status: 403 });
             }
@@ -301,6 +310,14 @@ export async function POST(request: Request) {
 
             if (fetchSessionErr || !session) {
                 return NextResponse.json({ success: false, error: "Training session not found." }, { status: 404 });
+            }
+
+            if (session.event_token !== token && session.id !== token) {
+                return NextResponse.json({ success: false, error: "Invalid or unauthorized RSVP token." }, { status: 403 });
+            }
+
+            if (session.lock_type && session.lock_type !== "Never" && session.lock_time && new Date() > new Date(session.lock_time)) {
+                return NextResponse.json({ success: false, error: "Attendance responses for this session are now locked." }, { status: 403 });
             }
 
             if (session.club_id && player.club_id && session.club_id !== player.club_id) {

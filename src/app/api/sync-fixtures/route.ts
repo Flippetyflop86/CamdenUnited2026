@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
+import { validateExternalLeagueUrl } from '@/lib/safe-url';
 import { getDefaultKickoffTime, resolveFixtureSurface } from '@/lib/whatsapp-utils';
 
 function parseDateToken(raw: string): string | null {
@@ -49,7 +50,11 @@ export async function POST(request: Request) {
         }
 
         url = String(url).trim();
-        let fetchUrl = url;
+        const urlCheck = validateExternalLeagueUrl(url);
+        if (!urlCheck.ok) {
+            return NextResponse.json({ success: false, error: urlCheck.error }, { status: 400 });
+        }
+        let fetchUrl = urlCheck.url;
 
         // For Mitoo URLs, upgrade TeamHist.cfm -> TeamHistAll.cfm (which includes both League and Cup fixtures) and MDX2025 -> MDX2026
         if (/mitoofootball\.com/i.test(fetchUrl)) {

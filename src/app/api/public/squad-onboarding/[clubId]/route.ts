@@ -28,13 +28,18 @@ const VALID_POSITIONS = new Set([
 ]);
 
 function getSigningSecret(): string {
-    return (
-        process.env.SUPABASE_SERVICE_ROLE_KEY ||
-        process.env.STRIPE_SECRET_KEY ||
+    const serverSecret =
+        process.env.PLAYER_INVITE_SECRET ||
         process.env.CRON_SECRET ||
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
-        "clubflow-player-reg-secret"
-    );
+        process.env.SUPABASE_SERVICE_ROLE_KEY ||
+        process.env.STRIPE_SECRET_KEY;
+    if (serverSecret) {
+        return serverSecret;
+    }
+    if (process.env.NODE_ENV !== "production") {
+        return "clubflow-local-dev-secret";
+    }
+    throw new Error("Server signing secret (SUPABASE_SERVICE_ROLE_KEY or PLAYER_INVITE_SECRET) is not configured.");
 }
 
 function signInviteToken(clubId: string, nonce: string, expUnix: number): string {

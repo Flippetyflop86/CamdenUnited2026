@@ -77,6 +77,7 @@ export default function AvailabilityResponderPage() {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
+                    token,
                     playerId: player.id,
                     eventId: event.id,
                     eventType,

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 import { checkRateLimit, getClientIdentifier } from '@/lib/rate-limit';
+import { validateExternalLeagueUrl } from '@/lib/safe-url';
 
 // Run in London (UK) on Vercel so UK football websites (like Mitoo) don't geo-block US datacenter IPs
 export const preferredRegion = ['lhr1'];
@@ -408,6 +409,11 @@ export async function POST(request: Request) {
         }
 
         url = String(url).trim();
+        const urlCheck = validateExternalLeagueUrl(url);
+        if (!urlCheck.ok) {
+            return NextResponse.json({ success: false, error: urlCheck.error }, { status: 400 });
+        }
+        url = urlCheck.url;
 
         let fetchUrl = url;
         const isFaFullTime = /fulltime\.thefa\.com/i.test(fetchUrl);
