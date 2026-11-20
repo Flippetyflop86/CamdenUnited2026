@@ -43,8 +43,9 @@ export default function StaffPage() {
     });
 
     useEffect(() => {
+        if (!clubId) return;
         fetchStaff();
-    }, []);
+    }, [clubId]);
 
     async function fetchStaff() {
         try {
@@ -154,7 +155,9 @@ export default function StaffPage() {
         try {
             if (isNew) {
                 // Check if this new staff member matches an existing club_member by email/name
-                const { data: members } = await supabase.from("club_members").select("*");
+                let membersLookup = supabase.from("club_members").select("*");
+                if (clubId) membersLookup = membersLookup.eq("club_id", clubId);
+                const { data: members } = await membersLookup;
                 const emailMatch = formData.email ? members?.find(m => m.email?.toLowerCase().trim() === formData.email?.toLowerCase().trim()) : null;
                 const nameMatch = members?.find(m => m.display_name?.toLowerCase().trim() === formData.name?.toLowerCase().trim());
                 const matchingMember = emailMatch || nameMatch;

@@ -419,6 +419,23 @@ export default function AdminPage() {
 
             // Build the invite link
             const link = `${window.location.origin}/join?token=${token}`;
+            supabase.auth.getSession().then(({ data: { session } }) => {
+                if (!session?.access_token) return;
+                fetch("/api/staff/invite", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        Authorization: `Bearer ${session.access_token}`,
+                    },
+                    body: JSON.stringify({
+                        clubId: currentMember.club_id,
+                        email: inviteEmail.trim().toLowerCase(),
+                        displayName: inviteDisplayName.trim() || undefined,
+                        role: inviteRole,
+                        inviteUrl: link,
+                    }),
+                }).catch(() => {});
+            });
             setGeneratedLink(link);
             setInviteEmail("");
             setInviteDisplayName("");

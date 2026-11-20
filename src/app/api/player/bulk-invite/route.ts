@@ -55,7 +55,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: true, message: "No pending players with valid email addresses found." });
         }
 
-        const origin = request.headers.get("origin") || "http://localhost:3000";
+        const origin =
+            request.headers.get("origin") ||
+            process.env.NEXT_PUBLIC_SITE_URL ||
+            "https://www.clubflow.org.uk";
 
         // 4. Loop & send invitations
         for (const player of invitees) {

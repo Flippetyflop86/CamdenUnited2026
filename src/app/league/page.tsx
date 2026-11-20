@@ -713,6 +713,36 @@ export default function LeagueTablePage() {
                     loadNextOpponent(updated);
                 });
             }
+            // Also check Supabase LEAGUE_TABLE_CACHE so tables imported on another device (e.g. laptop -> phone) sync immediately
+            if (clubId) {
+                const localSavedAt = localStorage.getItem(syncTimestampKey);
+                const localMs = localSavedAt ? new Date(localSavedAt).getTime() : 0;
+                supabase
+                    .from('documents')
+                    .select('url')
+                    .eq('club_id', clubId)
+                    .eq('category', 'LEAGUE_TABLE_CACHE')
+                    .maybeSingle()
+                    .then(({ data: remoteDoc }) => {
+                        if (!remoteDoc?.url) return;
+                        try {
+                            const parsedPayload = JSON.parse(remoteDoc.url);
+                            const remoteMs = parsedPayload?.updatedAt ? new Date(parsedPayload.updatedAt).getTime() : 0;
+                            if (Array.isArray(parsedPayload?.teams) && parsedPayload.teams.length > 0 && remoteMs > localMs) {
+                                const remoteRows = attachPositionMovements(parsedPayload.teams, loadedRows);
+                                setCurrentTable(remoteRows);
+                                setLastSyncedAt(parsedPayload.updatedAt);
+                                localStorage.setItem(syncTimestampKey, parsedPayload.updatedAt);
+                                localStorage.setItem(storageKey, JSON.stringify(remoteRows));
+                                loadNextOpponent(remoteRows);
+                                applyNewMatchResultsToTable(remoteRows).then(updated => {
+                                    setCurrentTable(updated);
+                                    loadNextOpponent(updated);
+                                });
+                            }
+                        } catch {}
+                    });
+            }
         } else {
             loadNextOpponent(null);
             if (clubId) {

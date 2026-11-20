@@ -29,20 +29,14 @@ function PlayerSignupForm() {
 
         async function verifyToken() {
             try {
-                const { data: player, error: fetchErr } = await supabase
-                    .from("players")
-                    .select("*")
-                    .eq("activation_token", token)
-                    .single();
+                const res = await fetch(`/api/player/activate?token=${encodeURIComponent(token)}`);
+                const data = await res.json();
 
-                if (fetchErr || !player) {
-                    throw new Error("Invalid or expired activation link.");
+                if (!res.ok || !data?.success || !data?.player) {
+                    throw new Error(data?.error || "Invalid or expired activation link.");
                 }
 
-                if (player.activation_expires_at && new Date() > new Date(player.activation_expires_at)) {
-                    throw new Error("Invitation link has expired.");
-                }
-
+                const player = data.player;
                 setInvitedPlayer(player);
                 setFirstName(player.first_name || "");
                 setLastName(player.last_name || "");
@@ -81,29 +75,21 @@ function PlayerSignupForm() {
             const userId = authData.user.id;
             const clubId = invitedPlayer ? invitedPlayer.club_id : null;
 
-            // 2. Insert into club_members as Player role
-            if (clubId) {
-                const { error: memberErr } = await supabase
-                    .from("club_members")
-                    .insert({
-                        club_id: clubId,
-                        user_id: userId,
-                        role: "Player"
-                    });
-                if (memberErr) throw memberErr;
-
-                // 3. Link squad player profile to auth user
-                const { error: playerUpdateErr } = await supabase
-                    .from("players")
-                    .update({
-                        user_id: userId,
-                        status: "Registered",
-                        activation_token: null,
-                        activation_expires_at: null
-                    })
-                    .eq("id", invitedPlayer.id);
-
-                if (playerUpdateErr) throw playerUpdateErr;
+            // 2. Link invited squad player profile & club_members server-side
+            if (clubId && token) {
+                const linkRes = await fetch("/api/player/activate", {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        token,
+                        userId,
+                        email,
+                    }),
+                });
+                const linkData = await linkRes.json();
+                if (!linkRes.ok || !linkData?.success) {
+                    throw new Error(linkData?.error || "Failed to link player profile.");
+                }
             }
 
             setSuccess(true);

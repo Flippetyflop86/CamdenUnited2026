@@ -77,10 +77,13 @@ export async function POST(request: Request) {
         }
 
         // 6. Send Invitation Email
-        const origin = request.headers.get("origin") || "http://localhost:3000";
-        const activationUrl = `${origin}/activate/${activationToken}`;
+        const origin =
+            request.headers.get("origin") ||
+            process.env.NEXT_PUBLIC_SITE_URL ||
+            "https://www.clubflow.org.uk";
+        const activationUrl = `${origin}/signup/player?token=${activationToken}`;
 
-        const emailText = `Welcome to ClubFlow!\n\nYour club has invited you to activate your secure Player Portal for ${player.first_name} ${player.last_name}.\n\nThe Player Portal allows you to check availability, view fixtures, and manage your profile in seconds.\n\nClick the link below to get started and create your secure 4-digit PIN:\n${activationUrl}\n\nNote: This link will expire in 48 hours.`;
+        const emailText = `Welcome to ClubFlow!\n\nYour club has invited you to join the Player Portal for ${player.first_name} ${player.last_name}.\n\nThe Player Portal allows you to confirm availability, view fixtures, and manage your profile in seconds.\n\nClick the link below to create your player login:\n${activationUrl}\n\nNote: This link will expire in 48 hours.`;
 
         await sendEmail({
             to: email,

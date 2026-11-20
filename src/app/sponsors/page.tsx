@@ -74,12 +74,13 @@ export default function SponsorsPage() {
     // ... (keep state) ...
 
     useEffect(() => {
+        if (!clubId) return;
         fetchSponsors();
         const channel = supabase.channel('public:sponsors')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'sponsors' }, fetchSponsors)
             .subscribe();
         return () => { supabase.removeChannel(channel); };
-    }, []);
+    }, [clubId]);
 
     const fetchSponsors = async () => {
         let query = supabase.from('sponsors').select('*');
