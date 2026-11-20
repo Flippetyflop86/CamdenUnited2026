@@ -69,16 +69,9 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
     useEffect(() => {
         if (typeof window !== "undefined") {
             try {
-                const existing = localStorage.getItem(storageKey);
-                if (existing) {
-                    const parsed = JSON.parse(existing);
-                    if (parsed?.name) {
-                        setSubmittedInfo({
-                            name: parsed.name,
-                            squad: parsed.squad || squadFromUrl || "Squad",
-                        });
-                    }
-                }
+                // Clear legacy device lock so coaches/shared devices can test or register multiple distinct players
+                localStorage.removeItem(`clubflow_new_player_reg_${clubId}`);
+                localStorage.removeItem(`clubflow_player_reg_${clubId}`);
             } catch {}
         }
 
@@ -136,13 +129,7 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
 
             const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
             const finalSquad = data.squad || selectedSquad || club?.defaultSquad || "First Team";
-            const info = { name: fullName, squad: finalSquad };
-            setSubmittedInfo(info);
-            if (typeof window !== "undefined") {
-                try {
-                    localStorage.setItem(storageKey, JSON.stringify(info));
-                } catch {}
-            }
+            setSubmittedInfo({ name: fullName, squad: finalSquad });
         } catch {
             setErrorMsg("Network error submitting your registration. Please try again.");
         } finally {
@@ -196,6 +183,23 @@ function SquadRegistrationFormInner({ clubId }: { clubId: string }) {
                             <strong className="text-white">{club.name}</strong> ({submittedInfo.squad}) for
                             manager approval. You don&apos;t need to submit this form again.
                         </p>
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setSubmittedInfo(null);
+                                setFirstName("");
+                                setLastName("");
+                                setDateOfBirth("");
+                                setEmail("");
+                                setPhone("");
+                                setSquadNumber("");
+                                setSecondaryPosition("");
+                                setErrorMsg(null);
+                            }}
+                            className="mt-4 text-[11px] font-semibold text-slate-400 hover:text-white underline underline-offset-2 cursor-pointer"
+                        >
+                            Register a different player
+                        </button>
                     </CardHeader>
                 </Card>
             </div>
