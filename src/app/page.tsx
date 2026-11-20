@@ -60,79 +60,56 @@ const SHOWCASE_TABS: {
     label: string;
     shortLabel: string;
     url: string;
-    badge: string;
     headline: string;
-    description: string;
 }[] = [
     {
         id: "dashboard",
-        label: "Club Dashboard",
+        label: "Dashboard",
         shortLabel: "Dashboard",
         url: "app.clubflow.org.uk/dashboard",
-        badge: "Club Command Centre",
-        headline: "Your entire week at a glance — form, home/away splits, next fixture, training & leaderboards.",
-        description:
-            "Log in whenever suits you and immediately see what needs attention, who is attending training, how your last match went, and who leads the squad in goals, assists, MOTM awards, and training commitment.",
+        headline: "Your entire week at a glance — form, next fixture, training attendance, and top performers.",
     },
     {
         id: "squad",
-        label: "Player Squad",
+        label: "Squad",
         shortLabel: "Squad",
         url: "app.clubflow.org.uk/squad",
-        badge: "Squad & Player Stats",
-        headline: "Every player’s appearances, sub minutes, goals, assists & yellow-card suspension risks in one table.",
-        description:
-            "Synced automatically from your Matchday Planner and logged results — see starts vs sub cameos, playing minutes, assists, medical availability, and who is one yellow card away from a ban.",
+        headline: "Appearances, sub minutes, goals, assists, injuries, and yellow-card ban risks synced automatically.",
     },
     {
         id: "matchday-xi",
         label: "Matchday Planner",
-        shortLabel: "Matchday Planner",
+        shortLabel: "Matchday",
         url: "app.clubflow.org.uk/matchday-xi",
-        badge: "Selection & Tactics",
-        headline: "Pick your starting XI from available players, assign set pieces & export your matchday graphic.",
-        description:
-            "Filter available players by position, see who started the previous game, toggle between 1–11 or fixed squad numbers, customise kit colours, and keep your bench and set-piece roles synchronised.",
+        headline: "Pick your starting XI from available players, assign set pieces, and export your lineup graphic.",
     },
     {
         id: "training",
-        label: "Training & Attendance",
+        label: "Training",
         shortLabel: "Training",
         url: "app.clubflow.org.uk/training",
-        badge: "Mid-Week Planning",
-        headline: "Plan your weekly schedule and see exactly who has been turning up before you pick the team.",
-        description:
-            "Schedule mid-week sessions on the 7-day football calendar, record attendance and late arrivals, track active streaks, and review every player's last 5 sessions and seasonal commitment percentage.",
+        headline: "Plan midweek sessions and see who has actually been turning up before you pick Saturday's team.",
     },
     {
         id: "fixtures",
-        label: "Fixtures & Results",
+        label: "Fixtures",
         shortLabel: "Fixtures",
         url: "app.clubflow.org.uk/matches",
-        badge: "Season Schedule",
-        headline: "Every league and cup fixture, result, goalscorer, assist, and saved lineup in one timeline.",
-        description:
-            "Log match results in seconds, record goals, assists, cards, and Man of the Match awards, and jump straight into the saved Matchday Planner or opposition report for any fixture.",
+        headline: "Every league and cup game, result, goalscorer, assist, and saved team sheet in one timeline.",
     },
     {
         id: "recruitment",
-        label: "Player Recruitment",
+        label: "Recruitment",
         shortLabel: "Recruitment",
         url: "app.clubflow.org.uk/recruitment",
-        badge: "Player Recruitment",
-        headline: "Track players you’ve watched, manage trialists in training, and convert signings to your squad.",
-        description:
-            "Move targets through Scouted, Contacted, Invited to Training, On Trial, and Signed stages. Keep scouting notes, star ratings, and positions organised and exportable to Excel or PDF.",
+        headline: "Track players you've watched, manage trialists in training, and move signings straight into the squad.",
     },
     {
         id: "opposition",
-        label: "Opposition Reports",
+        label: "Opposition",
         shortLabel: "Opposition",
         url: "app.clubflow.org.uk/opposition",
-        badge: "Match Preparation",
-        headline: "Build structured opposition reports on every team in your division and flag their danger men.",
-        description:
-            "Document how your next opponents build up in possession, defend out of possession, and set up on corners — and send standout opposition players straight to your recruitment shortlist.",
+        headline: "Keep simple notes on every team in your league — formations, set-piece threats, and danger men.",
     },
 ];
 
@@ -2227,7 +2204,6 @@ export default function LandingPage() {
     const [cycleProgress, setCycleProgress] = useState(0);
     const [whatsappTab, setWhatsappTab] = useState<"matchday" | "training" | "result">("matchday");
     const [copiedWhatsapp, setCopiedWhatsapp] = useState(false);
-    const [activeRoleView, setActiveRoleView] = useState<"coaches" | "secretaries">("coaches");
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
 
@@ -2401,30 +2377,26 @@ export default function LandingPage() {
 
             <main className="relative z-10">
                 {/* =================================================================
-                    SECTION 1: HERO & FULL-SIZED INTERACTIVE APPLICATION SHOWCASE
+                    SECTION 1: HERO & INTERACTIVE PREVIEW
                 ================================================================= */}
-                <section className="pt-10 pb-16 sm:pt-16 sm:pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-                    <div className="text-center max-w-4xl mx-auto">
-                        <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-white/[0.04] border border-white/10 text-xs font-semibold text-neutral-300 mb-6">
-                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-                            <span>Built for Grassroots, Semi-Pro & Academy Football Clubs</span>
+                <section className="pt-12 pb-16 sm:pt-20 sm:pb-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+                    <div className="text-center max-w-3xl mx-auto">
+                        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-white/[0.04] border border-white/10 text-xs font-medium text-neutral-300 mb-6">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                            <span>Grassroots, Semi-Pro &amp; Academy Football</span>
                         </div>
 
-                        <h1 className="text-4xl sm:text-6xl lg:text-[64px] font-black tracking-tight leading-[1.06] text-white">
+                        <h1 className="text-4xl sm:text-6xl lg:text-[62px] font-black tracking-tight leading-[1.07] text-white">
                             Plan the week.{" "}
-                            <span className="text-transparent bg-clip-text bg-gradient-to-r from-white via-neutral-100 to-neutral-400">
-                                Know your opposition.
-                            </span>{" "}
+                            <span className="text-neutral-200">Know your opposition.</span>{" "}
                             <span className="text-red-500">Win on Saturday.</span>
                         </h1>
 
-                        <p className="mt-5 text-base sm:text-xl text-neutral-400 max-w-2xl mx-auto leading-relaxed font-normal">
-                            Everything your football club needs to organise the squad, plan training
-                            and prepare for matchday — in one place.
+                        <p className="mt-5 text-base sm:text-lg text-neutral-400 max-w-xl mx-auto leading-relaxed">
+                            Your squad, training attendance, team sheets, opposition notes, and match subs — all in one clean club hub.
                         </p>
 
-                        {/* Primary CTA */}
-                        <div className="mt-7 flex flex-col items-center justify-center gap-3.5">
+                        <div className="mt-8 flex flex-col items-center justify-center gap-3">
                             <Link
                                 href="/signup"
                                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2.5 px-8 py-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-base shadow-xl shadow-red-600/25 transition-all hover:-translate-y-0.5"
@@ -2432,48 +2404,24 @@ export default function LandingPage() {
                                 <span>Start Your Club</span>
                                 <ArrowRight className="w-4 h-4" />
                             </Link>
-
-                            {/* #6 Instant League & Fixture Auto-Sync Friction-Killer Strip */}
-                            <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-xs text-neutral-400 font-medium">
-                                <span className="inline-flex items-center gap-1.5">
-                                    <Zap className="w-3.5 h-3.5 text-amber-400" />
-                                    <span>Set up in under 2 minutes</span>
-                                </span>
-                                <span className="hidden sm:inline text-white/20">•</span>
-                                <span className="inline-flex items-center gap-1.5">
-                                    <RefreshCw className="w-3.5 h-3.5 text-emerald-400" />
-                                    <span>Auto-sync league table & fixtures</span>
-                                </span>
-                                <span className="hidden sm:inline text-white/20">•</span>
-                                <span className="inline-flex items-center gap-1.5">
-                                    <FileSpreadsheet className="w-3.5 h-3.5 text-sky-400" />
-                                    <span>1-click Excel / CSV squad import</span>
-                                </span>
-                            </div>
+                            <p className="text-xs text-neutral-500">
+                                Set up in 2 minutes • Auto-syncs league tables &amp; fixtures • Works on laptop &amp; phone
+                            </p>
                         </div>
                     </div>
 
                     {/* =============================================================
-                        INTERACTIVE FULL-SCALE PRODUCT SHOWCASE (#preview)
+                        INTERACTIVE PRODUCT PREVIEW (#preview)
                     ============================================================= */}
                     <div
                         id="preview"
-                        className="mt-9 sm:mt-11 scroll-mt-24"
+                        className="mt-12 sm:mt-14 scroll-mt-24"
                         onMouseEnter={() => setIsHoveringShowcase(true)}
                         onMouseLeave={() => setIsHoveringShowcase(false)}
                     >
-                        {/* Screen Selector Tabs with #8 Auto-Cycle Progress Bar */}
-                        <div className="flex flex-col items-center">
-                            <div className="text-[11px] font-bold uppercase tracking-widest text-neutral-400 mb-3 flex items-center gap-2">
-                                <span>Click any module below — or use the sidebar inside the app — to explore</span>
-                                {!autoCyclePaused && (
-                                    <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[9px] text-neutral-300">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                        {isHoveringShowcase ? "Paused on hover" : "Auto-touring"}
-                                    </span>
-                                )}
-                            </div>
-                            <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-1.5 p-1.5 rounded-2xl bg-[#0d1322] border border-white/10 shadow-xl">
+                        {/* Clean Single-Row Tab Bar */}
+                        <div className="flex justify-center mb-5">
+                            <div className="inline-flex flex-wrap items-center justify-center gap-1 p-1.5 rounded-2xl bg-[#0d1322]/90 border border-white/10 shadow-lg">
                                 {SHOWCASE_TABS.map((tab) => {
                                     const isSelected = tab.id === activeTab;
                                     return (
@@ -2481,9 +2429,9 @@ export default function LandingPage() {
                                             key={tab.id}
                                             type="button"
                                             onClick={() => handleManualTabSelect(tab.id)}
-                                            className={`relative overflow-hidden px-3 py-2 rounded-xl text-xs sm:text-[13px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                                            className={`relative overflow-hidden px-3.5 py-2 rounded-xl text-xs sm:text-[13px] font-semibold transition-all cursor-pointer whitespace-nowrap ${
                                                 isSelected
-                                                    ? "bg-red-600 text-white shadow-md shadow-red-600/30"
+                                                    ? "bg-red-600 text-white shadow-sm"
                                                     : "text-neutral-400 hover:text-white hover:bg-white/5"
                                             }`}
                                         >
@@ -2491,7 +2439,7 @@ export default function LandingPage() {
                                             <span className="sm:hidden">{tab.shortLabel}</span>
                                             {isSelected && !autoCyclePaused && (
                                                 <span
-                                                    className="absolute bottom-0 left-0 h-[3px] bg-white/80 transition-all duration-100 ease-linear"
+                                                    className="absolute bottom-0 left-0 h-[2px] bg-white/80 transition-all duration-100 ease-linear"
                                                     style={{ width: `${cycleProgress}%` }}
                                                 />
                                             )}
@@ -2501,40 +2449,22 @@ export default function LandingPage() {
                             </div>
                         </div>
 
-                        {/* Active Screen Context Banner */}
-                        <div className="mt-5 mb-4 flex flex-col md:flex-row md:items-center justify-between gap-2.5 px-1 sm:px-2">
-                            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                                <span className="self-start inline-flex items-center px-3 py-1 rounded-full bg-red-500/15 border border-red-500/30 text-red-400 text-[11px] font-semibold tracking-wide whitespace-nowrap">
-                                    {currentShowcase.badge}
-                                </span>
-                                <h2 className="text-sm sm:text-base font-semibold text-white leading-snug tracking-tight">
-                                    {currentShowcase.headline}
-                                </h2>
-                            </div>
-                            <span className="text-xs text-neutral-400 shrink-0">
-                                Showing demo club: <strong className="text-neutral-200">Northbrook United</strong>
-                            </span>
-                        </div>
-
-                        {/* Restrained Browser Window Frame containing the Real Light-Mode App */}
-                        <div className="rounded-2xl sm:rounded-3xl border border-white/15 bg-[#111111] shadow-[0_30px_100px_-20px_rgba(0,0,0,0.95)] overflow-hidden">
-                            {/* Browser Chrome Top Bar */}
-                            <div className="h-10 sm:h-11 bg-[#141414] border-b border-neutral-800 px-4 flex items-center justify-between select-none">
+                        {/* Browser Window Frame containing the Real App */}
+                        <div className="rounded-2xl sm:rounded-3xl border border-white/15 bg-[#111111] shadow-[0_30px_90px_-20px_rgba(0,0,0,0.9)] overflow-hidden">
+                            {/* Minimal Browser Top Bar */}
+                            <div className="h-10 bg-[#141414] border-b border-neutral-800 px-4 flex items-center justify-between select-none">
                                 <div className="flex items-center gap-2">
                                     <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f56]" />
                                     <span className="w-2.5 h-2.5 rounded-full bg-[#ffbd2e]" />
                                     <span className="w-2.5 h-2.5 rounded-full bg-[#27c93f]" />
                                 </div>
-                                <div className="px-3 sm:px-4 py-1 rounded-md bg-[#1f1f1f] border border-neutral-700/70 text-[10px] sm:text-[11px] font-mono text-neutral-300 flex items-center gap-2 truncate max-w-[220px] sm:max-w-none">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-                                    <span className="truncate">{currentShowcase.url}</span>
+                                <div className="px-3 py-0.5 rounded-md bg-[#1f1f1f] border border-neutral-800 text-[10px] sm:text-[11px] font-mono text-neutral-400 truncate max-w-[220px] sm:max-w-none">
+                                    {currentShowcase.url}
                                 </div>
-                                <div className="hidden sm:flex items-center gap-2 text-[11px] font-semibold text-neutral-400">
-                                    <span>Live Interactive Preview</span>
-                                </div>
+                                <div className="w-12 hidden sm:block" />
                             </div>
 
-                            {/* Real Application Shell: Dark #171717 Left Sidebar + Light #FCFCFD Main Canvas */}
+                            {/* Real Application Shell */}
                             <div className="flex min-h-[410px] bg-[#FCFCFD]">
                                 <RealAppSidebar
                                     activeNav={activeTab}
@@ -2557,164 +2487,64 @@ export default function LandingPage() {
                             </div>
                         </div>
 
-                        {/* Supporting description under the frame */}
-                        <p className="mt-4 text-center text-xs sm:text-sm text-neutral-400 max-w-3xl mx-auto">
-                            {currentShowcase.description}
+                        <p className="mt-4 text-center text-xs sm:text-sm text-neutral-400 max-w-2xl mx-auto">
+                            {currentShowcase.headline}
                         </p>
-
-                        {/* #10 Credibility Strip */}
-                        <div className="mt-10 grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                            {[
-                                {
-                                    badge: "BUILT BY COACHES",
-                                    title: "Made for Football Managers",
-                                    desc: "Created by active grassroots & semi-pro coaches who run teams every week.",
-                                    accent: "text-red-400",
-                                },
-                                {
-                                    badge: "EVERY PITCH FORMAT",
-                                    title: "11v11 • 9v9 • 7v7 • 5v5",
-                                    desc: "Full formation libraries, custom kit colours, and support from Youth to First Team.",
-                                    accent: "text-emerald-400",
-                                },
-                                {
-                                    badge: "AUTOMATIC STATS",
-                                    title: "Stats Update Automatically",
-                                    desc: "Log a result once and appearances, minutes, goals, assists & cards update everywhere.",
-                                    accent: "text-amber-400",
-                                },
-                                {
-                                    badge: "QUICK SETUP",
-                                    title: "League Table & Fixture Sync",
-                                    desc: "Pull in division standings, PPG splits, and squad lists without typing everything by hand.",
-                                    accent: "text-sky-400",
-                                },
-                            ].map((item) => (
-                                <div
-                                    key={item.title}
-                                    className="rounded-2xl bg-[#0b101d]/90 border border-white/10 p-4 text-left"
-                                >
-                                    <div className={`text-[9px] font-black uppercase tracking-widest ${item.accent}`}>
-                                        {item.badge}
-                                    </div>
-                                    <div className="text-sm font-black text-white mt-1">
-                                        {item.title}
-                                    </div>
-                                    <p className="text-xs text-neutral-400 mt-1 leading-relaxed">
-                                        {item.desc}
-                                    </p>
-                                </div>
-                            ))}
-                        </div>
                     </div>
                 </section>
 
                 {/* =================================================================
-                    SECTION 2: THREE KEY BENEFITS (#benefits)
+                    SECTION 2: THREE PILLARS (#benefits)
                 ================================================================= */}
                 <section
                     id="benefits"
-                    className="py-16 sm:py-24 border-t border-white/[0.07] bg-[#080c17]/70"
+                    className="py-16 sm:py-24 border-t border-white/[0.06] bg-[#080c17]/60"
                 >
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
-                            <div className="text-xs font-bold uppercase tracking-widest text-red-500 mb-2">
-                                Built Around the Football Week
-                            </div>
+                        <div className="text-center max-w-2xl mx-auto mb-12 sm:mb-14">
                             <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-                                Run your club with clarity all week through to matchday.
+                                Built around your football week.
                             </h2>
                             <p className="mt-3 text-base text-neutral-400">
-                                Designed for managers and coaches who want everything in one structured system instead of scattered spreadsheets, notes apps, and group chats.
+                                Less time chasing players in group chats and spreadsheets — more time preparing the team.
                             </p>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                            <div className="rounded-2xl bg-[#0d1323] border border-white/10 p-6 sm:p-7 flex flex-col justify-between">
-                                <div>
-                                    <div className="w-11 h-11 rounded-xl bg-red-600/15 border border-red-500/30 flex items-center justify-center text-red-400 mb-5">
-                                        <Shirt className="w-5 h-5" />
-                                    </div>
-                                    <h3 className="text-xl font-black text-white">
-                                        1. Prepare for matchday
-                                    </h3>
-                                    <p className="mt-2.5 text-sm text-neutral-400 leading-relaxed">
-                                        Select your starting XI from available players, assign your captain and set-piece takers, prepare your opposition scouting report, and share your matchday graphic in seconds.
-                                    </p>
+                            <div className="rounded-2xl bg-[#0d1323]/90 border border-white/10 p-6 sm:p-7">
+                                <div className="w-10 h-10 rounded-xl bg-red-600/15 border border-red-500/30 flex items-center justify-center text-red-400 mb-4">
+                                    <Shirt className="w-5 h-5" />
                                 </div>
-                                <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-bold text-neutral-300">
-                                    <span>Matchday Planner • Opposition Report</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            handleManualTabSelect("matchday-xi");
-                                            document
-                                                .getElementById("preview")
-                                                ?.scrollIntoView({ behavior: "smooth" });
-                                        }}
-                                        className="text-red-400 hover:text-red-300 cursor-pointer"
-                                    >
-                                        Preview →
-                                    </button>
-                                </div>
+                                <h3 className="text-lg font-bold text-white">
+                                    Matchday &amp; Selection
+                                </h3>
+                                <p className="mt-2 text-sm text-neutral-400 leading-relaxed">
+                                    Pick your starting XI from available players, assign captain and set-piece roles, check opposition notes, and share the team sheet in seconds.
+                                </p>
                             </div>
 
-                            <div className="rounded-2xl bg-[#0d1323] border border-white/10 p-6 sm:p-7 flex flex-col justify-between">
-                                <div>
-                                    <div className="w-11 h-11 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-5">
-                                        <ClipboardCheck className="w-5 h-5" />
-                                    </div>
-                                    <h3 className="text-xl font-black text-white">
-                                        2. Understand your squad
-                                    </h3>
-                                    <p className="mt-2.5 text-sm text-neutral-400 leading-relaxed">
-                                        Know exactly who has been turning up to training, who is injured or suspended, and who leads the team in appearances, goals, assists, and Man of the Match awards.
-                                    </p>
+                            <div className="rounded-2xl bg-[#0d1323]/90 border border-white/10 p-6 sm:p-7">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-4">
+                                    <ClipboardCheck className="w-5 h-5" />
                                 </div>
-                                <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-bold text-neutral-300">
-                                    <span>Player Squad • Training Attendance</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            handleManualTabSelect("squad");
-                                            document
-                                                .getElementById("preview")
-                                                ?.scrollIntoView({ behavior: "smooth" });
-                                        }}
-                                        className="text-emerald-400 hover:text-emerald-300 cursor-pointer"
-                                    >
-                                        Preview →
-                                    </button>
-                                </div>
+                                <h3 className="text-lg font-bold text-white">
+                                    Squad &amp; Training Stats
+                                </h3>
+                                <p className="mt-2 text-sm text-neutral-400 leading-relaxed">
+                                    See who has been turning up to training, who is injured or close to a yellow-card ban, and track goals, assists, and playing minutes automatically.
+                                </p>
                             </div>
 
-                            <div className="rounded-2xl bg-[#0d1323] border border-white/10 p-6 sm:p-7 flex flex-col justify-between">
-                                <div>
-                                    <div className="w-11 h-11 rounded-xl bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400 mb-5">
-                                        <LayoutDashboard className="w-5 h-5" />
-                                    </div>
-                                    <h3 className="text-xl font-black text-white">
-                                        3. Keep everything organised
-                                    </h3>
-                                    <p className="mt-2.5 text-sm text-neutral-400 leading-relaxed">
-                                        Manage your recruitment, trialists, league table form guide, match subs, and club fines in one clean workspace that works on both laptop and phone.
-                                    </p>
+                            <div className="rounded-2xl bg-[#0d1323]/90 border border-white/10 p-6 sm:p-7">
+                                <div className="w-10 h-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-400 mb-4">
+                                    <CreditCard className="w-5 h-5" />
                                 </div>
-                                <div className="mt-6 pt-4 border-t border-white/[0.06] flex items-center justify-between text-xs font-bold text-neutral-300">
-                                    <span>Dashboard • Recruitment • Subs</span>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            handleManualTabSelect("recruitment");
-                                            document
-                                                .getElementById("preview")
-                                                ?.scrollIntoView({ behavior: "smooth" });
-                                        }}
-                                        className="text-blue-400 hover:text-blue-300 cursor-pointer"
-                                    >
-                                        Preview →
-                                    </button>
-                                </div>
+                                <h3 className="text-lg font-bold text-white">
+                                    Automated Subs &amp; Payments
+                                </h3>
+                                <p className="mt-2 text-sm text-neutral-400 leading-relaxed">
+                                    Send matchday subs, monthly fees, or fines in one go. Players pay in one tap via Apple Pay or card, and unanswered payments get automatic reminders.
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -2725,15 +2555,12 @@ export default function LandingPage() {
                 ================================================================= */}
                 <section className="py-16 sm:py-24 border-t border-white/[0.07]">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                        <div className="text-center max-w-3xl mx-auto mb-12 sm:mb-14">
-                            <div className="text-xs font-bold uppercase tracking-widest text-emerald-400 mb-2">
-                                Ready for the Players’ Group Chat
-                            </div>
+                        <div className="text-center max-w-2xl mx-auto mb-12">
                             <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-                                One-click WhatsApp briefings, Matchday XI graphics & Scouting PDFs.
+                                Ready for the players&apos; group chat.
                             </h2>
                             <p className="mt-3 text-base text-neutral-400">
-                                Every club runs communication on WhatsApp — ClubFlow generates formatted briefings, starting lineup graphics, and opposition dossiers you can drop straight into your players’ or staff chat.
+                                Copy formatted WhatsApp match messages, starting XI graphics, and opposition notes straight into your squad chat.
                             </p>
                         </div>
 
@@ -2948,16 +2775,12 @@ export default function LandingPage() {
                     id="features"
                     className="py-16 sm:py-24 border-t border-white/[0.07] max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
                 >
-                    <div className="text-center max-w-3xl mx-auto mb-14">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-neutral-300 mb-3">
-                            <Smartphone className="w-3.5 h-3.5 text-red-500" />
-                            <span>Pitchside & On Your Phone</span>
-                        </div>
+                    <div className="text-center max-w-2xl mx-auto mb-12">
                         <h2 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-                            The exact same club hub in your pocket on matchday.
+                            In your pocket on matchday.
                         </h2>
                         <p className="mt-3 text-base text-neutral-400">
-                            Check your starting XI in the changing room, copy your fixture details to WhatsApp, or tick off Thursday night training attendance straight from your phone.
+                            Check your starting XI in the changing room, copy fixture details to WhatsApp, or tick off Thursday night training straight from your phone.
                         </p>
                     </div>
 
@@ -3264,139 +3087,12 @@ export default function LandingPage() {
                             </div>
                             <div className="mt-3 text-center">
                                 <div className="text-xs font-bold text-white">
-                                    Mobile Training & Attendance
+                                    Mobile Training &amp; Attendance
                                 </div>
                                 <div className="text-[11px] text-neutral-400">
-                                    Streaks, last 5 sessions & commitment %
+                                    Streaks, last 5 sessions &amp; commitment %
                                 </div>
                             </div>
-                        </div>
-                    </div>
-
-                    {/* #9 Role-Based Capabilities Switcher: Managers & Coaches vs Secretaries & Treasurers */}
-                    <div className="mt-20">
-                        <div className="text-center max-w-2xl mx-auto mb-8">
-                            <h3 className="text-2xl sm:text-3xl font-black text-white">
-                                Built for the dugout and the clubhouse
-                            </h3>
-                            <p className="mt-2 text-sm text-neutral-400">
-                                Switch roles below to see how ClubFlow supports both your coaching staff and your club operations team.
-                            </p>
-
-                            {/* Role Pill Switcher */}
-                            <div className="mt-5 inline-flex flex-wrap items-center justify-center gap-1.5 p-1.5 rounded-2xl bg-[#0d1322] border border-white/10">
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveRoleView("coaches")}
-                                    className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                                        activeRoleView === "coaches"
-                                            ? "bg-red-600 text-white shadow-md shadow-red-600/30"
-                                            : "text-neutral-400 hover:text-white"
-                                    }`}
-                                >
-                                    For Managers & Coaches
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveRoleView("secretaries")}
-                                    className={`px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-                                        activeRoleView === "secretaries"
-                                            ? "bg-red-600 text-white shadow-md shadow-red-600/30"
-                                            : "text-neutral-400 hover:text-white"
-                                    }`}
-                                >
-                                    For Secretaries & Treasurers
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {(activeRoleView === "coaches"
-                                ? [
-                                      {
-                                          icon: Shirt,
-                                          title: "Tactical Matchday XI & Rest Defence",
-                                          desc: "Pick your starting XI from fit players, map In-Possession 3-2-5 shapes & attacking lanes, and assign set-piece roles.",
-                                      },
-                                      {
-                                          icon: Activity,
-                                          title: "Minutes, Assists & Card Tracking",
-                                          desc: "Automatically track starts, sub minutes, goals, assists, MOTM awards, and yellow-card suspension thresholds.",
-                                      },
-                                      {
-                                          icon: ClipboardCheck,
-                                          title: "Training Streaks & Commitment %",
-                                          desc: "See every player's seasonal attendance percentage, active streaks, and last 5 sessions before naming the squad.",
-                                      },
-                                      {
-                                          icon: Shield,
-                                          title: "Opposition Reports & Danger Men",
-                                          desc: "Break down how opponents build up, where they are vulnerable, and flag standout threats for your players.",
-                                      },
-                                      {
-                                          icon: Target,
-                                          title: "Trialists & Recruitment Pipeline",
-                                          desc: "Move watched players from Scouted to On Trial and Signed, with star ratings and coach notes in one place.",
-                                      },
-                                      {
-                                          icon: MessageCircle,
-                                          title: "1-Click WhatsApp & Pitch Graphics",
-                                          desc: "Copy formatted matchday briefings and export crisp lineup PNGs and scouting PDFs straight to your group chat.",
-                                      },
-                                  ]
-                                : [
-                                      {
-                                          icon: RefreshCw,
-                                          title: "League Table & Fixture Auto-Sync",
-                                          desc: "Sync division standings, Points Per Game (PPG) splits, and upcoming league & cup schedules in seconds.",
-                                      },
-                                      {
-                                          icon: Coins,
-                                          title: "Match Subs & Membership Ledgers",
-                                          desc: "Track weekly matchday subs, annual signing-on fees, and outstanding player balances without chasing spreadsheets.",
-                                      },
-                                      {
-                                          icon: Gavel,
-                                          title: "Dressing-Room Fines & Club Expenses",
-                                          desc: "Log referee fees, pitch hire, equipment costs, and player fines with clear paid/unpaid status tracking.",
-                                      },
-                                      {
-                                          icon: Users,
-                                          title: "Registrations, Loans & Medical Status",
-                                          desc: "Maintain clean squad records across First Team, Reserves, dual-registration players, and injury return dates.",
-                                      },
-                                      {
-                                          icon: FileSpreadsheet,
-                                          title: "Instant Excel, CSV & PDF Exports",
-                                          desc: "Import existing player lists in one click and export attendance, squad stats, or financial ledgers whenever needed.",
-                                      },
-                                      {
-                                          icon: Settings,
-                                          title: "Multi-Staff Roles & Custom Branding",
-                                          desc: "Configure your club crest, custom Home/Away/3rd kit colours, home ground postcode, and staff access.",
-                                      },
-                                  ]
-                            ).map((item) => {
-                                const Icon = item.icon;
-                                return (
-                                    <div
-                                        key={item.title}
-                                        className="rounded-2xl bg-[#0d1323]/90 border border-white/10 p-5 hover:border-white/20 transition-colors"
-                                    >
-                                        <div className="flex items-center gap-3 mb-2.5">
-                                            <div className="w-9 h-9 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-red-400">
-                                                <Icon className="w-4 h-4" />
-                                            </div>
-                                            <h4 className="text-base font-bold text-white">
-                                                {item.title}
-                                            </h4>
-                                        </div>
-                                        <p className="text-xs sm:text-sm text-neutral-400 leading-relaxed">
-                                            {item.desc}
-                                        </p>
-                                    </div>
-                                );
-                            })}
                         </div>
                     </div>
                 </section>
