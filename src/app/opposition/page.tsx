@@ -1625,7 +1625,7 @@ export default function OppositionReportsPage() {
             ...(report.dangerMenList || []).map((d) => {
                 const badge = d.number ? `#${d.number.replace(/^#/, "")}` : d.position || "!";
                 return `
-                    <div style="padding:8px 10px; border:1px solid #fde68a; border-radius:8px; background:#ffffff; margin-bottom:6px;">
+                    <div class="danger-card" style="padding:7px 10px; border:1px solid #fde68a; border-radius:8px; background:#ffffff; margin-bottom:6px; break-inside:avoid; page-break-inside:avoid;">
                         <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:4px;">
                             <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                                 <span style="background:#f59e0b; color:#0f172a; font-weight:900; font-size:10.5px; padding:1px 6px; border-radius:4px;">${badge}</span>
@@ -1645,13 +1645,13 @@ export default function OppositionReportsPage() {
             ...parseScoutingNotesIntoItems(report.dangerMen || "").map((item) =>
                 item.subject
                     ? `
-                        <div style="display:flex; align-items:flex-start; gap:8px; padding:6px 10px; border:1px solid #fde68a; border-radius:7px; background:#ffffff; margin-bottom:5px;">
+                        <div class="danger-card" style="display:flex; align-items:flex-start; gap:8px; padding:6px 10px; border:1px solid #fde68a; border-radius:7px; background:#ffffff; margin-bottom:5px; break-inside:avoid; page-break-inside:avoid;">
                             <span style="background:#fef3c7; color:#92400e; border:1px solid #fcd34d; font-weight:800; font-size:11px; padding:2px 8px; border-radius:5px; white-space:nowrap; flex-shrink:0;">${item.subject}</span>
                             <span style="font-size:12px; color:#1e293b; line-height:1.4;">${item.detail}</span>
                         </div>
                     `
                     : `
-                        <div style="display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border-left:3px solid #f59e0b; background:#ffffff; border-radius:4px; margin-bottom:4px; font-size:12px; color:#1e293b;">
+                        <div class="danger-card" style="display:flex; align-items:flex-start; gap:6px; padding:5px 8px; border-left:3px solid #f59e0b; background:#ffffff; border-radius:4px; margin-bottom:4px; font-size:12px; color:#1e293b; break-inside:avoid; page-break-inside:avoid;">
                             <span>•</span>
                             <span>${item.detail}</span>
                         </div>
@@ -1689,17 +1689,17 @@ export default function OppositionReportsPage() {
                 const displayPos = getDisplayPosition(pos.label);
                 const hasDetails = Boolean(profile?.strengths || profile?.weaknesses || profile?.traits);
                 return `
-                    <div style="padding:5px 8px; border:1px solid #e2e8f0; border-radius:6px; background:#f8fafc; font-size:11.5px;">
-                        <div style="display:flex; align-items:center; gap:7px;">
-                            <span style="width:21px; height:21px; border-radius:9999px; background:#dc2626; color:#ffffff; display:inline-flex; align-items:center; justify-content:center; font-size:10px; font-weight:900; flex-shrink:0;">${pos.number}</span>
-                            <span style="font-weight:800; color:#475569; width:30px; flex-shrink:0;">${displayPos}</span>
+                    <div class="lineup-row" style="padding:4px 7px; border:1px solid #e2e8f0; border-radius:6px; background:#f8fafc; font-size:11px; break-inside:avoid; page-break-inside:avoid;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="width:20px; height:20px; border-radius:9999px; background:#dc2626; color:#ffffff; display:inline-flex; align-items:center; justify-content:center; font-size:9.5px; font-weight:900; flex-shrink:0;">${pos.number}</span>
+                            <span style="font-weight:800; color:#475569; width:28px; flex-shrink:0;">${displayPos}</span>
                             <span style="font-weight:800; color:#0f172a; flex:1; word-break:break-word;">${playerName}</span>
                             ${profile?.foot && profile.foot !== "Right" ? `<span style="font-size:9.5px; font-weight:700; color:#64748b;">${profile.foot}</span>` : ""}
                             ${profile?.role ? `<span style="font-size:9.5px; font-weight:700; color:#b45309; background:#fef3c7; padding:1px 6px; border-radius:4px;">${profile.role}</span>` : ""}
                         </div>
                         ${
                             hasDetails
-                                ? `<div style="margin-top:4px; padding-left:28px; display:flex; flex-wrap:wrap; gap:4px; font-size:10.5px;">
+                                ? `<div style="margin-top:3px; padding-left:26px; display:flex; flex-wrap:wrap; gap:3px; font-size:10px;">
                                     ${profile?.strengths ? `<span style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; padding:1px 5px; border-radius:4px;"><strong>💪</strong> ${profile.strengths}</span>` : ""}
                                     ${profile?.weaknesses ? `<span style="background:#fff1f2; color:#9f1239; border:1px solid #fecdd3; padding:1px 5px; border-radius:4px;"><strong>🎯</strong> ${profile.weaknesses}</span>` : ""}
                                     ${profile?.traits ? `<span style="color:#475569;">${profile.traits}</span>` : ""}
@@ -1718,22 +1718,35 @@ export default function OppositionReportsPage() {
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
                 <title>${activeFixtureTitle} - ${activeCompetitionLabel}</title>
                 <style>
+                    @page { size: A4 portrait; margin: 12mm; }
                     body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 28px; max-width: 960px; margin: 0 auto; color: #0f172a; -webkit-print-color-adjust: exact; print-color-adjust: exact; box-sizing: border-box; }
-                    .header { border-bottom: 3px solid #dc2626; padding-bottom: 14px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
-                    h1 { margin: 4px 0 0 0; font-size: 26px; font-weight: 900; word-break: break-word; }
-                    .sub { font-size: 12px; font-weight: 800; color: #dc2626; text-transform: uppercase; letter-spacing: 0.06em; }
-                    .stats-bar { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
-                    .pitch-row { display: grid; grid-template-columns: 1.12fr 0.88fr; gap: 14px; margin-bottom: 16px; break-inside: avoid; }
-                    .pitch-canvas { position: relative; width: 100%; height: 410px; background: #047857; border-radius: 10px; overflow: hidden; border: 2px solid #065f46; }
-                    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-                    .box { border: 1px solid #e2e8f0; border-left: 4px solid #dc2626; border-radius: 8px; padding: 12px; background: #ffffff; break-inside: avoid; }
-                    .box-full { grid-column: 1 / -1; }
-                    .box-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; margin-bottom: 6px; }
-                    .box-body { font-size: 12.5px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; color: #1e293b; }
+                    .header { border-bottom: 3px solid #dc2626; padding-bottom: 12px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+                    h1 { margin: 4px 0 0 0; font-size: 24px; font-weight: 900; word-break: break-word; }
+                    .sub { font-size: 11.5px; font-weight: 800; color: #dc2626; text-transform: uppercase; letter-spacing: 0.06em; }
+                    .stats-bar { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 14px; margin-bottom: 12px; font-size: 11.5px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; }
+                    .pitch-row { display: flex; align-items: flex-start; gap: 14px; margin-bottom: 14px; }
+                    .pitch-col { flex: 1.08; min-width: 0; break-inside: avoid; page-break-inside: avoid; }
+                    .lineup-col { flex: 0.92; min-width: 0; }
+                    .pitch-canvas { position: relative; width: 100%; height: 390px; background: #047857; border-radius: 10px; overflow: hidden; border: 2px solid #065f46; break-inside: avoid; page-break-inside: avoid; }
+                    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+                    .box { border: 1px solid #e2e8f0; border-left: 4px solid #dc2626; border-radius: 8px; padding: 10px 12px; background: #ffffff; break-inside: avoid; page-break-inside: avoid; }
+                    .box-full { grid-column: 1 / -1; break-inside: auto; page-break-inside: auto; }
+                    .box-title { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; margin-bottom: 6px; break-after: avoid; page-break-after: avoid; }
+                    .box-body { font-size: 12px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; color: #1e293b; }
+                    @media print {
+                        body { padding: 0; max-width: none; }
+                        .pitch-row { display: block; }
+                        .pitch-row::after { content: ""; display: table; clear: both; }
+                        .pitch-col { float: left; width: 50%; padding-right: 12px; box-sizing: border-box; break-inside: avoid; page-break-inside: avoid; }
+                        .lineup-col { margin-left: 52%; }
+                        .pitch-canvas { height: 350px; }
+                        .grid { display: block; }
+                        .box { margin-bottom: 10px; }
+                    }
                     @media screen and (max-width: 680px) {
                         body { padding: 14px; }
                         h1 { font-size: 20px; }
-                        .pitch-row { grid-template-columns: 1fr; }
+                        .pitch-row { flex-direction: column; }
                         .pitch-canvas { height: 350px; }
                         .grid { grid-template-columns: 1fr; }
                     }
@@ -1763,7 +1776,7 @@ export default function OppositionReportsPage() {
                     }</div>
                 </div>
                 <div class="pitch-row">
-                    <div>
+                    <div class="pitch-col">
                         <div class="box-title" style="color:#047857; margin-bottom:6px;">⚽ ${report.name} (${report.formation})</div>
                         <div class="pitch-canvas">
                             <div style="position:absolute; inset:12px; border:2px solid rgba(255,255,255,0.55); border-radius:4px;"></div>
@@ -1774,9 +1787,9 @@ export default function OppositionReportsPage() {
                             ${pitchTokensHtml}
                         </div>
                     </div>
-                    <div>
+                    <div class="lineup-col">
                         <div class="box-title" style="color:#0f172a; margin-bottom:6px;">👥 ${report.name} Players & Roles</div>
-                        <div style="display:grid; grid-template-columns:1fr; gap:4px;">
+                        <div style="display:flex; flex-direction:column; gap:4px;">
                             ${lineupRowsHtml}
                         </div>
                     </div>
