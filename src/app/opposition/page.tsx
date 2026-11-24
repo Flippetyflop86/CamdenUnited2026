@@ -139,6 +139,13 @@ export default function OppositionReportsPage() {
     const [editedReport, setEditedReport] = useState<ScoutingReport | null>(null);
     const [selectedProfileIndex, setSelectedProfileIndex] = useState<number | null>(null);
 
+    const selectedReportRef = useRef<ScoutingReport | null>(null);
+    const editedReportRef = useRef<ScoutingReport | null>(null);
+    const isEditingRef = useRef<boolean>(false);
+    selectedReportRef.current = selectedReport;
+    editedReportRef.current = editedReport;
+    isEditingRef.current = isEditing;
+
     const [matches, setMatches] = useState<any[]>([]);
     const [leagueRows, setLeagueRows] = useState<any[]>([]);
     const [teamSearch, setTeamSearch] = useState("");
@@ -221,7 +228,18 @@ export default function OppositionReportsPage() {
                 strengths = rawNotes.strengths || "";
                 weaknesses = rawNotes.weaknesses || "";
                 dangerMen = rawNotes.dangerMen || rawNotes.keyPersonnel || "";
-                dangerMenList = Array.isArray(rawNotes.dangerMenList) ? rawNotes.dangerMenList : [];
+                dangerMenList = Array.isArray(rawNotes.dangerMenList)
+                    ? rawNotes.dangerMenList.map((dm: any, idx: number) => ({
+                          id: dm?.id || `dm-${row.id || "row"}-${idx}`,
+                          number: dm?.number ?? "",
+                          name: dm?.name ?? "",
+                          position: dm?.position ?? "",
+                          foot: dm?.foot || "Right",
+                          strengths: dm?.strengths ?? "",
+                          weaknesses: dm?.weaknesses ?? "",
+                          notes: dm?.notes ?? ""
+                      }))
+                    : [];
                 const rawPostMatch = (rawNotes.postMatchReview || "").trim();
                 const rawGeneral = (rawNotes.generalNotes || rawNotes.text || "").trim();
                 if (rawPostMatch && rawGeneral && rawPostMatch !== rawGeneral) {
@@ -274,11 +292,11 @@ export default function OppositionReportsPage() {
         const mapped = (data || []).map(parseDbReport);
         setReports(mapped);
 
-        if (mapped.length > 0 && !selectedReport && !editedReport) {
+        if (mapped.length > 0 && !selectedReportRef.current && !editedReportRef.current && !isEditingRef.current) {
             setSelectedReport(mapped[0]);
             setShowPitchSection(true);
             setIsEditing(false);
-        } else if (mapped.length === 0 && !editedReport) {
+        } else if (mapped.length === 0 && !editedReportRef.current && !isEditingRef.current) {
             const blank = createBlankReport();
             setEditedReport(blank);
             setShowPitchSection(true);
@@ -968,32 +986,44 @@ export default function OppositionReportsPage() {
 
     // Danger Men structured list helpers
     const handleAddDangerMan = () => {
-        const base = isEditing && editedReport ? editedReport : selectedReport || createBlankReport();
         const newItem: DangerManItem = {
-            id: Math.random().toString(36).substring(2, 9),
+            id: `dm-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 7)}`,
             number: "",
             name: "",
             position: "ST",
             foot: "Right",
+            strengths: "",
+            weaknesses: "",
             notes: ""
         };
-        setEditedReport({
-            ...base,
-            dangerMenList: [...(base.dangerMenList || []), newItem],
-            playerProfiles: [...(base.playerProfiles || [])],
-            lineup: [...(base.lineup || [])]
+        setEditedReport((prev) => {
+            const base = (isEditingRef.current && prev) ? prev : (selectedReportRef.current || prev || createBlankReport());
+            return {
+                ...base,
+                dangerMenList: [...(base.dangerMenList || []), newItem],
+                playerProfiles: [...(base.playerProfiles || [])],
+                lineup: [...(base.lineup || [])]
+            };
         });
         setIsEditing(true);
     };
 
-    const handleUpdateDangerMan = (id: string, field: keyof DangerManItem, value: string) => {
-        if (!isEditing || !editedReport) return;
-        setEditedReport({
-            ...editedReport,
-            dangerMenList: (editedReport.dangerMenList || []).map((item) =>
-                item.id === id ? { ...item, [field]: value } : item
-            )
+    const handleUpdateDangerMan = (id: string, field: keyof DangerManItem, value: string, fallbackIndex?: number) => {
+        setEditedReport((prev) => {
+            const base = prev || selectedReportRef.current || createBlankReport();
+            const list = base.dangerMenList || [];
+            return {
+                ...base,
+                dangerMenList: list.map((item, idx) =>
+                    (id && item.id === id) || (fallbackIndex !== undefined && idx === fallbackIndex)
+                        ? { ...item, [field]: value }
+                        : item
+                )
+            };
         });
+        if (!isEditingRef.current) {
+            setIsEditing(true);
+        }
     };
 
     const handleRemoveDangerMan = async (id: string, e?: React.MouseEvent) => {
@@ -2411,23 +2441,36 @@ export default function OppositionReportsPage() {
                                         Shirt #, position, foot &amp; how to stop them
                                     </p>
                                 </div>
-                                <Button
-                                    type="button"
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={handleAddDangerMan}
-                                    className="h-7 px-2.5 text-[11px] font-extrabold border-amber-500/40 text-amber-500"
-                                >
-                                    <Plus className="h-3 w-3 mr-1" />
-                                    Player
-                                </Button>
+                                <div className="flex items-center gap-1.5">
+                                    {isEditing && (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            onClick={handleSaveReport}
+                                            className="h-7 px-2.5 text-[11px] font-extrabold bg-emerald-600 hover:bg-emerald-700 text-white"
+                                        >
+                                            <Save className="h-3 w-3 mr-1" />
+                                            Save
+                                        </Button>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleAddDangerMan}
+                                        className="h-7 px-2.5 text-[11px] font-extrabold border-amber-500/40 text-amber-500"
+                                    >
+                                        <Plus className="h-3 w-3 mr-1" />
+                                        Player
+                                    </Button>
+                                </div>
                             </div>
 
                             {(activeReport.dangerMenList || []).length > 0 && (
                                 <div className="space-y-2">
-                                    {(activeReport.dangerMenList || []).map((dm) => (
+                                    {(activeReport.dangerMenList || []).map((dm, dmIdx) => (
                                         <div
-                                            key={dm.id}
+                                            key={dm.id || `dm-m-${dmIdx}`}
                                             className="rounded-xl bg-surface-2 border border-border p-2.5 space-y-2"
                                         >
                                             {isEditing ? (
@@ -2435,24 +2478,24 @@ export default function OppositionReportsPage() {
                                                     <div className="grid grid-cols-[54px_68px_1fr_auto] gap-1.5 items-center">
                                                         <Input
                                                             placeholder="#9"
-                                                            value={dm.number}
+                                                            value={dm.number ?? ""}
                                                             onChange={(e) =>
-                                                                handleUpdateDangerMan(dm.id, "number", e.target.value)
+                                                                handleUpdateDangerMan(dm.id, "number", e.target.value, dmIdx)
                                                             }
-                                                            className="h-9 text-base sm:text-xs font-bold text-center bg-surface-1 px-1"
+                                                            className="h-9 text-base sm:text-xs font-bold text-center text-foreground bg-surface-1 px-1"
                                                         />
                                                         <Input
                                                             placeholder="ST/LW"
-                                                            value={dm.position}
+                                                            value={dm.position ?? ""}
                                                             onChange={(e) =>
-                                                                handleUpdateDangerMan(dm.id, "position", e.target.value)
+                                                                handleUpdateDangerMan(dm.id, "position", e.target.value, dmIdx)
                                                             }
-                                                            className="h-9 text-base sm:text-xs font-bold bg-surface-1 px-2"
+                                                            className="h-9 text-base sm:text-xs font-bold text-foreground bg-surface-1 px-2"
                                                         />
                                                         <select
                                                             value={dm.foot || "Right"}
                                                             onChange={(e) =>
-                                                                handleUpdateDangerMan(dm.id, "foot", e.target.value)
+                                                                handleUpdateDangerMan(dm.id, "foot", e.target.value, dmIdx)
                                                             }
                                                             className="h-9 rounded-md border border-border bg-surface-1 px-2 text-base sm:text-xs font-semibold text-foreground"
                                                         >
@@ -2470,36 +2513,36 @@ export default function OppositionReportsPage() {
                                                     </div>
                                                     <Input
                                                         placeholder="Player name or nickname..."
-                                                        value={dm.name}
+                                                        value={dm.name ?? ""}
                                                         onChange={(e) =>
-                                                            handleUpdateDangerMan(dm.id, "name", e.target.value)
+                                                            handleUpdateDangerMan(dm.id, "name", e.target.value, dmIdx)
                                                         }
-                                                        className="h-9 text-base sm:text-xs font-semibold bg-surface-1"
+                                                        className="h-9 text-base sm:text-xs font-semibold text-foreground bg-surface-1"
                                                     />
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                                         <Input
                                                             placeholder="💪 Strengths (e.g. Pace, 1v1, aerial)..."
-                                                            value={dm.strengths || ""}
+                                                            value={dm.strengths ?? ""}
                                                             onChange={(e) =>
-                                                                handleUpdateDangerMan(dm.id, "strengths", e.target.value)
+                                                                handleUpdateDangerMan(dm.id, "strengths", e.target.value, dmIdx)
                                                             }
-                                                            className="h-9 text-base sm:text-xs bg-emerald-500/5 border-emerald-500/30"
+                                                            className="h-9 text-base sm:text-xs text-foreground bg-emerald-500/5 border-emerald-500/30"
                                                         />
                                                         <Input
                                                             placeholder="🎯 Weaknesses / Exploit (e.g. Press 1st touch)..."
-                                                            value={dm.weaknesses || ""}
+                                                            value={dm.weaknesses ?? ""}
                                                             onChange={(e) =>
-                                                                handleUpdateDangerMan(dm.id, "weaknesses", e.target.value)
+                                                                handleUpdateDangerMan(dm.id, "weaknesses", e.target.value, dmIdx)
                                                             }
-                                                            className="h-9 text-base sm:text-xs bg-rose-500/5 border-rose-500/30"
+                                                            className="h-9 text-base sm:text-xs text-foreground bg-rose-500/5 border-rose-500/30"
                                                         />
                                                     </div>
                                                     <textarea
                                                         rows={2}
                                                         placeholder="Additional tactical notes..."
-                                                        value={dm.notes}
+                                                        value={dm.notes ?? ""}
                                                         onChange={(e) =>
-                                                            handleUpdateDangerMan(dm.id, "notes", e.target.value)
+                                                            handleUpdateDangerMan(dm.id, "notes", e.target.value, dmIdx)
                                                         }
                                                         className="w-full rounded-md border border-border bg-surface-1 px-2.5 py-1.5 text-base sm:text-xs text-foreground placeholder:text-muted-foreground outline-none resize-y"
                                                     />
@@ -3763,6 +3806,17 @@ export default function OppositionReportsPage() {
                                 </p>
                             </div>
                             <div className="flex items-center gap-1.5">
+                                {isEditing && (
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        onClick={handleSaveReport}
+                                        className="h-8 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white"
+                                    >
+                                        <Save className="h-3.5 w-3.5 mr-1" />
+                                        Save
+                                    </Button>
+                                )}
                                 <Button
                                     type="button"
                                     size="sm"
@@ -3779,9 +3833,9 @@ export default function OppositionReportsPage() {
                             {/* Structured Danger Men Cards */}
                             {(activeReport.dangerMenList || []).length > 0 && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
-                                    {(activeReport.dangerMenList || []).map((dm) => (
+                                    {(activeReport.dangerMenList || []).map((dm, dmIdx) => (
                                         <div
-                                            key={dm.id}
+                                            key={dm.id || `dm-d-${dmIdx}`}
                                             className="rounded-xl bg-surface-2 border border-border p-3 space-y-2"
                                         >
                                             {isEditing ? (
@@ -3789,32 +3843,32 @@ export default function OppositionReportsPage() {
                                                     <div className="grid grid-cols-[52px_72px_1fr_82px_auto] gap-1.5 items-center">
                                                         <Input
                                                             placeholder="#9"
-                                                            value={dm.number}
+                                                            value={dm.number ?? ""}
                                                             onChange={(e) =>
-                                                                handleUpdateDangerMan(dm.id, "number", e.target.value)
+                                                                handleUpdateDangerMan(dm.id, "number", e.target.value, dmIdx)
                                                             }
-                                                            className="h-8 text-xs font-bold text-center bg-surface-1 px-1.5"
+                                                            className="h-8 text-xs font-bold text-center text-foreground bg-surface-1 px-1.5"
                                                         />
                                                         <Input
                                                             placeholder="Pos (ST)"
-                                                            value={dm.position}
+                                                            value={dm.position ?? ""}
                                                             onChange={(e) =>
-                                                                handleUpdateDangerMan(dm.id, "position", e.target.value)
+                                                                handleUpdateDangerMan(dm.id, "position", e.target.value, dmIdx)
                                                             }
-                                                            className="h-8 text-xs font-bold bg-surface-1 px-2"
+                                                            className="h-8 text-xs font-bold text-foreground bg-surface-1 px-2"
                                                         />
                                                         <Input
                                                             placeholder="Player name / nickname..."
-                                                            value={dm.name}
+                                                            value={dm.name ?? ""}
                                                             onChange={(e) =>
-                                                                handleUpdateDangerMan(dm.id, "name", e.target.value)
+                                                                handleUpdateDangerMan(dm.id, "name", e.target.value, dmIdx)
                                                             }
-                                                            className="h-8 text-xs font-semibold bg-surface-1 px-2"
+                                                            className="h-8 text-xs font-semibold text-foreground bg-surface-1 px-2"
                                                         />
                                                         <select
                                                             value={dm.foot || "Right"}
                                                             onChange={(e) =>
-                                                                handleUpdateDangerMan(dm.id, "foot", e.target.value)
+                                                                handleUpdateDangerMan(dm.id, "foot", e.target.value, dmIdx)
                                                             }
                                                             className="h-8 rounded-md border border-border bg-surface-1 px-1.5 text-[11px] font-semibold text-foreground"
                                                         >
@@ -3833,27 +3887,27 @@ export default function OppositionReportsPage() {
                                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                                         <Input
                                                             placeholder="💪 Strengths (e.g. Pace, 1v1, aerial)..."
-                                                            value={dm.strengths || ""}
+                                                            value={dm.strengths ?? ""}
                                                             onChange={(e) =>
-                                                                handleUpdateDangerMan(dm.id, "strengths", e.target.value)
+                                                                handleUpdateDangerMan(dm.id, "strengths", e.target.value, dmIdx)
                                                             }
-                                                            className="h-8 text-xs bg-emerald-500/5 border-emerald-500/30"
+                                                            className="h-8 text-xs text-foreground bg-emerald-500/5 border-emerald-500/30"
                                                         />
                                                         <Input
                                                             placeholder="🎯 Weaknesses / Exploit (e.g. Press 1st touch)..."
-                                                            value={dm.weaknesses || ""}
+                                                            value={dm.weaknesses ?? ""}
                                                             onChange={(e) =>
-                                                                handleUpdateDangerMan(dm.id, "weaknesses", e.target.value)
+                                                                handleUpdateDangerMan(dm.id, "weaknesses", e.target.value, dmIdx)
                                                             }
-                                                            className="h-8 text-xs bg-rose-500/5 border-rose-500/30"
+                                                            className="h-8 text-xs text-foreground bg-rose-500/5 border-rose-500/30"
                                                         />
                                                     </div>
                                                     <textarea
                                                         rows={2}
                                                         placeholder="Additional tactical notes (e.g. Cuts inside onto left foot)..."
-                                                        value={dm.notes}
+                                                        value={dm.notes ?? ""}
                                                         onChange={(e) =>
-                                                            handleUpdateDangerMan(dm.id, "notes", e.target.value)
+                                                            handleUpdateDangerMan(dm.id, "notes", e.target.value, dmIdx)
                                                         }
                                                         className="w-full rounded-md border border-border bg-surface-1 px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none resize-y"
                                                     />
