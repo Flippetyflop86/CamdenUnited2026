@@ -13,6 +13,9 @@ import {
     parsePlayerDeparture,
     serializeDepartureToNotes,
     stripDepartureTags,
+    stripInternalPlayerNoteTags,
+    parsePlayerNoteDate,
+    formatPlayerNoteDate,
     getLoanExpiryStatus,
 } from "@/lib/utils";
 import { useClub } from "@/context/club-context";
@@ -954,6 +957,7 @@ export default function SquadPage() {
                     holidayStart: p.holiday_start,
                     holidayEnd: p.holiday_end,
                     notes: p.notes,
+                    noteDate: parsePlayerNoteDate(p.notes),
                     weight: p.weight,
                     height: p.height,
                     preferredFoot: p.notes && p.notes.includes("[FOOT:Left]") ? "Left" : (p.notes && p.notes.includes("[FOOT:Right]") ? "Right" : (p.notes && p.notes.includes("[FOOT:Both]") ? "Both" : undefined)),
@@ -1528,22 +1532,13 @@ export default function SquadPage() {
         }
     };
 
-    const handleEdit = (player: Player) => { 
+    const handleEdit = (player: Player) => {
         // Strip PIN, departure tags, loan tags, and custom V3 tags from notes before showing edit dialog
-        let cleanedNotes = stripDepartureTags(player.notes ? player.notes : "");
-        cleanedNotes = cleanedNotes.replace(/\[PIN:\d{4}\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[FOOT:(Left|Right|Both)\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[REG:(Standard|Dual|LoanParent|LoanSub)\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[LOAN_CLUB:[^\]]*\]/g, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[LOAN_END:[^\]]*\]/g, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[INJURY:.*?\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[OUT_DURATION:.*?\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[RETURN_DATE:[^\]]*\]/g, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[SUSPENSION_REASON:.*?\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[SUSPENSION_DURATION:.*?\]/, "").trim();
+        const cleanedNotes = stripInternalPlayerNoteTags(player.notes || "");
+        const parsedNoteDate = parsePlayerNoteDate(player.notes) || player.noteDate;
 
-        setEditingPlayer({ ...player, notes: cleanedNotes }); 
-        setPreviewImage(player.imageUrl || null); 
+        setEditingPlayer({ ...player, notes: cleanedNotes, noteDate: parsedNoteDate });
+        setPreviewImage(player.imageUrl || null);
     };
 
     const [editReturnTo, setEditReturnTo] = useState<string | null>(null);
@@ -1577,21 +1572,26 @@ export default function SquadPage() {
         const originalPlayer = players.find(p => p.id === updatedPlayer.id);
         const matchPin = originalPlayer?.notes?.match(/\[PIN:(\d{4})\]/);
         const pinVal = matchPin ? matchPin[1] : null;
+        const matchPhone = originalPlayer?.notes?.match(/\[PHONE:([^\]]+)\]/);
+        const phoneVal = matchPhone ? matchPhone[1].trim() : null;
         const origDep = originalPlayer ? parsePlayerDeparture(originalPlayer) : { isFormer: false, departureStatus: "Active" as const };
-        let cleanedNotes = stripDepartureTags(updatedPlayer.notes ? updatedPlayer.notes : "");
-        cleanedNotes = cleanedNotes.replace(/\[PIN:\d{4}\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[FOOT:(Left|Right|Both)\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[REG:(Standard|Dual|LoanParent|LoanSub)\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[LOAN_CLUB:[^\]]*\]/g, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[LOAN_END:[^\]]*\]/g, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[INJURY:.*?\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[OUT_DURATION:.*?\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[RETURN_DATE:[^\]]*\]/g, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[SUSPENSION_REASON:.*?\]/, "").trim();
-        cleanedNotes = cleanedNotes.replace(/\[SUSPENSION_DURATION:.*?\]/, "").trim();
+        const origCleanNotes = stripInternalPlayerNoteTags(originalPlayer?.notes || "");
+        const origNoteDate = parsePlayerNoteDate(originalPlayer?.notes) || originalPlayer?.noteDate;
+        const cleanedNotes = stripInternalPlayerNoteTags(updatedPlayer.notes || "");
+
+        let noteDateVal: string | undefined;
+        if (cleanedNotes) {
+            if (cleanedNotes !== origCleanNotes) {
+                noteDateVal = new Date().toISOString();
+            } else {
+                noteDateVal = origNoteDate || updatedPlayer.noteDate || new Date().toISOString();
+            }
+        }
         
         let finalNotes = cleanedNotes;
+        if (noteDateVal) finalNotes = `${finalNotes} [NOTE_DATE:${noteDateVal}]`.trim();
         if (pinVal) finalNotes = `${finalNotes} [PIN:${pinVal}]`.trim();
+        if (phoneVal) finalNotes = `${finalNotes} [PHONE:${phoneVal}]`.trim();
         if (updatedPlayer.preferredFoot) {
             finalNotes = `${finalNotes} [FOOT:${updatedPlayer.preferredFoot}]`.trim();
         }
@@ -3896,7 +3896,20 @@ export default function SquadPage() {
 
 
                             <div className="space-y-1">
-                                <label className="block text-xs font-medium text-slate-500">Notes</label>
+                                <div className="flex items-center justify-between gap-2">
+                                    <label className="block text-xs font-medium text-slate-500">Notes</label>
+                                    {editingPlayer.noteDate && (editingPlayer.notes || "").trim() ? (
+                                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 font-medium">
+                                            <Clock className="w-3 h-3" />
+                                            Added {formatPlayerNoteDate(editingPlayer.noteDate)}
+                                        </span>
+                                    ) : (editingPlayer.notes || "").trim() ? (
+                                        <span className="inline-flex items-center gap-1 text-[11px] text-slate-400">
+                                            <Clock className="w-3 h-3" />
+                                            Date stamped on save
+                                        </span>
+                                    ) : null}
+                                </div>
                                 <textarea
                                     className="w-full h-24 px-3 py-2 border rounded-md text-xs resize-none focus:ring-2 focus:ring-slate-400 focus:outline-none"
                                     value={editingPlayer.notes || ""}

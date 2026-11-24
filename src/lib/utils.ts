@@ -197,4 +197,44 @@ export function getLoanExpiryStatus(loanEndDate?: string): {
     };
 }
 
+export function stripInternalPlayerNoteTags(notes?: string): string {
+    if (!notes) return "";
+    return stripDepartureTags(notes)
+        .replace(/\[PIN:\d{4}\]/g, "")
+        .replace(/\[FOOT:(Left|Right|Both)\]/g, "")
+        .replace(/\[REG:(Standard|Dual|LoanParent|LoanSub)\]/g, "")
+        .replace(/\[LOAN_CLUB:[^\]]*\]/g, "")
+        .replace(/\[LOAN_END:[^\]]*\]/g, "")
+        .replace(/\[INJURY:[^\]]*\]/g, "")
+        .replace(/\[OUT_DURATION:[^\]]*\]/g, "")
+        .replace(/\[RETURN_DATE:[^\]]*\]/g, "")
+        .replace(/\[SUSPENSION_REASON:[^\]]*\]/g, "")
+        .replace(/\[SUSPENSION_DURATION:[^\]]*\]/g, "")
+        .replace(/\[NOTE_DATE:[^\]]*\]/g, "")
+        .replace(/\[PENDING_REG:[^\]]*\]/g, "")
+        .replace(/\[REG_NONCE:[^\]]*\]/g, "")
+        .replace(/\[PHONE:[^\]]*\]/g, "")
+        .trim();
+}
+
+export function parsePlayerNoteDate(notes?: string): string | undefined {
+    if (!notes) return undefined;
+    const match = notes.match(/\[NOTE_DATE:([^\]]+)\]/);
+    return match?.[1]?.trim() || undefined;
+}
+
+export function formatPlayerNoteDate(rawDate?: string): string {
+    if (!rawDate) return "";
+    const trimmed = rawDate.trim();
+    const parsed = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+        ? new Date(trimmed + "T00:00:00")
+        : new Date(trimmed);
+    if (isNaN(parsed.getTime())) return trimmed;
+    return parsed.toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+    });
+}
+
 

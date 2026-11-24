@@ -9,6 +9,9 @@ import {
     parsePlayerDeparture,
     serializeDepartureToNotes,
     stripDepartureTags,
+    stripInternalPlayerNoteTags,
+    parsePlayerNoteDate,
+    formatPlayerNoteDate,
     getLoanExpiryStatus,
 } from "@/lib/utils";
 import { notFound, useParams, useRouter } from "next/navigation";
@@ -293,6 +296,7 @@ export default function PlayerProfilePage() {
                 suspensionReason,
                 suspensionDuration,
                 notes: rawPlayer.notes,
+                noteDate: parsePlayerNoteDate(rawPlayer.notes),
                 isInTrainingSquad: rawPlayer.is_in_training_squad,
                 medicalNotes: rawPlayer.medical_notes,
                 email: rawPlayer.email,
@@ -881,17 +885,8 @@ export default function PlayerProfilePage() {
     );
 
     // Strip internal tags from player notes for clean display
-    const cleanPlayerNotes = stripDepartureTags(player.notes || "")
-        .replace(/\[PIN:\d{4}\]/g, "")
-        .replace(/\[FOOT:(Left|Right|Both)\]/g, "")
-        .replace(/\[REG:(Standard|Dual|LoanParent|LoanSub)\]/g, "")
-        .replace(/\[LOAN_CLUB:[^\]]*\]/g, "")
-        .replace(/\[LOAN_END:[^\]]*\]/g, "")
-        .replace(/\[INJURY:.*?\]/g, "")
-        .replace(/\[OUT_DURATION:.*?\]/g, "")
-        .replace(/\[SUSPENSION_REASON:.*?\]/g, "")
-        .replace(/\[SUSPENSION_DURATION:.*?\]/g, "")
-        .trim();
+    const cleanPlayerNotes = stripInternalPlayerNoteTags(player.notes || "");
+    const formattedNoteDate = formatPlayerNoteDate(player.noteDate || parsePlayerNoteDate(player.notes));
 
     // Contextual Status Details
     let statusContextText = "";
@@ -1334,10 +1329,18 @@ export default function PlayerProfilePage() {
                     <div className="space-y-2 text-xs">
                         {cleanPlayerNotes && (
                             <div className="p-2.5 rounded-xl bg-surface-2/70 border border-border/60">
-                                <span className="font-bold uppercase tracking-wider text-[9px] text-muted-foreground block mb-0.5">
-                                    Player Notes
-                                </span>
-                                <p className="text-foreground text-xs leading-relaxed">{cleanPlayerNotes}</p>
+                                <div className="flex items-center justify-between gap-2 mb-0.5">
+                                    <span className="font-bold uppercase tracking-wider text-[9px] text-muted-foreground">
+                                        Player Notes
+                                    </span>
+                                    {formattedNoteDate && (
+                                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                                            <Clock className="w-2.5 h-2.5" />
+                                            Added {formattedNoteDate}
+                                        </span>
+                                    )}
+                                </div>
+                                <p className="text-foreground text-xs leading-relaxed whitespace-pre-wrap">{cleanPlayerNotes}</p>
                             </div>
                         )}
                         {player.medicalNotes && (
@@ -1903,10 +1906,18 @@ export default function PlayerProfilePage() {
                         <div className="pt-3 border-t border-border/60 flex flex-col sm:flex-row gap-3 text-xs">
                             {cleanPlayerNotes && (
                                 <div className="flex-1 p-2.5 rounded-lg bg-surface-2/70 border border-border/60">
-                                    <span className="font-bold uppercase tracking-wider text-[10px] text-muted-foreground block mb-0.5">
-                                        Player Notes
-                                    </span>
-                                    <p className="text-foreground">{cleanPlayerNotes}</p>
+                                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                                        <span className="font-bold uppercase tracking-wider text-[10px] text-muted-foreground">
+                                            Player Notes
+                                        </span>
+                                        {formattedNoteDate && (
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                                                <Clock className="w-3 h-3" />
+                                                Added {formattedNoteDate}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <p className="text-foreground whitespace-pre-wrap">{cleanPlayerNotes}</p>
                                 </div>
                             )}
                             {player.medicalNotes && (

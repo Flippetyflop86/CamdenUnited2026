@@ -42,6 +42,7 @@ export interface Player {
     red_cards?: number;
     imageUrl?: string;
     notes?: string;
+    noteDate?: string; // ISO date/timestamp when player note was entered
     isInTrainingSquad?: boolean;
     isInMatchdayTracker?: boolean;
     secondaryPositions?: Position[];
