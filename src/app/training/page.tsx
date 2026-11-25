@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Plus, CalendarDays, MapPin, Users, Trash2, Pencil, BarChart3, List, Download, ClipboardList, MessageCircle, Copy, ExternalLink, Link2, Repeat, Clock, Share2, X } from "lucide-react";
+import { Plus, CalendarDays, MapPin, Users, Trash2, Pencil, BarChart3, List, Download, ClipboardList, MessageCircle, Copy, ExternalLink, Link2, Repeat, Clock, Share2, X, AlertTriangle, Check } from "lucide-react";
 import Link from "next/link";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { supabase } from "@/lib/supabase";
@@ -434,15 +434,61 @@ export default function TrainingPage() {
         setIsDialogOpen(true);
     };
 
-    const handleDelete = async (id: string) => {
-        if (window.confirm("Are you sure you want to delete this session?")) {
-            const { error } = await supabase.from("training_sessions").delete().eq("id", id);
-            if (error) {
-                alert("Error deleting session");
-            } else {
-                // Optimistic or let subscription handle it? Subscription handles it but optimist is nicer
-                setSessions(sessions.filter(s => s.id !== id));
+    const [pendingDeleteSessions, setPendingDeleteSessions] = useState<TrainingSession[]>([]);
+    const [deleteConfirmChecked, setDeleteConfirmChecked] = useState(false);
+    const [isDeletingSessions, setIsDeletingSessions] = useState(false);
+    const [isSelectingPastSessions, setIsSelectingPastSessions] = useState(false);
+    const [selectedPastSessionIds, setSelectedPastSessionIds] = useState<string[]>([]);
+
+    const openDeleteConfirm = (sessionsToDelete: TrainingSession[]) => {
+        if (sessionsToDelete.length === 0) return;
+        setPendingDeleteSessions(sessionsToDelete);
+        setDeleteConfirmChecked(false);
+    };
+
+    const handleDelete = (id: string) => {
+        const target = sessions.find(s => s.id === id);
+        if (target) {
+            openDeleteConfirm([target]);
+        }
+    };
+
+    const togglePastSessionSelection = (sessionId: string) => {
+        setSelectedPastSessionIds(prev =>
+            prev.includes(sessionId) ? prev.filter(id => id !== sessionId) : [...prev, sessionId]
+        );
+    };
+
+    const confirmPendingDeletes = async () => {
+        if (pendingDeleteSessions.length === 0 || isDeletingSessions) return;
+        const todayStr = new Date().toISOString().split("T")[0];
+        const includesPast = pendingDeleteSessions.some(s => s.date < todayStr);
+        if (includesPast && !deleteConfirmChecked) return;
+
+        setIsDeletingSessions(true);
+        try {
+            const ids = pendingDeleteSessions.map(s => s.id);
+            const { error } = await supabase.from("training_sessions").delete().in("id", ids);
+            if (error) throw error;
+
+            const deletedSet = new Set(ids);
+            setSessions(prev => prev.filter(s => !deletedSet.has(s.id)));
+            setSelectedPastSessionIds(prev => prev.filter(id => !deletedSet.has(id)));
+            if (isSelectingPastSessions) {
+                setIsSelectingPastSessions(false);
             }
+            setPendingDeleteSessions([]);
+            setDeleteConfirmChecked(false);
+            setTrainingFeedback(
+                ids.length === 1
+                    ? "Training session permanently deleted."
+                    : `${ids.length} past training sessions permanently deleted.`
+            );
+            setTimeout(() => setTrainingFeedback(null), 4000);
+        } catch (err: any) {
+            alert(err?.message || "Error deleting session(s)");
+        } finally {
+            setIsDeletingSessions(false);
         }
     };
 
@@ -1650,15 +1696,44 @@ export default function TrainingPage() {
                         )}
 
                         {/* Historical Record (Mobile Cards) */}
-                        {displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]).length > 0 && (
+                        {displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]).length > 0 && (() => {
+                            const pastMobSessions = displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]);
+                            return (
                             <div className="space-y-2.5">
-                                <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground block px-0.5">
-                                    Historical Record ({displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]).length})
-                                </span>
+                                <div className="flex flex-wrap items-center justify-between gap-2 px-0.5">
+                                    <span className="text-xs font-extrabold uppercase tracking-wider text-muted-foreground">
+                                        Historical Record ({pastMobSessions.length})
+                                    </span>
+                                    <div className="flex items-center gap-1.5">
+                                        {isSelectingPastSessions && selectedPastSessionIds.length > 0 && (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={() => openDeleteConfirm(pastMobSessions.filter(s => selectedPastSessionIds.includes(s.id)))}
+                                                className="h-7 px-2.5 text-[11px] font-bold rounded-lg gap-1"
+                                            >
+                                                <Trash2 className="h-3 w-3" />
+                                                Delete ({selectedPastSessionIds.length})
+                                            </Button>
+                                        )}
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                                setIsSelectingPastSessions(prev => !prev);
+                                                setSelectedPastSessionIds([]);
+                                            }}
+                                            className="h-7 px-2.5 text-[11px] font-bold rounded-lg border-border bg-surface-1 text-muted-foreground hover:text-foreground"
+                                        >
+                                            {isSelectingPastSessions ? "Cancel" : "Select to Delete"}
+                                        </Button>
+                                    </div>
+                                </div>
                                 <div className="space-y-2.5">
-                                    {displaySessions
-                                        .filter(s => s.date < new Date().toISOString().split("T")[0])
-                                        .map((session) => {
+                                    {pastMobSessions.map((session) => {
+                                            const isSelected = selectedPastSessionIds.includes(session.id);
                                             const stats = getSessionAttendanceStats(session);
                                             const turnoutTier =
                                                 stats.percentage >= 75
@@ -1676,22 +1751,60 @@ export default function TrainingPage() {
                                             return (
                                                 <div
                                                     key={`mob-hist-${session.id}`}
-                                                    onClick={() => window.location.href = `/training/${session.id}`}
-                                                    className="rounded-xl border border-border bg-surface-1 p-3.5 shadow-xs active:bg-surface-2/60 transition-colors cursor-pointer space-y-2.5"
+                                                    onClick={() => {
+                                                        if (isSelectingPastSessions) {
+                                                            togglePastSessionSelection(session.id);
+                                                        } else {
+                                                            window.location.href = `/training/${session.id}`;
+                                                        }
+                                                    }}
+                                                    className={`rounded-xl border p-3.5 shadow-xs active:bg-surface-2/60 transition-colors cursor-pointer space-y-2.5 ${
+                                                        isSelected
+                                                            ? "border-rose-500 bg-rose-500/5 ring-1 ring-rose-500/40"
+                                                            : "border-border bg-surface-1"
+                                                    }`}
                                                 >
                                                     <div className="flex items-start justify-between gap-2">
-                                                        <div className="min-w-0 flex-1">
-                                                            <h4 className="text-sm font-bold text-foreground truncate">
-                                                                {session.topic || "General Preparation"}
-                                                            </h4>
-                                                            <p className="text-[11px] text-muted-foreground font-medium flex items-center gap-1 mt-0.5">
-                                                                <CalendarDays className="h-3 w-3 shrink-0" />
-                                                                <span>{formatDate(session.date)} • {formatTime12h(session.time).time}</span>
-                                                            </p>
+                                                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                                                            {isSelectingPastSessions && (
+                                                                <span
+                                                                    className={`mt-0.5 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+                                                                        isSelected
+                                                                            ? "bg-rose-600 border-rose-600 text-white"
+                                                                            : "border-border bg-background"
+                                                                    }`}
+                                                                >
+                                                                    {isSelected && <Check className="h-3 w-3" />}
+                                                                </span>
+                                                            )}
+                                                            <div className="min-w-0 flex-1">
+                                                                <h4 className="text-sm font-bold text-foreground truncate">
+                                                                    {session.topic || "General Preparation"}
+                                                                </h4>
+                                                                <p className="text-[11px] text-muted-foreground font-medium flex items-center gap-1 mt-0.5">
+                                                                    <CalendarDays className="h-3 w-3 shrink-0" />
+                                                                    <span>{formatDate(session.date)} • {formatTime12h(session.time).time}</span>
+                                                                </p>
+                                                            </div>
                                                         </div>
-                                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold border shrink-0 ${turnoutTier}`}>
-                                                            {stats.percentage}% Turnout
-                                                        </span>
+                                                        <div className="flex items-center gap-1.5 shrink-0">
+                                                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold border shrink-0 ${turnoutTier}`}>
+                                                                {stats.percentage}% Turnout
+                                                            </span>
+                                                            {!isSelectingPastSessions && (
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        openDeleteConfirm([session]);
+                                                                    }}
+                                                                    className="h-7 w-7 rounded-lg border border-border bg-surface-2 flex items-center justify-center text-muted-foreground hover:text-status-error hover:border-rose-500/40 transition-colors"
+                                                                    title="Delete Past Session"
+                                                                >
+                                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </div>
 
                                                     <div className="flex items-center justify-between gap-2 text-[11px]">
@@ -1732,7 +1845,8 @@ export default function TrainingPage() {
                                         })}
                                 </div>
                             </div>
-                        )}
+                            );
+                        })()}
 
                         {displaySessions.length === 0 && (
                             <div className="py-12 px-4 text-center border-2 border-dashed border-border rounded-2xl bg-surface-1">
@@ -1841,13 +1955,42 @@ export default function TrainingPage() {
                         )}
 
                         {/* Historical Record */}
-                        {displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]).length > 0 && (
+                        {displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]).length > 0 && (() => {
+                            const pastDesktopSessions = displaySessions.filter(s => s.date < new Date().toISOString().split("T")[0]);
+                            return (
                             <PageSection>
-                                <SectionHeader title="Historical Record" description="Past sessions, squad turnout %, punctuality, and trialist records." />
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <SectionHeader title="Historical Record" description="Past sessions, squad turnout %, punctuality, and trialist records." />
+                                    <div className="flex items-center gap-2">
+                                        {isSelectingPastSessions && selectedPastSessionIds.length > 0 && (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="destructive"
+                                                onClick={() => openDeleteConfirm(pastDesktopSessions.filter(s => selectedPastSessionIds.includes(s.id)))}
+                                                className="h-8 text-xs font-bold gap-1.5"
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                                Delete Selected ({selectedPastSessionIds.length})
+                                            </Button>
+                                        )}
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                                setIsSelectingPastSessions(prev => !prev);
+                                                setSelectedPastSessionIds([]);
+                                            }}
+                                            className="h-8 text-xs font-semibold border-border text-muted-foreground hover:text-foreground"
+                                        >
+                                            {isSelectingPastSessions ? "Cancel Selection" : "Select Past Sessions"}
+                                        </Button>
+                                    </div>
+                                </div>
                                 <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-                                    {displaySessions
-                                        .filter(s => s.date < new Date().toISOString().split("T")[0])
-                                        .map((session) => {
+                                    {pastDesktopSessions.map((session) => {
+                                            const isSelected = selectedPastSessionIds.includes(session.id);
                                             const stats = getSessionAttendanceStats(session);
                                             const turnoutTier =
                                                 stats.percentage >= 75
@@ -1865,17 +2008,57 @@ export default function TrainingPage() {
                                             return (
                                                 <Card 
                                                     key={session.id} 
-                                                    onClick={() => window.location.href = `/training/${session.id}`}
-                                                    className="hover:shadow-md transition-all cursor-pointer border-border bg-card hover:bg-surface-1/60 group"
+                                                    onClick={() => {
+                                                        if (isSelectingPastSessions) {
+                                                            togglePastSessionSelection(session.id);
+                                                        } else {
+                                                            window.location.href = `/training/${session.id}`;
+                                                        }
+                                                    }}
+                                                    className={`hover:shadow-md transition-all cursor-pointer group relative ${
+                                                        isSelected
+                                                            ? "border-rose-500 bg-rose-500/5 ring-1 ring-rose-500/40"
+                                                            : "border-border bg-card hover:bg-surface-1/60"
+                                                    }`}
                                                 >
                                                     <CardHeader className="pb-2.5">
                                                         <div className="flex justify-between items-start gap-2">
-                                                            <CardTitle className="text-base font-bold text-foreground group-hover:text-brand transition-colors line-clamp-1">
-                                                                {session.topic || "General Preparation"}
-                                                            </CardTitle>
-                                                            <Badge variant="secondary" className="bg-surface-1 text-muted-foreground border-border text-[11px] shrink-0">
-                                                                {formatSquad(session.squad)}
-                                                            </Badge>
+                                                            <div className="flex items-start gap-2 min-w-0 flex-1">
+                                                                {isSelectingPastSessions && (
+                                                                    <span
+                                                                        className={`mt-1 h-4 w-4 rounded border flex items-center justify-center shrink-0 ${
+                                                                            isSelected
+                                                                                ? "bg-rose-600 border-rose-600 text-white"
+                                                                                : "border-border bg-background"
+                                                                        }`}
+                                                                    >
+                                                                        {isSelected && <Check className="h-3 w-3" />}
+                                                                    </span>
+                                                                )}
+                                                                <CardTitle className="text-base font-bold text-foreground group-hover:text-brand transition-colors line-clamp-1">
+                                                                    {session.topic || "General Preparation"}
+                                                                </CardTitle>
+                                                            </div>
+                                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                                <Badge variant="secondary" className="bg-surface-1 text-muted-foreground border-border text-[11px] shrink-0">
+                                                                    {formatSquad(session.squad)}
+                                                                </Badge>
+                                                                {!isSelectingPastSessions && (
+                                                                    <Button
+                                                                        type="button"
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            openDeleteConfirm([session]);
+                                                                        }}
+                                                                        title="Delete Past Session"
+                                                                        className="h-7 w-7 text-muted-foreground hover:text-status-error opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                                                                    >
+                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                         <CardDescription className="flex items-center gap-1.5 text-xs font-medium">
                                                             <CalendarDays className="h-3 w-3 text-muted-foreground shrink-0" />
@@ -1925,7 +2108,8 @@ export default function TrainingPage() {
                                         })}
                                 </div>
                             </PageSection>
-                        )}
+                            );
+                        })()}
 
                         {displaySessions.length === 0 && (
                             <div className="col-span-full py-16 text-center border-2 border-dashed border-border rounded-xl bg-surface-1">
@@ -2889,6 +3073,113 @@ export default function TrainingPage() {
                     </div>
                 </div>
             )}
+
+            {/* Multi-Step Delete Training Session Confirmation Dialog */}
+            <Dialog
+                open={pendingDeleteSessions.length > 0}
+                onOpenChange={(open) => {
+                    if (!open && !isDeletingSessions) {
+                        setPendingDeleteSessions([]);
+                        setDeleteConfirmChecked(false);
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-[460px] bg-background border-border text-foreground">
+                    {(() => {
+                        const todayStr = new Date().toISOString().split("T")[0];
+                        const includesPast = pendingDeleteSessions.some(s => s.date < todayStr);
+                        const isMultiple = pendingDeleteSessions.length > 1;
+                        return (
+                            <>
+                                <DialogHeader>
+                                    <DialogTitle className="text-lg font-bold flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                                        <AlertTriangle className="h-5 w-5 shrink-0" />
+                                        {includesPast
+                                            ? isMultiple
+                                                ? `Delete ${pendingDeleteSessions.length} Past Sessions?`
+                                                : "Delete Past Training Session?"
+                                            : "Delete Training Session?"}
+                                    </DialogTitle>
+                                    <DialogDescription className="text-xs text-muted-foreground">
+                                        {includesPast
+                                            ? "This action cannot be undone and will permanently remove recorded attendance from your squad statistics."
+                                            : "This scheduled training session will be permanently removed."}
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="space-y-3 py-1">
+                                    <div className="max-h-44 overflow-y-auto space-y-1.5 rounded-xl border border-border bg-surface-1 p-2.5">
+                                        {pendingDeleteSessions.map((s) => {
+                                            const stats = getSessionAttendanceStats(s);
+                                            const isPast = s.date < todayStr;
+                                            return (
+                                                <div key={s.id} className="flex items-center justify-between gap-2 text-xs rounded-lg bg-background/60 border border-border/60 px-2.5 py-2">
+                                                    <div className="min-w-0">
+                                                        <p className="font-bold text-foreground truncate">
+                                                            {s.topic || "General Preparation"}
+                                                        </p>
+                                                        <p className="text-[11px] text-muted-foreground">
+                                                            {formatDate(s.date)} • {formatSquad(s.squad)}
+                                                        </p>
+                                                    </div>
+                                                    {isPast && (
+                                                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30 shrink-0">
+                                                            {stats.regAttendedCount}/{stats.totalEligible} Attended
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {includesPast && (
+                                        <label className="flex items-start gap-2.5 rounded-xl border border-rose-500/35 bg-rose-500/10 p-3 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={deleteConfirmChecked}
+                                                onChange={(e) => setDeleteConfirmChecked(e.target.checked)}
+                                                className="mt-0.5 h-4 w-4 accent-rose-600 cursor-pointer shrink-0"
+                                            />
+                                            <span className="text-xs font-semibold text-foreground leading-snug">
+                                                I understand this will permanently delete {isMultiple ? "these past sessions" : "this past session"} and erase {isMultiple ? "their" : "its"} attendance history.
+                                            </span>
+                                        </label>
+                                    )}
+                                </div>
+
+                                <DialogFooter className="gap-2 sm:gap-0 border-t border-border pt-4">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        disabled={isDeletingSessions}
+                                        onClick={() => {
+                                            setPendingDeleteSessions([]);
+                                            setDeleteConfirmChecked(false);
+                                        }}
+                                        className="border-border text-foreground"
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        disabled={isDeletingSessions || (includesPast && !deleteConfirmChecked)}
+                                        onClick={confirmPendingDeletes}
+                                        className="font-bold gap-1.5"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        {isDeletingSessions
+                                            ? "Deleting..."
+                                            : isMultiple
+                                                ? `Delete ${pendingDeleteSessions.length} Sessions`
+                                                : "Delete Permanently"}
+                                    </Button>
+                                </DialogFooter>
+                            </>
+                        );
+                    })()}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

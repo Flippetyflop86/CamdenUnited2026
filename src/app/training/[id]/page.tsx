@@ -6,7 +6,8 @@ import { useRouter, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ArrowLeft, CalendarDays, MapPin, Clock, Download, Share2, Link2, MessageCircle, Bell, Pencil } from "lucide-react";
+import { ArrowLeft, CalendarDays, MapPin, Clock, Download, Share2, Link2, MessageCircle, Bell, Pencil, Trash2, AlertTriangle } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ function formatFriendlyDate(dateStr: string) {
 }
 
 export default function TrainingSessionPage() {
+    const router = useRouter();
     const routeParams = useParams();
     const { settings } = useClub();
     const { clubId } = useAuth();
@@ -51,6 +53,29 @@ export default function TrainingSessionPage() {
     const [attendanceStats, setAttendanceStats] = useState<Record<string, { present: number; total: number }>>({});
     const [guestName, setGuestName] = useState("");
     const [isReminding, setIsReminding] = useState(false);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [deleteConfirmChecked, setDeleteConfirmChecked] = useState(false);
+    const [isDeletingSession, setIsDeletingSession] = useState(false);
+
+    const handleConfirmDeleteSession = async () => {
+        if (!session || isDeletingSession) return;
+        const todayStr = new Date().toISOString().split("T")[0];
+        const isPast = session.date < todayStr;
+        if (isPast && !deleteConfirmChecked) return;
+
+        setIsDeletingSession(true);
+        try {
+            const { error } = await supabase
+                .from("training_sessions")
+                .delete()
+                .eq("id", session.id);
+            if (error) throw error;
+            router.push("/training");
+        } catch (err: any) {
+            alert(err?.message || "Failed to delete session.");
+            setIsDeletingSession(false);
+        }
+    };
 
     useEffect(() => {
         const fetchSessionData = async () => {
@@ -557,6 +582,19 @@ export default function TrainingSessionPage() {
                         </div>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            onClick={() => {
+                                setDeleteConfirmChecked(false);
+                                setDeleteDialogOpen(true);
+                            }}
+                            title="Delete Session"
+                            className="h-8 w-8 border-border bg-surface-1 text-muted-foreground hover:text-rose-600 hover:border-rose-500/40"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
                         <Button variant="outline" size="sm" onClick={downloadSessionCSV} className="h-8 px-2.5 text-xs border-border bg-surface-1">
                             <Download className="h-3.5 w-3.5 mr-1" /> Export
                         </Button>
@@ -854,6 +892,19 @@ export default function TrainingSessionPage() {
                 {unsavedChanges && (
                     <Badge variant="destructive" className="animate-pulse">Unsaved Changes</Badge>
                 )}
+                <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                        setDeleteConfirmChecked(false);
+                        setDeleteDialogOpen(true);
+                    }}
+                    className="border-slate-200 text-slate-600 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 gap-1.5"
+                >
+                    <Trash2 className="h-4 w-4" />
+                    Delete Session
+                </Button>
             </div>
 
             {/* Session Details */}
@@ -1098,6 +1149,86 @@ export default function TrainingSessionPage() {
                 </CardContent>
             </Card>
             </div>
+
+            <Dialog
+                open={deleteDialogOpen}
+                onOpenChange={(open) => {
+                    if (!isDeletingSession) {
+                        setDeleteDialogOpen(open);
+                        if (!open) setDeleteConfirmChecked(false);
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-[440px] bg-background border-border text-foreground">
+                    {(() => {
+                        const todayStr = new Date().toISOString().split("T")[0];
+                        const isPast = session.date < todayStr;
+                        return (
+                            <>
+                                <DialogHeader>
+                                    <DialogTitle className="text-lg font-bold flex items-center gap-2 text-rose-600 dark:text-rose-400">
+                                        <AlertTriangle className="h-5 w-5 shrink-0" />
+                                        {isPast ? "Delete Past Training Session?" : "Delete Training Session?"}
+                                    </DialogTitle>
+                                    <DialogDescription className="text-xs text-muted-foreground">
+                                        {isPast
+                                            ? "This will permanently remove this past session and its recorded attendance from your club's training history."
+                                            : "This scheduled session will be permanently deleted."}
+                                    </DialogDescription>
+                                </DialogHeader>
+
+                                <div className="space-y-3 py-1">
+                                    <div className="rounded-xl border border-border bg-surface-1 px-3 py-2.5 text-xs space-y-0.5">
+                                        <p className="font-bold text-foreground">{session.topic || "General Preparation"}</p>
+                                        <p className="text-muted-foreground">
+                                            {formatFriendlyDate(session.date)} • {formatSquad(session.squad as string)} • {presentCount} Present
+                                        </p>
+                                    </div>
+
+                                    {isPast && (
+                                        <label className="flex items-start gap-2.5 rounded-xl border border-rose-500/35 bg-rose-500/10 p-3 cursor-pointer select-none">
+                                            <input
+                                                type="checkbox"
+                                                checked={deleteConfirmChecked}
+                                                onChange={(e) => setDeleteConfirmChecked(e.target.checked)}
+                                                className="mt-0.5 h-4 w-4 accent-rose-600 cursor-pointer shrink-0"
+                                            />
+                                            <span className="text-xs font-semibold text-foreground leading-snug">
+                                                I understand this will permanently delete this past session and erase its attendance history.
+                                            </span>
+                                        </label>
+                                    )}
+                                </div>
+
+                                <DialogFooter className="gap-2 sm:gap-0 border-t border-border pt-4">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        disabled={isDeletingSession}
+                                        onClick={() => {
+                                            setDeleteDialogOpen(false);
+                                            setDeleteConfirmChecked(false);
+                                        }}
+                                        className="border-border text-foreground"
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="button"
+                                        variant="destructive"
+                                        disabled={isDeletingSession || (isPast && !deleteConfirmChecked)}
+                                        onClick={handleConfirmDeleteSession}
+                                        className="font-bold gap-1.5"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        {isDeletingSession ? "Deleting..." : "Delete Permanently"}
+                                    </Button>
+                                </DialogFooter>
+                            </>
+                        );
+                    })()}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
