@@ -24,6 +24,7 @@ import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { Textarea } from "@/components/ui/textarea";
+import { parseMatchScoreline } from "@/lib/match-stats-sync";
 
 type FormResult = 'W' | 'D' | 'L';
 
@@ -280,15 +281,12 @@ export default function LeagueTablePage() {
 
     const parseCompletedMatchScores = (m: any): { ourGoals: number; oppGoals: number } | null => {
         if (!m?.scoreline || typeof m.scoreline !== 'string') return null;
-        const parts = m.scoreline.trim().split(/\s*[-:]\s*/);
-        if (parts.length !== 2) return null;
-        const homeScore = parseInt(parts[0], 10);
-        const awayScore = parseInt(parts[1], 10);
-        if (isNaN(homeScore) || isNaN(awayScore)) return null;
         if (m.result === 'Pending') return null;
+        const parsed = parseMatchScoreline(m.scoreline, Boolean(m.is_home));
+        if (!parsed) return null;
         return {
-            ourGoals: m.is_home ? homeScore : awayScore,
-            oppGoals: m.is_home ? awayScore : homeScore
+            ourGoals: parsed.clubGoals,
+            oppGoals: parsed.opponentGoals
         };
     };
 

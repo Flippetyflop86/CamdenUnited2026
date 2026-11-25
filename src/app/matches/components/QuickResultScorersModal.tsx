@@ -12,7 +12,11 @@ import {
     parseStatTextString,
     syncMatchGoalsAndAssistsEverywhere,
     ensureStatsHydratedFromMatchText,
-    extractLineupFromRawNotes
+    extractLineupFromRawNotes,
+    parseMatchScoreline,
+    buildMatchScoreline,
+    computeMatchOutcome,
+    isCupCompetition
 } from "@/lib/match-stats-sync";
 import Link from "next/link";
 
@@ -33,6 +37,9 @@ export function QuickResultScorersModal({
 }: QuickResultScorersModalProps) {
     const [homeGoals, setHomeGoals] = useState<string>("");
     const [awayGoals, setAwayGoals] = useState<string>("");
+    const [homePens, setHomePens] = useState<string>("");
+    const [awayPens, setAwayPens] = useState<string>("");
+    const [showPenalties, setShowPenalties] = useState<boolean>(false);
     const [players, setPlayers] = useState<SimplePlayerRef[]>([]);
     const [playerGoals, setPlayerGoals] = useState<Record<string, number>>({});
     const [playerAssists, setPlayerAssists] = useState<Record<string, number>>({});
@@ -66,15 +73,35 @@ export function QuickResultScorersModal({
             .eq("id", m.id)
             .single();
 
-        // Parse existing scoreline
+        // Parse existing scoreline (including optional cup penalty shootout scores)
         const rawScore = freshMatch?.scoreline || m.scoreline || (m.result && m.result.includes("-") ? m.result : "");
-        if (rawScore && rawScore.includes("-")) {
+        const mIsHome = m.isHome !== undefined ? Boolean(m.isHome) : Boolean((m as any).is_home ?? true);
+        const parsedScore = parseMatchScoreline(rawScore, mIsHome);
+        if (parsedScore) {
+            setHomeGoals(String(parsedScore.homeGoals));
+            setAwayGoals(String(parsedScore.awayGoals));
+            if (parsedScore.homePens !== undefined && parsedScore.awayPens !== undefined) {
+                setHomePens(String(parsedScore.homePens));
+                setAwayPens(String(parsedScore.awayPens));
+                setShowPenalties(true);
+            } else {
+                setHomePens("");
+                setAwayPens("");
+                setShowPenalties(isCupCompetition(m.competition));
+            }
+        } else if (rawScore && rawScore.includes("-")) {
             const parts = rawScore.split("-").map((s: string) => s.trim());
             setHomeGoals(parts[0] ?? "");
             setAwayGoals(parts[1] ?? "");
+            setHomePens("");
+            setAwayPens("");
+            setShowPenalties(isCupCompetition(m.competition));
         } else {
             setHomeGoals("");
             setAwayGoals("");
+            setHomePens("");
+            setAwayPens("");
+            setShowPenalties(isCupCompetition(m.competition));
         }
 
         // Extract lineup starters & subs from freshMatch.notes or m.rawNotes or m.lineup
@@ -240,6 +267,21 @@ export function QuickResultScorersModal({
         return isHome ? h : a;
     }, [homeGoals, awayGoals, isHome]);
 
+    const isTiedRegulation = useMemo(() => {
+        const h = parseInt(homeGoals, 10);
+        const a = parseInt(awayGoals, 10);
+        return !isNaN(h) && !isNaN(a) && h === a;
+    }, [homeGoals, awayGoals]);
+
+    const livePenaltyOutcome = useMemo(() => {
+        if (!isTiedRegulation || !showPenalties) return null;
+        const hp = parseInt(homePens, 10);
+        const ap = parseInt(awayPens, 10);
+        if (isNaN(hp) || isNaN(ap)) return null;
+        const previewScore = buildMatchScoreline(homeGoals, awayGoals, hp, ap);
+        return computeMatchOutcome(previewScore, Boolean(isHome));
+    }, [isTiedRegulation, showPenalties, homeGoals, awayGoals, homePens, awayPens, isHome]);
+
     const totalAssignedGoals = useMemo(() => {
         const fromPlayers = Object.values(playerGoals).reduce((acc, v) => acc + (v || 0), 0);
         const fromManual = extraManualGoals.reduce((acc, m) => acc + (m.count || 0), 0);
@@ -330,7 +372,14 @@ export function QuickResultScorersModal({
         try {
             const hTrim = homeGoals.trim();
             const aTrim = awayGoals.trim();
-            const newScoreline = (hTrim !== "" && aTrim !== "") ? `${hTrim} - ${aTrim}` : "";
+            const newScoreline = (hTrim !== "" && aTrim !== "")
+                ? buildMatchScoreline(
+                      hTrim,
+                      aTrim,
+                      showPenalties ? homePens.trim() : "",
+                      showPenalties ? awayPens.trim() : ""
+                  )
+                : "";
 
             // Update usedSubstitutes inside [Lineup: {...}] if a lineup exists in matches.notes
             const { data: freshMatchRow } = await supabase
@@ -475,7 +524,7 @@ export function QuickResultScorersModal({
                             {(homeGoals !== "" || awayGoals !== "") && (
                                 <button
                                     type="button"
-                                    onClick={() => { setHomeGoals(""); setAwayGoals(""); }}
+                                    onClick={() => { setHomeGoals(""); setAwayGoals(""); setHomePens(""); setAwayPens(""); }}
                                     className="text-[10px] sm:text-[11px] text-amber-700 dark:text-amber-400 hover:underline font-semibold"
                                 >
                                     Clear Score (Mark as Upcoming)
@@ -520,6 +569,92 @@ export function QuickResultScorersModal({
                                 <div className="text-[10px] text-muted-foreground uppercase">Away</div>
                             </div>
                         </div>
+
+                        {/* Cup / Tied Match Penalty Shootout Section */}
+                        {isTiedRegulation && (
+                            showPenalties ? (
+                                <div className="pt-2.5 border-t border-border/70 space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                                            Penalty Shootout
+                                        </span>
+                                        <div className="flex items-center gap-2">
+                                            {livePenaltyOutcome === "Win" && (
+                                                <span className="text-[10px] sm:text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                                                    Win on Penalties
+                                                </span>
+                                            )}
+                                            {livePenaltyOutcome === "Loss" && (
+                                                <span className="text-[10px] sm:text-[11px] font-extrabold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30">
+                                                    Loss on Penalties
+                                                </span>
+                                            )}
+                                            {livePenaltyOutcome === "Draw" && (
+                                                <span className="text-[10px] sm:text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                                                    Tied — enter winning pen score
+                                                </span>
+                                            )}
+                                            {(homePens !== "" || awayPens !== "") ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => { setHomePens(""); setAwayPens(""); }}
+                                                    className="text-[10px] text-muted-foreground hover:text-foreground underline font-semibold"
+                                                >
+                                                    Clear Pens
+                                                </button>
+                                            ) : !isCupCompetition(match?.competition) ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowPenalties(false)}
+                                                    className="text-[10px] text-muted-foreground hover:text-foreground underline font-semibold"
+                                                >
+                                                    Hide
+                                                </button>
+                                            ) : null}
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2 sm:gap-3">
+                                        <div className="text-right text-[11px] font-semibold text-muted-foreground truncate">
+                                            {homeTeamName} Pens
+                                        </div>
+                                        <div className="flex items-center gap-1.5 sm:gap-2">
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={30}
+                                                placeholder="P"
+                                                value={homePens}
+                                                onChange={(e) => setHomePens(e.target.value)}
+                                                className="w-12 sm:w-14 h-9 text-center text-sm sm:text-base font-black bg-surface-1 border-amber-500/40 px-1"
+                                            />
+                                            <span className="text-muted-foreground font-bold text-sm">:</span>
+                                            <Input
+                                                type="number"
+                                                min={0}
+                                                max={30}
+                                                placeholder="P"
+                                                value={awayPens}
+                                                onChange={(e) => setAwayPens(e.target.value)}
+                                                className="w-12 sm:w-14 h-9 text-center text-sm sm:text-base font-black bg-surface-1 border-amber-500/40 px-1"
+                                            />
+                                        </div>
+                                        <div className="text-left text-[11px] font-semibold text-muted-foreground truncate">
+                                            {awayTeamName} Pens
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="pt-1 text-center">
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPenalties(true)}
+                                        className="text-[11px] font-bold text-amber-700 dark:text-amber-400 hover:underline"
+                                    >
+                                        + Decided on Penalties? Log penalty shootout score
+                                    </button>
+                                </div>
+                            )
+                        )}
 
                         {/* Scoreline vs Logged Goals Validation (#20) */}
                         {clubExpectedGoals !== null && (

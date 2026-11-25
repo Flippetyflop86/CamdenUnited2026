@@ -170,28 +170,93 @@ export function formatStatTokensToString(
     return items.join(", ");
 }
 
+export interface ParsedMatchScoreline {
+    homeGoals: number;
+    awayGoals: number;
+    clubGoals: number;
+    opponentGoals: number;
+    homePens?: number;
+    awayPens?: number;
+    clubPens?: number;
+    opponentPens?: number;
+}
+
 /**
- * Extracts our club's goals and opponent's goals from a scoreline string ("3-1" or "3 - 1")
- * Note: In ClubFlow matches table, `result` is stored in standard `Home - Away` order (or `X-Y`).
+ * Returns true if a competition name looks like a knockout / cup competition that can go to penalties.
+ */
+export function isCupCompetition(competition?: string | null): boolean {
+    if (!competition) return false;
+    return /\b(cup|trophy|shield|plate|vase|knockout|play-?off|final|semi|quarter|round)\b/i.test(competition);
+}
+
+/**
+ * Builds a canonical Home-Away scoreline string, e.g. `"3 - 3"` or `"3 - 3 (5-4 pens)"`.
+ * Penalty scores are only attached when regular-time goals are tied and both penalty scores are valid integers.
+ */
+export function buildMatchScoreline(
+    homeGoals: string | number | null | undefined,
+    awayGoals: string | number | null | undefined,
+    homePens?: string | number | null,
+    awayPens?: string | number | null
+): string {
+    const hStr = String(homeGoals ?? "").trim();
+    const aStr = String(awayGoals ?? "").trim();
+    if (hStr === "" || aStr === "") return "";
+    const h = parseInt(hStr, 10);
+    const a = parseInt(aStr, 10);
+    if (isNaN(h) || isNaN(a)) return "";
+
+    const base = `${h} - ${a}`;
+    const hpStr = String(homePens ?? "").trim();
+    const apStr = String(awayPens ?? "").trim();
+    if (h === a && hpStr !== "" && apStr !== "") {
+        const hp = parseInt(hpStr, 10);
+        const ap = parseInt(apStr, 10);
+        if (!isNaN(hp) && !isNaN(ap)) {
+            return `${base} (${hp}-${ap} pens)`;
+        }
+    }
+    return base;
+}
+
+/**
+ * Extracts our club's goals and opponent's goals (plus optional penalty shootout scores)
+ * from a scoreline string such as `"3-1"`, `"3 - 1"`, or `"3 - 3 (5-4 pens)"`.
+ * Note: In ClubFlow matches table, `scoreline` is stored in standard `Home - Away` order.
  */
 export function parseMatchScoreline(
     scoreline: string | null | undefined,
     isHome: boolean
-): { homeGoals: number; awayGoals: number; clubGoals: number; opponentGoals: number } | null {
-    if (!scoreline || !scoreline.includes("-")) return null;
+): ParsedMatchScoreline | null {
+    if (!scoreline || (!scoreline.includes("-") && !scoreline.includes(":"))) return null;
     const clean = scoreline.trim();
-    const match = clean.match(/^(\d+)\s*-\s*(\d+)$/);
+    const match = clean.match(
+        /^(\d+)\s*[-:]\s*(\d+)(?:\s*\(\s*(\d+)\s*[-:]\s*(\d+)\s*(?:pens?|p\.?)\s*\))?$/i
+    );
     if (!match) return null;
     const homeGoals = parseInt(match[1], 10);
     const awayGoals = parseInt(match[2], 10);
     if (isNaN(homeGoals) || isNaN(awayGoals)) return null;
 
-    return {
+    const result: ParsedMatchScoreline = {
         homeGoals,
         awayGoals,
         clubGoals: isHome ? homeGoals : awayGoals,
         opponentGoals: isHome ? awayGoals : homeGoals
     };
+
+    if (match[3] !== undefined && match[4] !== undefined) {
+        const homePens = parseInt(match[3], 10);
+        const awayPens = parseInt(match[4], 10);
+        if (!isNaN(homePens) && !isNaN(awayPens)) {
+            result.homePens = homePens;
+            result.awayPens = awayPens;
+            result.clubPens = isHome ? homePens : awayPens;
+            result.opponentPens = isHome ? awayPens : homePens;
+        }
+    }
+
+    return result;
 }
 
 export function computeMatchOutcome(
@@ -202,11 +267,15 @@ export function computeMatchOutcome(
     if (!parsed) return "Pending";
     if (parsed.clubGoals > parsed.opponentGoals) return "Win";
     if (parsed.clubGoals < parsed.opponentGoals) return "Loss";
+    if (parsed.clubPens !== undefined && parsed.opponentPens !== undefined) {
+        if (parsed.clubPens > parsed.opponentPens) return "Win";
+        if (parsed.clubPens < parsed.opponentPens) return "Loss";
+    }
     return "Draw";
 }
 
 /**
- * Formats a stored `Home - Away` scoreline from our club's perspective (`clubGoals-opponentGoals`, e.g. `"2-1"` or `"W 2-1"`).
+ * Formats a stored `Home - Away` scoreline from our club's perspective (`clubGoals-opponentGoals`, e.g. `"2-1"`, `"W 2-1"`, or `"W 3-3 (5-4 pens)"`).
  * Use whenever displaying a scoreline alongside a single opponent (`vs/@ Opponent`) or a club outcome badge (`W`/`D`/`L`),
  * so away wins (stored as `"1-2"` Home-Away) always read as `"2-1"` (`"W 2-1"`) rather than `"1-2"`.
  * When both teams are displayed side-by-side, always put the Home team on the left and Away team on the right with the `Home - Away` scoreline.
@@ -220,9 +289,14 @@ export function formatClubScoreline(
     const parsed = parseMatchScoreline(scoreline, isHome);
     if (!parsed) return scoreline.trim();
     const sep = options?.spaced ? " - " : "-";
-    const formatted = `${parsed.clubGoals}${sep}${parsed.opponentGoals}`;
+    const penSuffix =
+        parsed.clubPens !== undefined && parsed.opponentPens !== undefined
+            ? ` (${parsed.clubPens}-${parsed.opponentPens} pens)`
+            : "";
+    const formatted = `${parsed.clubGoals}${sep}${parsed.opponentGoals}${penSuffix}`;
     if (options?.includeOutcome) {
-        const outcome = parsed.clubGoals > parsed.opponentGoals ? "W" : parsed.clubGoals < parsed.opponentGoals ? "L" : "D";
+        const outcomeEnum = computeMatchOutcome(scoreline, isHome);
+        const outcome = outcomeEnum === "Win" ? "W" : outcomeEnum === "Loss" ? "L" : "D";
         return `${outcome} ${formatted}`;
     }
     return formatted;

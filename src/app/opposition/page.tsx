@@ -60,7 +60,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Label } from "@/components/ui/label";
 import { resolveFixtureKickoffTime } from "@/lib/whatsapp-utils";
 import { serializeRecruitForDb, normalizeRecruitPosition } from "@/lib/recruitment-utils";
-import { formatClubScoreline } from "@/lib/match-stats-sync";
+import { formatClubScoreline, parseMatchScoreline } from "@/lib/match-stats-sync";
 
 interface DangerManItem {
     id: string;
@@ -478,14 +478,10 @@ export default function OppositionReportsPage() {
             else if (m.result === "Draw") draws++;
             else if (m.result === "Loss") losses++;
 
-            if (m.scoreline && m.scoreline.includes("-")) {
-                const [hStr, aStr] = m.scoreline.split("-");
-                const h = parseInt(hStr.trim(), 10);
-                const a = parseInt(aStr.trim(), 10);
-                if (!isNaN(h) && !isNaN(a)) {
-                    gf += m.isHome ? h : a;
-                    ga += m.isHome ? a : h;
-                }
+            const parsed = parseMatchScoreline(m.scoreline, Boolean(m.isHome));
+            if (parsed) {
+                gf += parsed.clubGoals;
+                ga += parsed.opponentGoals;
             }
         });
 

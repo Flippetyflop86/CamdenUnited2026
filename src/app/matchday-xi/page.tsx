@@ -54,7 +54,7 @@ import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer, parsePlayerDeparture } from "@/lib/utils";
 import { calculateMeetTime, resolveFixtureKickoffTime, resolveFullMatchAddress } from "@/lib/whatsapp-utils";
 import { assessMatchdayKitClash } from "@/lib/kit-clash";
-import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, computeMatchOutcome, formatClubScoreline, extractLineupFromRawNotes, computeLineupParticipation } from "@/lib/match-stats-sync";
+import { syncMatchGoalsAndAssistsEverywhere, ensureStatsHydratedFromMatchText, parseMatchScoreline, buildMatchScoreline, computeMatchOutcome, formatClubScoreline, extractLineupFromRawNotes, computeLineupParticipation } from "@/lib/match-stats-sync";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
 
@@ -4571,11 +4571,16 @@ export default function MatchdayXIPage() {
                                     type="number"
                                     min={0}
                                     placeholder="H"
-                                    value={nextMatch.scoreline?.includes("-") ? nextMatch.scoreline.split("-")[0].trim() : ""}
+                                    value={(() => {
+                                        const p = parseMatchScoreline(nextMatch.scoreline, Boolean(nextMatch.isHome));
+                                        if (p) return String(p.homeGoals);
+                                        return nextMatch.scoreline?.includes("-") ? nextMatch.scoreline.split("-")[0].trim() : "";
+                                    })()}
                                     onChange={async (e) => {
+                                        const p = parseMatchScoreline(nextMatch.scoreline, Boolean(nextMatch.isHome));
                                         const homeVal = e.target.value.replace(/[^0-9]/g, "");
-                                        const awayVal = nextMatch.scoreline?.includes("-") ? nextMatch.scoreline.split("-")[1].trim() : "";
-                                        const nextScore = (!homeVal && !awayVal) ? "" : `${homeVal || "0"}-${awayVal || "0"}`;
+                                        const awayVal = p ? String(p.awayGoals) : (nextMatch.scoreline?.includes("-") ? nextMatch.scoreline.split("-")[1].replace(/[^0-9]/g, "") : "");
+                                        const nextScore = (!homeVal && !awayVal) ? "" : buildMatchScoreline(homeVal || "0", awayVal || "0", p?.homePens, p?.awayPens);
                                         const nextOutcome = computeMatchOutcome(nextScore, Boolean(nextMatch.isHome));
                                         setNextMatch(prev => prev ? { ...prev, scoreline: nextScore, result: nextOutcome } : prev);
                                         setMatches(prev => prev.map(m => m.id === nextMatch.id ? { ...m, scoreline: nextScore, result: nextOutcome } : m));
@@ -4591,11 +4596,16 @@ export default function MatchdayXIPage() {
                                     type="number"
                                     min={0}
                                     placeholder="A"
-                                    value={nextMatch.scoreline?.includes("-") ? nextMatch.scoreline.split("-")[1].trim() : ""}
+                                    value={(() => {
+                                        const p = parseMatchScoreline(nextMatch.scoreline, Boolean(nextMatch.isHome));
+                                        if (p) return String(p.awayGoals);
+                                        return nextMatch.scoreline?.includes("-") ? nextMatch.scoreline.split("-")[1].replace(/[^0-9]/g, "") : "";
+                                    })()}
                                     onChange={async (e) => {
-                                        const homeVal = nextMatch.scoreline?.includes("-") ? nextMatch.scoreline.split("-")[0].trim() : "";
+                                        const p = parseMatchScoreline(nextMatch.scoreline, Boolean(nextMatch.isHome));
+                                        const homeVal = p ? String(p.homeGoals) : (nextMatch.scoreline?.includes("-") ? nextMatch.scoreline.split("-")[0].replace(/[^0-9]/g, "") : "");
                                         const awayVal = e.target.value.replace(/[^0-9]/g, "");
-                                        const nextScore = (!homeVal && !awayVal) ? "" : `${homeVal || "0"}-${awayVal || "0"}`;
+                                        const nextScore = (!homeVal && !awayVal) ? "" : buildMatchScoreline(homeVal || "0", awayVal || "0", p?.homePens, p?.awayPens);
                                         const nextOutcome = computeMatchOutcome(nextScore, Boolean(nextMatch.isHome));
                                         setNextMatch(prev => prev ? { ...prev, scoreline: nextScore, result: nextOutcome } : prev);
                                         setMatches(prev => prev.map(m => m.id === nextMatch.id ? { ...m, scoreline: nextScore, result: nextOutcome } : m));
@@ -4609,6 +4619,48 @@ export default function MatchdayXIPage() {
                                 <span className="text-[10px] font-bold text-muted-foreground truncate max-w-[95px]" title={nextMatch.isHome ? nextMatch.opponent : settings.name}>
                                     {nextMatch.isHome ? nextMatch.opponent : settings.name}
                                 </span>
+                                {(() => {
+                                    const p = parseMatchScoreline(nextMatch.scoreline, Boolean(nextMatch.isHome));
+                                    if (!p || p.homeGoals !== p.awayGoals) return null;
+                                    return (
+                                        <div className="flex items-center gap-1 pl-2 ml-1 border-l border-border">
+                                            <span className="text-[10px] font-extrabold uppercase tracking-wider text-amber-700 dark:text-amber-400">Pens:</span>
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                placeholder="H"
+                                                value={p.homePens !== undefined ? String(p.homePens) : ""}
+                                                onChange={async (e) => {
+                                                    const hp = e.target.value.replace(/[^0-9]/g, "");
+                                                    const ap = p.awayPens !== undefined ? String(p.awayPens) : "";
+                                                    const nextScore = buildMatchScoreline(p.homeGoals, p.awayGoals, hp, ap || (hp ? "0" : ""));
+                                                    const nextOutcome = computeMatchOutcome(nextScore, Boolean(nextMatch.isHome));
+                                                    setNextMatch(prev => prev ? { ...prev, scoreline: nextScore, result: nextOutcome } : prev);
+                                                    setMatches(prev => prev.map(m => m.id === nextMatch.id ? { ...m, scoreline: nextScore, result: nextOutcome } : m));
+                                                    await supabase.from("matches").update({ scoreline: nextScore, result: nextOutcome }).eq("id", nextMatch.id);
+                                                }}
+                                                className="w-7 bg-surface-1 border border-amber-500/40 rounded px-1 py-0.5 text-[11px] font-extrabold text-foreground focus:outline-none text-center tabular-nums"
+                                            />
+                                            <span className="text-muted-foreground font-bold">-</span>
+                                            <input
+                                                type="number"
+                                                min={0}
+                                                placeholder="A"
+                                                value={p.awayPens !== undefined ? String(p.awayPens) : ""}
+                                                onChange={async (e) => {
+                                                    const hp = p.homePens !== undefined ? String(p.homePens) : "";
+                                                    const ap = e.target.value.replace(/[^0-9]/g, "");
+                                                    const nextScore = buildMatchScoreline(p.homeGoals, p.awayGoals, hp || (ap ? "0" : ""), ap);
+                                                    const nextOutcome = computeMatchOutcome(nextScore, Boolean(nextMatch.isHome));
+                                                    setNextMatch(prev => prev ? { ...prev, scoreline: nextScore, result: nextOutcome } : prev);
+                                                    setMatches(prev => prev.map(m => m.id === nextMatch.id ? { ...m, scoreline: nextScore, result: nextOutcome } : m));
+                                                    await supabase.from("matches").update({ scoreline: nextScore, result: nextOutcome }).eq("id", nextMatch.id);
+                                                }}
+                                                className="w-7 bg-surface-1 border border-amber-500/40 rounded px-1 py-0.5 text-[11px] font-extrabold text-foreground focus:outline-none text-center tabular-nums"
+                                            />
+                                        </div>
+                                    );
+                                })()}
                             </div>
 
                             <div className="flex items-center gap-1.5 bg-surface-2 border border-border rounded-lg px-2.5 py-1">

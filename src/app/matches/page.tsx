@@ -26,7 +26,7 @@ import { UpcomingFixtures } from "./components/UpcomingFixtures";
 import { RecentResults } from "./components/RecentResults";
 import { QuickResultScorersModal } from "./components/QuickResultScorersModal";
 import { WeeklyFootballCalendar } from "@/components/calendar/WeeklyFootballCalendar";
-import { parseMatchScoreline, parseStatTextString, extractLineupFromRawNotes } from "@/lib/match-stats-sync";
+import { parseMatchScoreline, buildMatchScoreline, computeMatchOutcome, isCupCompetition, parseStatTextString, extractLineupFromRawNotes } from "@/lib/match-stats-sync";
 
 export default function MatchesPage() {
     const router = useRouter();
@@ -206,6 +206,8 @@ export default function MatchesPage() {
         isHome: true,
         competition: "League Match",
         scoreline: "",
+        homePens: "",
+        awayPens: "",
         goalscorers: "",
         assists: "",
         yellow_cards: "",
@@ -702,15 +704,23 @@ export default function MatchesPage() {
     const handleSaveMatch = async () => {
         if (!formData.opponent || !formData.date) return;
 
-        let cleanScoreline = formData.scoreline;
-        if (cleanScoreline && cleanScoreline.includes('-')) {
+        let cleanScoreline = formData.scoreline || "";
+        const parsedExistingForm = parseMatchScoreline(cleanScoreline, Boolean(formData.isHome));
+        if (parsedExistingForm) {
+            cleanScoreline = buildMatchScoreline(
+                parsedExistingForm.homeGoals,
+                parsedExistingForm.awayGoals,
+                formData.homePens ?? parsedExistingForm.homePens,
+                formData.awayPens ?? parsedExistingForm.awayPens
+            );
+        } else if (cleanScoreline && cleanScoreline.includes('-')) {
             const parts = cleanScoreline.split('-');
             if (parts[0].trim() === "" && parts[1].trim() === "") {
                 cleanScoreline = "";
             } else {
                 const home = parts[0].trim() || "0";
                 const away = parts[1].trim() || "0";
-                cleanScoreline = `${home} - ${away}`;
+                cleanScoreline = buildMatchScoreline(home, away, formData.homePens, formData.awayPens);
             }
         }
 
@@ -843,6 +853,7 @@ export default function MatchesPage() {
     };
 
     const handleEditMatch = async (match: Match) => {
+        const parsedScore = parseMatchScoreline(match.scoreline, Boolean(match.isHome));
         setFormData({
             date: match.date,
             time: match.time,
@@ -850,7 +861,9 @@ export default function MatchesPage() {
             opponent: match.opponent,
             isHome: match.isHome,
             competition: match.competition,
-            scoreline: match.scoreline || "",
+            scoreline: parsedScore ? `${parsedScore.homeGoals}-${parsedScore.awayGoals}` : (match.scoreline || ""),
+            homePens: parsedScore?.homePens !== undefined ? String(parsedScore.homePens) : "",
+            awayPens: parsedScore?.awayPens !== undefined ? String(parsedScore.awayPens) : "",
             goalscorers: match.goalscorers || "",
             assists: match.assists || "",
             yellow_cards: match.yellow_cards || "",
@@ -1490,6 +1503,8 @@ export default function MatchesPage() {
             isHome: true,
             competition: "League Match",
             scoreline: "",
+            homePens: "",
+            awayPens: "",
             goalscorers: "",
             assists: "",
             yellow_cards: "",
@@ -1543,25 +1558,7 @@ export default function MatchesPage() {
     };
 
     const determineResult = (score?: string, isHome?: boolean): "Win" | "Loss" | "Draw" | "Pending" | undefined => {
-        if (!score) return "Pending";
-        const parts = score.split(/[-:]/);
-        if (parts.length !== 2) return "Pending";
-
-        const homeStr = parts[0].trim() || "0";
-        const awayStr = parts[1].trim() || "0";
-        
-        const homeScore = parseInt(homeStr);
-        const awayScore = parseInt(awayStr);
-
-        if (isNaN(homeScore) || isNaN(awayScore)) return "Pending";
-        if (homeScore === awayScore) return "Draw";
-
-        if (isHome) {
-            return homeScore > awayScore ? "Win" : "Loss";
-        } else {
-            // We are Away. Score is Home - Away.
-            return awayScore > homeScore ? "Win" : "Loss";
-        }
+        return computeMatchOutcome(score, Boolean(isHome));
     };
 
     // Helper result styling
@@ -1843,11 +1840,20 @@ export default function MatchesPage() {
                                 title="Tap to log or edit scoreline & scorers"
                             >
                                 {match.scoreline ? (
-                                    <span className="text-sm font-black text-foreground tracking-tight tabular-nums">
-                                        {match.scoreline.includes("-")
-                                            ? `${match.scoreline.split("-")[0].trim() || "0"} - ${match.scoreline.split("-")[1].trim() || "0"}`
-                                            : match.scoreline}
-                                    </span>
+                                    <div className="flex flex-col items-center leading-tight">
+                                        <span className="text-sm font-black text-foreground tracking-tight tabular-nums">
+                                            {parsedScore
+                                                ? `${parsedScore.homeGoals} - ${parsedScore.awayGoals}`
+                                                : match.scoreline.includes("-")
+                                                    ? `${match.scoreline.split("-")[0].trim() || "0"} - ${match.scoreline.split("-")[1].trim() || "0"}`
+                                                    : match.scoreline}
+                                        </span>
+                                        {parsedScore?.homePens !== undefined && parsedScore?.awayPens !== undefined && (
+                                            <span className="text-[9px] font-extrabold text-amber-700 dark:text-amber-400 tracking-tight tabular-nums">
+                                                ({parsedScore.homePens}-{parsedScore.awayPens} pens)
+                                            </span>
+                                        )}
+                                    </div>
                                 ) : (
                                     <span className="text-xs font-extrabold text-brand uppercase">
                                         {match.time ? match.time.slice(0, 5) : "VS"}
@@ -2194,7 +2200,20 @@ export default function MatchesPage() {
                                 className="text-2xl font-black text-foreground tracking-tight flex items-center justify-center min-w-[84px] px-2.5 py-0.5 rounded-lg hover:bg-surface-2 transition-colors"
                             >
                                 {match.scoreline ? (
-                                    match.scoreline.includes('-') ? (
+                                    parsedScore ? (
+                                        <div className="flex flex-col items-center leading-tight">
+                                            <div className="flex items-center gap-2">
+                                                <span>{parsedScore.homeGoals}</span>
+                                                <span className="text-muted-foreground">-</span>
+                                                <span>{parsedScore.awayGoals}</span>
+                                            </div>
+                                            {parsedScore.homePens !== undefined && parsedScore.awayPens !== undefined && (
+                                                <span className="text-[11px] font-extrabold text-amber-700 dark:text-amber-400 mt-0.5 tabular-nums">
+                                                    ({parsedScore.homePens}-{parsedScore.awayPens} pens)
+                                                </span>
+                                            )}
+                                        </div>
+                                    ) : match.scoreline.includes('-') ? (
                                         <div className="flex items-center gap-2">
                                             <span>{match.scoreline.split('-')[0].trim() || "0"}</span>
                                             <span className="text-muted-foreground">-</span>
@@ -2205,7 +2224,9 @@ export default function MatchesPage() {
                             </button>
                             {match.result && match.result !== "Pending" && (
                                 <Badge variant="outline" className={`mt-1 text-[10px] uppercase px-2 py-0 ${getResultColor(match.result)}`}>
-                                    {match.result}
+                                    {parsedScore?.homePens !== undefined && parsedScore?.awayPens !== undefined && (match.result === "Win" || match.result === "Loss")
+                                        ? `${match.result} (Pens)`
+                                        : match.result}
                                 </Badge>
                             )}
                             {match.location && (
@@ -2390,21 +2411,16 @@ export default function MatchesPage() {
     // Mobile Season Summary Stats (computed from filtered pastMatches)
     const mobileSeasonStats = pastMatches.reduce(
         (acc, m) => {
-            if (!m.scoreline || !m.scoreline.includes("-")) return acc;
-            const parts = m.scoreline.split("-");
-            const homeScore = parseInt(parts[0]?.trim() || "", 10);
-            const awayScore = parseInt(parts[1]?.trim() || "", 10);
-            if (isNaN(homeScore) || isNaN(awayScore)) return acc;
+            const parsed = parseMatchScoreline(m.scoreline, Boolean(m.isHome));
+            if (!parsed) return acc;
 
-            const ourScore = m.isHome ? homeScore : awayScore;
-            const theirScore = m.isHome ? awayScore : homeScore;
-
+            const outcome = computeMatchOutcome(m.scoreline, Boolean(m.isHome));
             acc.played += 1;
-            acc.gf += ourScore;
-            acc.ga += theirScore;
-            if (ourScore > theirScore) acc.wins += 1;
-            else if (ourScore === theirScore) acc.draws += 1;
-            else acc.losses += 1;
+            acc.gf += parsed.clubGoals;
+            acc.ga += parsed.opponentGoals;
+            if (outcome === "Win") acc.wins += 1;
+            else if (outcome === "Draw") acc.draws += 1;
+            else if (outcome === "Loss") acc.losses += 1;
             return acc;
         },
         { played: 0, wins: 0, draws: 0, losses: 0, gf: 0, ga: 0 }
@@ -2890,37 +2906,97 @@ export default function MatchesPage() {
                             </TabsContent>
 
                             <TabsContent value="result" className="space-y-3 mt-0 py-1">
-                                <div className="space-y-1">
-                                    <Label className="text-xs font-bold text-muted-foreground">Scoreline</Label>
-                                    <div className="flex items-center gap-3">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-xs font-bold text-muted-foreground w-10 text-right">Home</span>
-                                            <Input
-                                                className="w-14 h-8 text-center font-bold text-sm"
-                                                placeholder="0"
-                                                value={(formData.scoreline || "").split('-')[0]?.trim() || ""}
-                                                onChange={e => {
-                                                    const home = e.target.value;
-                                                    const away = (formData.scoreline || "").split('-')[1]?.trim() || "";
-                                                    setFormData({ ...formData, scoreline: `${home}-${away}` });
-                                                }}
-                                            />
-                                        </div>
-                                        <span className="text-slate-300 font-bold">-</span>
-                                        <div className="flex items-center gap-2">
-                                            <Input
-                                                className="w-14 h-8 text-center font-bold text-sm"
-                                                placeholder="0"
-                                                value={(formData.scoreline || "").split('-')[1]?.trim() || ""}
-                                                onChange={e => {
-                                                    const home = (formData.scoreline || "").split('-')[0]?.trim() || "";
-                                                    const away = e.target.value;
-                                                    setFormData({ ...formData, scoreline: `${home}-${away}` });
-                                                }}
-                                            />
-                                            <span className="text-xs font-bold text-muted-foreground w-10">Away</span>
+                                <div className="space-y-2.5">
+                                    <div className="space-y-1">
+                                        <Label className="text-xs font-bold text-muted-foreground">Scoreline</Label>
+                                        <div className="flex items-center gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-xs font-bold text-muted-foreground w-10 text-right">Home</span>
+                                                <Input
+                                                    className="w-14 h-8 text-center font-bold text-sm"
+                                                    placeholder="0"
+                                                    value={(formData.scoreline || "").split('-')[0]?.trim() || ""}
+                                                    onChange={e => {
+                                                        const home = e.target.value.replace(/[^0-9]/g, "");
+                                                        const away = (formData.scoreline || "").split('-')[1]?.replace(/[^0-9]/g, "") || "";
+                                                        setFormData({ ...formData, scoreline: (home || away) ? `${home}-${away}` : "" });
+                                                    }}
+                                                />
+                                            </div>
+                                            <span className="text-slate-300 font-bold">-</span>
+                                            <div className="flex items-center gap-2">
+                                                <Input
+                                                    className="w-14 h-8 text-center font-bold text-sm"
+                                                    placeholder="0"
+                                                    value={(formData.scoreline || "").split('-')[1]?.replace(/[^0-9]/g, "") || ""}
+                                                    onChange={e => {
+                                                        const home = (formData.scoreline || "").split('-')[0]?.replace(/[^0-9]/g, "") || "";
+                                                        const away = e.target.value.replace(/[^0-9]/g, "");
+                                                        setFormData({ ...formData, scoreline: (home || away) ? `${home}-${away}` : "" });
+                                                    }}
+                                                />
+                                                <span className="text-xs font-bold text-muted-foreground w-10">Away</span>
+                                            </div>
                                         </div>
                                     </div>
+
+                                    {(() => {
+                                        const hStr = (formData.scoreline || "").split('-')[0]?.trim() || "";
+                                        const aStr = (formData.scoreline || "").split('-')[1]?.replace(/[^0-9]/g, "") || "";
+                                        const isTied = hStr !== "" && aStr !== "" && parseInt(hStr, 10) === parseInt(aStr, 10);
+                                        if (!isTied && !isCupCompetition(formData.competition) && !formData.homePens && !formData.awayPens) return null;
+                                        if (!isTied) return null;
+                                        const penPreview = (formData.homePens !== "" && formData.awayPens !== "")
+                                            ? computeMatchOutcome(buildMatchScoreline(hStr, aStr, formData.homePens, formData.awayPens), Boolean(formData.isHome))
+                                            : null;
+                                        return (
+                                            <div className="space-y-1.5 pt-2 border-t border-border/60">
+                                                <div className="flex items-center justify-between gap-2">
+                                                    <Label className="text-xs font-bold text-amber-700 dark:text-amber-400">Penalty Shootout (Optional)</Label>
+                                                    {penPreview === "Win" && (
+                                                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30">
+                                                            Win on Penalties
+                                                        </span>
+                                                    )}
+                                                    {penPreview === "Loss" && (
+                                                        <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-700 dark:text-rose-400 border border-rose-500/30">
+                                                            Loss on Penalties
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-xs font-bold text-muted-foreground w-10 text-right">Home</span>
+                                                        <Input
+                                                            className="w-14 h-8 text-center font-bold text-sm border-amber-500/40"
+                                                            placeholder="P"
+                                                            value={formData.homePens || ""}
+                                                            onChange={e => setFormData({ ...formData, homePens: e.target.value.replace(/[^0-9]/g, "") })}
+                                                        />
+                                                    </div>
+                                                    <span className="text-slate-300 font-bold">-</span>
+                                                    <div className="flex items-center gap-2">
+                                                        <Input
+                                                            className="w-14 h-8 text-center font-bold text-sm border-amber-500/40"
+                                                            placeholder="P"
+                                                            value={formData.awayPens || ""}
+                                                            onChange={e => setFormData({ ...formData, awayPens: e.target.value.replace(/[^0-9]/g, "") })}
+                                                        />
+                                                        <span className="text-xs font-bold text-muted-foreground w-10">Away</span>
+                                                    </div>
+                                                    {(formData.homePens || formData.awayPens) && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setFormData({ ...formData, homePens: "", awayPens: "" })}
+                                                            className="text-[11px] text-muted-foreground hover:text-foreground underline font-semibold"
+                                                        >
+                                                            Clear
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
                                 </div>
 
                                 <div className="grid grid-cols-2 gap-3">
@@ -2994,7 +3070,7 @@ export default function MatchesPage() {
                             <Button
                                 type="button"
                                 variant="outline"
-                                onClick={() => setFormData({ ...formData, scoreline: "", goalscorers: "", assists: "", yellow_cards: "", red_cards: "", notes: "" })}
+                                onClick={() => setFormData({ ...formData, scoreline: "", homePens: "", awayPens: "", goalscorers: "", assists: "", yellow_cards: "", red_cards: "", notes: "" })}
                                 className="h-9 text-xs text-muted-foreground bg-amber-50 hover:bg-amber-100 border border-amber-200 mr-auto"
                             >
                                 Reset to Upcoming
