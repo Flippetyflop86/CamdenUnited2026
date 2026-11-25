@@ -1463,17 +1463,23 @@ export default function SquadPage() {
         const matchesSinglePos = (posRaw: string) => {
             const p = (posRaw || "").trim().toUpperCase();
             if (!p) return false;
+            const isWingBackOrDef =
+                ['CB', 'LCB', 'RCB', 'RB', 'LB', 'DEF', 'RWB', 'LWB'].includes(p) ||
+                p.includes('DEF') ||
+                p.includes('BACK');
             if (positionFilter === "GK") {
                 return p === 'GK' || p.includes('GK') || p.includes('KEEPER') || p.includes('GOAL');
             }
             if (positionFilter === "DEF") {
-                return ['CB', 'RB', 'LB', 'DEF', 'RWB', 'LWB'].includes(p) || p.includes('DEF') || p.includes('BACK');
+                return isWingBackOrDef;
             }
             if (positionFilter === "MID") {
-                return ['CM', 'CDM', 'CAM', 'MID', 'RM', 'LM'].includes(p) || p.includes('MID') || p.includes('CENT') || p.includes('RM') || p.includes('LM');
+                if (isWingBackOrDef) return false;
+                return ['CM', 'CDM', 'CAM', 'MID', 'RM', 'LM'].includes(p) || p.includes('MID') || p.includes('CENT') || /\b(RM|LM)\b/.test(p);
             }
             if (positionFilter === "FWD") {
-                return ['ST', 'CF', 'RW', 'LW', 'FWD', 'ATT'].includes(p) || p.includes('STRIKER') || p.includes('WING') || p.includes('FWD') || p.includes('FORWARD') || p.includes('ST') || p.includes('CF') || p.includes('RW') || p.includes('LW');
+                if (isWingBackOrDef) return false;
+                return ['ST', 'CF', 'RW', 'LW', 'FWD', 'ATT', 'SS'].includes(p) || p.includes('STRIKER') || p.includes('WINGER') || p.includes('FWD') || p.includes('FORWARD') || /\b(ST|CF|RW|LW)\b/.test(p);
             }
             return false;
         };
