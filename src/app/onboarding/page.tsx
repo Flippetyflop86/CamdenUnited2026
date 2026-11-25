@@ -7,6 +7,7 @@ import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { supabase } from "@/lib/supabase";
 import { ALL_PAGE_PERMISSIONS } from "@/lib/permissions";
+import { SUBS_PAYMENTS_COMING_SOON, canAccessSubsPayments } from "@/lib/feature-flags";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -519,6 +520,7 @@ function OnboardingContent() {
 
     const { settings, updateSettings } = useClub();
     const { user, clubId } = useAuth();
+    const hasPrivatePaymentsAccess = canAccessSubsPayments(user?.email);
 
     const [wizardMode, setWizardMode] = useState<WizardMode>("full");
     const [stage, setStage] = useState<StageId>(isRerun ? 1 : 0);
@@ -1673,7 +1675,7 @@ function OnboardingContent() {
                     }
                 } catch {}
 
-                if (subsEnabledVal && bankHandler === "treasurer" && treasurerInviteEmail.trim()) {
+                if (hasPrivatePaymentsAccess && subsEnabledVal && bankHandler === "treasurer" && treasurerInviteEmail.trim()) {
                     try {
                         const {
                             data: { session },
@@ -2680,6 +2682,24 @@ function OnboardingContent() {
                                     </div>
 
                                     {/* Subs & Payments Setup */}
+                                    {SUBS_PAYMENTS_COMING_SOON && !hasPrivatePaymentsAccess ? (
+                                        <div className="space-y-2 pt-3 border-t border-slate-200">
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <label className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                                                    <PoundSterling className="w-3.5 h-3.5 text-emerald-600" /> Subs &amp; Club Payments
+                                                </label>
+                                                <Badge
+                                                    variant="outline"
+                                                    className="bg-amber-50 text-amber-700 border-amber-200 text-[10px] font-bold uppercase tracking-wider"
+                                                >
+                                                    Coming Soon
+                                                </Badge>
+                                            </div>
+                                            <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-600 leading-relaxed">
+                                                1-tap Apple Pay, Google Pay, and Card collection for match subs, monthly fees, and fines is launching soon — you can finish setting up your club now and enable payments once live.
+                                            </div>
+                                        </div>
+                                    ) : (
                                     <div className="space-y-4 pt-3 border-t border-slate-200">
                                         <div className="flex flex-wrap items-center justify-between gap-2">
                                             <label className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
@@ -2907,6 +2927,7 @@ function OnboardingContent() {
                                             </div>
                                         )}
                                     </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         )}
@@ -3510,7 +3531,7 @@ function OnboardingContent() {
                                             </div>
                                         </div>
 
-                                        {financeModel !== "skip" && bankHandler === "self" && (
+                                        {hasPrivatePaymentsAccess && financeModel !== "skip" && bankHandler === "self" && (
                                             <div className="p-3.5 rounded-xl bg-white border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                                                 <div>
                                                     <div className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
@@ -3535,7 +3556,8 @@ function OnboardingContent() {
                                             </div>
                                         )}
 
-                                        {financeModel !== "skip" &&
+                                        {hasPrivatePaymentsAccess &&
+                                            financeModel !== "skip" &&
                                             bankHandler === "treasurer" &&
                                             treasurerInviteEmail.trim() && (
                                                 <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center gap-2.5 text-xs text-emerald-800">

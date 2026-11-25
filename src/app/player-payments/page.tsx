@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useEffect, useState, useMemo, useRef } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/auth-context";
+import { SUBS_PAYMENTS_COMING_SOON, canAccessSubsPayments } from "@/lib/feature-flags";
 import { useClub } from "@/context/club-context";
 import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
 import { extractLineupFromRawNotes, parseStatTextString } from "@/lib/match-stats-sync";
@@ -54,6 +56,9 @@ import {
     Users,
     UserPlus,
     Loader2,
+    Lock,
+    Eye,
+    ArrowLeft,
     X,
 } from "lucide-react";
 
@@ -135,8 +140,10 @@ function getDefaultDueDateStr(daysAhead = 5): string {
 }
 
 export default function PlayerPaymentsPage() {
-    const { clubId, isManager } = useAuth();
+    const { user, clubId, isManager, isLoading: authLoading } = useAuth();
     const { settings } = useClub();
+    const hasPrivatePaymentsAccess = canAccessSubsPayments(user?.email);
+    const [previewComingSoonView, setPreviewComingSoonView] = useState(false);
     const [loading, setLoading] = useState(true);
     const [connectAccount, setConnectAccount] = useState<string | null>(null);
     const [onboardingComplete, setOnboardingComplete] = useState(false);
@@ -352,6 +359,11 @@ export default function PlayerPaymentsPage() {
     };
 
     useEffect(() => {
+        if (authLoading) return;
+        if (!hasPrivatePaymentsAccess) {
+            setLoading(false);
+            return;
+        }
         if (!clubId) {
             setLoading(false);
             return;
@@ -368,7 +380,7 @@ export default function PlayerPaymentsPage() {
             setIsEditingAccountModal(true);
         }
         loadData(connectParam === "success" || connectParam === "refresh");
-    }, [clubId]);
+    }, [clubId, authLoading, hasPrivatePaymentsAccess]);
 
     const loadData = async (forceVerifyConnect = false) => {
         setLoading(true);
@@ -1456,12 +1468,129 @@ export default function PlayerPaymentsPage() {
         return Boolean(pl?.email?.trim());
     }).length;
 
+    if (authLoading) {
+        return <div className="p-8 text-center text-muted-foreground">Loading Subs &amp; Payments...</div>;
+    }
+
+    if (!hasPrivatePaymentsAccess || previewComingSoonView) {
+        return (
+            <div className="max-w-3xl mx-auto py-8 sm:py-12 px-2 sm:px-4 space-y-6">
+                {hasPrivatePaymentsAccess && previewComingSoonView && (
+                    <div className="rounded-xl bg-amber-500/10 border border-amber-500/35 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-300">
+                            <Eye className="h-4 w-4 shrink-0" />
+                            <span>You are previewing what other users see for Subs &amp; Payments.</span>
+                        </div>
+                        <Button
+                            size="sm"
+                            onClick={() => setPreviewComingSoonView(false)}
+                            className="h-8 text-xs font-bold bg-brand text-brand-foreground hover:bg-brand/90"
+                        >
+                            Return to Private Workspace
+                        </Button>
+                    </div>
+                )}
+
+                <Card className="bg-surface-1 border-border shadow-sm overflow-hidden">
+                    <div className="h-1.5 bg-gradient-to-r from-brand via-amber-500 to-emerald-500" />
+                    <CardContent className="p-6 sm:p-10 text-center space-y-6">
+                        <div className="mx-auto h-14 w-14 rounded-2xl bg-brand/10 border border-brand/25 flex items-center justify-center text-brand">
+                            <CreditCard className="h-7 w-7" />
+                        </div>
+
+                        <div className="space-y-2 max-w-lg mx-auto">
+                            <Badge
+                                variant="outline"
+                                className="bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 text-[11px] font-extrabold uppercase tracking-wider px-3 py-0.5"
+                            >
+                                Coming Soon
+                            </Badge>
+                            <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                                Subs &amp; Payments
+                            </h1>
+                            <p className="text-sm text-muted-foreground leading-relaxed">
+                                We&apos;re putting the finishing touches on ClubFlow Subs &amp; Payments so clubs can collect match fees, monthly subs, and fines effortlessly in one place.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-left pt-2">
+                            <div className="rounded-xl bg-surface-2/80 border border-border p-4 space-y-1.5">
+                                <div className="h-8 w-8 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                                    <Smartphone className="h-4 w-4" />
+                                </div>
+                                <h3 className="text-xs font-extrabold text-foreground">1-Tap Player Pay</h3>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                    Instant Apple Pay, Google Pay, and Card links sent straight via WhatsApp or email.
+                                </p>
+                            </div>
+                            <div className="rounded-xl bg-surface-2/80 border border-border p-4 space-y-1.5">
+                                <div className="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+                                    <Receipt className="h-4 w-4" />
+                                </div>
+                                <h3 className="text-xs font-extrabold text-foreground">Subs &amp; Club Fines</h3>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                    Matchday fees, monthly subs, yellow/red card fines, and automatic overdue reminders.
+                                </p>
+                            </div>
+                            <div className="rounded-xl bg-surface-2/80 border border-border p-4 space-y-1.5">
+                                <div className="h-8 w-8 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+                                    <Landmark className="h-4 w-4" />
+                                </div>
+                                <h3 className="text-xs font-extrabold text-foreground">Direct Club Payouts</h3>
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">
+                                    Automatic treasurer ledger tracking with payouts straight into your club bank account.
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="pt-2 flex flex-wrap items-center justify-center gap-3">
+                            <Button asChild variant="outline" className="gap-1.5 font-bold text-xs">
+                                <Link href="/dashboard">
+                                    <ArrowLeft className="h-3.5 w-3.5" />
+                                    Back to Dashboard
+                                </Link>
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     if (loading) {
         return <div className="p-8 text-center text-muted-foreground">Loading Subs &amp; Payments...</div>;
     }
 
     return (
         <div className="space-y-6 max-w-6xl mx-auto">
+            {/* Private Development Preview Banner (visible only to allowlisted owner emails while Coming Soon is active) */}
+            {SUBS_PAYMENTS_COMING_SOON && hasPrivatePaymentsAccess && (
+                <div className="rounded-xl bg-amber-500/10 border border-amber-500/35 px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="h-7 w-7 rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-300 flex items-center justify-center shrink-0">
+                            <Lock className="h-3.5 w-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                            <div className="text-xs font-extrabold text-amber-900 dark:text-amber-200">
+                                Private Mode — Only visible to you
+                            </div>
+                            <p className="text-[11px] text-amber-800/80 dark:text-amber-300/80">
+                                All other users currently see a &ldquo;Coming Soon&rdquo; screen for Subs &amp; Payments while you work on it.
+                            </p>
+                        </div>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setPreviewComingSoonView(true)}
+                        className="h-8 text-xs font-bold border-amber-500/40 bg-surface-1 hover:bg-amber-500/10 text-amber-800 dark:text-amber-300 gap-1.5 shrink-0"
+                    >
+                        <Eye className="h-3.5 w-3.5" />
+                        Preview &ldquo;Coming Soon&rdquo;
+                    </Button>
+                </div>
+            )}
             {/* Stripe Connect Return Banner */}
             {connectBanner === "success" && (
                 <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/40 p-4 flex items-center justify-between gap-3">

@@ -44,6 +44,7 @@ import {
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
 import { canAccess } from "@/lib/permissions";
+import { SUBS_PAYMENTS_COMING_SOON, canAccessSubsPayments } from "@/lib/feature-flags";
 import { Button } from "@/components/ui/button";
 
 
@@ -136,6 +137,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
     const router = useRouter();
     const { settings } = useClub();
     const { user, role, pagePermissions, displayName, signOut, isManager } = useAuth();
+    const hasPrivatePaymentsAccess = canAccessSubsPayments(user?.email);
     const [copiedEmail, setCopiedEmail] = useState(false);
     const [theme, setTheme] = useState<"light" | "dark">("dark");
 
@@ -303,6 +305,18 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
                                         >
                                             {item.icon && <item.icon className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110 group-hover:translate-x-0.5" aria-hidden="true" />}
                                             <span className={cn("truncate flex-1", (isActiveTop || hasActiveChild) && isGroup && "font-medium text-brand")}>{item.label}</span>
+                                            {SUBS_PAYMENTS_COMING_SOON && item.href === "/player-payments" && (
+                                                hasPrivatePaymentsAccess ? (
+                                                    <span className="inline-flex items-center gap-1 rounded bg-emerald-500/15 border border-emerald-500/30 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-emerald-400 shrink-0">
+                                                        <Lock className="h-2.5 w-2.5" />
+                                                        Private
+                                                    </span>
+                                                ) : (
+                                                    <span className="rounded bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-amber-400 shrink-0">
+                                                        Soon
+                                                    </span>
+                                                )
+                                            )}
                                             {locked && <Lock className="h-3.5 w-3.5 text-slate-500 shrink-0" />}
                                         </Link>
                                         

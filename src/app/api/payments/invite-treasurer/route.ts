@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase";
 import { sendEmail } from "@/lib/email-service";
+import { canAccessSubsPayments } from "@/lib/feature-flags";
 import crypto from "crypto";
 
 export async function POST(request: Request) {
@@ -18,6 +19,13 @@ export async function POST(request: Request) {
         } = await supabase.auth.getUser(token);
         if (authErr || !user) {
             return NextResponse.json({ error: "Invalid session" }, { status: 401 });
+        }
+
+        if (!canAccessSubsPayments(user.email)) {
+            return NextResponse.json(
+                { error: "Subs & Payments is coming soon and currently in private preview." },
+                { status: 403 }
+            );
         }
 
         const body = await request.json();

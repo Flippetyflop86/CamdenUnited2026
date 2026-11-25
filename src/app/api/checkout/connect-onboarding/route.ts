@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getServerSupabase } from '@/lib/supabase';
+import { canAccessSubsPayments } from '@/lib/feature-flags';
 import Stripe from 'stripe';
 
 let stripeInstance: Stripe | null = null;
@@ -21,6 +22,13 @@ export async function POST(request: Request) {
         const { data: { user }, error: authError } = await supabase.auth.getUser(token);
         if (authError || !user) {
             return NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 });
+        }
+
+        if (!canAccessSubsPayments(user.email)) {
+            return NextResponse.json(
+                { error: 'Subs & Payments is coming soon and currently in private preview.' },
+                { status: 403 }
+            );
         }
 
         const body = await request.json().catch(() => ({}));

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSupabase } from "@/lib/supabase";
 import { sendEmail, isEmailConfigured } from "@/lib/email-service";
+import { canAccessSubsPayments } from "@/lib/feature-flags";
 import {
     buildPaymentNotificationEmail,
     calculateClubFlowFee,
@@ -28,6 +29,13 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 { error: "Unauthorized: Invalid session token" },
                 { status: 401 }
+            );
+        }
+
+        if (!canAccessSubsPayments(user.email)) {
+            return NextResponse.json(
+                { error: "Subs & Payments is coming soon and currently in private preview." },
+                { status: 403 }
             );
         }
 

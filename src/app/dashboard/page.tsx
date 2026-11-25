@@ -34,6 +34,7 @@ import {
 } from "lucide-react";
 import { useClub } from "@/context/club-context";
 import { useAuth } from "@/context/auth-context";
+import { canAccessSubsPayments } from "@/lib/feature-flags";
 import { supabase, fetchScopedMatchPlayerStats } from "@/lib/supabase";
 import { formatPlayerName, isFormerPlayer } from "@/lib/utils";
 import {
@@ -63,7 +64,8 @@ type StandingsRow = {
 export default function DashboardPage() {
     const router = useRouter();
     const { settings, updateSettings } = useClub();
-    const { clubId } = useAuth();
+    const { clubId, user } = useAuth();
+    const hasPrivatePaymentsAccess = canAccessSubsPayments(user?.email);
 
     const [matches, setMatches] = useState<(Match & { rawNotes?: string; motm?: string })[]>([]);
     const [players, setPlayers] = useState<Player[]>([]);
@@ -270,15 +272,26 @@ export default function DashboardPage() {
     }, [nextMatch]);
 
     const fetchData = async () => {
-        await Promise.allSettled([
+        const tasks: Promise<any>[] = [
             fetchMatches(),
             fetchSquad(),
             fetchMatchPlayerStats(),
             fetchTrainingSessions(),
-            fetchPaymentRequests(),
-        ]);
+        ];
+        if (hasPrivatePaymentsAccess) {
+            tasks.push(fetchPaymentRequests());
+        }
+        await Promise.allSettled(tasks);
         setIsInitialLoaded(true);
     };
+
+    useEffect(() => {
+        if (hasPrivatePaymentsAccess) {
+            fetchPaymentRequests();
+        } else {
+            setPaymentRequests([]);
+        }
+    }, [clubId, hasPrivatePaymentsAccess]);
 
     const fetchMatchPlayerStats = async () => {
         const data = await fetchScopedMatchPlayerStats();
@@ -784,12 +797,12 @@ export default function DashboardPage() {
             });
         }
 
-        if (totalOutstandingAmount > 0) {
+        if (hasPrivatePaymentsAccess && totalOutstandingAmount > 0) {
             items.push({
                 id: "unpaid_subs",
                 label: `£${totalOutstandingAmount} in unpaid player subs`,
                 sub: `${outstandingInvoices.length} open payment request${outstandingInvoices.length === 1 ? "" : "s"}`,
-                href: "/payments",
+                href: "/player-payments",
                 tone: "amber"
             });
         }
@@ -805,7 +818,7 @@ export default function DashboardPage() {
         }
 
         return items.filter(item => !dismissedPriorities.includes(item.id));
-    }, [overduePendingMatches, nextMatch, unavailablePlayers.length, injuredPlayers.length, suspendedPlayers.length, holidayPlayers.length, totalOutstandingAmount, outstandingInvoices.length, isInitialLoaded, isLeagueConnected, dismissedPriorities]);
+    }, [overduePendingMatches, nextMatch, unavailablePlayers.length, injuredPlayers.length, suspendedPlayers.length, holidayPlayers.length, hasPrivatePaymentsAccess, totalOutstandingAmount, outstandingInvoices.length, isInitialLoaded, isLeagueConnected, dismissedPriorities]);
 
     // 1-Tap WhatsApp Copy Helpers (Addition #6)
     const copyMatchForWhatsApp = async () => {

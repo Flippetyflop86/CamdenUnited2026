@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { supabase, unproxiedSupabase } from "@/lib/supabase";
+import { canAccessSubsPayments } from "@/lib/feature-flags";
 import { calculateClubFlowFee, parsePaymentDescription } from "@/lib/clubflow-pay";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,7 @@ export default function PlayerDashboard() {
     const [upcomingMatches, setUpcomingMatches] = useState<any[]>([]);
     const [upcomingTraining, setUpcomingTraining] = useState<any[]>([]);
     const [unansweredPayments, setUnansweredPayments] = useState<any[]>([]);
+    const [hasPrivatePaymentsAccess, setHasPrivatePaymentsAccess] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -27,6 +29,9 @@ export default function PlayerDashboard() {
                     router.push("/login");
                     return;
                 }
+
+                const allowPayments = canAccessSubsPayments(session.user.email);
+                setHasPrivatePaymentsAccess(allowPayments);
 
                 const { data: player, error: playerErr } = await unproxiedSupabase
                     .from("players")
@@ -40,15 +45,17 @@ export default function PlayerDashboard() {
                     setPlayerId(player.id);
                     setPlayerName(player.first_name);
 
-                    const { data: openPayments } = await unproxiedSupabase
-                        .from("player_payment_requests")
-                        .select("*")
-                        .eq("player_id", player.id)
-                        .eq("status", "Unpaid")
-                        .order("created_at", { ascending: false });
+                    if (allowPayments) {
+                        const { data: openPayments } = await unproxiedSupabase
+                            .from("player_payment_requests")
+                            .select("*")
+                            .eq("player_id", player.id)
+                            .eq("status", "Unpaid")
+                            .order("created_at", { ascending: false });
 
-                    if (openPayments) {
-                        setUnansweredPayments(openPayments);
+                        if (openPayments) {
+                            setUnansweredPayments(openPayments);
+                        }
                     }
                 }
 
@@ -131,7 +138,9 @@ export default function PlayerDashboard() {
             <div>
                 <h1 className="text-2xl font-black tracking-tight text-white">Welcome, {playerName}!</h1>
                 <p className="text-xs text-slate-400">
-                    Your unanswered payments, upcoming fixtures, training sessions, and RSVPs.
+                    {hasPrivatePaymentsAccess
+                        ? "Your unanswered payments, upcoming fixtures, training sessions, and RSVPs."
+                        : "Your upcoming fixtures, training sessions, and RSVPs."}
                 </p>
             </div>
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { supabase, unproxiedSupabase } from "@/lib/supabase";
+import { canAccessSubsPayments } from "@/lib/feature-flags";
 import { Calendar, User, ShieldCheck, LogOut, CheckSquare, RefreshCw, CreditCard } from "lucide-react";
 import Link from "next/link";
 
@@ -33,7 +34,7 @@ export default function PlayerLayout({ children }: { children: React.ReactNode }
                     setPlayerName(session.user.user_metadata?.first_name || "Player");
                 } else {
                     setPlayerName(`${player.first_name} ${player.last_name}`);
-                    if (player.club_id) {
+                    if (player.club_id && canAccessSubsPayments(session.user.email)) {
                         setPaymentsHref(`/pay/club/${player.club_id}?player=${player.id}`);
                     }
                 }
